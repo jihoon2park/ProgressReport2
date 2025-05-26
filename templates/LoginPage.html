@@ -47,6 +47,21 @@
             text-align: center;
             margin-bottom: 15px;
         }
+        .site-select {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+        .site-select select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .site-select label {
+            margin-bottom: 5px;
+        }
+
     </style>
 </head>
 <body>
@@ -56,17 +71,21 @@
             <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company Logo">
         </div>
 
-        <!-- 에러 메시지 표시 -->
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="error-message">{{ message }}</div>
+        <!-- 사이트 선택  -->
+        <div class="site-select">
+            <label for="site">Select Site: Login page </label>
+            <select id="site" name="site" required>
+                <option value="">-- Select Site --</option>
+                {% for site in sites %}
+                <option value="{{ site }}">{{ site }}</option>
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
+            </select>
+        </div>
 
         <!-- 로그인 폼 -->
         <form class="login-form" action="{{ url_for('login') }}" method="POST">
+            <label for="form-group">Select Site: hahah </label>
+
             <div class="form-group">
                 <input type="text" name="username" placeholder="Username" required>
             </div>

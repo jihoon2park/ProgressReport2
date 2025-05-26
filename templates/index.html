@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Progress Note</title>
     <!-- CSS 파일 로드 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <div class="site-info-box">
+        <div class="selected-site">
+        Selected Site: <span class="site-name">{{ selected_site }}</span>
+    </div>
+</div>
 </head>
 <body>
     <div class="app-container">
@@ -20,10 +29,13 @@
                 <div class="sidebar-section client-selection">
                     <div class="form-group">
                         <label for="client">Client:</label>
-                        <select id="client">
+                        <select id="client" class="form-control">
                             <option value="">(none)</option>
-                            <option value="client1">Client Alpha (ID: C001)</option>
-                            <option value="client2">Client Beta (ID: C002)</option>
+                            {% if clients %}
+                                {% for client in clients %}
+                                    <option value="{{ client.id }}">{{ client.name }} (ID: {{ client.id }})</option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
                     </div>
                     <div class="form-group">
@@ -56,13 +68,14 @@
                 </div>
                 <div id="details" class="tab-content active">
                     <div class="form-row">
-                        <div class="form-group">
+                        <div class="form-group create-date-group">
+                            <label for="createDate">Create date</label>
                             <input type="text" id="createDate" value="10 May 2019">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group create-time-group">
                             <input type="time" id="createTime" value="15:12">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group current-time-group">
                             <button id="currentTimeBtn">Current Time</button>
                         </div>
                         <div class="form-group checkbox-group">
@@ -72,7 +85,7 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group event-type-group">
-                            <label for="eventType">Event type</label>
+                            <label for="eventType">Event type </label>
                             <select id="eventType">
                                 <option value="">(none)</option>
                             </select>
@@ -81,7 +94,7 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group full-width">
-                            <label for="careArea">Care Area</label>
+                            <label for="careArea">Care Area </label>
                             <select id="careArea" class="full-width-select">
                                 <option value="">(none)</option>
                             </select>

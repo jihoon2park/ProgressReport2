@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Current Time 버튼 이벤트 리스너 추가
-    document.getElementById('currentTimeBtn').addEventListener('click', function() {
+    const createDateInput = document.getElementById('createDate');
+    const createTimeInput = document.getElementById('createTime');
+    const currentTimeBtn = document.getElementById('currentTimeBtn');
+
+    function setCurrentDateTime() {
         const now = new Date();
         
         // 날짜 포맷팅 (예: "10 May 2023" 형식)
@@ -12,10 +15,54 @@ document.addEventListener('DOMContentLoaded', function() {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const formattedTime = `${hours}:${minutes}`;
         
-        // input 필드에 현재 날짜와 시간 설정
-        document.getElementById('createDate').value = formattedDate;
-        document.getElementById('createTime').value = formattedTime;
-    });
+        // flatpickr가 초기화되었는지 확인 후 업데이트
+        if (createDateInput._flatpickr) {
+            createDateInput._flatpickr.setDate(now);
+        } else {
+            createDateInput.value = formattedDate;
+        }
+
+        if (createTimeInput._flatpickr) {
+            createTimeInput._flatpickr.setDate(now);
+        } else {
+            createTimeInput.value = formattedTime;
+        }
+    }
+
+    function initializeDateTimeFields() {
+        // flatpickr가 로드되었는지 확인
+        if (typeof flatpickr === 'undefined') {
+            console.error('Flatpickr is not loaded. Please include the flatpickr library.');
+            return;
+        }
+
+        // 달력 선택기 초기화
+        flatpickr(createDateInput, {
+            defaultDate: new Date(),
+            dateFormat: "d M Y",
+            allowInput: true,
+            monthSelectorType: "static"
+        });
+        
+        // 시간 선택기 초기화
+        flatpickr(createTimeInput, {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: "H:i",
+            defaultDate: new Date(),
+            time_24hr: true,
+            allowInput: true
+        });
+
+        // 초기값 설정
+        setCurrentDateTime();
+    }
+
+    // Current Time 버튼 이벤트 리스너 추가
+    currentTimeBtn.addEventListener('click', setCurrentDateTime);
+
+    // 페이지 로드시 초기화
+    initializeDateTimeFields();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -125,8 +172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     clientDetailItems.forEach(item => {
         item.addEventListener('click', () => {
             clientDetailItems.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-            console.log(`Mapsd to: ${item.textContent}`);
+            item.classLisclientDetailItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    clientDetailItems.forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                });
+            });
+            console.log(`Mapped to: ${item.textContent}`);
             // Add logic to display content for each section
         });
     });

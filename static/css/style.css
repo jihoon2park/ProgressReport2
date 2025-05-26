@@ -6,6 +6,23 @@ body {
     color: #333;
 }
 
+.site-info-box {
+    background-color: #f8f9fa;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.selected-site {
+    font-size: 1.2em;
+    color: #495057;
+}
+.site-name {
+    font-weight: bold;
+    color: #007bff;
+}
+
 .app-container {
     width: 95%;
     max-width: 1200px;
@@ -105,7 +122,6 @@ body {
     border: 1px solid #f0ad4e;
     font-weight: bold;
 }
-
 
 .content-area {
     flex-grow: 1;
