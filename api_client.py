@@ -46,7 +46,7 @@ def fetch_client_information(site):
         api_client = APIClient(site)  # SITE_SERVERS 인자 제거
         client_info = api_client.get_client_information()
         logger.info(f"클라이언트 정보 가져오기 성공 - 사이트: {site}")
-        return True, client_info
+        return True, None #client_info
     except requests.RequestException as e:
         logger.error(f"클라이언트 정보 가져오기 실패 - 사이트: {site}, 에러: {str(e)}")
         return False, None

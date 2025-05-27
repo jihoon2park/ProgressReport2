@@ -38,6 +38,32 @@ def require_authentication(wrapped_function):
 def _is_authenticated():
     return AUTH_SESSION_KEY in session
 
+def process_client_information(client_info):
+    """
+    클라이언트 정보를 가공하여 필요한 정보만 추출하는 함수
+    """
+    processed_clients = []
+
+    for client in client_info:
+        processed_client = {
+            'PersonId': client.get('PersonId'),
+            'ClientName': f"{client.get('Title', '')} {client.get('FirstName', '')} {client.get('LastName', '')}".strip(),
+            'BirthDate': client.get('BirthDate'),
+            'WingName': client.get('WingName'),
+            'RoomName': client.get('RoomName')
+        }
+        processed_clients.append(processed_client)
+
+    # 가공된 데이터를 JSON 파일로 저장
+    try:
+        with open('data/Client_list.json', 'w', encoding='utf-8') as f:
+            json.dump(processed_clients, f, ensure_ascii=False, indent=4)
+        logger.info("Client_list.json 파일 생성 완료")
+    except Exception as e:
+        logger.error(f"JSON 파일 저장 중 오류 발생: {str(e)}")
+
+    return None #processed_clients
+
 @app.route('/')
 def home():
     if 'logged_in' in session:
@@ -59,6 +85,10 @@ def fetch_client_information(site):
         api_client = APIClient(site)  # SITE_SERVERS 인자 제거
         client_info = api_client.get_client_information()
         logger.info(f"클라이언트 정보 가져오기 성공 - 사이트: {site}")
+
+        # 클라이언트 정보 가공
+        processed_client_info = process_client_information(client_info)
+
         return True, client_info
     except requests.RequestException as e:
         logger.error(f"클라이언트 정보 가져오기 실패 - 사이트: {site}, 에러: {str(e)}")
@@ -77,6 +107,14 @@ def get_server_ip():
         'success': False,
         'message': 'Invalid site selected'
     })
+
+@app.route('/data/Client_list.json')
+def get_client_list():
+    try:
+        with open('data/Client_list.json', 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify([]), 404
 
 def save_client_data(username, site, client_info):
     """클라이언트 데이터를 JSON 파일로 저장"""

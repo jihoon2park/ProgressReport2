@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const createDateInput = document.getElementById('createDate');
     const createTimeInput = document.getElementById('createTime');
     const currentTimeBtn = document.getElementById('currentTimeBtn');
+    const clientSelect = document.getElementById('client');
 
     function setCurrentDateTime() {
         const now = new Date();
@@ -57,6 +58,35 @@ document.addEventListener('DOMContentLoaded', function() {
         // 초기값 설정
         setCurrentDateTime();
     }
+   function loadClientList() {
+        fetch('/data/Client_list.json')
+            .then(response => response.json())
+            .then(data => {
+                // 기존의 "(none)" 옵션 유지
+                const noneOption = clientSelect.querySelector('option[value=""]');
+                clientSelect.innerHTML = '';
+                if (noneOption) {
+                    clientSelect.appendChild(noneOption);
+                }
+
+                // 클라이언트 이름으로 정렬
+                data.sort((a, b) => a.ClientName.localeCompare(b.ClientName));
+
+                data.forEach(client => {
+                    const option = document.createElement('option');
+                    option.value = client.PersonId;
+                    option.textContent = `${client.ClientName} (ID: ${client.PersonId})`;
+                    clientSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading clients:', error);
+                // 에러 발생 시 기존 클라이언트 목록 유지
+            });
+    }
+
+    // 페이지 로드 시 클라이언트 목록 로드
+    if (clientSelect) { loadClientList(); }
 
     // Current Time 버튼 이벤트 리스너 추가
     currentTimeBtn.addEventListener('click', setCurrentDateTime);
