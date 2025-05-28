@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -73,7 +73,7 @@
 
         <!-- 사이트 선택  -->
         <div class="site-select">
-            <label for="site">Select Site: Login page </label>
+            <label for="site">Select Site:</label>
             <select id="site" name="site" required>
                 <option value="">-- Select Site --</option>
                 {% for site in sites %}
@@ -84,8 +84,6 @@
 
         <!-- 로그인 폼 -->
         <form class="login-form" action="{{ url_for('login') }}" method="POST">
-            <label for="form-group">Select Site: hahah </label>
-
             <div class="form-group">
                 <input type="text" name="username" placeholder="Username" required>
             </div>

@@ -138,17 +138,30 @@
                         </div>
                         툴바 주석 처리 끝 -->
                         <textarea id="notes" rows="8"></textarea>
+                        
+                        <!-- Notes 바로 아래 액션 버튼들 -->
+                        <div class="floating-actions">
+                            <button id="floatingSaveNewBtn">Save & new</button>
+                            <button id="floatingSaveCloseBtn">Save & close</button>
+                            <button id="floatingCloseBtn">Close</button>
+                        </div>
                     </div>
                      <div class="form-row bottom-controls">
+                        <!-- Previous versions 버튼 주석 처리 시작
                         <button id="previousVersionsBtn"><img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2212%22 height=%2212%22 fill=%22%23555%22%3E%3Cpath d=%22M12.5 8H11v6l4.75 2.85.75-1.23-4-2.37zm4.5-4.94L15.53 1.53C14.22.48 12.66 0 11 0 6.76 0 3.28 3.04 3.03 7H1l3.89 3.89.07.14L9 7H6.03C6.29 4.19 8.42 2 11 2c1.31 0 2.5.53 3.38 1.38l1.48 1.48L17 3.06zM20 10.11l-3.89-3.89L12 10.11h2.97c-.26 2.81-2.39 5-4.97 5-1.31 0-2.5-.53-3.38-1.38L5.15 12.26 4 13.74l1.47 1.47C6.78 16.52 8.34 17 10 17c4.24 0 7.72-3.04 7.97-7h2.03z%22/%3E%3C/svg%3E" alt="Previous versions"> Previous versions</button>
+                        Previous versions 버튼 주석 처리 끝 -->
+                        <!-- Flag on noticeboard 체크박스 주석 처리 시작
                         <div class="checkbox-group">
                             <input type="checkbox" id="flagOnNoticeboard">
                             <label for="flagOnNoticeboard">Flag on noticeboard</label>
                         </div>
+                        Flag on noticeboard 체크박스 주석 처리 끝 -->
+                        <!-- Archived 체크박스 주석 처리 시작
                         <div class="checkbox-group">
                             <input type="checkbox" id="archived">
                             <label for="archived">Archived</label>
                         </div>
+                        Archived 체크박스 주석 처리 끝 -->
                     </div>
                 </div>
                 <div id="attachments" class="tab-content">
@@ -159,19 +172,6 @@
                 </div>
             </main>
         </div>
-        <footer class="app-footer">
-            <div class="footer-left">
-                <select id="quickActions">
-                    <option value="">Quick actions</option>
-                    <option value="action1">Action 1</option>
-                </select>
-            </div>
-            <div class="footer-right">
-                <button id="saveNewBtn">Save & new</button>
-                <button id="saveCloseBtn">Save & close</button>
-                <button id="closeBtn">Close</button>
-            </div>
-        </footer>
     </div>
     <!-- JavaScript 파일 로드 (body 끝 부분에) -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

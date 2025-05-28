@@ -22,16 +22,18 @@ function initializeDOMElements() {
     DOM.careArea = document.getElementById('careArea');
     DOM.riskRating = document.getElementById('riskRating');
     DOM.notes = document.getElementById('notes');
-    DOM.flagOnNoticeboard = document.getElementById('flagOnNoticeboard');
-    DOM.archived = document.getElementById('archived');
+    // DOM.flagOnNoticeboard = document.getElementById('flagOnNoticeboard'); // 주석 처리됨
+    // DOM.archived = document.getElementById('archived'); // 주석 처리됨
     
     // Buttons
     DOM.currentTimeBtn = document.getElementById('currentTimeBtn');
-    DOM.saveNewBtn = document.getElementById('saveNewBtn');
-    DOM.saveCloseBtn = document.getElementById('saveCloseBtn');
-    DOM.closeBtn = document.getElementById('closeBtn');
     DOM.addEventTypeBtn = document.getElementById('addEventTypeBtn');
-    DOM.previousVersionsBtn = document.getElementById('previousVersionsBtn');
+    // DOM.previousVersionsBtn = document.getElementById('previousVersionsBtn'); // 주석 처리됨
+    
+    // Floating action buttons (near notes)
+    DOM.floatingSaveNewBtn = document.getElementById('floatingSaveNewBtn');
+    DOM.floatingSaveCloseBtn = document.getElementById('floatingSaveCloseBtn');
+    DOM.floatingCloseBtn = document.getElementById('floatingCloseBtn');
     
     // Client related
     DOM.client = document.getElementById('client');
@@ -44,7 +46,7 @@ function initializeDOMElements() {
     DOM.tabContents = document.querySelectorAll('.tab-content');
     
     // Toolbar
-    DOM.toolbar = document.querySelector('.toolbar');
+    // DOM.toolbar = document.querySelector('.toolbar'); // 주석 처리됨
 }
 
 // Initialize all UI components
@@ -57,6 +59,7 @@ function initializeUI() {
     loadCareAreas();
     loadEventTypes();
     loadReferenceData();
+    initializeNotesResizeObserver();
 }
 
 // Initialize date and time pickers
@@ -397,8 +400,14 @@ function loadEventTypes() {
 
 // Initialize text editor toolbar
 function initializeToolbar() {
-    if (!DOM.toolbar || !DOM.notes) {
-        console.error('Toolbar or notes textarea not found');
+    // Toolbar가 주석 처리되어 있으므로 존재하지 않을 수 있음
+    if (!DOM.toolbar) {
+        console.log('Toolbar not found (likely commented out) - skipping toolbar initialization');
+        return;
+    }
+    
+    if (!DOM.notes) {
+        console.error('Notes textarea not found');
         return;
     }
 
@@ -424,28 +433,28 @@ function initializeToolbar() {
 
 // Initialize buttons
 function initializeButtons() {
-    // Close button
-    if (DOM.closeBtn) {
-        DOM.closeBtn.addEventListener('click', function() {
-            // Show confirmation dialog before closing
-            if (confirm('로그아웃 하시겠습니까?')) {
-                // 창 닫기 대신 로그아웃 처리
-                window.location.href = '/logout';
-            }
-        });
-    }
-
-    // Save & Close button
-    if (DOM.saveCloseBtn) {
-        DOM.saveCloseBtn.addEventListener('click', function() {
+    // Floating Save & Close button (near notes)
+    if (DOM.floatingSaveCloseBtn) {
+        DOM.floatingSaveCloseBtn.addEventListener('click', function() {
             handleSave(true);
         });
     }
 
-    // Save & New button
-    if (DOM.saveNewBtn) {
-        DOM.saveNewBtn.addEventListener('click', function() {
+    // Floating Save & New button (near notes)
+    if (DOM.floatingSaveNewBtn) {
+        DOM.floatingSaveNewBtn.addEventListener('click', function() {
             handleSave(false);
+        });
+    }
+    
+    // Floating Close button (near notes)
+    if (DOM.floatingCloseBtn) {
+        DOM.floatingCloseBtn.addEventListener('click', function() {
+            // Show confirmation dialog before closing
+            if (confirm('Do you want to logout?')) {
+                // 창 닫기 대신 로그아웃 처리
+                window.location.href = '/logout';
+            }
         });
     }
     
@@ -453,13 +462,6 @@ function initializeButtons() {
     if (DOM.addEventTypeBtn) {
         DOM.addEventTypeBtn.addEventListener('click', function() {
             alert("Add new Event Type functionality to be implemented (e.g., open a modal).");
-        });
-    }
-    
-    // Previous Versions button
-    if (DOM.previousVersionsBtn) {
-        DOM.previousVersionsBtn.addEventListener('click', function() {
-            alert("Previous Versions functionality to be implemented (e.g., fetch and display history).");
         });
     }
 }
@@ -569,9 +571,9 @@ function gatherFormData() {
         createDate: createDateFormatted,
         eventDate: eventDateFormatted,
         notes: DOM.notes ? DOM.notes.value : '',
-        lateEntry: DOM.lateEntry ? DOM.lateEntry.checked : false,
-        flagOnNoticeboard: DOM.flagOnNoticeboard ? DOM.flagOnNoticeboard.checked : false,
-        archived: DOM.archived ? DOM.archived.checked : false
+        lateEntry: DOM.lateEntry ? DOM.lateEntry.checked : false
+        // flagOnNoticeboard: DOM.flagOnNoticeboard ? DOM.flagOnNoticeboard.checked : false, // 주석 처리됨
+        // archived: DOM.archived ? DOM.archived.checked : false // 주석 처리됨
     };
     
     console.log('Gathered form data:', formData);
@@ -622,17 +624,74 @@ function formatDateTime(dateValue, timeValue) {
 
 // Reset form for new entry
 function resetForm() {
-    // Keep client selected but reset other fields
-    if (DOM.eventType) DOM.eventType.value = '';
+    // Reset all fields including client selection
+    if (DOM.client) DOM.client.value = '';
     if (DOM.careArea) DOM.careArea.value = '';
     if (DOM.riskRating) DOM.riskRating.value = '';
     if (DOM.notes) DOM.notes.value = '';
     if (DOM.lateEntry) DOM.lateEntry.checked = false;
-    if (DOM.flagOnNoticeboard) DOM.flagOnNoticeboard.checked = false;
-    if (DOM.archived) DOM.archived.checked = false;
+    // if (DOM.flagOnNoticeboard) DOM.flagOnNoticeboard.checked = false; // 주석 처리됨
+    // if (DOM.archived) DOM.archived.checked = false; // 주석 처리됨
+    
+    // Clear client details display
+    displayClientDetails(null);
+    
+    // Event Type은 역할별 기본값으로 다시 설정
+    restoreEventTypeDefault();
     
     // Update time to current for both create and event dates
     setCurrentDateTime();
+    
+    // Notes 영역이 리셋되었으므로 버튼 위치 재조정
+    setTimeout(adjustFloatingButtonsPosition, 100);
+}
+
+// 역할별 Event Type 기본값 복원
+function restoreEventTypeDefault() {
+    if (!DOM.eventType) return;
+    
+    fetch('/api/user-info')
+        .then(response => response.json())
+        .then(userInfo => {
+            const userRole = userInfo.role;
+            
+            if (userRole === 'doctor') {
+                // Doctor 역할인 경우 "Doctor" Event Type 찾아서 선택
+                const doctorOption = Array.from(DOM.eventType.options).find(option => 
+                    option.textContent === 'Doctor'
+                );
+                if (doctorOption) {
+                    DOM.eventType.value = doctorOption.value;
+                    DOM.eventType.style.backgroundColor = '#e8f4fd';
+                    DOM.eventType.style.color = '#333';
+                    console.log('Reset 후 Doctor Event Type 복원');
+                }
+            } else if (userRole === 'physiotherapist') {
+                // Physiotherapist 역할인 경우 "Physio Therapist" Event Type 찾아서 선택
+                const physioOption = Array.from(DOM.eventType.options).find(option => 
+                    option.textContent === 'Physio Therapist'
+                );
+                if (physioOption) {
+                    DOM.eventType.value = physioOption.value;
+                    DOM.eventType.style.backgroundColor = '#e8f4fd';
+                    DOM.eventType.style.color = '#333';
+                    console.log('Reset 후 Physio Therapist Event Type 복원');
+                }
+            } else {
+                // Admin이나 기타 역할인 경우 기본값 없음
+                DOM.eventType.value = '';
+                DOM.eventType.style.backgroundColor = '';
+                DOM.eventType.style.color = '';
+                console.log('Reset 후 Admin Event Type 기본값 없음');
+            }
+        })
+        .catch(error => {
+            console.error('Error restoring event type default:', error);
+            // 오류 발생 시 기본값 없음으로 설정
+            DOM.eventType.value = '';
+            DOM.eventType.style.backgroundColor = '';
+            DOM.eventType.style.color = '';
+        });
 }
 
 // Load reference data for dropdowns
@@ -672,4 +731,54 @@ function populateDropdowns(data) {
     }
     
     // Note: Care Areas and Event Types are loaded separately from JSON files
+}
+
+// Notes 영역 크기 변화 감지 및 버튼 위치 조정
+function initializeNotesResizeObserver() {
+    if (!DOM.notes) return;
+    
+    // ResizeObserver로 textarea 크기 변화 감지
+    if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(entries => {
+            adjustFloatingButtonsPosition();
+        });
+        resizeObserver.observe(DOM.notes);
+    }
+    
+    // Notes 내용 변화 감지
+    DOM.notes.addEventListener('input', adjustFloatingButtonsPosition);
+    DOM.notes.addEventListener('scroll', adjustFloatingButtonsPosition);
+    
+    // 초기 위치 설정
+    setTimeout(adjustFloatingButtonsPosition, 100);
+}
+
+// Floating 버튼 위치 조정
+function adjustFloatingButtonsPosition() {
+    const floatingActions = document.querySelector('.floating-actions');
+    if (!floatingActions || !DOM.notes) return;
+    
+    // Notes 영역의 실제 높이 계산
+    const notesHeight = DOM.notes.offsetHeight;
+    const notesScrollHeight = DOM.notes.scrollHeight;
+    const hasScrollbar = notesScrollHeight > notesHeight;
+    
+    // Notes 내용이 많아서 스크롤이 생겼을 때는 버튼을 더 가깝게
+    if (hasScrollbar || notesHeight > 200) {
+        floatingActions.style.marginTop = '10px';
+        floatingActions.style.position = 'sticky';
+        floatingActions.style.bottom = '10px';
+        floatingActions.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+        floatingActions.style.backdropFilter = 'blur(5px)';
+        floatingActions.style.zIndex = '10';
+    } else {
+        floatingActions.style.marginTop = '15px';
+        floatingActions.style.position = 'relative';
+        floatingActions.style.bottom = 'auto';
+        floatingActions.style.backgroundColor = 'transparent';
+        floatingActions.style.backdropFilter = 'none';
+        floatingActions.style.zIndex = 'auto';
+    }
+    
+    console.log(`Notes height: ${notesHeight}px, Scroll height: ${notesScrollHeight}px, Has scrollbar: ${hasScrollbar}`);
 }

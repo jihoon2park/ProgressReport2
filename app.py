@@ -304,20 +304,45 @@ def save_prepare_send_json(progress_note_data):
         
         # 기존 파일이 있으면 백업 생성
         if os.path.exists(filepath):
-            backup_number = 1
+            # 순환 백업 시스템 (최대 1000개)
+            MAX_BACKUP_COUNT = 1000
             
-            # 사용 가능한 백업 번호 찾기
-            while True:
-                backup_filepath = f'data/prepare_send_backup{backup_number}.json'
-                if not os.path.exists(backup_filepath):
-                    break
-                backup_number += 1
+            # 기존 백업 파일들 확인
+            existing_backups = []
+            for i in range(1, MAX_BACKUP_COUNT + 1):
+                backup_filepath = f'data/prepare_send_backup{i}.json'
+                if os.path.exists(backup_filepath):
+                    existing_backups.append(i)
             
-            # 기존 파일을 백업으로 이동
+            # 다음 백업 번호 결정
+            if len(existing_backups) < MAX_BACKUP_COUNT:
+                # 아직 최대 개수에 도달하지 않았으면 다음 번호 사용
+                backup_number = len(existing_backups) + 1
+                logger.info(f"새 백업 파일 생성: backup{backup_number}.json")
+            else:
+                # 최대 개수에 도달했으면 가장 오래된 파일 찾아서 덮어쓰기
+                oldest_backup = 1
+                oldest_time = None
+                
+                for i in range(1, MAX_BACKUP_COUNT + 1):
+                    backup_filepath = f'data/prepare_send_backup{i}.json'
+                    if os.path.exists(backup_filepath):
+                        file_time = os.path.getmtime(backup_filepath)
+                        if oldest_time is None or file_time < oldest_time:
+                            oldest_time = file_time
+                            oldest_backup = i
+                
+                backup_number = oldest_backup
+                logger.info(f"최대 백업 개수 도달 - 가장 오래된 파일 덮어쓰기: backup{backup_number}.json")
+            
+            backup_filepath = f'data/prepare_send_backup{backup_number}.json'
+            
+            # 기존 파일을 백업으로 이동 (덮어쓰기)
             try:
                 import shutil
                 shutil.move(filepath, backup_filepath)
                 logger.info(f"기존 파일을 백업으로 이동: {filepath} -> {backup_filepath}")
+                logger.info(f"현재 백업 파일 개수: {min(len(existing_backups) + 1, MAX_BACKUP_COUNT)}/{MAX_BACKUP_COUNT}")
             except Exception as e:
                 logger.error(f"백업 파일 생성 실패: {str(e)}")
                 # 백업 실패해도 새 파일은 저장 계속 진행
@@ -393,13 +418,16 @@ def login():
                         session['role'] = user_info['role']
                         session['site'] = site
                         
-                        flash('로그인 성공!', 'success')
+                        flash('Login successful!', 'success')
+                        logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
+                        
                         return redirect(url_for('index'))
                     except Exception as e:
                         logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
-                        flash('데이터 저장 중 오류가 발생했습니다.', 'error')
+                        flash('Error occurred while saving data.', 'error')
                 else:
-                    flash('서버에서 데이터를 가져오는데 실패했습니다.', 'error')
+                    flash('Failed to fetch data from server.', 'error')
+                    logger.error("데이터 가져오기 실패로 인한 로그인 실패")
             except Exception as e:
                 logger.error(f"API 호출 중 오류 발생: {str(e)}")
                 flash('서버 연결 중 오류가 발생했습니다.', 'error')
@@ -460,17 +488,17 @@ def save_progress_note():
         progress_note = create_progress_note_json(form_data)
         
         if not progress_note:
-            return jsonify({'success': False, 'message': 'JSON 생성에 실패했습니다.'})
+            return jsonify({'success': False, 'message': 'Failed to generate JSON.'})
         
         # prepare_send.json에 저장
         if save_prepare_send_json(progress_note):
             return jsonify({
                 'success': True, 
-                'message': 'Progress Note가 성공적으로 저장되었습니다.',
+                'message': 'Progress Note saved successfully.',
                 'data': progress_note
             })
         else:
-            return jsonify({'success': False, 'message': '파일 저장에 실패했습니다.'})
+            return jsonify({'success': False, 'message': 'Failed to save file.'})
             
     except Exception as e:
         logger.error(f"Progress Note 저장 중 오류: {str(e)}")
@@ -522,6 +550,45 @@ def get_event_type_list():
         return send_from_directory(data_dir, 'eventtype.json')
     except FileNotFoundError:
         return jsonify([]), 404
+
+@app.route('/api/backup-status')
+@require_authentication
+def get_backup_status():
+    """백업 파일 상태 확인 (테스트용)"""
+    try:
+        backup_files = []
+        data_dir = 'data'
+        
+        # prepare_send.json 확인
+        main_file = os.path.join(data_dir, 'prepare_send.json')
+        main_file_exists = os.path.exists(main_file)
+        
+        # 백업 파일들 확인
+        for i in range(1, 1001):  # 1부터 1000까지
+            backup_filepath = os.path.join(data_dir, f'prepare_send_backup{i}.json')
+            if os.path.exists(backup_filepath):
+                file_stat = os.stat(backup_filepath)
+                backup_files.append({
+                    'number': i,
+                    'filename': f'prepare_send_backup{i}.json',
+                    'size': file_stat.st_size,
+                    'modified_time': datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+                })
+        
+        # 수정 시간 순으로 정렬 (가장 오래된 것부터)
+        backup_files.sort(key=lambda x: x['modified_time'])
+        
+        return jsonify({
+            'main_file_exists': main_file_exists,
+            'backup_count': len(backup_files),
+            'max_backup_count': 1000,
+            'backup_files': backup_files[:10],  # 처음 10개만 반환
+            'oldest_backup': backup_files[0] if backup_files else None,
+            'newest_backup': backup_files[-1] if backup_files else None
+        })
+    except Exception as e:
+        logger.error(f"백업 상태 확인 중 오류: {str(e)}")
+        return jsonify({'error': 'Failed to get backup status'}), 500
 
 @app.route('/api/user-info')
 @require_authentication
