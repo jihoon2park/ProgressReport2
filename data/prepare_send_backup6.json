@@ -1,0 +1,13 @@
+{
+    "ClientId": 2703,
+    "EventDate": "2025-05-28T03:30:00.000Z",
+    "ProgressNoteEventType": {
+        "Id": 83
+    },
+    "NotesPlainText": "afsdfagasd122222221212121",
+    "CreatedByUser": {
+        "UserName": "doctor1",
+        "DisplayName": "Dr. Smith"
+    },
+    "CreatedDate": "2025-05-28T03:30:00.000Z"
+}

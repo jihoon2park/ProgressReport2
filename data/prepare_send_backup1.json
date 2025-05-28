@@ -1,0 +1,20 @@
+{
+    "ClientId": 2786,
+    "EventDate": "2025-05-28T03:01:00.000Z",
+    "ProgressNoteEventType": {
+        "Id": 152
+    },
+    "NotesPlainText": "22222222222222",
+    "CreatedBy": "admin",
+    "CreatedByUser": {
+        "UserName": "admin",
+        "DisplayName": "admin"
+    },
+    "CreatedDate": "2025-05-28T03:01:00.000Z",
+    "CareAreas": [
+        {
+            "Id": 73
+        }
+    ],
+    "ClientServiceId": 26
+}

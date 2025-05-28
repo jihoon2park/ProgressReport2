@@ -1,0 +1,21 @@
+{
+    "ClientId": 2378,
+    "EventDate": "2025-05-28T03:21:00.000Z",
+    "ProgressNoteEventType": {
+        "Id": 3
+    },
+    "NotesPlainText": "432432",
+    "CreatedByUser": {
+        "UserName": "doctor1",
+        "DisplayName": "Dr. Smith"
+    },
+    "CreatedDate": "2025-05-28T03:21:00.000Z",
+    "CareAreas": [
+        {
+            "Id": 1002
+        }
+    ],
+    "ProgressNoteRiskRating": {
+        "Id": 1
+    }
+}
