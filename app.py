@@ -1,33 +1,56 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    redirect, 
+    url_for, 
+    flash, 
+    session, 
+    jsonify, 
+    send_from_directory
+)
 import requests
 from functools import wraps
-from flask import session, redirect, url_for
-from api_client import APIClient
 import logging
-from config import SITE_SERVERS  # config.py에서 SITE_SERVERS import 추가
 import json
 import os
 from datetime import datetime
 
-# Login required decorator
+# 내부 모듈 임포트
+from api_client import APIClient
+from api_carearea import APICareArea
+from api_eventtype import APIEventType
+from config import SITE_SERVERS, API_HEADERS
+from config_users import authenticate_user
 
-# 로깅 설정 (app.py 시작 부분에 추가)
+# 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-
+# 플라스크 앱 초기화
 app = Flask(__name__, static_url_path='/static')
-app.secret_key = 'your_secret_key_here'
-
-VALID_USERNAME = "admin"
-VALID_PASSWORD = "password123"
+app.secret_key = 'your_secret_key_here'  # 실제 운영환경에선 환경변수로 관리해야 함
 
 AUTH_SESSION_KEY = 'logged_in'
 
+# 데이터 디렉토리 확인 및 생성
+if not os.path.exists('data'):
+    os.makedirs('data')
+    logger.info("data 디렉토리 생성됨")
+
+# ==============================
+# 인증 관련 기능
+# ==============================
+
+def _is_authenticated():
+    """사용자 인증 상태 확인"""
+    return AUTH_SESSION_KEY in session
+
 def require_authentication(wrapped_function):
+    """인증이 필요한 라우트에 사용할 데코레이터"""
     @wraps(wrapped_function)
     def decorated_function(*args, **kwargs):
         if not _is_authenticated():
@@ -35,68 +58,431 @@ def require_authentication(wrapped_function):
         return wrapped_function(*args, **kwargs)
     return decorated_function
 
-def _is_authenticated():
-    return AUTH_SESSION_KEY in session
+# ==============================
+# 데이터 처리 기능
+# ==============================
 
 def process_client_information(client_info):
-    """
-    클라이언트 정보를 가공하여 필요한 정보만 추출하는 함수
-    """
+    """클라이언트 정보를 가공하여 필요한 정보만 추출"""
+    if not client_info:
+        logger.warning("처리할 클라이언트 정보가 없습니다.")
+        return []
+        
     processed_clients = []
-
-    for client in client_info:
-        processed_client = {
-            'PersonId': client.get('PersonId'),
-            'ClientName': f"{client.get('Title', '')} {client.get('FirstName', '')} {client.get('LastName', '')}".strip(),
-            'BirthDate': client.get('BirthDate'),
-            'WingName': client.get('WingName'),
-            'RoomName': client.get('RoomName')
-        }
-        processed_clients.append(processed_client)
-
-    # 가공된 데이터를 JSON 파일로 저장
     try:
-        with open('data/Client_list.json', 'w', encoding='utf-8') as f:
-            json.dump(processed_clients, f, ensure_ascii=False, indent=4)
-        logger.info("Client_list.json 파일 생성 완료")
+        for client in client_info:
+            processed_client = {
+                'PersonId': client.get('PersonId'),
+                'ClientName': f"{client.get('Title', '')} {client.get('FirstName', '')} {client.get('LastName', '')}".strip(),
+                'PreferredName': client.get('PreferredName', ''),
+                'Gender': client.get('Gender', ''),
+                'BirthDate': client.get('BirthDate'),
+                'WingName': client.get('WingName'),
+                'RoomName': client.get('RoomName')
+            }
+            processed_clients.append(processed_client)
+
+        # 가공된 데이터를 파일로 저장
+        save_json_file('data/Client_list.json', processed_clients)
+        
+        return processed_clients
     except Exception as e:
-        logger.error(f"JSON 파일 저장 중 오류 발생: {str(e)}")
-
-    return None #processed_clients
-
-@app.route('/')
-def home():
-    if 'logged_in' in session:
-        return redirect(url_for('index'))
-    return render_template('progressnote.html', sites=SITE_SERVERS.keys())
-
-
-# 로그인 페이지 렌더링을 위한 GET 메소드 라우트 추가
-@app.route('/login', methods=['GET'])
-def login_page():
-    return render_template('ProgressNote.html', sites=SITE_SERVERS.keys())
-
-logger = logging.getLogger(__name__)
+        logger.error(f"클라이언트 정보 처리 중 오류 발생: {str(e)}")
+        return []
 
 def fetch_client_information(site):
-    """클라이언트 정보를 가져오고 처리하는 함수"""
+    """클라이언트 정보를 가져오고 처리"""
     logger.info(f"클라이언트 정보 요청 시작 - 사이트: {site}")
     try:
-        api_client = APIClient(site)  # SITE_SERVERS 인자 제거
+        api_client = APIClient(site)
         client_info = api_client.get_client_information()
         logger.info(f"클라이언트 정보 가져오기 성공 - 사이트: {site}")
 
         # 클라이언트 정보 가공
         processed_client_info = process_client_information(client_info)
-
         return True, client_info
     except requests.RequestException as e:
         logger.error(f"클라이언트 정보 가져오기 실패 - 사이트: {site}, 에러: {str(e)}")
         return False, None
+    except Exception as e:
+        logger.error(f"클라이언트 정보 처리 중 예외 발생: {str(e)}")
+        return False, None
 
-# 서버 IP 조회 API 엔드포인트 추가
+def fetch_care_area_information(site):
+    """Care Area 정보를 가져오고 처리"""
+    logger.info(f"Care Area 정보 요청 시작 - 사이트: {site}")
+    try:
+        api_care_area = APICareArea(site)
+        care_area_info = api_care_area.get_care_area_information()
+        logger.info("Care Area 정보 가져오기 성공")
+        return True, care_area_info
+    except Exception as e:
+        logger.error(f"Care Area 정보 가져오기 실패: {str(e)}")
+        return False, None
+
+def fetch_event_type_information(site):
+    """Event Type 정보를 가져오고 처리"""
+    logger.info(f"Event Type 정보 요청 시작 - 사이트: {site}")
+    try:
+        api_event_type = APIEventType(site)
+        event_type_info = api_event_type.get_event_type_information()
+        logger.info("Event Type 정보 가져오기 성공")
+        return True, event_type_info
+    except Exception as e:
+        logger.error(f"Event Type 정보 가져오기 실패: {str(e)}")
+        return False, None
+
+def save_json_file(filepath, data):
+    """JSON 데이터를 파일로 저장"""
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        logger.info(f"파일 저장 성공: {filepath}")
+        return True
+    except Exception as e:
+        logger.error(f"JSON 파일 저장 중 오류 발생: {str(e)}")
+        return False
+
+def save_client_data(username, site, client_info):
+    """클라이언트 데이터를 JSON 파일로 저장"""
+    try:
+        data = {
+            'username': username,
+            'site': site,
+            'server_ip': SITE_SERVERS.get(site, ''),
+            'client_info': client_info,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # 사이트명에서 공백을 언더스코어로 변환하고 소문자로 변경
+        site_name = site.replace(' ', '_').lower()
+        filename = f"data/{site_name}_client.json"
+        
+        logger.info(f"파일 저장 시도: {filename}")
+        save_json_file(filename, data)
+        
+        return filename
+        
+    except Exception as e:
+        logger.error(f"파일 저장 중 오류 발생: {str(e)}")
+        raise
+
+def create_progress_note_json(form_data):
+    """사용자 입력 데이터를 Progress Note JSON 형식으로 변환 (값이 있는 필드만 포함)"""
+    try:
+        logger.info(f"Progress Note JSON 생성 시작 - 입력 데이터: {form_data}")
+        
+        # 필수 필드들
+        progress_note = {}
+        
+        # ClientId (필수)
+        if form_data.get('clientId'):
+            try:
+                progress_note["ClientId"] = int(form_data.get('clientId'))
+                logger.info(f"ClientId 설정: {progress_note['ClientId']}")
+            except (ValueError, TypeError) as e:
+                logger.error(f"ClientId 변환 실패: {form_data.get('clientId')}, 오류: {e}")
+                return None
+        else:
+            logger.error("ClientId가 없습니다 - 필수 필드")
+            return None
+            
+        # EventDate (필수)
+        if form_data.get('eventDate'):
+            progress_note["EventDate"] = form_data.get('eventDate')
+            logger.info(f"EventDate 설정: {progress_note['EventDate']}")
+        else:
+            # EventDate가 없으면 현재 시간 사용
+            progress_note["EventDate"] = datetime.now().isoformat()
+            logger.info(f"EventDate 기본값 설정: {progress_note['EventDate']}")
+            
+        # ProgressNoteEventType (필수)
+        if form_data.get('eventType'):
+            try:
+                event_type_id = int(form_data.get('eventType'))
+                progress_note["ProgressNoteEventType"] = {
+                    "Id": event_type_id
+                }
+                logger.info(f"ProgressNoteEventType 설정: {event_type_id}")
+            except (ValueError, TypeError) as e:
+                logger.error(f"EventType 변환 실패: {form_data.get('eventType')}, 오류: {e}")
+                return None
+        else:
+            logger.error("EventType이 없습니다 - 필수 필드")
+            return None
+            
+        # NotesPlainText (필수)
+        notes_text = form_data.get('notes', '').strip()
+        if notes_text:
+            progress_note["NotesPlainText"] = notes_text
+            logger.info(f"NotesPlainText 설정: {len(notes_text)}")
+        else:
+            # 빈 노트라도 빈 문자열로 설정
+            progress_note["NotesPlainText"] = ""
+            logger.info("NotesPlainText 빈 문자열로 설정")
+            
+        # 선택적 필드들 (값이 있을 때만 추가)
+        
+        # CreatedByUser (CreatedBy는 제거)
+        username = session.get('username')
+        display_name = session.get('display_name', username)  # display_name이 없으면 username 사용
+        
+        if username:
+            progress_note["CreatedByUser"] = {
+                "UserName": username,
+                "DisplayName": display_name
+            }
+            logger.info(f"CreatedByUser 설정: {username} ({display_name})")
+            
+        # CreatedDate (선택적)
+        if form_data.get('createDate'):
+            progress_note["CreatedDate"] = form_data.get('createDate')
+            logger.info(f"CreatedDate 설정: {progress_note['CreatedDate']}")
+            
+        # CareAreas (선택한 경우만)
+        if form_data.get('careArea'):
+            try:
+                care_area_id = int(form_data.get('careArea'))
+                progress_note["CareAreas"] = [{
+                    "Id": care_area_id
+                }]
+                logger.info(f"CareAreas 설정: {care_area_id}")
+            except (ValueError, TypeError) as e:
+                logger.error(f"CareArea 변환 실패: {form_data.get('careArea')}, 오류: {e}")
+                
+        # ProgressNoteRiskRating (선택한 경우만)
+        if form_data.get('riskRating'):
+            risk_rating_value = form_data.get('riskRating')
+            
+            # 문자열 ID를 숫자로 매핑
+            risk_rating_mapping = {
+                'rr1': 1,  # Extreme
+                'rr2': 2,  # High
+                'rr3': 3,  # Moderate
+                'rr4': 4   # Low
+            }
+            
+            risk_rating_id = None
+            if risk_rating_value in risk_rating_mapping:
+                risk_rating_id = risk_rating_mapping[risk_rating_value]
+            elif risk_rating_value.isdigit():
+                risk_rating_id = int(risk_rating_value)
+                
+            if risk_rating_id:
+                progress_note["ProgressNoteRiskRating"] = {
+                    "Id": risk_rating_id
+                }
+                logger.info(f"ProgressNoteRiskRating 설정: {risk_rating_id}")
+                
+        # Boolean 필드들 (true인 경우만 추가)
+        if form_data.get('lateEntry'):
+            progress_note["IsLateEntry"] = True
+            logger.info("IsLateEntry 설정: True")
+            
+        if form_data.get('flagOnNoticeboard'):
+            progress_note["IsNoticeFlag"] = True
+            logger.info("IsNoticeFlag 설정: True")
+            
+        if form_data.get('archived'):
+            progress_note["IsArchived"] = True
+            logger.info("IsArchived 설정: True")
+            
+        # ClientServiceId는 API에서 필요한 경우에만 추가
+        # progress_note["ClientServiceId"] = 26  # 임시 제거
+        
+        logger.info(f"Progress Note JSON 생성 완료: {progress_note}")
+        return progress_note
+        
+    except Exception as e:
+        logger.error(f"Progress Note JSON 생성 중 예외 발생: {str(e)}", exc_info=True)
+        return None
+
+def save_prepare_send_json(progress_note_data):
+    """prepare_send.json 파일에 데이터 저장 (매번 새 파일로 생성, 기존 파일은 백업)"""
+    try:
+        filepath = 'data/prepare_send.json'
+        
+        # 기존 파일이 있으면 백업 생성
+        if os.path.exists(filepath):
+            backup_number = 1
+            
+            # 사용 가능한 백업 번호 찾기
+            while True:
+                backup_filepath = f'data/prepare_send_backup{backup_number}.json'
+                if not os.path.exists(backup_filepath):
+                    break
+                backup_number += 1
+            
+            # 기존 파일을 백업으로 이동
+            try:
+                import shutil
+                shutil.move(filepath, backup_filepath)
+                logger.info(f"기존 파일을 백업으로 이동: {filepath} -> {backup_filepath}")
+            except Exception as e:
+                logger.error(f"백업 파일 생성 실패: {str(e)}")
+                # 백업 실패해도 새 파일은 저장 계속 진행
+        
+        # 새 파일로 저장
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(progress_note_data, f, ensure_ascii=False, indent=4)
+        
+        logger.info(f"Progress Note 데이터가 새 파일로 저장됨: {filepath}")
+        logger.info(f"저장된 데이터: {progress_note_data}")
+        return True
+    except Exception as e:
+        logger.error(f"prepare_send.json 저장 중 오류: {str(e)}")
+        return False
+
+# ==============================
+# 라우트 정의
+# ==============================
+
+@app.route('/')
+def home():
+    """홈 페이지"""
+    if _is_authenticated():
+        return redirect(url_for('index'))
+    return render_template('progressnote.html', sites=SITE_SERVERS.keys())
+
+@app.route('/login', methods=['GET'])
+def login_page():
+    """로그인 페이지"""
+    return render_template('ProgressNote.html', sites=SITE_SERVERS.keys())
+
+@app.route('/login', methods=['POST'])
+def login():
+    """로그인 처리"""
+    try:
+        username = request.form.get('username')
+        password = request.form.get('password')
+        site = request.form.get('site')
+        
+        logger.info(f"로그인 시도 - 사용자: {username}, 사이트: {site}")
+
+        # 입력값 검증
+        if not all([username, password, site]):
+            flash('모든 필드를 입력해주세요.', 'error')
+            return redirect(url_for('home'))
+
+        # 인증 검증
+        auth_success, user_info = authenticate_user(username, password)
+        
+        if auth_success:
+            logger.info("인증 성공")
+            
+            try:
+                # 클라이언트 정보 가져오기
+                client_success, client_info = fetch_client_information(site)
+                
+                # Care Area 정보 가져오기
+                care_area_success, care_area_info = fetch_care_area_information(site)
+                
+                # Event Type 정보 가져오기
+                event_type_success, event_type_info = fetch_event_type_information(site)
+                
+                if client_success or care_area_success or event_type_success:  # 하나라도 성공하면 진행
+                    try:
+                        if client_info:  # client_info가 있을 때만 저장
+                            filename = save_client_data(username, site, client_info)
+                            session['current_file'] = filename
+                        
+                        # 세션 설정
+                        session['logged_in'] = True
+                        session['username'] = username
+                        session['display_name'] = user_info['display_name']
+                        session['role'] = user_info['role']
+                        session['site'] = site
+                        
+                        flash('로그인 성공!', 'success')
+                        return redirect(url_for('index'))
+                    except Exception as e:
+                        logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
+                        flash('데이터 저장 중 오류가 발생했습니다.', 'error')
+                else:
+                    flash('서버에서 데이터를 가져오는데 실패했습니다.', 'error')
+            except Exception as e:
+                logger.error(f"API 호출 중 오류 발생: {str(e)}")
+                flash('서버 연결 중 오류가 발생했습니다.', 'error')
+                
+            return redirect(url_for('home'))
+        else:
+            flash('잘못된 인증 정보입니다.', 'error')
+            return redirect(url_for('home'))
+            
+    except Exception as e:
+        logger.error(f"로그인 처리 중 예외 발생: {str(e)}")
+        flash('서버 오류가 발생했습니다.', 'error')
+        return redirect(url_for('home'))
+
+@app.route('/logout')
+def logout():
+    """로그아웃 처리"""
+    session.clear()
+    return redirect(url_for('home'))
+
+@app.route('/index')
+@require_authentication
+def index():
+    """메인 대시보드 페이지"""
+    # 추가 인증 검사 (데코레이터가 있지만 안전을 위해 이중 체크)
+    if not _is_authenticated():
+        return redirect(url_for('home'))
+
+    # JSON 파일에서 데이터 읽기
+    filename = session.get('current_file')
+    if filename and os.path.exists(filename):
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return render_template('index.html',
+                                    selected_site=data['site'],
+                                    client_info=data['client_info'])
+        except Exception as e:
+            logger.error(f"파일 읽기 오류: {str(e)}")
+            flash('데이터 로딩 중 오류가 발생했습니다.', 'error')
+    
+    return redirect(url_for('home'))
+
+@app.route('/save_progress_note', methods=['POST'])
+@require_authentication
+def save_progress_note():
+    """Progress Note 데이터 저장"""
+    try:
+        # JSON 데이터 받기
+        form_data = request.get_json()
+        
+        if not form_data:
+            return jsonify({'success': False, 'message': '데이터가 없습니다.'})
+        
+        logger.info(f"받은 폼 데이터: {form_data}")
+        
+        # Progress Note JSON 형식으로 변환
+        progress_note = create_progress_note_json(form_data)
+        
+        if not progress_note:
+            return jsonify({'success': False, 'message': 'JSON 생성에 실패했습니다.'})
+        
+        # prepare_send.json에 저장
+        if save_prepare_send_json(progress_note):
+            return jsonify({
+                'success': True, 
+                'message': 'Progress Note가 성공적으로 저장되었습니다.',
+                'data': progress_note
+            })
+        else:
+            return jsonify({'success': False, 'message': '파일 저장에 실패했습니다.'})
+            
+    except Exception as e:
+        logger.error(f"Progress Note 저장 중 오류: {str(e)}")
+        return jsonify({'success': False, 'message': f'서버 오류: {str(e)}'})
+
+# ==============================
+# API 엔드포인트
+# ==============================
+
 @app.route('/get_server_ip', methods=['POST'])
 def get_server_ip():
+    """서버 IP 조회 API"""
     site = request.json.get('site')
     if site in SITE_SERVERS:
         return jsonify({
@@ -110,105 +496,52 @@ def get_server_ip():
 
 @app.route('/data/Client_list.json')
 def get_client_list():
+    """클라이언트 목록 JSON 반환"""
     try:
-        with open('data/Client_list.json', 'r', encoding='utf-8') as f:
-            return jsonify(json.load(f))
+        data_dir = os.path.join(app.root_path, 'data')
+        return send_from_directory(data_dir, 'Client_list.json')
     except FileNotFoundError:
         return jsonify([]), 404
 
-def save_client_data(username, site, client_info):
-    """클라이언트 데이터를 JSON 파일로 저장"""
-    try:
-        data = {
-            'username': username,
-            'site': site,
-            'server_ip': SITE_SERVERS[site],
-            'client_info': client_info,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # data 디렉토리가 없으면 생성
-        if not os.path.exists('data'):
-            os.makedirs('data')
-            logger.info("data 디렉토리 생성됨")
-        
-        # 사이트명에서 공백을 언더스코어로 변환하고 소문자로 변경
-        site_name = site.replace(' ', '_').lower()
-        filename = f"data/{site_name}_client.json"
-        
-        logger.info(f"파일 저장 시도: {filename}")
-        
-        # 파일 저장
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        
-        logger.info(f"파일이 성공적으로 저장됨: {filename}")
-        return filename
-        
-    except Exception as e:
-        logger.error(f"파일 저장 중 오류 발생: {str(e)}")
-        raise
-
-@app.route('/login', methods=['POST'])
-def login():
-    username = request.form.get('username')
-    password = request.form.get('password')
-    site = request.form.get('site')
-    
-    logger.info(f"로그인 시도 - 사용자: {username}, 사이트: {site}")
-
-    if username == VALID_USERNAME and password == VALID_PASSWORD:
-        logger.info("인증 성공")
-        success, client_info = fetch_client_information(site)
-        
-        if success:
-            try:
-                logger.info(f"클라이언트 정보 가져오기 성공: {client_info}")
-                # JSON 파일로 저장
-                filename = save_client_data(username, site, client_info)
-                
-                # 세션에는 최소한의 정보만 저장
-                session['logged_in'] = True
-                session['username'] = username
-                session['current_file'] = filename
-                
-                flash('클라이언트 정보를 성공적으로 저장했습니다.', 'success')
-                return redirect(url_for('index'))
-            except Exception as e:
-                logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
-                flash('데이터 저장 중 오류가 발생했습니다.', 'error')
-                return redirect(url_for('home'))
-        else:
-            logger.error(f"클라이언트 정보 가져오기 실패 - 사이트: {site}")    
-            flash('클라이언트 정보를 가져오는데 실패했습니다.', 'error')
-            return redirect(url_for('home'))
-    else:
-        logger.warning(f"인증 실패 - 사용자: {username}")
-        flash('잘못된 인증 정보입니다.', 'error')
-        return redirect(url_for('home'))
-
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('home'))
-
-@app.route('/index')
+@app.route('/data/carearea.json')
 @require_authentication
-def index():
-    if 'logged_in' not in session:
-        return redirect(url_for('home'))
+def get_care_area_list():
+    """Care Area 목록 JSON 반환"""
+    try:
+        data_dir = os.path.join(app.root_path, 'data')
+        return send_from_directory(data_dir, 'carearea.json')
+    except FileNotFoundError:
+        return jsonify([]), 404
 
-    # JSON 파일에서 데이터 읽기
-    filename = session.get('current_file')
-    if filename and os.path.exists(filename):
-        with open(filename, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return render_template('index.html',
-                                selected_site=data['site'],
-                                client_info=data['client_info'])
-    
-    return redirect(url_for('home'))
+@app.route('/data/eventtype.json')
+@require_authentication
+def get_event_type_list():
+    """Event Type 목록 JSON 반환"""
+    try:
+        data_dir = os.path.join(app.root_path, 'data')
+        return send_from_directory(data_dir, 'eventtype.json')
+    except FileNotFoundError:
+        return jsonify([]), 404
+
+@app.route('/api/user-info')
+@require_authentication
+def get_user_info():
+    """현재 로그인한 사용자 정보 반환"""
+    try:
+        user_info = {
+            'username': session.get('username'),
+            'display_name': session.get('display_name'),
+            'role': session.get('role'),
+            'site': session.get('site')
+        }
+        return jsonify(user_info)
+    except Exception as e:
+        logger.error(f"사용자 정보 조회 중 오류: {str(e)}")
+        return jsonify({'error': 'Failed to get user info'}), 500
+
+# ==============================
+# 앱 실행
+# ==============================
 
 if __name__ == '__main__':
     app.run(debug=True)

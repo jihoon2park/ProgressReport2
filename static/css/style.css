@@ -205,6 +205,19 @@ body {
 #createTime {
     width: 70px;
 }
+#eventDate {
+    width: 120px;
+}
+#eventTime {
+    width: 70px;
+}
+
+/* Create date와 Event date 라벨 정렬을 위한 스타일 */
+.create-date-group label {
+    display: inline-block;
+    width: 80px;
+    text-align: left;
+}
 
 .checkbox-group label {
     margin-left: 4px;
@@ -318,4 +331,39 @@ body {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+.client-details-container {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.client-info {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.info-group {
+    display: flex;
+    gap: 10px;
+}
+
+.info-group label {
+    font-weight: bold;
+    min-width: 100px;
+    color: #555;
+}
+
+.info-group span {
+    color: #333;
+}
+
+h3 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
 }
