@@ -1,13 +1,18 @@
 {
-    "ClientId": 2723,
-    "EventDate": "2025-05-28T03:31:00.000Z",
+    "ClientId": 2277,
+    "EventDate": "2025-06-02T23:22:00.000Z",
     "ProgressNoteEventType": {
-        "Id": 26
+        "Id": 3
     },
-    "NotesPlainText": "asfasdfasd 4444444",
+    "NotesPlainText": "test for the 08:53",
     "CreatedByUser": {
-        "UserName": "physio1",
-        "DisplayName": "Physiotherapist Jones"
+        "UserName": "admin",
+        "DisplayName": "Administrator"
     },
-    "CreatedDate": "2025-05-28T03:31:00.000Z"
+    "CreatedDate": "2025-06-02T23:22:00.000Z",
+    "CareAreas": [
+        {
+            "Id": 1019
+        }
+    ]
 }

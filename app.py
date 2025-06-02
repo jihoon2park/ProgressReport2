@@ -366,7 +366,14 @@ def save_prepare_send_json(progress_note_data):
 def home():
     """홈 페이지"""
     if _is_authenticated():
-        return redirect(url_for('index'))
+        # 인증되어 있더라도 필요한 데이터 파일이 있는지 확인
+        filename = session.get('current_file')
+        if filename and os.path.exists(filename):
+            return redirect(url_for('index'))
+        else:
+            # 데이터 파일이 없으면 세션 클리어하고 로그인 페이지로
+            session.clear()
+            flash('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning')
     return render_template('progressnote.html', sites=SITE_SERVERS.keys())
 
 @app.route('/login', methods=['GET'])
@@ -611,4 +618,4 @@ def get_user_info():
 # ==============================
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False, port=5000)
