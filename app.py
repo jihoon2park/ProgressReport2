@@ -94,13 +94,16 @@ def process_client_information(client_info):
     try:
         for client in client_info:
             processed_client = {
-                'PersonId': client.get('PersonId'),
+                'PersonId': client.get('MainClientServiceId'),  # MainClientServiceId를 PersonId로 사용
                 'ClientName': f"{client.get('Title', '')} {client.get('FirstName', '')} {client.get('LastName', '')}".strip(),
                 'PreferredName': client.get('PreferredName', ''),
                 'Gender': client.get('Gender', ''),
                 'BirthDate': client.get('BirthDate'),
                 'WingName': client.get('WingName'),
-                'RoomName': client.get('RoomName')
+                'RoomName': client.get('RoomName'),
+                'MainClientServiceId': client.get('MainClientServiceId'),  # ClientServiceId로 사용
+                'OriginalPersonId': client.get('PersonId'),  # 원본 PersonId도 보관
+                'ClientRecordId': client.get('Id')  # 클라이언트 레코드 ID (ClientId로 사용)
             }
             processed_clients.append(processed_client)
 
@@ -197,11 +200,41 @@ def create_progress_note_json(form_data):
         # 필수 필드들
         progress_note = {}
         
-        # ClientId (필수)
+        # ClientId와 ClientServiceId 처리 (필수)
         if form_data.get('clientId'):
             try:
-                progress_note["ClientId"] = int(form_data.get('clientId'))
-                logger.info(f"ClientId 설정: {progress_note['ClientId']}")
+                selected_client_id = int(form_data.get('clientId'))
+                
+                # Client_list.json에서 선택된 클라이언트 정보 찾기
+                import json
+                try:
+                    with open('data/Client_list.json', 'r', encoding='utf-8') as f:
+                        clients = json.load(f)
+                    
+                    selected_client = None
+                    for client in clients:
+                        if client.get('PersonId') == selected_client_id:
+                            selected_client = client
+                            break
+                    
+                    if selected_client:
+                        # 성공한 조합: ClientId = 클라이언트 레코드 ID, ClientServiceId = MainClientServiceId
+                        progress_note["ClientId"] = selected_client.get('ClientRecordId', selected_client_id)  # 클라이언트 레코드 ID
+                        progress_note["ClientServiceId"] = selected_client.get('MainClientServiceId', selected_client_id)  # MainClientServiceId
+                        
+                        logger.info(f"ClientId 설정: {progress_note['ClientId']} (클라이언트 레코드 ID)")
+                        logger.info(f"ClientServiceId 설정: {progress_note['ClientServiceId']} (MainClientServiceId)")
+                    else:
+                        logger.error(f"선택된 클라이언트를 찾을 수 없습니다: {selected_client_id}")
+                        return None
+                        
+                except Exception as e:
+                    logger.error(f"Client_list.json 읽기 실패: {e}")
+                    # 기본값으로 설정 - 클라이언트 레코드 ID를 알 수 없으므로 MainClientServiceId 사용
+                    progress_note["ClientId"] = selected_client_id  # MainClientServiceId를 ClientId로 사용 (fallback)
+                    progress_note["ClientServiceId"] = selected_client_id  # MainClientServiceId
+                    logger.warning("기본값으로 설정 - 정확한 클라이언트 레코드 ID를 찾을 수 없어 MainClientServiceId 사용")
+                    
             except (ValueError, TypeError) as e:
                 logger.error(f"ClientId 변환 실패: {form_data.get('clientId')}, 오류: {e}")
                 return None
@@ -531,7 +564,7 @@ def index():
 @app.route('/save_progress_note', methods=['POST'])
 @require_authentication
 def save_progress_note():
-    """Progress Note 데이터 저장"""
+    """Progress Note 데이터 저장 및 API 전송"""
     try:
         # JSON 데이터 받기
         form_data = request.get_json()
@@ -548,14 +581,55 @@ def save_progress_note():
             return jsonify({'success': False, 'message': 'Failed to generate JSON.'})
         
         # prepare_send.json에 저장
-        if save_prepare_send_json(progress_note):
-            return jsonify({
-                'success': True, 
-                'message': 'Progress Note saved successfully.',
-                'data': progress_note
-            })
-        else:
+        if not save_prepare_send_json(progress_note):
             return jsonify({'success': False, 'message': 'Failed to save file.'})
+        
+        logger.info("prepare_send.json 파일 저장 완료, API 전송 시작...")
+        
+        # API로 Progress Note 전송
+        try:
+            from api_progressnote import send_progress_note_to_api
+            
+            # 세션에서 선택된 사이트 정보 가져오기
+            selected_site = session.get('site', 'Parafield Gardens')  # 기본값: Parafield Gardens
+            
+            api_success, api_response = send_progress_note_to_api(selected_site)
+            
+            if api_success:
+                logger.info("Progress Note API 전송 성공")
+                return jsonify({
+                    'success': True, 
+                    'message': 'Progress Note saved and sent to API successfully.',
+                    'data': progress_note,
+                    'api_response': api_response
+                })
+            else:
+                logger.warning(f"Progress Note API 전송 실패: {api_response}")
+                # 파일 저장은 성공했지만 API 전송 실패
+                return jsonify({
+                    'success': True,  # 파일 저장은 성공
+                    'message': 'Progress Note saved but API transmission failed.',
+                    'data': progress_note,
+                    'api_error': api_response,
+                    'warning': 'API 전송에 실패했습니다. 파일은 정상적으로 저장되었습니다.'
+                })
+        except ImportError as e:
+            logger.error(f"API 모듈 import 오류: {str(e)}")
+            return jsonify({
+                'success': True,  # 파일 저장은 성공
+                'message': 'Progress Note saved but API module not available.',
+                'data': progress_note,
+                'warning': 'API 전송 모듈을 찾을 수 없습니다. 파일은 정상적으로 저장되었습니다.'
+            })
+        except Exception as e:
+            logger.error(f"API 전송 중 예상치 못한 오류: {str(e)}")
+            return jsonify({
+                'success': True,  # 파일 저장은 성공
+                'message': 'Progress Note saved but API transmission failed.',
+                'data': progress_note,
+                'api_error': str(e),
+                'warning': f'API 전송 중 오류가 발생했습니다: {str(e)}. 파일은 정상적으로 저장되었습니다.'
+            })
             
     except Exception as e:
         logger.error(f"Progress Note 저장 중 오류: {str(e)}")
@@ -704,6 +778,8 @@ def refresh_session():
     except Exception as e:
         logger.error(f"세션 새로고침 중 오류: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+
 
 # ==============================
 # 앱 실행

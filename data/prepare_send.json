@@ -1,15 +1,16 @@
 {
-    "ClientId": 2736,
-    "EventDate": "2025-06-05T15:56:00",
+    "ClientId": 1250,
+    "ClientServiceId": 1411,
+    "EventDate": "2025-06-06T13:04:00",
     "ProgressNoteEventType": {
-        "Id": 3
+        "Id": 26
     },
-    "NotesPlainText": "2736 right ?\ndsafasdfkjasdj\nsadjfkasjdkl \nasjfksajkflas \nasjdkfasjklfajs \nsajkfasjklfasl",
+    "NotesPlainText": "test web API - physio",
     "CreatedByUser": {
-        "FirstName": "Paul",
-        "LastName": "Vaska",
-        "UserName": "PaulVaska",
-        "Position": "GP"
+        "FirstName": "Edmond",
+        "LastName": "Grosser",
+        "UserName": "EdmondGrosser",
+        "Position": "Physiotherapist"
     },
-    "CreatedDate": "2025-06-05T15:56:00"
+    "CreatedDate": "2025-06-06T13:04:00"
 }

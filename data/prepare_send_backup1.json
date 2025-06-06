@@ -1,20 +1,16 @@
 {
-    "ClientId": 2786,
-    "EventDate": "2025-05-28T03:01:00.000Z",
+    "ClientId": 1309,
+    "ClientServiceId": 1511,
+    "EventDate": "2025-06-06T12:56:00",
     "ProgressNoteEventType": {
-        "Id": 152
+        "Id": 3
     },
-    "NotesPlainText": "22222222222222",
-    "CreatedBy": "admin",
+    "NotesPlainText": "test for web",
     "CreatedByUser": {
-        "UserName": "admin",
-        "DisplayName": "admin"
+        "FirstName": "Paul",
+        "LastName": "Vaska",
+        "UserName": "PaulVaska",
+        "Position": "GP"
     },
-    "CreatedDate": "2025-05-28T03:01:00.000Z",
-    "CareAreas": [
-        {
-            "Id": 73
-        }
-    ],
-    "ClientServiceId": 26
+    "CreatedDate": "2025-06-06T12:56:00"
 }

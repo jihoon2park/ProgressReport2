@@ -515,16 +515,32 @@ function saveProgressNoteToServer(formData) {
     .then(data => {
         if (data.success) {
             console.log('Progress note saved successfully:', data.data);
+            
+            // API 전송 결과 처리
+            if (data.api_response) {
+                // API 전송 성공
+                console.log('API transmission successful:', data.api_response);
+                alert('✅ Progress Note가 성공적으로 저장되고 API로 전송되었습니다!');
+            } else if (data.warning || data.api_error) {
+                // 파일 저장은 성공했지만 API 전송 실패
+                console.warn('API transmission failed:', data.api_error || data.warning);
+                const warningMsg = data.warning || 'API 전송에 실패했습니다.';
+                alert('⚠️ Progress Note가 저장되었지만 API 전송에 실패했습니다.\n\n' + warningMsg + '\n\n파일은 정상적으로 저장되었으므로 나중에 다시 시도할 수 있습니다.');
+            } else {
+                // 일반적인 저장 성공 (API 전송 정보 없음)
+                alert('✅ Progress Note가 성공적으로 저장되었습니다!');
+            }
+            
             return true;
         } else {
             console.error('Failed to save progress note:', data.message);
-            alert('Failed to save progress note: ' + data.message);
+            alert('❌ Progress Note 저장에 실패했습니다: ' + data.message);
             return false;
         }
     })
     .catch(error => {
         console.error('Error saving progress note:', error);
-        alert('Error saving progress note: ' + error.message);
+        alert('❌ Progress Note 저장 중 오류가 발생했습니다: ' + error.message);
         return false;
     });
 }
