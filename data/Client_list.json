@@ -502,14 +502,5 @@
         "BirthDate": "1946-07-17T00:00:00",
         "WingName": "Acacia",
         "RoomName": "008: A"
-    },
-    {
-        "PersonId": 2796,
-        "ClientName": "Janet Cantley",
-        "PreferredName": "",
-        "Gender": "Female",
-        "BirthDate": "1955-03-02T00:00:00",
-        "WingName": "Jacaranda ",
-        "RoomName": "010: J"
     }
 ]

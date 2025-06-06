@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize UI components
     initializeUI();
+    
+    // 세션 새로고침 (사용자 정보 업데이트)
+    refreshUserSession();
 });
 
 // Store references to all DOM elements we'll need
@@ -580,7 +583,7 @@ function gatherFormData() {
     return formData;
 }
 
-// Format date and time into ISO string
+// Format date and time into ISO string (local timezone, no milliseconds, no Z)
 function formatDateTime(dateValue, timeValue) {
     if (!dateValue) return '';
     
@@ -615,7 +618,15 @@ function formatDateTime(dateValue, timeValue) {
             date.setHours(0, 0, 0, 0);
         }
         
-        return date.toISOString();
+        // YYYY-MM-DDTHH:mm:ss 형식으로 로컬 시간 반환
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
     } catch (e) {
         console.error('Error formatting date time:', e, 'dateValue:', dateValue, 'timeValue:', timeValue);
         return '';
@@ -781,4 +792,25 @@ function adjustFloatingButtonsPosition() {
     }
     
     console.log(`Notes height: ${notesHeight}px, Scroll height: ${notesScrollHeight}px, Has scrollbar: ${hasScrollbar}`);
+}
+
+// 세션 새로고침 함수
+function refreshUserSession() {
+    fetch('/api/refresh-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('세션 새로고침 성공:', data.user_info);
+        } else {
+            console.log('세션 새로고침 실패:', data.message);
+        }
+    })
+    .catch(error => {
+        console.log('세션 새로고침 오류:', error);
+    });
 }

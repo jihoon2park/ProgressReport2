@@ -7,20 +7,41 @@ body {
 }
 
 .site-info-box {
-    background-color: #f8f9fa;
-    padding: 15px;
-    margin: 20px 0;
-    border-radius: 5px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 25px;
+    margin: 20px auto;
+    border-radius: 12px;
     border: 1px solid #dee2e6;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    max-width: 650px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 .selected-site {
-    font-size: 1.2em;
+    font-size: 1.4em;
     color: #495057;
+    font-weight: 600;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #dee2e6;
 }
 .site-name {
     font-weight: bold;
     color: #007bff;
+    font-size: 1.2em;
+    text-shadow: 0 1px 2px rgba(0,123,255,0.1);
+}
+.login-user {
+    font-size: 1.3em;
+    color: #495057;
+    font-weight: 600;
+}
+.user-name {
+    font-weight: bold;
+    color: #28a745;
+    font-size: 1.2em;
+    text-shadow: 0 1px 2px rgba(40,167,69,0.1);
 }
 
 .app-container {

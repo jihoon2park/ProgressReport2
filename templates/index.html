@@ -12,9 +12,12 @@
 
     <div class="site-info-box">
         <div class="selected-site">
-        Selected Site: <span class="site-name">{{ selected_site }}</span>
+            Selected Site: <span class="site-name">{{ selected_site }}</span>
+        </div>
+        <div class="login-user">
+            Login User: <span class="user-name">{{ current_user.display_name if current_user else 'Unknown' }}</span>
+        </div>
     </div>
-</div>
 </head>
 <body>
     <div class="app-container">
