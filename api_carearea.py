@@ -1,6 +1,8 @@
 from typing import Dict, Any
 import requests
 import logging
+import json
+import os
 
 from flask import json
 
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class APICareArea:
     def __init__(self, site: str):
-        from config import SITE_SERVERS, API_HEADERS
+        from config import SITE_SERVERS, get_api_headers
         
         self.site = site
         if site not in SITE_SERVERS:
@@ -23,7 +25,7 @@ class APICareArea:
         logger.info(f"APICareArea initialized with base_url: {self.base_url}")
         
         self.session = requests.Session()
-        self.session.headers.update(API_HEADERS)
+        self.session.headers.update(get_api_headers(site))
 
     def get_care_area_information(self) -> Dict[str, Any]:
         try:
@@ -35,10 +37,6 @@ class APICareArea:
             
             response.raise_for_status()
             care_area_data = response.json()
-            
-            # 상세 데이터 로깅
-            logger.info("Care Area Data received:")
-            logger.info(json.dumps(care_area_data, indent=2, ensure_ascii=False))
             
             # 데이터를 파일로 저장
             self._save_care_area_data(care_area_data)
@@ -53,9 +51,6 @@ class APICareArea:
 
     def _save_care_area_data(self, care_area_data: Dict[str, Any]):
         """Care Area 데이터를 JSON 파일로 저장"""
-        import json
-        import os
-        
         try:
             # data 디렉토리가 없으면 생성
             if not os.path.exists('data'):

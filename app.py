@@ -9,9 +9,11 @@ from flask import (
     jsonify, 
     send_from_directory
 )
+
 import requests
 from functools import wraps
 import logging
+import logging.handlers
 import json
 import os
 from datetime import datetime
@@ -33,9 +35,27 @@ flask_config = get_flask_config()
 
 # 로깅 설정
 log_level = getattr(logging, flask_config['LOG_LEVEL'].upper())
+
+# 로그 디렉토리 생성
+log_dir = 'logs'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+# 파일 핸들러와 콘솔 핸들러 설정
 logging.basicConfig(
     level=log_level,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        # 콘솔 출력
+        logging.StreamHandler(),
+        # 파일 출력 (최대 10MB, 5개 파일 로테이션)
+        logging.handlers.RotatingFileHandler(
+            f'{log_dir}/app.log',
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+    ]
 )
 logger = logging.getLogger(__name__)
 
