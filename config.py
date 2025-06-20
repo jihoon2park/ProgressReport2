@@ -11,7 +11,7 @@ SITE_SERVERS = {
 SITE_API_KEYS = {
     'Parafield Gardens': '6RU+gahOFDvf/aF2dC7hAV+flYNe+dMb8Ts2xMsR0QM=',
     'Nerrilda': 'rcPYmmujoPHYwZ7w6U4nKttH2lt2GgLnnRD7BUwvm58=',
-    'Ramsay': 'iKsCR/wbvEdTRa1cq0k4H7j8/dAKb5t4aAQqchXfmfQ=',
+    'Ramsay': 'DtQEnNJohGnYnzQory++De2NijWqINO+enhDdBNHYTM=',
     'West Park': 'YjTVon6NmDLeIUF3S3kyWyJtiB+cHOtxiIxXYb0Z6zw=',
     'Yankalilla': 'RhU1zjQMJs2/BK/USVmVywy5SdimDTm28BRguF70c+I='
 }
