@@ -10,22 +10,24 @@ logger = logging.getLogger(__name__)
 class ProgressNoteAPIClient:
     def __init__(self, site=None):
         """Progress Note API 클라이언트 초기화"""
-        from config import SITE_SERVERS, API_HEADERS
+        from config import SITE_SERVERS, get_api_headers
         
         self.site = site
         if site and site in SITE_SERVERS:
             self.api_url = f"http://{SITE_SERVERS[site]}/api/progressnote"
         else:
             # 기본값 (Parafield Gardens)
+            self.site = 'Parafield Gardens'
             self.api_url = f"http://{SITE_SERVERS['Parafield Gardens']}/api/progressnote"
             
         self.prepare_send_file = "data/prepare_send.json"
         
-        # 세션 설정 (기존 API 헤더 사용)
+        # 세션 설정 (사이트별 API 헤더 사용)
         self.session = requests.Session()
-        self.session.headers.update(API_HEADERS)
+        self.session.headers.update(get_api_headers(self.site))
         
-        logger.info(f"ProgressNoteAPIClient initialized for site '{site}' with API URL: {self.api_url}")
+        logger.info(f"ProgressNoteAPIClient initialized for site '{self.site}' with API URL: {self.api_url}")
+        logger.info(f"API 헤더: {dict(self.session.headers)}")
 
     def load_prepare_send_data(self) -> Optional[Dict[str, Any]]:
         """prepare_send.json 파일을 로드합니다."""

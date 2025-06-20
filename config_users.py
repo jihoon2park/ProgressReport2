@@ -111,6 +111,16 @@ USERS_DB = {
         "position": "Physiotherapist",
         "email": "edmond.grosser@hospital.com",
         "department": "Rehabilitation"
+    },
+    "SarahJones": {
+        "password_hash": hash_password("password123"),
+        "display_name": "Sarah Jones",
+        "first_name": "Sarah",
+        "last_name": "Jones",
+        "role": "physiotherapist",
+        "position": "Physiotherapist",
+        "email": "sarah.jones@hospital.com",
+        "department": "Rehabilitation"
     }
 }
 
