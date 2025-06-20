@@ -1,16 +1,16 @@
 {
-    "ClientId": 1250,
-    "ClientServiceId": 1411,
-    "EventDate": "2025-06-06T13:04:00",
+    "ClientId": 1309,
+    "ClientServiceId": 1511,
+    "EventDate": "2025-06-20T14:04:00",
     "ProgressNoteEventType": {
-        "Id": 26
+        "Id": 3
     },
-    "NotesPlainText": "test web API - physio",
+    "NotesPlainText": "test for progress note web",
     "CreatedByUser": {
-        "FirstName": "Edmond",
-        "LastName": "Grosser",
-        "UserName": "EdmondGrosser",
-        "Position": "Physiotherapist"
+        "FirstName": "Paul",
+        "LastName": "Vaska",
+        "UserName": "PaulVaska",
+        "Position": "GP"
     },
-    "CreatedDate": "2025-06-06T13:04:00"
+    "CreatedDate": "2025-06-20T14:04:00"
 }

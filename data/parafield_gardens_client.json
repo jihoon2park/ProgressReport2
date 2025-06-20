@@ -7177,7 +7177,7 @@
             "LastUpdatedDate": "2025-05-02T03:29:24.22Z"
         },
         {
-            "MainClientServiceId": 1522,
+            "MainClientServiceId": 1530,
             "Title": "",
             "FirstName": "Margaret",
             "MiddleName": "Edna",
@@ -7186,7 +7186,7 @@
             "PreferredName": "",
             "RoomNumber": "6",
             "BirthDate": "1935-05-04T00:00:00",
-            "AdmissionDate": "2025-05-20T10:00:00",
+            "AdmissionDate": "2025-06-17T08:30:00",
             "Gender": "Female",
             "GenderDesc": "Female",
             "LocationId": 1,
@@ -7196,6 +7196,9 @@
             "RoomId": 43,
             "RoomName": "006: W",
             "BedName": "W",
+            "AcatLevelId": 3,
+            "AcatLevelName": "Residential",
+            "PensionerStatus": "FullPension",
             "MeansTestedAssessmentStatus": "None",
             "Contacts": [
                 {
@@ -7359,7 +7362,7 @@
             "IsArchived": false,
             "IsDeleted": false,
             "ClientStatusTypeId": 1,
-            "CareType": "Respite",
+            "CareType": "Permanent",
             "PersonId": 2803,
             "HeadShotThumbUrl": "person/headshotthumbnail/2803.20250520111653183.png",
             "HeadShotUrl": "person/headshot/2803.20250520111653183.png",
@@ -7370,7 +7373,7 @@
             "ReferenceNumber": "",
             "Managers": [],
             "Id": 1315,
-            "LastUpdatedDate": "2025-05-20T02:38:22.277Z"
+            "LastUpdatedDate": "2025-06-16T23:13:17.177Z"
         },
         {
             "MainClientServiceId": 1241,
@@ -12722,5 +12725,5 @@
             "LastUpdatedDate": "2025-05-18T23:31:11.497Z"
         }
     ],
-    "timestamp": "2025-06-16T17:08:57.640622"
+    "timestamp": "2025-06-20T14:04:39.793907"
 }
