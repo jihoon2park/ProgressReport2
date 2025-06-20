@@ -1,4 +1,5 @@
 # Python
+/__pycache__
 __pycache__/
 *.py[cod]
 *$py.class
@@ -37,6 +38,7 @@ config_secrets.py
 *.crt
 
 # 데이터 파일
+/data
 data/
 *.json
 *.db
