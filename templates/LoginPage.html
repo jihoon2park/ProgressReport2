@@ -62,6 +62,73 @@
             margin-bottom: 5px;
         }
 
+        /* API 서버 상태 표시 스타일 */
+        .server-status {
+            max-width: 400px;
+            margin: 30px auto;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .server-status h3 {
+            margin: 0 0 15px 0;
+            text-align: center;
+            color: #495057;
+            font-size: 1.2rem;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .status-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            word-break: keep-all;
+        }
+        .status-item.online {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-item.offline {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status-item.loading {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status-icon {
+            display: block;
+            width: 15px;
+            height: 15px;
+            margin: 0 auto 5px auto;
+            border-radius: 50%;
+        }
+        .status-icon.online {
+            background-color: #28a745;
+        }
+        .status-icon.offline {
+            background-color: #dc3545;
+        }
+        .status-icon.loading {
+            background-color: #ffc107;
+        }
+        .last-updated {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -71,19 +138,19 @@
             <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company Logo">
         </div>
 
-        <!-- 사이트 선택  -->
-        <div class="site-select">
-            <label for="site">Select Site:</label>
-            <select id="site" name="site" required>
-                <option value="">-- Select Site --</option>
-                {% for site in sites %}
-                <option value="{{ site }}">{{ site }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
         <!-- 로그인 폼 -->
         <form class="login-form" action="{{ url_for('login') }}" method="POST">
+            <!-- 사이트 선택  -->
+            <div class="site-select">
+                <label for="site">Select Site:</label>
+                <select id="site" name="site" required>
+                    <option value="">-- Select Site --</option>
+                    {% for site in sites %}
+                    <option value="{{ site }}">{{ site }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <div class="form-group">
                 <input type="text" name="username" placeholder="Username" required>
             </div>
@@ -93,5 +160,107 @@
             <button type="submit" class="login-button">Login</button>
         </form>
     </div>
+
+    <!-- API 서버 상태 표시 -->
+    <div class="server-status">
+        <h3>API Server Status</h3>
+        <div class="status-grid">
+            <div class="status-item loading" id="status-parafield">
+                <div class="status-icon loading"></div>
+                Parafield Gardens
+            </div>
+            <div class="status-item loading" id="status-nerrilda">
+                <div class="status-icon loading"></div>
+                Nerrilda
+            </div>
+            <div class="status-item loading" id="status-ramsay">
+                <div class="status-icon loading"></div>
+                Ramsay
+            </div>
+            <div class="status-item loading" id="status-westpark">
+                <div class="status-icon loading"></div>
+                West Park
+            </div>
+            <div class="status-item loading" id="status-yankalilla">
+                <div class="status-icon loading"></div>
+                Yankalilla
+            </div>
+        </div>
+        <div class="last-updated" id="last-updated">Last updated: Checking...</div>
+    </div>
+
+    <script>
+        // API 서버 상태 체크 함수
+        function checkServerStatus() {
+            fetch('/api/server-status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatusDisplay(data);
+                    updateLastUpdated();
+                })
+                .catch(error => {
+                    console.error('Error checking server status:', error);
+                    // 에러 시 모든 서버를 오프라인으로 표시
+                    const sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
+                    const errorData = {};
+                    sites.forEach(site => {
+                        errorData[site] = false;
+                    });
+                    updateStatusDisplay(errorData);
+                    updateLastUpdated();
+                });
+        }
+
+        // 상태 표시 업데이트 함수
+        function updateStatusDisplay(statusData) {
+            const statusMap = {
+                'Parafield Gardens': 'status-parafield',
+                'Nerrilda': 'status-nerrilda',
+                'Ramsay': 'status-ramsay',
+                'West Park': 'status-westpark',
+                'Yankalilla': 'status-yankalilla'
+            };
+
+            Object.keys(statusData).forEach(site => {
+                const elementId = statusMap[site];
+                const element = document.getElementById(elementId);
+                const icon = element.querySelector('.status-icon');
+                
+                if (statusData[site]) {
+                    // 온라인 상태
+                    element.className = 'status-item online';
+                    icon.className = 'status-icon online';
+                } else {
+                    // 오프라인 상태
+                    element.className = 'status-item offline';
+                    icon.className = 'status-icon offline';
+                }
+            });
+        }
+
+        // 마지막 업데이트 시간 표시
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-updated').textContent = `Last updated: ${timeString}`;
+        }
+
+        // 페이지 로드 시 초기 상태 체크
+        document.addEventListener('DOMContentLoaded', function() {
+            // 초기 상태 체크
+            checkServerStatus();
+            
+            // 1분(60000ms)마다 상태 체크
+            setInterval(checkServerStatus, 60000);
+        });
+
+        // 페이지가 숨겨질 때 타이머 정리 (선택사항)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // 페이지가 숨겨졌을 때는 체크를 중단할 수 있지만,
+                // 요구사항에 따라 계속 실행되도록 유지
+            }
+        });
+    </script>
 </body>
 </html>
