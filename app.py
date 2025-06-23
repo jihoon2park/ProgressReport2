@@ -451,6 +451,28 @@ def save_prepare_send_json(progress_note_data):
         return False
 
 # ==============================
+# API 서버 상태 체크 기능
+# ==============================
+
+def check_api_server_health(server_ip):
+    """API 서버 상태 체크"""
+    try:
+        url = f"http://{server_ip}/api/system/canconnect"
+        response = requests.get(url, timeout=5)
+        return response.status_code == 200 and response.text.strip() == 'true'
+    except Exception as e:
+        logger.error(f"API 서버 상태 체크 실패 - {server_ip}: {str(e)}")
+        return False
+
+@app.route('/api/server-status')
+def get_server_status():
+    """모든 사이트의 API 서버 상태를 반환"""
+    status = {}
+    for site, server_ip in SITE_SERVERS.items():
+        status[site] = check_api_server_health(server_ip)
+    return jsonify(status)
+
+# ==============================
 # 라우트 정의
 # ==============================
 
@@ -466,12 +488,12 @@ def home():
             # 데이터 파일이 없으면 세션 클리어하고 로그인 페이지로
             session.clear()
             flash('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning')
-    return render_template('progressnote.html', sites=SITE_SERVERS.keys())
+    return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
 
 @app.route('/login', methods=['GET'])
 def login_page():
     """로그인 페이지"""
-    return render_template('ProgressNote.html', sites=SITE_SERVERS.keys())
+    return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -798,8 +820,6 @@ def refresh_session():
     except Exception as e:
         logger.error(f"세션 새로고침 중 오류: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
-
-
 
 # ==============================
 # 앱 실행
