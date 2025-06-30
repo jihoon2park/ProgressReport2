@@ -9,6 +9,7 @@ from flask import (
     jsonify, 
     send_from_directory
 )
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 import requests
 from functools import wraps
@@ -29,6 +30,7 @@ from api_eventtype import APIEventType
 from config import SITE_SERVERS, API_HEADERS
 from config_users import authenticate_user, get_user
 from config_env import get_flask_config, print_current_config
+from models import load_user, User
 
 # 환경별 설정 로딩
 flask_config = get_flask_config()
@@ -69,6 +71,18 @@ app = Flask(__name__, static_url_path='/static')
 app.secret_key = flask_config['SECRET_KEY']
 app.config['DEBUG'] = flask_config['DEBUG']
 
+# Flask-Login 설정
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'home'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'warning'
+
+@login_manager.user_loader
+def user_loader(user_id):
+    """Flask-Login의 user_loader 콜백"""
+    return load_user(user_id)
+
 # 설정 검증 로그
 if flask_config['ENVIRONMENT'] == 'production' and flask_config['DEBUG']:
     logger.warning("⚠️  운영환경에서 DEBUG 모드가 활성화되어 있습니다!")
@@ -76,26 +90,24 @@ if flask_config['ENVIRONMENT'] == 'production' and flask_config['DEBUG']:
 if flask_config['SECRET_KEY'] == 'fallback-secret-key':
     logger.warning("⚠️  기본 SECRET_KEY를 사용하고 있습니다. 보안상 위험합니다!")
 
-AUTH_SESSION_KEY = 'logged_in'
-
 # 데이터 디렉토리 확인 및 생성
 if not os.path.exists('data'):
     os.makedirs('data')
     logger.info("data 디렉토리 생성됨")
 
 # ==============================
-# 인증 관련 기능
+# 인증 관련 기능 (Flask-Login 사용)
 # ==============================
 
 def _is_authenticated():
-    """사용자 인증 상태 확인"""
-    return AUTH_SESSION_KEY in session
+    """사용자 인증 상태 확인 (Flask-Login 사용)"""
+    return current_user.is_authenticated
 
 def require_authentication(wrapped_function):
-    """인증이 필요한 라우트에 사용할 데코레이터"""
+    """인증이 필요한 라우트에 사용할 데코레이터 (Flask-Login 사용)"""
     @wraps(wrapped_function)
     def decorated_function(*args, **kwargs):
-        if not _is_authenticated():
+        if not current_user.is_authenticated:
             return redirect(url_for('home'))
         return wrapped_function(*args, **kwargs)
     return decorated_function
@@ -299,10 +311,10 @@ def create_progress_note_json(form_data):
         # 선택적 필드들 (값이 있을 때만 추가)
         
         # CreatedByUser (ExternalUserDto 형식)
-        username = session.get('username')
-        first_name = session.get('first_name', '')
-        last_name = session.get('last_name', '')
-        position = session.get('position', '')
+        username = current_user.username
+        first_name = current_user.first_name
+        last_name = current_user.last_name
+        position = current_user.position
         
         # 세션에 정보가 없으면 사용자 DB에서 다시 가져오기 - 이부분 나중에 다시 확인해야 함...... Jay 2025-06-05
         if username and (not first_name or not last_name or not position):
@@ -479,13 +491,14 @@ def get_server_status():
 @app.route('/')
 def home():
     """홈 페이지"""
-    if _is_authenticated():
+    if current_user.is_authenticated:
         # 인증되어 있더라도 필요한 데이터 파일이 있는지 확인
         filename = session.get('current_file')
         if filename and os.path.exists(filename):
             return redirect(url_for('index'))
         else:
-            # 데이터 파일이 없으면 세션 클리어하고 로그인 페이지로
+            # 데이터 파일이 없으면 로그아웃하고 로그인 페이지로
+            logout_user()
             session.clear()
             flash('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning')
     return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
@@ -532,14 +545,11 @@ def login():
                             filename = save_client_data(username, site, client_info)
                             session['current_file'] = filename
                         
-                        # 세션 설정
-                        session['logged_in'] = True
-                        session['username'] = username
-                        session['display_name'] = user_info['display_name']
-                        session['first_name'] = user_info['first_name']
-                        session['last_name'] = user_info['last_name']
-                        session['role'] = user_info['role']
-                        session['position'] = user_info['position']
+                        # Flask-Login을 사용한 로그인 처리
+                        user = User(username, user_info)
+                        login_user(user, remember=True)  # Remember Me 기능 활성화
+                        
+                        # 세션에 추가 정보 저장
                         session['site'] = site
                         
                         flash('Login successful!', 'success')
@@ -569,22 +579,20 @@ def login():
 @app.route('/logout')
 def logout():
     """로그아웃 처리"""
+    logout_user()
     session.clear()
+    flash('You have been logged out successfully.', 'info')
     return redirect(url_for('home'))
 
 @app.route('/index')
-@require_authentication
+@login_required
 def index():
     """메인 대시보드 페이지"""
-    # 추가 인증 검사 (데코레이터가 있지만 안전을 위해 이중 체크)
-    if not _is_authenticated():
-        return redirect(url_for('home'))
-
     # 현재 로그인한 사용자 정보
-    current_user = {
-        'username': session.get('username'),
-        'display_name': session.get('display_name'),
-        'role': session.get('role')
+    current_user_info = {
+        'username': current_user.username,
+        'display_name': current_user.display_name,
+        'role': current_user.role
     }
 
     # JSON 파일에서 데이터 읽기
@@ -596,7 +604,7 @@ def index():
                 return render_template('index.html',
                                     selected_site=data['site'],
                                     client_info=data['client_info'],
-                                    current_user=current_user)
+                                    current_user=current_user_info)
         except Exception as e:
             logger.error(f"파일 읽기 오류: {str(e)}")
             flash('{An error occurred while loading data}', 'error')
@@ -604,7 +612,7 @@ def index():
     return redirect(url_for('home'))
 
 @app.route('/save_progress_note', methods=['POST'])
-@require_authentication
+@login_required
 def save_progress_note():
     """Progress Note 데이터 저장 및 API 전송"""
     try:
@@ -705,7 +713,7 @@ def get_client_list():
         return jsonify([]), 404
 
 @app.route('/data/carearea.json')
-@require_authentication
+@login_required
 def get_care_area_list():
     """Care Area 목록 JSON 반환"""
     try:
@@ -715,7 +723,7 @@ def get_care_area_list():
         return jsonify([]), 404
 
 @app.route('/data/eventtype.json')
-@require_authentication
+@login_required
 def get_event_type_list():
     """Event Type 목록 JSON 반환"""
     try:
@@ -725,7 +733,7 @@ def get_event_type_list():
         return jsonify([]), 404
 
 @app.route('/api/backup-status')
-@require_authentication
+@login_required
 def get_backup_status():
     """백업 파일 상태 확인 (테스트용)"""
     try:
@@ -764,17 +772,17 @@ def get_backup_status():
         return jsonify({'error': 'Failed to get backup status'}), 500
 
 @app.route('/api/user-info')
-@require_authentication
+@login_required
 def get_user_info():
     """현재 로그인한 사용자 정보 반환"""
     try:
         user_info = {
-            'username': session.get('username'),
-            'display_name': session.get('display_name'),
-            'first_name': session.get('first_name'),
-            'last_name': session.get('last_name'),
-            'role': session.get('role'),
-            'position': session.get('position'),
+            'username': current_user.username,
+            'display_name': current_user.display_name,
+            'first_name': current_user.first_name,
+            'last_name': current_user.last_name,
+            'role': current_user.role,
+            'position': current_user.position,
             'site': session.get('site')
         }
         return jsonify(user_info)
@@ -783,11 +791,11 @@ def get_user_info():
         return jsonify({'error': 'Failed to get user info'}), 500
 
 @app.route('/api/refresh-session', methods=['POST'])
-@require_authentication
+@login_required
 def refresh_session():
     """현재 세션 새로고침 - 사용자 정보 다시 로딩"""
     try:
-        username = session.get('username')
+        username = current_user.username
         if not username:
             return jsonify({'success': False, 'message': 'No username in session'}), 400
             
@@ -796,12 +804,9 @@ def refresh_session():
         if not user_data:
             return jsonify({'success': False, 'message': 'User not found'}), 404
             
-        # 세션 업데이트
-        session['display_name'] = user_data.get('display_name', username)
-        session['first_name'] = user_data.get('first_name', '')
-        session['last_name'] = user_data.get('last_name', '')
-        session['role'] = user_data.get('role', '')
-        session['position'] = user_data.get('position', '')
+        # 새로운 User 객체 생성하여 로그인 갱신
+        user = User(username, user_data)
+        login_user(user, remember=True)
         
         logger.info(f"세션 새로고침 완료: {username}")
         
@@ -809,12 +814,12 @@ def refresh_session():
             'success': True,
             'message': 'Session refreshed successfully',
             'user_info': {
-                'username': username,
-                'display_name': session.get('display_name'),
-                'first_name': session.get('first_name'),
-                'last_name': session.get('last_name'),
-                'role': session.get('role'),
-                'position': session.get('position')
+                'username': user.username,
+                'display_name': user.display_name,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'position': user.position
             }
         })
     except Exception as e:
