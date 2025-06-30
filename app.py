@@ -17,7 +17,7 @@ import logging
 import logging.handlers
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # .env 파일에서 환경변수 로딩
@@ -70,6 +70,10 @@ app = Flask(__name__, static_url_path='/static')
 # 환경별 설정 적용
 app.secret_key = flask_config['SECRET_KEY']
 app.config['DEBUG'] = flask_config['DEBUG']
+
+# 세션 타임아웃 설정 (5분)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(minutes=5)
 
 # Flask-Login 설정
 login_manager = LoginManager()
@@ -549,6 +553,9 @@ def login():
                         user = User(username, user_info)
                         login_user(user, remember=True)  # Remember Me 기능 활성화
                         
+                        # 세션 생성 시간 기록
+                        session['_created'] = datetime.now().isoformat()
+                        
                         # 세션에 추가 정보 저장
                         session['site'] = site
                         
@@ -824,6 +831,58 @@ def refresh_session():
         })
     except Exception as e:
         logger.error(f"세션 새로고침 중 오류: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/session-status')
+@login_required
+def get_session_status():
+    """세션 상태 확인"""
+    try:
+        # 세션 만료 시간 계산 (5분)
+        session_lifetime = timedelta(minutes=5)
+        session_created = session.get('_created', datetime.now())
+        
+        if isinstance(session_created, str):
+            session_created = datetime.fromisoformat(session_created)
+        
+        session_expires = session_created + session_lifetime
+        now = datetime.now()
+        
+        # 남은 시간 계산 (초 단위)
+        remaining_seconds = (session_expires - now).total_seconds()
+        
+        return jsonify({
+            'success': True,
+            'session_created': session_created.isoformat(),
+            'session_expires': session_expires.isoformat(),
+            'remaining_seconds': max(0, int(remaining_seconds)),
+            'is_expired': remaining_seconds <= 0
+        })
+    except Exception as e:
+        logger.error(f"세션 상태 확인 중 오류: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/extend-session', methods=['POST'])
+@login_required
+def extend_session():
+    """세션 연장"""
+    try:
+        # 세션 생성 시간 업데이트
+        session['_created'] = datetime.now().isoformat()
+        
+        # Flask-Login 세션 갱신 (재귀 방지를 위해 직접 세션 갱신)
+        session.permanent = True
+        session.modified = True
+        
+        logger.info(f"세션 연장 완료: {current_user.username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Session extended successfully',
+            'session_created': session['_created']
+        })
+    except Exception as e:
+        logger.error(f"세션 연장 중 오류: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 # ==============================

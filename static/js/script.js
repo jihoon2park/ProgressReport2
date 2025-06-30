@@ -1,6 +1,13 @@
 // DOM Elements object to store references
 const DOM = {};
 
+// 세션 타임아웃 관련 변수
+let sessionTimeoutId = null;
+let sessionWarningId = null;
+let sessionCheckInterval = null;
+const SESSION_TIMEOUT_MINUTES = 5;
+const SESSION_WARNING_MINUTES = 1;
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize DOM references
@@ -11,6 +18,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 세션 새로고침 (사용자 정보 업데이트)
     refreshUserSession();
+    
+    // 세션 타임아웃 모니터링 시작
+    startSessionTimeoutMonitoring();
+    
+    // 사용자 활동 감지 (세션 연장)
+    setupActivityDetection();
 });
 
 // Store references to all DOM elements we'll need
@@ -829,4 +842,339 @@ function refreshUserSession() {
     .catch(error => {
         console.log('세션 새로고침 오류:', error);
     });
+}
+
+// 세션 타임아웃 모니터링 시작
+function startSessionTimeoutMonitoring() {
+    console.log('세션 타임아웃 모니터링 시작');
+    
+    // 30초마다 세션 상태 확인
+    sessionCheckInterval = setInterval(checkSessionStatus, 30000);
+    
+    // 초기 세션 상태 확인
+    checkSessionStatus();
+}
+
+// 세션 상태 확인
+function checkSessionStatus() {
+    fetch('/api/session-status')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Session status check failed');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const remainingSeconds = data.remaining_seconds;
+                const remainingMinutes = Math.floor(remainingSeconds / 60);
+                
+                console.log(`session remaining time: ${remainingMinutes}min ${remainingSeconds % 60}sec`);
+                
+                // 1분 남았을 때 경고
+                if (remainingSeconds <= 60 && remainingSeconds > 0) {
+                    showSessionWarning(remainingSeconds);
+                }
+                
+                // 세션 만료 시 로그아웃
+                if (remainingSeconds <= 0) {
+                    handleSessionTimeout();
+                }
+            }
+        })
+        .catch(error => {
+            console.error('session status check error:', error);    
+            // 네트워크 오류 시에도 세션 타임아웃 처리
+            handleSessionTimeout();
+        });
+}
+
+// 세션 경고 표시
+function showSessionWarning(remainingSeconds) {
+    // 이미 경고가 표시되고 있으면 중복 표시하지 않음
+    if (sessionWarningId) {
+        return;
+    }
+    
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    
+    // 경고 모달 생성
+    const warningModal = document.createElement('div');
+    warningModal.id = 'session-warning-modal';
+    warningModal.innerHTML = `
+        <div class="session-warning-overlay">
+            <div class="session-warning-content">
+                <h3>⚠️ Session Expiration Warning</h3>
+                <p>Your session will expire in <strong>${minutes}min ${seconds}sec</strong>.</p>
+                <p>Click the "Extend Session" button to continue working.</p>
+                <div class="session-warning-buttons">
+                    <button id="extend-session-btn" class="btn-primary">Extend Session</button>
+                    <button id="logout-now-btn" class="btn-secondary">Logout Now</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 스타일 추가
+    const style = document.createElement('style');
+    style.textContent = `
+        .session-warning-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .session-warning-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .session-warning-content h3 {
+            color: #e74c3c;
+            margin-bottom: 15px;
+        }
+        .session-warning-content p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .session-warning-buttons {
+            margin-top: 20px;
+        }
+        .session-warning-buttons button {
+            margin: 0 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(warningModal);
+    
+    // 버튼 이벤트 리스너
+    document.getElementById('extend-session-btn').addEventListener('click', extendSession);
+    document.getElementById('logout-now-btn').addEventListener('click', logoutNow);
+    
+    // 경고 ID 저장
+    sessionWarningId = warningModal;
+    
+    // 10초 후 자동으로 경고 제거 (사용자가 아무것도 하지 않으면)
+    setTimeout(() => {
+        if (sessionWarningId) {
+            removeSessionWarning();
+        }
+    }, 10000);
+}
+
+// 세션 연장
+function extendSession() {
+    fetch('/api/extend-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Session extension failed');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            console.log('세션 연장 성공');
+            removeSessionWarning();
+            
+            // 성공 메시지 표시
+            showNotification('Session extended successfully.', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('session extension error:', error);
+        showNotification('Session extension failed.', 'error');
+        handleSessionTimeout();
+    });
+}
+
+// 지금 로그아웃
+function logoutNow() {
+    removeSessionWarning();
+    window.location.href = '/logout';
+}
+
+// 세션 경고 제거
+function removeSessionWarning() {
+    if (sessionWarningId) {
+        sessionWarningId.remove();
+        sessionWarningId = null;
+    }
+}
+
+// 세션 타임아웃 처리
+function handleSessionTimeout() {
+    console.log('세션 타임아웃 - 로그아웃 처리');
+    
+    // 모니터링 중지
+    if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval);
+        sessionCheckInterval = null;
+    }
+    
+    // 경고 제거
+    removeSessionWarning();
+    
+    // 타임아웃 모달 표시
+    const timeoutModal = document.createElement('div');
+    timeoutModal.innerHTML = `
+        <div class="session-warning-overlay">
+            <div class="session-warning-content">
+                <h3>⏰ Session Expired</h3>
+                <p>Your session has expired.</p>
+                <p>You will be automatically redirected to the login page.</p>
+                <div class="session-warning-buttons">
+                    <button id="go-login-btn" class="btn-primary">Go to Login Page</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(timeoutModal);
+    
+    document.getElementById('go-login-btn').addEventListener('click', () => {
+        window.location.href = '/';
+    });
+    
+    // 3초 후 자동으로 로그인 페이지로 이동
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 3000);
+}
+
+// 사용자 활동 감지 (세션 연장)
+function setupActivityDetection() {
+    console.log('사용자 활동 감지 설정');
+    
+    // 사용자 활동 이벤트들
+    const activityEvents = [
+        'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'
+    ];
+    
+    let activityTimeout = null;
+    
+    activityEvents.forEach(event => {
+        document.addEventListener(event, () => {
+            // 마지막 활동 시간 기록
+            sessionStorage.setItem('lastActivity', Date.now().toString());
+            
+            // 기존 타임아웃 클리어
+            if (activityTimeout) {
+                clearTimeout(activityTimeout);
+            }
+            
+            // 2분 후에 세션 연장 시도
+            activityTimeout = setTimeout(() => {
+                extendSessionSilently();
+            }, 120000); // 2분
+        });
+    });
+}
+
+// 조용한 세션 연장 (사용자에게 알리지 않음)
+function extendSessionSilently() {
+    fetch('/api/extend-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Silent session extension failed');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            console.log('조용한 세션 연장 성공');
+        }
+    })
+    .catch(error => {
+        console.error('조용한 세션 연장 오류:', error);
+    });
+}
+
+// 알림 표시 함수
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    // 스타일 추가
+    const style = document.createElement('style');
+    style.textContent = `
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 10001;
+            animation: slideIn 0.3s ease-out;
+        }
+        .notification-success {
+            background: #27ae60;
+        }
+        .notification-error {
+            background: #e74c3c;
+        }
+        .notification-info {
+            background: #3498db;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(notification);
+    
+    // 3초 후 자동 제거
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
 }
