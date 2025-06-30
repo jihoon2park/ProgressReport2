@@ -37,12 +37,21 @@ config_secrets.py
 *.pem
 *.crt
 
+<<<<<<< HEAD
 # 데이터 파일
 /data
+=======
+# 데이터 파일 - JSON 파일 모두 제외
+>>>>>>> develop
 data/
 *.json
+data/*.json
+data/**/*.json
+
+# 데이터베이스 파일
 *.db
 *.sqlite
+*.sqlite3
 
 # 로그 파일
 *.log
@@ -64,4 +73,12 @@ instance/
 
 # 백업 파일
 *.bak
+<<<<<<< HEAD
 *~ 
+=======
+*~
+
+# 임시 파일
+*.tmp
+*.temp 
+>>>>>>> develop
