@@ -507,7 +507,7 @@ def login():
 
         # 입력값 검증
         if not all([username, password, site]):
-            flash('모든 필드를 입력해주세요.', 'error')
+            flash('{Please fill in all fields}', 'error')
             return redirect(url_for('home'))
 
         # 인증 검증
@@ -554,16 +554,16 @@ def login():
                     logger.error("데이터 가져오기 실패로 인한 로그인 실패")
             except Exception as e:
                 logger.error(f"API 호출 중 오류 발생: {str(e)}")
-                flash('서버 연결 중 오류가 발생했습니다.', 'error')
+                flash('{An error occurred while connecting to the server}', 'error')
                 
             return redirect(url_for('home'))
         else:
-            flash('잘못된 인증 정보입니다.', 'error')
+            flash('{Invalid authentication information}', 'error')
             return redirect(url_for('home'))
             
     except Exception as e:
         logger.error(f"로그인 처리 중 예외 발생: {str(e)}")
-        flash('서버 오류가 발생했습니다.', 'error')
+        flash('{An error occurred while connecting to the server}', 'error')
         return redirect(url_for('home'))
 
 @app.route('/logout')
@@ -599,7 +599,7 @@ def index():
                                     current_user=current_user)
         except Exception as e:
             logger.error(f"파일 읽기 오류: {str(e)}")
-            flash('데이터 로딩 중 오류가 발생했습니다.', 'error')
+            flash('{An error occurred while loading data}', 'error')
     
     return redirect(url_for('home'))
 
@@ -612,9 +612,9 @@ def save_progress_note():
         form_data = request.get_json()
         
         if not form_data:
-            return jsonify({'success': False, 'message': '데이터가 없습니다.'})
+            return jsonify({'success': False, 'message': 'Data is empty'})
         
-        logger.info(f"받은 폼 데이터: {form_data}")
+        logger.info(f"Received form data: {form_data}")
         
         # Progress Note JSON 형식으로 변환
         progress_note = create_progress_note_json(form_data)
@@ -653,7 +653,7 @@ def save_progress_note():
                     'message': 'Progress Note saved but API transmission failed.',
                     'data': progress_note,
                     'api_error': api_response,
-                    'warning': 'API 전송에 실패했습니다. 파일은 정상적으로 저장되었습니다.'
+                    'warning': 'API transmission failed. The file was saved successfully.'
                 })
         except ImportError as e:
             logger.error(f"API 모듈 import 오류: {str(e)}")
@@ -661,7 +661,7 @@ def save_progress_note():
                 'success': True,  # 파일 저장은 성공
                 'message': 'Progress Note saved but API module not available.',
                 'data': progress_note,
-                'warning': 'API 전송 모듈을 찾을 수 없습니다. 파일은 정상적으로 저장되었습니다.'
+                'warning': 'API transmission module not found. The file was saved successfully.'
             })
         except Exception as e:
             logger.error(f"API 전송 중 예상치 못한 오류: {str(e)}")
@@ -670,12 +670,12 @@ def save_progress_note():
                 'message': 'Progress Note saved but API transmission failed.',
                 'data': progress_note,
                 'api_error': str(e),
-                'warning': f'API 전송 중 오류가 발생했습니다: {str(e)}. 파일은 정상적으로 저장되었습니다.'
+                'warning': f'An error occurred while sending the API: {str(e)}. The file was saved successfully.'
             })
             
     except Exception as e:
-        logger.error(f"Progress Note 저장 중 오류: {str(e)}")
-        return jsonify({'success': False, 'message': f'서버 오류: {str(e)}'})
+        logger.error(f"Progress Note saving error: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
 
 # ==============================
 # API 엔드포인트
