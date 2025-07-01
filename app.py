@@ -87,6 +87,12 @@ def user_loader(user_id):
     """Flask-Login의 user_loader 콜백"""
     return load_user(user_id)
 
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': 'Session expired', 'is_expired': True}), 401
+    return redirect(url_for('home'))
+
 # 설정 검증 로그
 if flask_config['ENVIRONMENT'] == 'production' and flask_config['DEBUG']:
     logger.warning("⚠️  운영환경에서 DEBUG 모드가 활성화되어 있습니다!")
@@ -534,44 +540,60 @@ def login():
             logger.info("인증 성공")
             
             try:
-                # 클라이언트 정보 가져오기
+                # 클라이언트 정보 가져오기 (실패해도 로그인 진행)
                 client_success, client_info = fetch_client_information(site)
                 
-                # Care Area 정보 가져오기
+                # Care Area 정보 가져오기 (실패해도 로그인 진행)
                 care_area_success, care_area_info = fetch_care_area_information(site)
                 
-                # Event Type 정보 가져오기
+                # Event Type 정보 가져오기 (실패해도 로그인 진행)
                 event_type_success, event_type_info = fetch_event_type_information(site)
                 
-                if client_success or care_area_success or event_type_success:  # 하나라도 성공하면 진행
-                    try:
-                        if client_info:  # client_info가 있을 때만 저장
-                            filename = save_client_data(username, site, client_info)
-                            session['current_file'] = filename
-                        
-                        # Flask-Login을 사용한 로그인 처리
-                        user = User(username, user_info)
-                        login_user(user, remember=True)  # Remember Me 기능 활성화
-                        
-                        # 세션 생성 시간 기록
-                        session['_created'] = datetime.now().isoformat()
-                        
-                        # 세션에 추가 정보 저장
-                        session['site'] = site
-                        
-                        flash('Login successful!', 'success')
-                        logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
-                        
-                        return redirect(url_for('index'))
-                    except Exception as e:
-                        logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
-                        flash('Error occurred while saving data.', 'error')
-                else:
-                    flash('Failed to fetch data from server.', 'error')
-                    logger.error("데이터 가져오기 실패로 인한 로그인 실패")
+                # API 서버 연결 실패 시에도 로그인 허용
+                try:
+                    if client_info:  # client_info가 있을 때만 저장
+                        filename = save_client_data(username, site, client_info)
+                        session['current_file'] = filename
+                    
+                    # Flask-Login을 사용한 로그인 처리
+                    user = User(username, user_info)
+                    login_user(user, remember=True)  # Remember Me 기능 활성화
+                    
+                    # 세션 생성 시간 기록
+                    session['_created'] = datetime.now().isoformat()
+                    
+                    # 세션에 추가 정보 저장
+                    session['site'] = site
+                    
+                    flash('Login successful!', 'success')
+                    logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
+                    
+                    return redirect(url_for('index'))
+                except Exception as e:
+                    logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
+                    flash('Error occurred while saving data.', 'error')
+                    
             except Exception as e:
                 logger.error(f"API 호출 중 오류 발생: {str(e)}")
-                flash('{An error occurred while connecting to the server}', 'error')
+                # API 오류 시에도 로그인 허용
+                try:
+                    # Flask-Login을 사용한 로그인 처리
+                    user = User(username, user_info)
+                    login_user(user, remember=True)
+                    
+                    # 세션 생성 시간 기록
+                    session['_created'] = datetime.now().isoformat()
+                    
+                    # 세션에 추가 정보 저장
+                    session['site'] = site
+                    
+                    flash('Login successful! (Some data may not be available)', 'success')
+                    logger.info(f"로그인 성공 (API 오류 있음) - 사용자: {username}, 사이트: {site}")
+                    
+                    return redirect(url_for('index'))
+                except Exception as login_error:
+                    logger.error(f"로그인 처리 중 오류: {str(login_error)}")
+                    flash('Login failed due to system error.', 'error')
                 
             return redirect(url_for('home'))
         else:
@@ -616,7 +638,12 @@ def index():
             logger.error(f"파일 읽기 오류: {str(e)}")
             flash('{An error occurred while loading data}', 'error')
     
-    return redirect(url_for('home'))
+    # 데이터 파일이 없거나 읽기 실패 시 기본 정보로 페이지 표시
+    selected_site = session.get('site', 'Unknown Site')
+    return render_template('index.html',
+                        selected_site=selected_site,
+                        client_info=[],
+                        current_user=current_user_info)
 
 @app.route('/save_progress_note', methods=['POST'])
 @login_required
