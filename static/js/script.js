@@ -859,6 +859,11 @@ function startSessionTimeoutMonitoring() {
 function checkSessionStatus() {
     fetch('/api/session-status')
         .then(response => {
+            if (response.status === 401) {
+                // 세션 만료: 즉시 로그아웃 처리
+                handleSessionTimeout();
+                return Promise.reject('Session expired');
+            }
             if (!response.ok) {
                 throw new Error('Session status check failed');
             }
@@ -883,6 +888,7 @@ function checkSessionStatus() {
             }
         })
         .catch(error => {
+            if (error === 'Session expired') return;
             console.error('session status check error:', error);    
             // 네트워크 오류 시에도 세션 타임아웃 처리
             handleSessionTimeout();
@@ -1067,12 +1073,25 @@ function handleSessionTimeout() {
     document.body.appendChild(timeoutModal);
     
     document.getElementById('go-login-btn').addEventListener('click', () => {
-        window.location.href = '/';
+        // 로그아웃 처리 후 로그인 페이지로 이동
+        fetch('/logout')
+            .then(() => {
+                window.location.href = '/';
+            })
+            .catch(() => {
+                window.location.href = '/';
+            });
     });
     
-    // 3초 후 자동으로 로그인 페이지로 이동
+    // 3초 후 자동으로 로그아웃 처리 후 로그인 페이지로 이동
     setTimeout(() => {
-        window.location.href = '/';
+        fetch('/logout')
+            .then(() => {
+                window.location.href = '/';
+            })
+            .catch(() => {
+                window.location.href = '/';
+            });
     }, 3000);
 }
 

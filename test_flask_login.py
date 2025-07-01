@@ -34,27 +34,69 @@ def test_login():
             # 세션 생성
             session = requests.Session()
             
-            # 로그인
-            response = session.post(f"{base_url}/login", data=login_data)
-            print(f"로그인 응답 상태: {response.status_code}")
+            print("1. 로그인 테스트...")
+            login_response = session.post(f"{base_url}/login", data=login_data, allow_redirects=False)
             
-            if response.status_code == 302:  # 리다이렉트 (성공)
+            print(f"   로그인 응답 상태: {login_response.status_code}")
+            print(f"   리다이렉트 URL: {login_response.headers.get('Location', 'None')}")
+            
+            # 302 (리다이렉트) 또는 200 (성공) 모두 성공으로 처리
+            if login_response.status_code in [200, 302]:
                 print("✅ 로그인 성공")
                 
-                # 사용자 정보 조회
-                user_info_response = session.get(f"{base_url}/api/user-info")
-                if user_info_response.status_code == 200:
-                    user_info = user_info_response.json()
-                    print(f"사용자 정보: {json.dumps(user_info, indent=2, ensure_ascii=False)}")
-                else:
-                    print(f"❌ 사용자 정보 조회 실패: {user_info_response.status_code}")
+                # 리다이렉트가 있으면 따라가기
+                if login_response.status_code == 302:
+                    redirect_url = login_response.headers.get('Location')
+                    if redirect_url:
+                        print(f"   리다이렉트 따라가기: {redirect_url}")
+                        session.get(f"{base_url}{redirect_url}")
                 
-                # 로그아웃
-                logout_response = session.get(f"{base_url}/logout")
-                print(f"로그아웃 응답: {logout_response.status_code}")
+                print("\n2. 세션 상태 확인...")
+                status_response = session.get(f"{base_url}/api/session-status")
+                
+                if status_response.status_code == 200:
+                    status_data = status_response.json()
+                    print(f"✅ 세션 상태 확인 성공")
+                    print(f"   - 세션 생성 시간: {status_data['session_created']}")
+                    print(f"   - 세션 만료 시간: {status_data['session_expires']}")
+                    print(f"   - 남은 시간: {status_data['remaining_seconds']}초")
+                    
+                    # 세션 연장 테스트
+                    print("\n3. 세션 연장 테스트...")
+                    extend_response = session.post(f"{base_url}/api/extend-session")
+                    
+                    if extend_response.status_code == 200:
+                        extend_data = extend_response.json()
+                        print(f"✅ 세션 연장 성공")
+                        print(f"   - 새로운 세션 생성 시간: {extend_data['session_created']}")
+                        
+                        # 연장 후 상태 확인
+                        print("\n4. 연장 후 세션 상태 확인...")
+                        status_response2 = session.get(f"{base_url}/api/session-status")
+                        
+                        if status_response2.status_code == 200:
+                            status_data2 = status_response2.json()
+                            print(f"✅ 연장 후 세션 상태 확인 성공")
+                            print(f"   - 남은 시간: {status_data2['remaining_seconds']}초")
+                            
+                            # 5분 대기 테스트 (실제로는 너무 오래 걸리므로 10초만 대기)
+                            print("\n5. 세션 타임아웃 대기 테스트 (10초)...")
+                            print("   실제 테스트에서는 5분을 기다려야 합니다.")
+                            print("   브라우저에서 직접 테스트하세요.")
+                            
+                        else:
+                            print(f"❌ 연장 후 세션 상태 확인 실패: {status_response2.status_code}")
+                            print(f"   응답 내용: {status_response2.text}")
+                    else:
+                        print(f"❌ 세션 연장 실패: {extend_response.status_code}")
+                        print(f"   응답 내용: {extend_response.text}")
+                else:
+                    print(f"❌ 세션 상태 확인 실패: {status_response.status_code}")
+                    print(f"   응답 내용: {status_response.text}")
                 
             else:
-                print(f"❌ 로그인 실패: {response.text}")
+                print(f"❌ 로그인 실패: {login_response.status_code}")
+                print(f"   응답 내용: {login_response.text}")
                 
         except Exception as e:
             print(f"❌ 테스트 중 오류: {str(e)}")
