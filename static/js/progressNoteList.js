@@ -233,6 +233,9 @@ async function renderNotesTable() {
     const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 1000, sortBy: 'EventDate', sortOrder: 'desc' });
     console.log('Loaded Progress Note count:', notes.length, notes);
     
+    // 전역 변수에 모든 노트 데이터 저장 (필터링용)
+    window.allNotes = notes.map(note => mapNoteToRow(note));
+    
     const tbody = document.querySelector('#notesTable tbody');
     console.log('tbody element:', tbody);
     
@@ -254,7 +257,12 @@ async function renderNotesTable() {
     
     console.log(`Total ${notes.length} rows added`);
     
-            // Auto-select first row
+    // 필터 적용 (기존 필터가 있는 경우)
+    if (window.currentFilters && (window.currentFilters.client || window.currentFilters.eventType)) {
+        window.applyFilters();
+    }
+    
+    // Auto-select first visible row
     if (notes.length > 0) {
         console.log('First row selected');
         selectNote(0, notes);
