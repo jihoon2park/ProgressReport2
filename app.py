@@ -502,15 +502,7 @@ def get_server_status():
 def home():
     """홈 페이지"""
     if current_user.is_authenticated:
-        # 인증되어 있더라도 필요한 데이터 파일이 있는지 확인
-        filename = session.get('current_file')
-        if filename and os.path.exists(filename):
-            return redirect(url_for('index'))
-        else:
-            # 데이터 파일이 없으면 로그아웃하고 로그인 페이지로
-            logout_user()
-            session.clear()
-            flash('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning')
+        return redirect(url_for('progress_notes'))
     return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
 
 @app.route('/login', methods=['GET'])
@@ -557,7 +549,8 @@ def login():
                     
                     # Flask-Login을 사용한 로그인 처리
                     user = User(username, user_info)
-                    login_user(user, remember=True)  # Remember Me 기능 활성화
+                    login_user(user, remember=False)  # 브라우저 닫으면 세션 만료
+                    session.permanent = False
                     
                     # 세션 생성 시간 기록
                     session['_created'] = datetime.now().isoformat()
@@ -568,7 +561,7 @@ def login():
                     flash('Login successful!', 'success')
                     logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
                     
-                    return redirect(url_for('index'))
+                    return redirect(url_for('progress_notes', site=site))
                 except Exception as e:
                     logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
                     flash('Error occurred while saving data.', 'error')
@@ -579,7 +572,7 @@ def login():
                 try:
                     # Flask-Login을 사용한 로그인 처리
                     user = User(username, user_info)
-                    login_user(user, remember=True)
+                    login_user(user, remember=False)
                     
                     # 세션 생성 시간 기록
                     session['_created'] = datetime.now().isoformat()
@@ -590,7 +583,7 @@ def login():
                     flash('Login successful! (Some data may not be available)', 'success')
                     logger.info(f"로그인 성공 (API 오류 있음) - 사용자: {username}, 사이트: {site}")
                     
-                    return redirect(url_for('index'))
+                    return redirect(url_for('progress_notes', site=site))
                 except Exception as login_error:
                     logger.error(f"로그인 처리 중 오류: {str(login_error)}")
                     flash('Login failed due to system error.', 'error')
@@ -616,34 +609,15 @@ def logout():
 @app.route('/index')
 @login_required
 def index():
-    """메인 대시보드 페이지"""
-    # 현재 로그인한 사용자 정보
-    current_user_info = {
-        'username': current_user.username,
-        'display_name': current_user.display_name,
-        'role': current_user.role
-    }
+    """Progress Note 입력 페이지"""
+    site = request.args.get('site', session.get('site', 'Ramsay'))
+    return render_template('index.html', selected_site=site, current_user=current_user)
 
-    # JSON 파일에서 데이터 읽기
-    filename = session.get('current_file')
-    if filename and os.path.exists(filename):
-        try:
-            with open(filename, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return render_template('index.html',
-                                    selected_site=data['site'],
-                                    client_info=data['client_info'],
-                                    current_user=current_user_info)
-        except Exception as e:
-            logger.error(f"파일 읽기 오류: {str(e)}")
-            flash('{An error occurred while loading data}', 'error')
-    
-    # 데이터 파일이 없거나 읽기 실패 시 기본 정보로 페이지 표시
-    selected_site = session.get('site', 'Unknown Site')
-    return render_template('index.html',
-                        selected_site=selected_site,
-                        client_info=[],
-                        current_user=current_user_info)
+@app.route('/progress-notes')
+@login_required
+def progress_notes():
+    site = request.args.get('site', session.get('site', 'Ramsay'))
+    return render_template('ProgressNoteList.html', site=site)
 
 @app.route('/save_progress_note', methods=['POST'])
 @login_required
@@ -840,7 +814,7 @@ def refresh_session():
             
         # 새로운 User 객체 생성하여 로그인 갱신
         user = User(username, user_data)
-        login_user(user, remember=True)
+        login_user(user, remember=False)
         
         logger.info(f"세션 새로고침 완료: {username}")
         
@@ -911,6 +885,166 @@ def extend_session():
     except Exception as e:
         logger.error(f"세션 연장 중 오류: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+@app.route('/api/fetch-progress-notes', methods=['POST'])
+@login_required
+def fetch_progress_notes():
+    """프로그레스 노트를 사이트에서 가져오기"""
+    try:
+        data = request.get_json()
+        site = data.get('site')
+        days = data.get('days', 14)  # 기본값: 14일
+        force_refresh = data.get('force_refresh', False)  # 강제 새로고침
+        
+        if not site:
+            return jsonify({'success': False, 'message': 'Site is required'}), 400
+        
+        logger.info(f"프로그레스 노트 가져오기 요청 - 사이트: {site}, 일수: {days}")
+        
+        try:
+            from api_progressnote_fetch import fetch_progress_notes_for_site
+            
+            # 프로그레스 노트 가져오기
+            success, progress_notes = fetch_progress_notes_for_site(site, days)
+            
+            if success:
+                logger.info(f"프로그레스 노트 가져오기 성공 - {site}: {len(progress_notes) if progress_notes else 0}개")
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} progress notes',
+                    'data': progress_notes,
+                    'site': site,
+                    'count': len(progress_notes) if progress_notes else 0,
+                    'fetched_at': datetime.now().isoformat()
+                })
+            else:
+                logger.error(f"프로그레스 노트 가져오기 실패 - {site}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to fetch progress notes from server'
+                }), 500
+                
+        except ImportError as e:
+            logger.error(f"API 모듈 import 오류: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Progress note fetch module not available'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"프로그레스 노트 가져오기 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}'
+        }), 500
+
+@app.route('/api/fetch-progress-notes-incremental', methods=['POST'])
+@login_required
+def fetch_progress_notes_incremental():
+    """증분 업데이트로 프로그레스 노트 가져오기"""
+    try:
+        data = request.get_json()
+        site = data.get('site')
+        since_date = data.get('since_date')  # ISO 8601 형식
+        
+        if not site:
+            return jsonify({'success': False, 'message': 'Site is required'}), 400
+        
+        if not since_date:
+            return jsonify({'success': False, 'message': 'Since date is required'}), 400
+        
+        logger.info(f"증분 프로그레스 노트 가져오기 요청 - 사이트: {site}, 시작일: {since_date}")
+        
+        try:
+            from api_progressnote_fetch import ProgressNoteFetchClient
+            from datetime import datetime
+            
+            # 날짜 파싱
+            try:
+                since_datetime = datetime.fromisoformat(since_date.replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+            
+            # 프로그레스 노트 가져오기
+            client = ProgressNoteFetchClient(site)
+            success, progress_notes = client.fetch_progress_notes_since(since_datetime)
+            
+            if success:
+                logger.info(f"증분 프로그레스 노트 가져오기 성공 - {site}: {len(progress_notes) if progress_notes else 0}개")
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} new progress notes',
+                    'data': progress_notes,
+                    'site': site,
+                    'count': len(progress_notes) if progress_notes else 0,
+                    'since_date': since_date,
+                    'fetched_at': datetime.now().isoformat()
+                })
+            else:
+                logger.error(f"증분 프로그레스 노트 가져오기 실패 - {site}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to fetch incremental progress notes from server'
+                }), 500
+                
+        except ImportError as e:
+            logger.error(f"API 모듈 import 오류: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Progress note fetch module not available'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"증분 프로그레스 노트 가져오기 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}'
+        }), 500
+
+@app.route('/api/progress-notes-db-info')
+@login_required
+def get_progress_notes_db_info():
+    """IndexedDB 정보 조회 (클라이언트에서 호출)"""
+    try:
+        # 클라이언트에서 IndexedDB 정보를 조회하도록 안내
+        return jsonify({
+            'success': True,
+            'message': 'Use client-side IndexedDB API to get database info',
+            'endpoints': {
+                'fetch_notes': '/api/fetch-progress-notes',
+                'fetch_incremental': '/api/fetch-progress-notes-incremental'
+            }
+        })
+    except Exception as e:
+        logger.error(f"데이터베이스 정보 조회 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}'
+        }), 500
+
+@app.route('/data/<filename>')
+def serve_data_file(filename):
+    """data 디렉토리의 JSON 파일들을 서빙"""
+    from flask import send_from_directory
+    import os
+    
+    # 허용된 파일 확장자
+    allowed_extensions = {'.json'}
+    
+    # 파일 확장자 확인
+    if not any(filename.endswith(ext) for ext in allowed_extensions):
+        return jsonify({'error': 'Invalid file type'}), 400
+    
+    data_dir = os.path.join(app.root_path, 'data')
+    file_path = os.path.join(data_dir, filename)
+    
+    # 파일 존재 확인
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'File not found'}), 404
+    
+    return send_from_directory(data_dir, filename)
 
 # ==============================
 # 앱 실행

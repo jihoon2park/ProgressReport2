@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Progress Notes</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f7f9fa; }
+        .container { display: flex; height: 100vh; }
+        .left-panel { flex: 2; padding: 24px 16px 16px 24px; background: #fff; border-right: 1px solid #e0e0e0; overflow-y: auto; }
+        .right-panel { flex: 1; padding: 24px 24px 16px 24px; background: #f9fbfd; }
+        .header { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; gap: 20px; }
+        .btn-addnew { background: #28a745; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
+        .btn-addnew:hover { background: #218838; }
+        .btn-refresh { background: #17a2b8; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
+        .btn-refresh:hover { background: #138496; }
+        .btn-logout { background: #dc3545; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
+        .btn-logout:hover { background: #c82333; }
+        table { width: 100%; border-collapse: collapse; background: #fff; table-layout: fixed; }
+        th, td { padding: 8px 10px; border-bottom: 1px solid #e0e0e0; text-align: left; font-size: 0.98em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        th { background: #f1f5fa !important; font-weight: 600; color: #222 !important; }
+        th, thead tr { background: #f1f5fa !important; }
+        th:nth-child(1) { width: 70px; }
+        th:nth-child(2) { width: 120px; }
+        th:nth-child(3) { width: 140px; }
+        th:nth-child(4) { width: 90px; }
+        th:nth-child(5) { width: 70px; }
+        th:nth-child(6) { width: 80px; }
+        th:nth-child(7) { width: 120px; }
+        th:nth-child(8) { width: 140px; }
+        th:nth-child(9) { width: 120px; }
+        tbody tr { background: #fff; transition: background 0.2s; }
+        tbody tr:nth-child(even) { background: #f6f8fa; }
+        tr.selected { background: #e3f2fd !important; }
+        tr:hover { background: #eaf4fb !important; cursor: pointer; }
+        .note-detail { background: #fff; border-radius: 6px; box-shadow: 0 2px 8px #0001; padding: 18px; min-height: 200px; }
+        .note-detail h3 { margin-top: 0; font-size: 1.1em; color: #1976d2; }
+        .note-detail pre { background: #f7f7f7; padding: 10px; border-radius: 4px; font-size: 0.97em; }
+        
+        /* 팝업 스타일 */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .popup-content {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 1200px;
+            height: 90%;
+            max-height: 800px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .popup-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.2em;
+        }
+        
+        .popup-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .popup-close:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .popup-body {
+            flex: 1;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        #progressNoteFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0 0 8px 8px;
+        }
+        
+        /* iframe 내부에서 View Notes와 Logout 버튼 숨기기 */
+        #progressNoteFrame {
+            /* iframe 내부 스타일 주입을 위한 CSS */
+        }
+        
+        @media (max-width: 900px) {
+            .container { flex-direction: column; }
+            .left-panel, .right-panel { flex: unset; width: 100%; }
+            
+            .popup-content {
+                width: 95%;
+                height: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="site-info-box">
+    <div class="site-info-line">
+        Selected Site: <span class="site-name">{{ site }}</span>
+        <span class="separator">|</span>
+        Login User: <span class="user-name">{{ current_user.display_name if current_user else 'Unknown' }}</span>
+    </div>
+</div>
+<div class="header">
+    <button class="btn-addnew" onclick="openProgressNotePopup()">Add New</button>
+    <button class="btn-refresh" onclick="refreshData()">Refresh</button>
+    <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
+</div>
+<div class="container">
+    <div class="left-panel">
+        <table id="notesTable">
+            <thead>
+            <tr>
+                <th>Record ID</th>
+                <th>Service wing</th>
+                <th>Client</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Late entry</th>
+                <th>Event type</th>
+                <th>Care area(s)</th>
+                <th>Created by</th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- Data rendered by JS -->
+            </tbody>
+        </table>
+    </div>
+    <div class="right-panel">
+        <div class="note-detail" id="noteDetail">
+            <h3>Progress Note Details</h3>
+            <div id="noteDetailContent">Select a row to view detailed content here.</div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Note 팝업 -->
+<div id="progressNotePopup" class="popup-overlay" style="display: none;">
+    <div class="popup-content">
+        <div class="popup-header">
+            <h3>Add New Progress Note</h3>
+            <button class="popup-close" onclick="closeProgressNotePopup()">&times;</button>
+        </div>
+        <div class="popup-body">
+            <iframe id="progressNoteFrame" src="/index" width="100%" height="600px" frameborder="0"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Set site information received from server as global variable
+    window.currentSite = '{{ site }}';
+    console.log('Site from server:', window.currentSite);
+    
+    // 팝업 열기 함수
+    function openProgressNotePopup() {
+        const popup = document.getElementById('progressNotePopup');
+        const frame = document.getElementById('progressNoteFrame');
+        
+        // iframe의 src를 현재 사이트 정보와 함께 설정
+        frame.src = `/index?site=${encodeURIComponent(window.currentSite)}`;
+        
+        popup.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+    }
+    
+    // 팝업 닫기 함수
+    function closeProgressNotePopup() {
+        const popup = document.getElementById('progressNotePopup');
+        popup.style.display = 'none';
+        document.body.style.overflow = 'auto'; // 배경 스크롤 복원
+    }
+    
+    // ESC 키로 팝업 닫기
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const popup = document.getElementById('progressNotePopup');
+            if (popup.style.display === 'flex') {
+                closeProgressNotePopup();
+            }
+        }
+    });
+    
+    // 팝업 외부 클릭으로 닫기
+    document.addEventListener('click', function(event) {
+        const popup = document.getElementById('progressNotePopup');
+        if (event.target === popup) {
+            closeProgressNotePopup();
+        }
+    });
+    
+    // iframe으로부터 메시지 수신
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'PROGRESS_NOTE_SAVED') {
+            if (event.data.action === 'close_and_refresh') {
+                closeProgressNotePopup();
+                // 데이터 새로고침
+                setTimeout(() => {
+                    refreshData();
+                }, 500);
+            } else if (event.data.action === 'refresh_only') {
+                // 데이터만 새로고침
+                setTimeout(() => {
+                    refreshData();
+                }, 500);
+            } else if (event.data.action === 'close_only') {
+                // 팝업만 닫기
+                closeProgressNotePopup();
+            }
+        }
+    });
+</script>
+<script src="/static/js/progressNoteDB.js"></script>
+<script src="/static/js/progressNoteList.js"></script>
+</body>
+</html> 
