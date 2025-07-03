@@ -8,7 +8,133 @@ const currentSite = window.currentSite || new URLSearchParams(window.location.se
 // 전역 클라이언트 매핑 객체
 let clientMap = {};
 
+// Top progress bar control
+function showTopProgressBar() {
+    console.log('showTopProgressBar called');
+    
+    const bar = document.getElementById('top-progress-bar');
+    console.log('Progress bar element:', bar);
+    if (!bar) return;
+    
+    // Record start time for minimum loading duration
+    bar._loadingStartTime = Date.now();
+    
+    // Reset and show progress bar
+    bar.style.width = '0%';
+    bar.style.display = 'block';
+    
+    // Animate progress bar with repeating animation
+    let progress = 0;
+    const animateProgress = () => {
+        progress += 2;
+        if (progress > 90) {
+            progress = 0;
+        }
+        bar.style.width = progress + '%';
+    };
+    
+    // Start animation
+    bar._progressInterval = setInterval(animateProgress, 100);
+    
+    // Disable refresh button and show loading state
+    const refreshBtn = document.getElementById('refreshBtn');
+    console.log('Refresh button element:', refreshBtn);
+    if (refreshBtn) {
+        console.log('Disabling refresh button...');
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Loading...';
+        refreshBtn.style.opacity = '0.6';
+        refreshBtn.style.cursor = 'not-allowed';
+        console.log('Refresh button disabled successfully');
+    } else {
+        console.error('Refresh button not found!');
+    }
+    
+    // Show loading message in table area
+    const tableContainer = document.getElementById('notesTable');
+    console.log('Table container element:', tableContainer);
+    if (tableContainer) {
+        const loadingMsg = document.createElement('div');
+        loadingMsg.id = 'loadingMessage';
+        loadingMsg.style.cssText = `
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #e0e0e0;
+        `;
+        loadingMsg.innerHTML = `
+            <div style="margin-bottom: 10px;">
+                <div style="width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+            </div>
+            Loading data from Manad plus server...
+        `;
+        tableContainer.parentNode.insertBefore(loadingMsg, tableContainer);
+        console.log('Loading message added');
+    } else {
+        console.error('Table container not found!');
+    }
+}
 
+function hideTopProgressBar() {
+    console.log('hideTopProgressBar called');
+    
+    const bar = document.getElementById('top-progress-bar');
+    if (!bar) return;
+    
+    // Calculate elapsed time
+    const elapsedTime = Date.now() - (bar._loadingStartTime || 0);
+    const minLoadingTime = 10000; // 10 seconds minimum
+    const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+    
+    console.log(`Elapsed time: ${elapsedTime}ms, Remaining time: ${remainingTime}ms`);
+    
+    // If minimum time hasn't passed, wait
+    if (remainingTime > 0) {
+        console.log(`Waiting ${remainingTime}ms more to meet minimum loading time...`);
+        setTimeout(() => {
+            hideTopProgressBar();
+        }, remainingTime);
+        return;
+    }
+    
+    // Stop the animation
+    if (bar._progressInterval) {
+        clearInterval(bar._progressInterval);
+        bar._progressInterval = null;
+    }
+    
+    // Complete the progress bar
+    bar.style.width = '100%';
+    setTimeout(() => {
+        bar.style.display = 'none';
+        bar.style.width = '0%';
+    }, 350);
+    
+    // Re-enable refresh button and restore original state
+    const refreshBtn = document.getElementById('refreshBtn');
+    console.log('Refresh button element in hide:', refreshBtn);
+    if (refreshBtn) {
+        console.log('Re-enabling refresh button...');
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = 'Refresh';
+        refreshBtn.style.opacity = '1';
+        refreshBtn.style.cursor = 'pointer';
+        console.log('Refresh button re-enabled successfully');
+    } else {
+        console.error('Refresh button not found in hide!');
+    }
+    
+    // Remove loading message
+    const loadingMsg = document.getElementById('loadingMessage');
+    if (loadingMsg) {
+        loadingMsg.remove();
+        console.log('Loading message removed');
+    }
+}
 
 // Client mapping test function
 function testClientMapping() {
@@ -268,7 +394,7 @@ async function renderNotesTable() {
         selectNote(0, notes);
     }
     
-            // Output mapping result summary
+    // Output mapping result summary
     if (window._mappingAttempts) {
         const total = window._mappingAttempts.length;
         const found = window._mappingAttempts.filter(a => a.found).length;
@@ -304,71 +430,7 @@ function selectNote(idx, notes) {
     document.getElementById('noteDetailContent').innerHTML = formatNoteDetail(note);
 }
 
-    // Show loading popup
-function showLoadingPopup(message) {
-    // Remove existing popup if any
-    const existingPopup = document.getElementById('loadingPopup');
-    if (existingPopup) {
-        existingPopup.remove();
-    }
-    
-    const popup = document.createElement('div');
-    popup.id = 'loadingPopup';
-    popup.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    `;
-    
-    const content = document.createElement('div');
-    content.style.cssText = `
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        max-width: 400px;
-    `;
-    
-    content.innerHTML = `
-        <div style="margin-bottom: 20px;">
-            <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
-        </div>
-        <h3 style="margin: 0 0 10px 0; color: #333;">Loading Data...</h3>
-        <p style="margin: 0; color: #666; font-size: 14px;">${message}</p>
-        <p style="margin: 10px 0 0 0; color: #999; font-size: 12px;">Please wait...</p>
-    `;
-    
-    // Add CSS animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    `;
-    document.head.appendChild(style);
-    
-    popup.appendChild(content);
-    document.body.appendChild(popup);
-}
-
-    // Hide loading popup
-function hideLoadingPopup() {
-    const popup = document.getElementById('loadingPopup');
-    if (popup) {
-        popup.remove();
-    }
-}
-
-    // Complete IndexedDB deletion and recreation
+// Complete IndexedDB deletion and recreation
 async function resetIndexedDB() {
     console.log('Starting IndexedDB complete deletion...');
     
@@ -387,7 +449,7 @@ async function resetIndexedDB() {
     });
 }
 
-    // Execute on page load
+// Execute on page load
 window.addEventListener('DOMContentLoaded', async () => {
     console.log('Page loaded - starting initialization');
     console.log('Current site:', currentSite);
@@ -398,13 +460,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         siteTitle.textContent = `Progress Notes - ${currentSite}`;
     }
     
-            // Detect site change and initialize
+    // Detect site change and initialize
     await initializeForSite(currentSite);
     
-            // Detect URL change (browser back/forward)
+    // Detect URL change (browser back/forward)
     window.addEventListener('popstate', handleSiteChange);
     
-            // Detect URL change (programmatic)
+    // Detect URL change (programmatic)
     let currentUrl = window.location.href;
     const observer = new MutationObserver(() => {
         if (window.location.href !== currentUrl) {
@@ -415,11 +477,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     observer.observe(document, { subtree: true, childList: true });
 });
 
-    // Site-specific initialization function
+// Site-specific initialization function
 async function initializeForSite(site) {
     console.log(`Initializing for site: ${site}`);
     
     try {
+        showTopProgressBar(); // 로딩 상태 시작
         // 1. Load client mapping first (differs by site)
         console.log('Loading client mapping for site:', site);
         await loadClientMap();
@@ -504,7 +567,9 @@ async function initializeForSite(site) {
         testClientMapping();
         
         console.log('Site initialization completed for:', site);
+        hideTopProgressBar(); // 로딩 상태 종료
     } catch (error) {
+        hideTopProgressBar(); // 에러 시에도 로딩 상태 종료
         console.error('Error during site initialization for:', site, error);
     }
 }
@@ -513,7 +578,6 @@ async function initializeForSite(site) {
 async function fetchAndSaveProgressNotes() {
     try {
         console.log('Starting to fetch Progress Notes from server...');
-        showLoadingPopup(`Fetching Progress Note data from ${currentSite}...`);
         
         const response = await fetch('/api/fetch-progress-notes', {
             method: 'POST',
@@ -541,8 +605,6 @@ async function fetchAndSaveProgressNotes() {
                 console.log('First data item:', result.data[0]);
             }
             
-            showLoadingPopup(`Saving ${result.count} items to IndexedDB...`);
-            
             // Save to IndexedDB
             if (result.data && result.data.length > 0) {
                 const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
@@ -552,36 +614,27 @@ async function fetchAndSaveProgressNotes() {
                 await window.progressNoteDB.saveLastUpdateTime(currentSite, result.fetched_at);
                 
                 console.log('Progress Note data saved successfully');
-                showLoadingPopup('Data saving completed!');
-                
-                // 1초 후 팝업 닫기
-                setTimeout(() => {
-                    hideLoadingPopup();
-                }, 1000);
+            } else {
+                console.log('No progress notes found.');
             }
         } else {
             throw new Error(result.message || 'Failed to fetch Progress Notes');
         }
         
+        hideTopProgressBar();
     } catch (error) {
+        hideTopProgressBar();
         console.error('Failed to fetch Progress Notes:', error);
-        showLoadingPopup('An error occurred while fetching data.');
-        
-        // 2초 후 팝업 닫기
-        setTimeout(() => {
-            hideLoadingPopup();
-        }, 2000);
     }
 }
 
 // 수동 새로고침 함수
 async function refreshData() {
     try {
+        showTopProgressBar(); // 로딩 상태 시작
         console.log('Manual refresh requested for site:', currentSite);
-        
         // 마지막 업데이트 시간 확인
         const lastUpdateTime = await window.progressNoteDB.getLastUpdateTime(currentSite);
-        
         if (lastUpdateTime) {
             console.log('Attempting incremental refresh from:', lastUpdateTime);
             await fetchIncrementalProgressNotes(lastUpdateTime);
@@ -589,17 +642,12 @@ async function refreshData() {
             console.log('No last update time found, performing full refresh');
             await fetchAndSaveProgressNotes();
         }
-        
         // 테이블 다시 렌더링
         await renderNotesTable();
-        
+        hideTopProgressBar(); // 테이블 렌더링 끝난 후 프로그레스 바 닫기
     } catch (error) {
+        hideTopProgressBar();
         console.error('Refresh failed for site:', currentSite, error);
-        showLoadingPopup('Refresh failed. Please try again.');
-        
-        setTimeout(() => {
-            hideLoadingPopup();
-        }, 2000);
     }
 }
 
@@ -627,7 +675,6 @@ function handleSiteChange() {
 async function fetchIncrementalProgressNotes(lastUpdateTime) {
     try {
         console.log('Starting incremental update from:', lastUpdateTime);
-        showLoadingPopup(`Checking for new Progress Notes since ${new Date(lastUpdateTime).toLocaleString()}...`);
         
         const response = await fetch('/api/fetch-progress-notes-incremental', {
             method: 'POST',
@@ -648,39 +695,60 @@ async function fetchIncrementalProgressNotes(lastUpdateTime) {
         
         if (result.success) {
             console.log(`Successfully fetched ${result.count} new Progress Notes from server`);
-            
             if (result.data && result.data.length > 0) {
-                showLoadingPopup(`Saving ${result.count} new items to IndexedDB...`);
-                
                 // IndexedDB에 저장
                 const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
                 console.log('IndexedDB incremental save result:', saveResult);
-                
                 // Save last update time
                 await window.progressNoteDB.saveLastUpdateTime(currentSite, result.fetched_at);
-                
                 console.log('Incremental update completed successfully');
-                showLoadingPopup(`Updated with ${result.count} new Progress Notes!`);
-                
-                // 1초 후 팝업 닫기
-                setTimeout(() => {
-                    hideLoadingPopup();
-                }, 1000);
             } else {
-                console.log('No new data available');
-                showLoadingPopup('No new Progress Notes found.');
-                
-                // 1초 후 팝업 닫기
-                setTimeout(() => {
-                    hideLoadingPopup();
-                }, 1000);
+                console.log('No new Progress Notes found.');
             }
         } else {
             throw new Error(result.message || 'Failed to fetch incremental Progress Notes');
         }
         
+        hideTopProgressBar();
     } catch (error) {
+        hideTopProgressBar();
         console.error('Failed to fetch incremental Progress Notes:', error);
         throw error; // 상위 함수에서 처리하도록 에러를 다시 던짐
     }
+}
+
+// Loading popup functions removed - using top progress bar instead
+
+// Remove the wrapper since fetchAndRenderProgressNotes doesn't exist
+// The progress bar will be controlled directly in the functions that need it 
+
+// Test function for debugging
+function testProgressBar() {
+    console.log('=== Testing Progress Bar ===');
+    console.log('Testing progress bar...');
+    
+    // Check if elements exist
+    const bar = document.getElementById('top-progress-bar');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const tableContainer = document.getElementById('notesTable');
+    
+    console.log('Progress bar element:', bar);
+    console.log('Refresh button element:', refreshBtn);
+    console.log('Table container element:', tableContainer);
+    
+    if (!bar) {
+        console.error('Progress bar element not found!');
+        return;
+    }
+    
+    if (!refreshBtn) {
+        console.error('Refresh button element not found!');
+        return;
+    }
+    
+    showTopProgressBar();
+    setTimeout(() => {
+        console.log('Hiding progress bar...');
+        hideTopProgressBar();
+    }, 3000);
 } 
