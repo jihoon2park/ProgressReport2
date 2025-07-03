@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Progress Note - Login</title>
+    <link rel="preload" as="image" href="{{ url_for('static', filename='images/company-logo.png') }}">
     <style>
         .login-container {
             max-width: 400px;
@@ -135,7 +136,12 @@
     <div class="login-container">
         <!-- Logo Image -->
         <div class="logo">
-            <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company Logo">
+            <img src="{{ url_for('static', filename='images/company-logo.png') }}"
+                 alt="Company Logo"
+                 width="200"
+                 height="60"
+                 loading="eager"
+                 style="display:block; margin:0 auto;" />
         </div>
 
         <!-- Login Form -->

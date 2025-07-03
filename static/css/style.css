@@ -508,3 +508,21 @@ h3 {
 .note-content s, .note-content strike {
     text-decoration: line-through !important;
 }
+
+#top-progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 4px;
+    background: linear-gradient(90deg, #4f8cff 0%, #00e0c6 100%);
+    z-index: 9999;
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: none;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
