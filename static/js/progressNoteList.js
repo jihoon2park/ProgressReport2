@@ -420,8 +420,9 @@ async function fetchAndSaveProgressNotes() {
                 const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
                 console.log('IndexedDB save result:', saveResult);
                 
-                // Save last update time
-                await window.progressNoteDB.saveLastUpdateTime(currentSite, result.fetched_at);
+                // Save last update time (use local time)
+                const localTime = new Date().toLocaleString();
+                await window.progressNoteDB.saveLastUpdateTime(currentSite, localTime);
                 
                 console.log('Progress Note data saved successfully');
             } else {
@@ -447,8 +448,16 @@ async function refreshData() {
         // 마지막 업데이트 시간 확인
         const lastUpdateTime = await window.progressNoteDB.getLastUpdateTime(currentSite);
         if (lastUpdateTime) {
-            console.log('Attempting incremental refresh from:', lastUpdateTime);
-            await fetchIncrementalProgressNotes(lastUpdateTime);
+            // 시간 형식 변환 (UTC -> 로컬 시간)
+            let convertedTime = lastUpdateTime;
+            if (lastUpdateTime.includes('T') && lastUpdateTime.includes('Z')) {
+                // UTC 형식인 경우 로컬 시간으로 변환
+                const utcDate = new Date(lastUpdateTime);
+                convertedTime = utcDate.toLocaleString();
+                console.log('Converted UTC time to local:', lastUpdateTime, '->', convertedTime);
+            }
+            console.log('Attempting incremental refresh from:', convertedTime);
+            await fetchIncrementalProgressNotes(convertedTime);
         } else {
             console.log('No last update time found, performing full refresh');
             await fetchAndSaveProgressNotes();
@@ -468,8 +477,8 @@ async function testIncrementalUpdate() {
     try {
         console.log('=== Testing Incremental Update ===');
         
-        // 현재 시간에서 1시간 전으로 설정
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        // 현재 시간에서 1시간 전으로 설정 (로컬 시간 사용)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toLocaleString();
         console.log('Testing incremental update from:', oneHourAgo);
         
         const response = await fetch('/api/fetch-progress-notes-incremental', {
@@ -529,7 +538,8 @@ function handleSiteChange() {
 async function fetchIncrementalProgressNotes(lastUpdateTime) {
     try {
         console.log('Starting incremental update from:', lastUpdateTime);
-        console.log('Current time:', new Date().toISOString());
+        console.log('Current time (local):', new Date().toLocaleString());
+        console.log('Current time (UTC):', new Date().toISOString());
         
         const response = await fetch('/api/fetch-progress-notes-incremental', {
             method: 'POST',
@@ -562,8 +572,9 @@ async function fetchIncrementalProgressNotes(lastUpdateTime) {
                 // IndexedDB에 저장
                 const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
                 console.log('IndexedDB incremental save result:', saveResult);
-                // Save last update time
-                await window.progressNoteDB.saveLastUpdateTime(currentSite, result.fetched_at);
+                // Save last update time (use local time)
+                const localTime = new Date().toLocaleString();
+                await window.progressNoteDB.saveLastUpdateTime(currentSite, localTime);
                 console.log('Incremental update completed successfully');
             } else {
                 console.log('No new Progress Notes found.');

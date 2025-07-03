@@ -911,11 +911,42 @@ def fetch_progress_notes_incremental():
             from api_progressnote_fetch import ProgressNoteFetchClient
             from datetime import datetime
             
-            # 날짜 파싱
+            # 날짜 파싱 - 다양한 형식 지원
             try:
-                since_datetime = datetime.fromisoformat(since_date.replace('Z', '+00:00'))
-            except ValueError:
-                return jsonify({'success': False, 'message': 'Invalid date format'}), 400
+                since_datetime = None
+                
+                # 1. ISO 형식 (UTC) - Z가 있는 경우
+                if since_date.endswith('Z'):
+                    since_datetime = datetime.fromisoformat(since_date.replace('Z', '+00:00')).replace(tzinfo=None)
+                    logger.info(f"Parsed UTC ISO date: {since_date} -> {since_datetime}")
+                
+                # 2. ISO 형식 (로컬 시간)
+                elif 'T' in since_date and ('+' in since_date or '-' in since_date[-6:]):
+                    since_datetime = datetime.fromisoformat(since_date).replace(tzinfo=None)
+                    logger.info(f"Parsed ISO date with timezone: {since_date} -> {since_datetime}")
+                
+                # 3. 로컬 시간 문자열 (예: "2025-07-03T16:08:47.189824")
+                elif 'T' in since_date:
+                    since_datetime = datetime.fromisoformat(since_date)
+                    logger.info(f"Parsed local ISO date: {since_date} -> {since_datetime}")
+                
+                # 4. 일반 날짜 문자열 (예: "7/3/2025, 4:08:47 PM")
+                else:
+                    # 브라우저의 toLocaleString() 형식 파싱
+                    try:
+                        since_datetime = datetime.strptime(since_date, '%m/%d/%Y, %I:%M:%S %p')
+                        logger.info(f"Parsed locale string: {since_date} -> {since_datetime}")
+                    except ValueError:
+                        # 다른 형식 시도
+                        since_datetime = datetime.fromisoformat(since_date)
+                        logger.info(f"Parsed fallback format: {since_date} -> {since_datetime}")
+                
+                if since_datetime is None:
+                    raise ValueError(f"Unable to parse date: {since_date}")
+                    
+            except ValueError as e:
+                logger.error(f"Date parsing error: {e}")
+                return jsonify({'success': False, 'message': f'Invalid date format: {since_date}'}), 400
             
             # 프로그레스 노트 가져오기
             client = ProgressNoteFetchClient(site)
