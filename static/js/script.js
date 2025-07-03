@@ -1,3 +1,10 @@
+// 중복 스크립트 로드 방지
+if (window.scriptLoaded) {
+    console.log('Script already loaded, exiting...');
+    throw new Error('Script already loaded');
+}
+window.scriptLoaded = true;
+
 // DOM Elements object to store references
 const DOM = {};
 
@@ -8,8 +15,18 @@ let sessionCheckInterval = null;
 const SESSION_TIMEOUT_MINUTES = 5;
 const SESSION_WARNING_MINUTES = 1;
 
+// 중복 실행 방지를 위한 플래그 (전역 변수로 설정)
+if (typeof window.sessionMonitoringStarted === 'undefined') {
+    window.sessionMonitoringStarted = false;
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    // 중복 실행 방지 (이미 초기화되었으면 리턴)
+    if (window.sessionInitialized) {
+        return;
+    }
+    window.sessionInitialized = true;
     // Check if we're in popup mode (iframe)
     if (window.parent !== window) {
         // Hide header buttons in popup mode
@@ -28,14 +45,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Session refresh (user information update)
     refreshUserSession();
     
-    // Start session timeout monitoring
-    startSessionTimeoutMonitoring();
+    // Start session timeout monitoring (중복 실행 방지)
+    if (!window.sessionMonitoringStarted) {
+        console.log('Starting session monitoring...');
+        startSessionTimeoutMonitoring();
+        window.sessionMonitoringStarted = true;
+    } else {
+        console.log('Session monitoring already started, skipping...');
+    }
     
     // User activity detection (session extension)
     setupActivityDetection();
     
-    // 프로그레스 노트 데이터베이스 초기화 및 데이터 가져오기
-    initializeProgressNoteData();
+
 });
 
 // Store references to all DOM elements we'll need
@@ -50,13 +72,10 @@ function initializeDOMElements() {
     DOM.careArea = document.getElementById('careArea');
     DOM.riskRating = document.getElementById('riskRating');
     DOM.notes = document.getElementById('notes');
-    // DOM.flagOnNoticeboard = document.getElementById('flagOnNoticeboard'); // 주석 처리됨
-    // DOM.archived = document.getElementById('archived'); // 주석 처리됨
     
     // Buttons
     DOM.currentTimeBtn = document.getElementById('currentTimeBtn');
     DOM.addEventTypeBtn = document.getElementById('addEventTypeBtn');
-    // DOM.previousVersionsBtn = document.getElementById('previousVersionsBtn'); // Commented out
     
     // Floating action buttons (near notes)
     DOM.floatingSaveNewBtn = document.getElementById('floatingSaveNewBtn');
@@ -72,16 +91,12 @@ function initializeDOMElements() {
     // Tab related
     DOM.tabButtons = document.querySelectorAll('.tab-button');
     DOM.tabContents = document.querySelectorAll('.tab-content');
-    
-    // Toolbar
-    // DOM.toolbar = document.querySelector('.toolbar'); // Commented out
 }
 
 // Initialize all UI components
 function initializeUI() {
     initializeDatePicker();
     initializeTabs();
-    initializeToolbar();
     initializeButtons();
     initializeClientHandling();
     loadCareAreas();
@@ -427,37 +442,7 @@ function loadEventTypes() {
 }
 
 // Initialize text editor toolbar
-function initializeToolbar() {
-    // Toolbar is commented out, so it may not exist
-    if (!DOM.toolbar) {
-        console.log('Toolbar not found (likely commented out) - skipping toolbar initialization');
-        return;
-    }
-    
-    if (!DOM.notes) {
-        console.error('Notes textarea not found');
-        return;
-    }
 
-    DOM.toolbar.querySelectorAll('button').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.preventDefault();
-            const command = button.title.toLowerCase();
-            if (command === 'unordered list') {
-                document.execCommand('insertUnorderedList', false, null);
-            } else if (command === 'ordered list') {
-                document.execCommand('insertOrderedList', false, null);
-            } else if (command === 'decrease indent') {
-                document.execCommand('outdent', false, null);
-            } else if (command === 'increase indent') {
-                document.execCommand('indent', false, null);
-            } else {
-                document.execCommand(command, false, null);
-            }
-            DOM.notes.focus();
-        });
-    });
-}
 
 // Initialize buttons
 function initializeButtons() {
@@ -885,10 +870,22 @@ function refreshUserSession() {
 
 // 세션 타임아웃 모니터링 시작
 function startSessionTimeoutMonitoring() {
+    // 이미 모니터링이 시작되었으면 중복 실행 방지
+    if (sessionCheckInterval) {
+        console.log('세션 모니터링이 이미 실행 중입니다.');
+        return;
+    }
+    
     console.log('세션 타임아웃 모니터링 시작');
     
-    // 30초마다 세션 상태 확인
-    sessionCheckInterval = setInterval(checkSessionStatus, 30000);
+    // 기존 인터벌이 있다면 정리
+    if (window.sessionCheckInterval) {
+        clearInterval(window.sessionCheckInterval);
+    }
+    
+    // 10초마다 세션 상태 확인 (더 정확한 실시간 업데이트를 위해)
+    sessionCheckInterval = setInterval(checkSessionStatus, 10000);
+    window.sessionCheckInterval = sessionCheckInterval;
     
     // 초기 세션 상태 확인
     checkSessionStatus();
@@ -913,11 +910,35 @@ function checkSessionStatus() {
                 const remainingSeconds = data.remaining_seconds;
                 const remainingMinutes = Math.floor(remainingSeconds / 60);
                 
-                console.log(`session remaining time: ${remainingMinutes}min ${remainingSeconds % 60}sec`);
+                console.log(`[${new Date().toISOString()}] session remaining time: ${remainingMinutes}min ${remainingSeconds % 60}sec`);
                 
-                // 1분 남았을 때 경고
+                // 1분 이하로 남았을 때 로그 추가
+                if (remainingSeconds <= 60) {
+                    console.log(`⚠️ 세션 만료 임박: ${remainingSeconds}초 남음`);
+                }
+                
+                // 1분 남았을 때 경고 (자동 연장은 하지 않음)
                 if (remainingSeconds <= 60 && remainingSeconds > 0) {
                     showSessionWarning(remainingSeconds);
+                }
+                
+                // 이미 경고가 표시되고 있으면 남은 시간 업데이트
+                if (sessionWarningId && remainingSeconds > 0) {
+                    const countdownElement = document.getElementById('session-countdown');
+                    if (countdownElement) {
+                        const minutes = Math.floor(remainingSeconds / 60);
+                        const seconds = remainingSeconds % 60;
+                        countdownElement.textContent = `${minutes}min ${seconds}sec`;
+                        
+                        // 시간이 30초 이하로 남으면 빨간색으로 강조
+                        if (remainingSeconds <= 30) {
+                            countdownElement.style.color = '#ff0000';
+                            countdownElement.style.animation = 'pulse 1s infinite';
+                        } else {
+                            countdownElement.style.color = '#e74c3c';
+                            countdownElement.style.animation = 'none';
+                        }
+                    }
                 }
                 
                 // 세션 만료 시 로그아웃
@@ -951,7 +972,7 @@ function showSessionWarning(remainingSeconds) {
         <div class="session-warning-overlay">
             <div class="session-warning-content">
                 <h3>⚠️ Session Expiration Warning</h3>
-                <p>Your session will expire in <strong>${minutes}min ${seconds}sec</strong>.</p>
+                <p>Your session will expire in <strong id="session-countdown">${minutes}min ${seconds}sec</strong>.</p>
                 <p>Click the "Extend Session" button to continue working.</p>
                 <div class="session-warning-buttons">
                     <button id="extend-session-btn" class="btn-primary">Extend Session</button>
@@ -1017,6 +1038,16 @@ function showSessionWarning(remainingSeconds) {
         .btn-secondary:hover {
             background: #7f8c8d;
         }
+        #session-countdown {
+            color: #e74c3c;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     `;
     
     document.head.appendChild(style);
@@ -1029,12 +1060,46 @@ function showSessionWarning(remainingSeconds) {
     // 경고 ID 저장
     sessionWarningId = warningModal;
     
-    // 10초 후 자동으로 경고 제거 (사용자가 아무것도 하지 않으면)
-    setTimeout(() => {
-        if (sessionWarningId) {
-            removeSessionWarning();
+    // 실시간 카운트다운 시작
+    startCountdown(remainingSeconds);
+}
+
+// 실시간 카운트다운 함수
+function startCountdown(initialSeconds) {
+    let remainingSeconds = initialSeconds;
+    
+    const countdownInterval = setInterval(() => {
+        remainingSeconds--;
+        
+        const countdownElement = document.getElementById('session-countdown');
+        if (countdownElement) {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            countdownElement.textContent = `${minutes}min ${seconds}sec`;
+            
+            // 시간이 30초 이하로 남으면 빨간색으로 강조
+            if (remainingSeconds <= 30) {
+                countdownElement.style.color = '#ff0000';
+                countdownElement.style.animation = 'pulse 1s infinite';
+            }
         }
-    }, 10000);
+        
+        // 시간이 0이 되면 세션 타임아웃 처리
+        if (remainingSeconds <= 0) {
+            clearInterval(countdownInterval);
+            handleSessionTimeout();
+        }
+        
+        // 경고가 제거되면 카운트다운도 중지
+        if (!sessionWarningId) {
+            clearInterval(countdownInterval);
+        }
+    }, 1000);
+    
+    // 경고 모달에 카운트다운 인터벌 ID 저장
+    if (sessionWarningId) {
+        sessionWarningId._countdownInterval = countdownInterval;
+    }
 }
 
 // 세션 연장
@@ -1076,6 +1141,10 @@ function logoutNow() {
 // 세션 경고 제거
 function removeSessionWarning() {
     if (sessionWarningId) {
+        // 카운트다운 인터벌 중지
+        if (sessionWarningId._countdownInterval) {
+            clearInterval(sessionWarningId._countdownInterval);
+        }
         sessionWarningId.remove();
         sessionWarningId = null;
     }
@@ -1138,9 +1207,9 @@ function handleSessionTimeout() {
 function setupActivityDetection() {
     console.log('사용자 활동 감지 설정');
     
-    // 사용자 활동 이벤트들
+    // 사용자 활동 이벤트들 (의미 있는 활동만 감지)
     const activityEvents = [
-        'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'
+        'mousedown', 'keypress', 'click', 'touchstart'
     ];
     
     let activityTimeout = null;
@@ -1155,12 +1224,46 @@ function setupActivityDetection() {
                 clearTimeout(activityTimeout);
             }
             
-            // 2분 후에 세션 연장 시도
+            // 4분 후에 세션 연장 시도 (1분 이하로 남았을 때만)
             activityTimeout = setTimeout(() => {
-                extendSessionSilently();
-            }, 120000); // 2분
+                // 현재 세션 상태를 확인하여 1분 이하로 남았을 때만 자동 연장
+                checkSessionStatusForAutoExtension();
+            }, 240000); // 4분 (5분 세션에서 1분 남았을 때)
         });
     });
+}
+
+// 자동 세션 연장을 위한 세션 상태 확인
+function checkSessionStatusForAutoExtension() {
+    fetch('/api/session-status')
+        .then(response => {
+            if (response.status === 401) {
+                // 세션 만료: 즉시 로그아웃 처리
+                handleSessionTimeout();
+                return Promise.reject('Session expired');
+            }
+            if (!response.ok) {
+                throw new Error('Session status check failed');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const remainingSeconds = data.remaining_seconds;
+                
+                // 1분 이하로 남았을 때만 자동 연장
+                if (remainingSeconds <= 60 && remainingSeconds > 0) {
+                    console.log(`자동 세션 연장 시도 (남은 시간: ${remainingSeconds}초)`);
+                    extendSessionSilently();
+                } else {
+                    console.log(`자동 세션 연장 건너뜀 (남은 시간: ${remainingSeconds}초)`);
+                }
+            }
+        })
+        .catch(error => {
+            if (error === 'Session expired') return;
+            console.error('자동 세션 연장 확인 오류:', error);
+        });
 }
 
 // 조용한 세션 연장 (사용자에게 알리지 않음)
@@ -1179,7 +1282,7 @@ function extendSessionSilently() {
     })
     .then(data => {
         if (data.success) {
-            console.log('조용한 세션 연장 성공');
+            console.log('조용한 세션 연장 성공 (1분 이하 남은 경우)');
         }
     })
     .catch(error => {
@@ -1237,211 +1340,3 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// 프로그레스 노트 데이터베이스 초기화 및 데이터 가져오기
-async function initializeProgressNoteData() {
-    try {
-        console.log('프로그레스 노트 데이터베이스 초기화 시작...');
-        
-        // IndexedDB 초기화
-        await progressNoteDB.init();
-        console.log('IndexedDB 초기화 완료');
-        
-        // 현재 사이트 정보 가져오기
-        const site = document.querySelector('.site-name').textContent;
-        console.log(`현재 사이트: ${site}`);
-        
-        // 데이터베이스 정보 조회
-        const dbInfo = await progressNoteDB.getDatabaseInfo();
-        console.log('데이터베이스 정보:', dbInfo);
-        
-        // 마지막 업데이트 시간 확인
-        const lastUpdate = await progressNoteDB.getLastUpdateTime(site);
-        console.log(`${site} 마지막 업데이트:`, lastUpdate);
-        
-        // 데이터 가져오기 (2주치)
-        await fetchAndSaveProgressNotes(site, 14);
-        
-        console.log('프로그레스 노트 데이터베이스 초기화 완료');
-        
-    } catch (error) {
-        console.error('프로그레스 노트 데이터베이스 초기화 실패:', error);
-    }
-}
-
-// 프로그레스 노트 가져오기 및 저장
-async function fetchAndSaveProgressNotes(site, days = 14) {
-    try {
-        console.log(`${site}에서 ${days}일치 프로그레스 노트 가져오기 시작...`);
-        
-        // 서버에서 프로그레스 노트 가져오기
-        const response = await fetch('/api/fetch-progress-notes', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                site: site,
-                days: days
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            console.log(`${site}: ${result.count}개의 프로그레스 노트 가져오기 성공`);
-            
-            // IndexedDB에 저장
-            if (result.data && result.data.length > 0) {
-                const saveResult = await progressNoteDB.saveProgressNotes(site, result.data);
-                console.log(`${site} 저장 결과:`, saveResult);
-                
-                // 마지막 업데이트 시간 저장
-                await progressNoteDB.saveLastUpdateTime(site, result.fetched_at);
-                
-                // Only show notification on progress note list page, not in popup
-                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
-                    showNotification(`${site}: ${result.count} progress notes have been loaded.`, 'success');
-                }
-            } else {
-                console.log(`${site}: 가져올 프로그레스 노트가 없습니다.`);
-                // Only show notification on progress note list page, not in popup
-                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
-                    showNotification(`${site}: No progress notes to load.`, 'info');
-                }
-            }
-        } else {
-            throw new Error(result.message || '프로그레스 노트 가져오기 실패');
-        }
-        
-    } catch (error) {
-        console.error(`${site} 프로그레스 노트 가져오기 실패:`, error);
-        // Only show notification on progress note list page, not in popup
-        if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
-            showNotification(`${site} Failed to load progress notes: ${error.message}`, 'error');
-        }
-    }
-}
-
-// 증분 업데이트로 프로그레스 노트 가져오기
-async function fetchIncrementalProgressNotes(site) {
-    try {
-        console.log(`${site} 증분 업데이트 시작...`);
-        
-        // 마지막 업데이트 시간 가져오기
-        const lastUpdate = await progressNoteDB.getLastUpdateTime(site);
-        
-        if (!lastUpdate) {
-            console.log(`${site}: 마지막 업데이트 시간이 없어 전체 데이터를 가져옵니다.`);
-            return await fetchAndSaveProgressNotes(site, 14);
-        }
-        
-        console.log(`${site} 마지막 업데이트: ${lastUpdate}`);
-        
-        // 증분 업데이트 요청
-        const response = await fetch('/api/fetch-progress-notes-incremental', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                site: site,
-                since_date: lastUpdate
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            console.log(`${site}: ${result.count}개의 새로운 프로그레스 노트 가져오기 성공`);
-            
-            // IndexedDB에 저장
-            if (result.data && result.data.length > 0) {
-                const saveResult = await progressNoteDB.saveProgressNotes(site, result.data);
-                console.log(`${site} 저장 결과:`, saveResult);
-                
-                // 마지막 업데이트 시간 저장
-                await progressNoteDB.saveLastUpdateTime(site, result.fetched_at);
-                
-                // Only show notification on progress note list page, not in popup
-                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
-                    showNotification(`${site}: ${result.count} new progress notes have been loaded.`, 'success');
-                }
-            } else {
-                console.log(`${site}: 새로운 프로그레스 노트가 없습니다.`);
-                // Only show notification on progress note list page, not in popup
-                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
-                    showNotification(`${site}: No new progress notes available.`, 'info');
-                }
-            }
-        } else {
-            throw new Error(result.message || '증분 업데이트 실패');
-        }
-        
-    } catch (error) {
-        console.error(`${site} 증분 업데이트 실패:`, error);
-        // Only show notification on progress note list page, not in popup
-        if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
-            showNotification(`${site} Incremental update failed: ${error.message}`, 'error');
-        }
-    }
-}
-
-// 프로그레스 노트 조회
-async function getProgressNotes(site, options = {}) {
-    try {
-        const result = await progressNoteDB.getProgressNotes(site, options);
-        console.log(`${site} 프로그레스 노트 조회 결과:`, result);
-        return result;
-    } catch (error) {
-        console.error(`${site} 프로그레스 노트 조회 실패:`, error);
-        throw error;
-    }
-}
-
-// 프로그레스 노트 데이터베이스 정보 조회
-async function getProgressNoteDBInfo() {
-    try {
-        const info = await progressNoteDB.getDatabaseInfo();
-        console.log('프로그레스 노트 데이터베이스 정보:', info);
-        return info;
-    } catch (error) {
-        console.error('데이터베이스 정보 조회 실패:', error);
-        throw error;
-    }
-}
-
-// 프로그레스 노트 새로고침 (수동)
-async function refreshProgressNotes() {
-    const site = document.querySelector('.site-name').textContent;
-    console.log(`${site} 프로그레스 노트 수동 새로고침 시작...`);
-    
-    try {
-        await fetchAndSaveProgressNotes(site, 14);
-        showNotification(`${site} Progress notes refresh completed`, 'success');
-    } catch (error) {
-        console.error('프로그레스 노트 새로고침 실패:', error);
-        showNotification('Progress notes refresh failed', 'error');
-    }
-}
-
-// 프로그레스 노트 증분 업데이트 (수동)
-async function updateProgressNotes() {
-    const site = document.querySelector('.site-name').textContent;
-    console.log(`${site} 프로그레스 노트 증분 업데이트 시작...`);
-    
-    try {
-        await fetchIncrementalProgressNotes(site);
-        showNotification(`${site} Progress notes incremental update completed`, 'success');
-    } catch (error) {
-        console.error('프로그레스 노트 증분 업데이트 실패:', error);
-        showNotification('Progress notes incremental update failed', 'error');
-    }
-}

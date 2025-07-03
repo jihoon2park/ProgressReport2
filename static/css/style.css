@@ -300,28 +300,7 @@ body {
     margin-bottom: 5px;
 }
 
-.toolbar {
-    margin-bottom: 5px;
-    background-color: #eaeaea;
-    padding: 4px;
-    border: 1px solid #ccc;
-    border-bottom: none;
-}
 
-.toolbar button, .toolbar select {
-    margin-right: 3px;
-    padding: 3px 5px;
-    background-color: #f0f0f0;
-    border: 1px solid #aaa;
-    cursor: pointer;
-    font-size: 12px;
-}
-.toolbar button:hover, .toolbar select:hover {
-    background-color: #ddd;
-}
-.toolbar select {
-    height: 24px; /* Match button height */
-}
 
 
 #notes {
@@ -387,26 +366,7 @@ body {
     background-color: #d32f2f;
 }
 
-.bottom-controls {
-    display: none; /* 모든 내용이 주석 처리되어 숨김 */
-    justify-content: space-between; /* Pushes previous versions left, checkboxes right */
-    align-items: center;
-    margin-top: 10px;
-    border-top: 1px solid #ccc;
-    padding-top: 10px;
-}
 
-#previousVersionsBtn {
-    padding: 6px 10px;
-    background-color: #f0f0f0;
-    border: 1px solid #aaa;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-}
-#previousVersionsBtn img {
-    margin-right: 4px;
-}
 
 /* Utility for visually hidden but accessible by screen readers */
 .sr-only {
