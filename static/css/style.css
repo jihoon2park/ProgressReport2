@@ -8,23 +8,22 @@ body {
 
 .site-info-box {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    padding: 25px;
+    padding: 20px;
     margin: 20px auto;
     border-radius: 12px;
     border: 1px solid #dee2e6;
     box-shadow: 0 6px 16px rgba(0,0,0,0.15);
     max-width: 650px;
     text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
 }
-.selected-site {
-    font-size: 1.4em;
+.site-info-line {
+    font-size: 1.3em;
     color: #495057;
     font-weight: 600;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
 }
 .site-name {
     font-weight: bold;
@@ -32,16 +31,16 @@ body {
     font-size: 1.2em;
     text-shadow: 0 1px 2px rgba(0,123,255,0.1);
 }
-.login-user {
-    font-size: 1.3em;
-    color: #495057;
-    font-weight: 600;
-}
 .user-name {
     font-weight: bold;
     color: #28a745;
     font-size: 1.2em;
     text-shadow: 0 1px 2px rgba(40,167,69,0.1);
+}
+.separator {
+    color: #6c757d;
+    font-weight: normal;
+    margin: 0 5px;
 }
 
 .app-container {
@@ -64,6 +63,40 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn-view-notes {
+    background: #28a745;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.btn-view-notes:hover {
+    background: #218838;
+}
+
+.btn-logout {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.btn-logout:hover {
+    background: #c82333;
 }
 
 .window-controls span {
@@ -421,4 +454,57 @@ h3 {
     color: #2c3e50;
     border-bottom: 2px solid #e9ecef;
     padding-bottom: 10px;
+}
+
+/* Progress Note 내용을 위한 안전한 스타일 */
+.note-content {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    color: inherit !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: inherit !important;
+}
+
+/* HTML 노트 내용이 페이지 전체에 영향을 주지 않도록 격리 */
+.note-content * {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    color: inherit !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: inherit !important;
+}
+
+.note-content p {
+    margin: 5px 0 !important;
+    padding: 0 !important;
+}
+
+.note-content ul, .note-content ol {
+    margin: 5px 0 5px 20px !important;
+    padding: 0 !important;
+}
+
+.note-content li {
+    margin: 2px 0 !important;
+    padding: 0 !important;
+}
+
+.note-content b, .note-content strong {
+    font-weight: bold !important;
+}
+
+.note-content i, .note-content em {
+    font-style: italic !important;
+}
+
+.note-content u {
+    text-decoration: underline !important;
+}
+
+.note-content s, .note-content strike {
+    text-decoration: line-through !important;
 }

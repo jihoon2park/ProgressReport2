@@ -62,7 +62,7 @@
             margin-bottom: 5px;
         }
 
-        /* API 서버 상태 표시 스타일 */
+        /* API Server Status Display Styles */
         .server-status {
             max-width: 400px;
             margin: 30px auto;
@@ -133,14 +133,14 @@
 </head>
 <body>
     <div class="login-container">
-        <!-- 로고 이미지 -->
+        <!-- Logo Image -->
         <div class="logo">
             <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company Logo">
         </div>
 
-        <!-- 로그인 폼 -->
+        <!-- Login Form -->
         <form class="login-form" action="{{ url_for('login') }}" method="POST">
-            <!-- 사이트 선택  -->
+            <!-- Site Selection -->
             <div class="site-select">
                 <label for="site">Select Site:</label>
                 <select id="site" name="site" required>
@@ -161,7 +161,7 @@
         </form>
     </div>
 
-    <!-- API 서버 상태 표시 -->
+    <!-- API Server Status Display -->
     <div class="server-status">
         <h3>Manad Plus server status</h3>
         <div class="status-grid">
@@ -190,7 +190,7 @@
     </div>
 
     <script>
-        // API 서버 상태 체크 함수
+        // API server status check function
         function checkServerStatus() {
             fetch('/api/server-status')
                 .then(response => response.json())
@@ -200,7 +200,7 @@
                 })
                 .catch(error => {
                     console.error('Error checking server status:', error);
-                    // 에러 시 모든 서버를 오프라인으로 표시
+                    // Show all servers as offline on error
                     const sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
                     const errorData = {};
                     sites.forEach(site => {
@@ -211,7 +211,7 @@
                 });
         }
 
-        // 상태 표시 업데이트 함수
+        // Status display update function
         function updateStatusDisplay(statusData) {
             const statusMap = {
                 'Parafield Gardens': 'status-parafield',
@@ -227,38 +227,38 @@
                 const icon = element.querySelector('.status-icon');
                 
                 if (statusData[site]) {
-                    // 온라인 상태
+                    // Online status
                     element.className = 'status-item online';
                     icon.className = 'status-icon online';
                 } else {
-                    // 오프라인 상태
+                    // Offline status
                     element.className = 'status-item offline';
                     icon.className = 'status-icon offline';
                 }
             });
         }
 
-        // 마지막 업데이트 시간 표시
+        // Display last updated time
         function updateLastUpdated() {
             const now = new Date();
             const timeString = now.toLocaleTimeString();
             document.getElementById('last-updated').textContent = `Last updated: ${timeString}`;
         }
 
-        // 페이지 로드 시 초기 상태 체크
+        // Initial status check on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // 초기 상태 체크
+            // Initial status check
             checkServerStatus();
             
-            // 1분(60000ms)마다 상태 체크
+            // Check status every 1 minute (60000ms)
             setInterval(checkServerStatus, 60000);
         });
 
-        // 페이지가 숨겨질 때 타이머 정리 (선택사항)
+                    // Clean up timer when page is hidden (optional)
         document.addEventListener('visibilitychange', function() {
             if (document.hidden) {
-                // 페이지가 숨겨졌을 때는 체크를 중단할 수 있지만,
-                // 요구사항에 따라 계속 실행되도록 유지
+                // Can stop checking when page is hidden,
+                // but keep running according to requirements
             }
         });
     </script>

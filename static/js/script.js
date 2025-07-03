@@ -1,7 +1,7 @@
 // DOM Elements object to store references
 const DOM = {};
 
-// 세션 타임아웃 관련 변수
+// Session timeout related variables
 let sessionTimeoutId = null;
 let sessionWarningId = null;
 let sessionCheckInterval = null;
@@ -10,20 +10,32 @@ const SESSION_WARNING_MINUTES = 1;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're in popup mode (iframe)
+    if (window.parent !== window) {
+        // Hide header buttons in popup mode
+        const headerButtons = document.getElementById('headerButtons');
+        if (headerButtons) {
+            headerButtons.style.display = 'none';
+        }
+    }
+    
     // Initialize DOM references
     initializeDOMElements();
     
     // Initialize UI components
     initializeUI();
     
-    // 세션 새로고침 (사용자 정보 업데이트)
+    // Session refresh (user information update)
     refreshUserSession();
     
-    // 세션 타임아웃 모니터링 시작
+    // Start session timeout monitoring
     startSessionTimeoutMonitoring();
     
-    // 사용자 활동 감지 (세션 연장)
+    // User activity detection (session extension)
     setupActivityDetection();
+    
+    // 프로그레스 노트 데이터베이스 초기화 및 데이터 가져오기
+    initializeProgressNoteData();
 });
 
 // Store references to all DOM elements we'll need
@@ -44,7 +56,7 @@ function initializeDOMElements() {
     // Buttons
     DOM.currentTimeBtn = document.getElementById('currentTimeBtn');
     DOM.addEventTypeBtn = document.getElementById('addEventTypeBtn');
-    // DOM.previousVersionsBtn = document.getElementById('previousVersionsBtn'); // 주석 처리됨
+    // DOM.previousVersionsBtn = document.getElementById('previousVersionsBtn'); // Commented out
     
     // Floating action buttons (near notes)
     DOM.floatingSaveNewBtn = document.getElementById('floatingSaveNewBtn');
@@ -62,7 +74,7 @@ function initializeDOMElements() {
     DOM.tabContents = document.querySelectorAll('.tab-content');
     
     // Toolbar
-    // DOM.toolbar = document.querySelector('.toolbar'); // 주석 처리됨
+    // DOM.toolbar = document.querySelector('.toolbar'); // Commented out
 }
 
 // Initialize all UI components
@@ -347,7 +359,7 @@ function loadCareAreas() {
 function loadEventTypes() {
     if (!DOM.eventType) return;
     
-    // 사용자 정보와 Event Type 데이터를 동시에 가져오기
+            // Fetch user information and Event Type data simultaneously
     Promise.all([
         fetch('/api/user-info').then(response => response.json()),
         fetch('/data/eventtype.json').then(response => response.json())
@@ -356,7 +368,7 @@ function loadEventTypes() {
         DOM.eventType.innerHTML = '<option value="">(none)</option>';
 
         if (Array.isArray(eventTypeData)) {
-            // IsArchived가 false인 항목만 필터링하고 Description으로 정렬
+            // Filter only items where IsArchived is false and sort by Description
             const activeEventTypes = eventTypeData
                 .filter(item => !item.IsArchived)
                 .sort((a, b) => {
@@ -365,7 +377,7 @@ function loadEventTypes() {
                     return descA.localeCompare(descB);
                 });
 
-            // 모든 Event Type을 드롭다운에 추가
+            // Add all Event Types to dropdown
             activeEventTypes.forEach(eventType => {
                 if (eventType.Description) {
                     const option = document.createElement('option');
@@ -375,28 +387,28 @@ function loadEventTypes() {
                 }
             });
 
-            // 사용자 역할에 따른 기본값 설정
+            // Set default value based on user role
             const userRole = userInfo.role;
             let defaultEventType = null;
             
             if (userRole === 'doctor') {
-                // Doctor 역할인 경우 "Doctor" Event Type을 기본값으로 설정
+                // Set "Doctor" Event Type as default for Doctor role
                 defaultEventType = activeEventTypes.find(et => et.Description === 'Doctor');
             } else if (userRole === 'physiotherapist') {
-                // Physiotherapist 역할인 경우 "Physio Therapist" Event Type을 기본값으로 설정
+                // Set "Physio Therapist" Event Type as default for Physiotherapist role
                 defaultEventType = activeEventTypes.find(et => et.Description === 'Physio Therapist');
             }
             
             if (defaultEventType) {
                 DOM.eventType.value = defaultEventType.Id;
                 
-                // 시각적 표시를 위해 연한 배경색 적용 (기본값임을 나타냄)
+                // Apply light background color for visual indication (indicates default value)
                 DOM.eventType.style.backgroundColor = '#e8f4fd';
                 DOM.eventType.style.color = '#333';
                 
-                console.log(`역할(${userRole})에 따라 Event Type 기본값 설정: ${defaultEventType.Description} (ID: ${defaultEventType.Id})`);
+                console.log(`Event Type default value set based on role (${userRole}): ${defaultEventType.Description} (ID: ${defaultEventType.Id})`);
             } else {
-                // Admin이나 기타 역할인 경우 정상적인 스타일
+                // Normal style for Admin or other roles
                 DOM.eventType.style.backgroundColor = '';
                 DOM.eventType.style.color = '';
             }
@@ -416,7 +428,7 @@ function loadEventTypes() {
 
 // Initialize text editor toolbar
 function initializeToolbar() {
-    // Toolbar가 주석 처리되어 있으므로 존재하지 않을 수 있음
+    // Toolbar is commented out, so it may not exist
     if (!DOM.toolbar) {
         console.log('Toolbar not found (likely commented out) - skipping toolbar initialization');
         return;
@@ -466,10 +478,19 @@ function initializeButtons() {
     // Floating Close button (near notes)
     if (DOM.floatingCloseBtn) {
         DOM.floatingCloseBtn.addEventListener('click', function() {
-            // Show confirmation dialog before closing
-            if (confirm('Do you want to logout?')) {
-                // 창 닫기 대신 로그아웃 처리
-                window.location.href = '/logout';
+            // Check if we're in an iframe (popup mode)
+            if (window.parent !== window) {
+                // Send message to parent window to close popup
+                window.parent.postMessage({
+                    type: 'PROGRESS_NOTE_SAVED',
+                    action: 'close_only'
+                }, '*');
+            } else {
+                // Show confirmation dialog before closing
+                if (confirm('Do you want to logout?')) {
+                    // Handle logout instead of closing window
+                    window.location.href = '/logout';
+                }
             }
         });
     }
@@ -502,12 +523,30 @@ function handleSave(andClose = false) {
         .then(success => {
             if (success) {
                 if (andClose) {
-                    if (confirm('Data saved successfully. Close the window?')) {
-                        window.location.href = '/logout';
+                    // Check if we're in an iframe (popup mode)
+                    if (window.parent !== window) {
+                        // Send message to parent window to close popup and refresh
+                        window.parent.postMessage({
+                            type: 'PROGRESS_NOTE_SAVED',
+                            action: 'close_and_refresh'
+                        }, '*');
+                    } else {
+                        if (confirm('Data saved successfully. Close the window?')) {
+                            window.location.href = '/logout';
+                        }
                     }
                 } else {
                     resetForm();
-                    alert('Data saved successfully. Form has been reset for new entry.');
+                    // Check if we're in an iframe (popup mode)
+                    if (window.parent !== window) {
+                        // Send message to parent window to refresh
+                        window.parent.postMessage({
+                            type: 'PROGRESS_NOTE_SAVED',
+                            action: 'refresh_only'
+                        }, '*');
+                    } else {
+                        alert('Data saved successfully. Form has been reset for new entry.');
+                    }
                 }
             }
         });
@@ -529,38 +568,38 @@ function saveProgressNoteToServer(formData) {
         if (data.success) {
             console.log('Progress note saved successfully:', data.data);
             
-            // API 전송 결과 처리
+            // Handle API transmission result
             if (data.api_response) {
-                // API 전송 성공
+                // API transmission successful
                 console.log('API transmission successful:', data.api_response);
-                alert('✅ Progress Note가 성공적으로 저장되고 API로 전송되었습니다!');
+                alert('✅ Progress Note saved and sent to API successfully!');
             } else if (data.warning || data.api_error) {
-                // 파일 저장은 성공했지만 API 전송 실패
+                // File saved successfully but API transmission failed
                 console.warn('API transmission failed:', data.api_error || data.warning);
-                const warningMsg = data.warning || 'API 전송에 실패했습니다.';
-                alert('⚠️ Progress Note가 저장되었지만 API 전송에 실패했습니다.\n\n' + warningMsg + '\n\n파일은 정상적으로 저장되었으므로 나중에 다시 시도할 수 있습니다.');
+                                  const warningMsg = data.warning || 'API transmission failed.';
+                alert('⚠️ Progress Note saved but API transmission failed.\n\n' + warningMsg + '\n\nThe file was saved successfully, so you can try again later.');
             } else {
-                // 일반적인 저장 성공 (API 전송 정보 없음)
-                alert('✅ Progress Note가 성공적으로 저장되었습니다!');
+                // General save success (no API transmission info)
+                alert('✅ Progress Note saved successfully!');
             }
             
             return true;
         } else {
             console.error('Failed to save progress note:', data.message);
-            alert('❌ Progress Note 저장에 실패했습니다: ' + data.message);
+                            alert('❌ Progress Note save failed: ' + data.message);
             return false;
         }
     })
     .catch(error => {
         console.error('Error saving progress note:', error);
-        alert('❌ Progress Note 저장 중 오류가 발생했습니다: ' + error.message);
+                    alert('❌ Error occurred while saving Progress Note: ' + error.message);
         return false;
     });
 }
 
 // Gather all form data
 function gatherFormData() {
-    // 날짜/시간 값들을 먼저 확인
+            // Check date/time values first
     const createDateValue = DOM.createDate ? DOM.createDate.value : '';
     const createTimeValue = DOM.createTime ? DOM.createTime.value : '';
     const eventDateValue = DOM.eventDate ? DOM.eventDate.value : '';
@@ -573,7 +612,7 @@ function gatherFormData() {
         eventTime: eventTimeValue
     });
     
-    // Flatpickr 인스턴스에서 실제 Date 객체 가져오기
+            // Get actual Date object from Flatpickr instance
     let createDateFormatted = '';
     let eventDateFormatted = '';
     
@@ -597,15 +636,15 @@ function gatherFormData() {
     
     const formData = {
         clientId: DOM.client ? DOM.client.value : '',
-        eventType: DOM.eventType ? DOM.eventType.value : '', // disabled 상태여도 값 가져오기
+        eventType: DOM.eventType ? DOM.eventType.value : '', // Get value even if disabled
         careArea: DOM.careArea ? DOM.careArea.value : '',
         riskRating: DOM.riskRating ? DOM.riskRating.value : '',
         createDate: createDateFormatted,
         eventDate: eventDateFormatted,
         notes: DOM.notes ? DOM.notes.value : '',
         lateEntry: DOM.lateEntry ? DOM.lateEntry.checked : false
-        // flagOnNoticeboard: DOM.flagOnNoticeboard ? DOM.flagOnNoticeboard.checked : false, // 주석 처리됨
-        // archived: DOM.archived ? DOM.archived.checked : false // 주석 처리됨
+        // flagOnNoticeboard: DOM.flagOnNoticeboard ? DOM.flagOnNoticeboard.checked : false, // Commented out
+        // archived: DOM.archived ? DOM.archived.checked : false // Commented out
     };
     
     console.log('Gathered form data:', formData);
@@ -617,24 +656,24 @@ function formatDateTime(dateValue, timeValue) {
     if (!dateValue) return '';
     
     try {
-        // Flatpickr에서 반환하는 날짜 형식을 처리
+        // Handle date format returned by Flatpickr
         let date;
         
-        // 먼저 Date 객체로 파싱 시도
+        // Try parsing as Date object first
         if (dateValue instanceof Date) {
             date = dateValue;
         } else {
-            // 문자열인 경우 Date 객체로 변환
+            // Convert to Date object if string
             date = new Date(dateValue);
         }
         
-        // 유효한 날짜인지 확인
+        // Check if valid date
         if (isNaN(date.getTime())) {
             console.error('Invalid date value:', dateValue);
             return '';
         }
         
-        // 시간 설정
+        // Set time
         if (timeValue) {
             const timeParts = timeValue.split(':');
             if (timeParts.length >= 2) {
@@ -647,7 +686,7 @@ function formatDateTime(dateValue, timeValue) {
             date.setHours(0, 0, 0, 0);
         }
         
-        // YYYY-MM-DDTHH:mm:ss 형식으로 로컬 시간 반환
+        // Return local time in YYYY-MM-DDTHH:mm:ss format
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
@@ -670,19 +709,19 @@ function resetForm() {
     if (DOM.riskRating) DOM.riskRating.value = '';
     if (DOM.notes) DOM.notes.value = '';
     if (DOM.lateEntry) DOM.lateEntry.checked = false;
-    // if (DOM.flagOnNoticeboard) DOM.flagOnNoticeboard.checked = false; // 주석 처리됨
-    // if (DOM.archived) DOM.archived.checked = false; // 주석 처리됨
+            // if (DOM.flagOnNoticeboard) DOM.flagOnNoticeboard.checked = false; // Commented out
+        // if (DOM.archived) DOM.archived.checked = false; // Commented out
     
     // Clear client details display
     displayClientDetails(null);
     
-    // Event Type은 역할별 기본값으로 다시 설정
+            // Reset Event Type to role-based default value
     restoreEventTypeDefault();
     
     // Update time to current for both create and event dates
     setCurrentDateTime();
     
-    // Notes 영역이 리셋되었으므로 버튼 위치 재조정
+            // Adjust button position since Notes area was reset
     setTimeout(adjustFloatingButtonsPosition, 100);
 }
 
@@ -1196,4 +1235,213 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.remove();
     }, 3000);
+}
+
+// 프로그레스 노트 데이터베이스 초기화 및 데이터 가져오기
+async function initializeProgressNoteData() {
+    try {
+        console.log('프로그레스 노트 데이터베이스 초기화 시작...');
+        
+        // IndexedDB 초기화
+        await progressNoteDB.init();
+        console.log('IndexedDB 초기화 완료');
+        
+        // 현재 사이트 정보 가져오기
+        const site = document.querySelector('.site-name').textContent;
+        console.log(`현재 사이트: ${site}`);
+        
+        // 데이터베이스 정보 조회
+        const dbInfo = await progressNoteDB.getDatabaseInfo();
+        console.log('데이터베이스 정보:', dbInfo);
+        
+        // 마지막 업데이트 시간 확인
+        const lastUpdate = await progressNoteDB.getLastUpdateTime(site);
+        console.log(`${site} 마지막 업데이트:`, lastUpdate);
+        
+        // 데이터 가져오기 (2주치)
+        await fetchAndSaveProgressNotes(site, 14);
+        
+        console.log('프로그레스 노트 데이터베이스 초기화 완료');
+        
+    } catch (error) {
+        console.error('프로그레스 노트 데이터베이스 초기화 실패:', error);
+    }
+}
+
+// 프로그레스 노트 가져오기 및 저장
+async function fetchAndSaveProgressNotes(site, days = 14) {
+    try {
+        console.log(`${site}에서 ${days}일치 프로그레스 노트 가져오기 시작...`);
+        
+        // 서버에서 프로그레스 노트 가져오기
+        const response = await fetch('/api/fetch-progress-notes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                site: site,
+                days: days
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`${site}: ${result.count}개의 프로그레스 노트 가져오기 성공`);
+            
+            // IndexedDB에 저장
+            if (result.data && result.data.length > 0) {
+                const saveResult = await progressNoteDB.saveProgressNotes(site, result.data);
+                console.log(`${site} 저장 결과:`, saveResult);
+                
+                // 마지막 업데이트 시간 저장
+                await progressNoteDB.saveLastUpdateTime(site, result.fetched_at);
+                
+                // Only show notification on progress note list page, not in popup
+                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
+                    showNotification(`${site}: ${result.count} progress notes have been loaded.`, 'success');
+                }
+            } else {
+                console.log(`${site}: 가져올 프로그레스 노트가 없습니다.`);
+                // Only show notification on progress note list page, not in popup
+                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
+                    showNotification(`${site}: No progress notes to load.`, 'info');
+                }
+            }
+        } else {
+            throw new Error(result.message || '프로그레스 노트 가져오기 실패');
+        }
+        
+    } catch (error) {
+        console.error(`${site} 프로그레스 노트 가져오기 실패:`, error);
+        // Only show notification on progress note list page, not in popup
+        if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
+            showNotification(`${site} Failed to load progress notes: ${error.message}`, 'error');
+        }
+    }
+}
+
+// 증분 업데이트로 프로그레스 노트 가져오기
+async function fetchIncrementalProgressNotes(site) {
+    try {
+        console.log(`${site} 증분 업데이트 시작...`);
+        
+        // 마지막 업데이트 시간 가져오기
+        const lastUpdate = await progressNoteDB.getLastUpdateTime(site);
+        
+        if (!lastUpdate) {
+            console.log(`${site}: 마지막 업데이트 시간이 없어 전체 데이터를 가져옵니다.`);
+            return await fetchAndSaveProgressNotes(site, 14);
+        }
+        
+        console.log(`${site} 마지막 업데이트: ${lastUpdate}`);
+        
+        // 증분 업데이트 요청
+        const response = await fetch('/api/fetch-progress-notes-incremental', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                site: site,
+                since_date: lastUpdate
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`${site}: ${result.count}개의 새로운 프로그레스 노트 가져오기 성공`);
+            
+            // IndexedDB에 저장
+            if (result.data && result.data.length > 0) {
+                const saveResult = await progressNoteDB.saveProgressNotes(site, result.data);
+                console.log(`${site} 저장 결과:`, saveResult);
+                
+                // 마지막 업데이트 시간 저장
+                await progressNoteDB.saveLastUpdateTime(site, result.fetched_at);
+                
+                // Only show notification on progress note list page, not in popup
+                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
+                    showNotification(`${site}: ${result.count} new progress notes have been loaded.`, 'success');
+                }
+            } else {
+                console.log(`${site}: 새로운 프로그레스 노트가 없습니다.`);
+                // Only show notification on progress note list page, not in popup
+                if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
+                    showNotification(`${site}: No new progress notes available.`, 'info');
+                }
+            }
+        } else {
+            throw new Error(result.message || '증분 업데이트 실패');
+        }
+        
+    } catch (error) {
+        console.error(`${site} 증분 업데이트 실패:`, error);
+        // Only show notification on progress note list page, not in popup
+        if (document.title.includes('Progress Notes') && (!window.parent || window.parent === window)) {
+            showNotification(`${site} Incremental update failed: ${error.message}`, 'error');
+        }
+    }
+}
+
+// 프로그레스 노트 조회
+async function getProgressNotes(site, options = {}) {
+    try {
+        const result = await progressNoteDB.getProgressNotes(site, options);
+        console.log(`${site} 프로그레스 노트 조회 결과:`, result);
+        return result;
+    } catch (error) {
+        console.error(`${site} 프로그레스 노트 조회 실패:`, error);
+        throw error;
+    }
+}
+
+// 프로그레스 노트 데이터베이스 정보 조회
+async function getProgressNoteDBInfo() {
+    try {
+        const info = await progressNoteDB.getDatabaseInfo();
+        console.log('프로그레스 노트 데이터베이스 정보:', info);
+        return info;
+    } catch (error) {
+        console.error('데이터베이스 정보 조회 실패:', error);
+        throw error;
+    }
+}
+
+// 프로그레스 노트 새로고침 (수동)
+async function refreshProgressNotes() {
+    const site = document.querySelector('.site-name').textContent;
+    console.log(`${site} 프로그레스 노트 수동 새로고침 시작...`);
+    
+    try {
+        await fetchAndSaveProgressNotes(site, 14);
+        showNotification(`${site} Progress notes refresh completed`, 'success');
+    } catch (error) {
+        console.error('프로그레스 노트 새로고침 실패:', error);
+        showNotification('Progress notes refresh failed', 'error');
+    }
+}
+
+// 프로그레스 노트 증분 업데이트 (수동)
+async function updateProgressNotes() {
+    const site = document.querySelector('.site-name').textContent;
+    console.log(`${site} 프로그레스 노트 증분 업데이트 시작...`);
+    
+    try {
+        await fetchIncrementalProgressNotes(site);
+        showNotification(`${site} Progress notes incremental update completed`, 'success');
+    } catch (error) {
+        console.error('프로그레스 노트 증분 업데이트 실패:', error);
+        showNotification('Progress notes incremental update failed', 'error');
+    }
 }
