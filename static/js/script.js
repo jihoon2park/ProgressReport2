@@ -1132,10 +1132,42 @@ function extendSession() {
     });
 }
 
+// DB 초기화 및 로그아웃 함수
+async function clearDatabaseAndLogout() {
+    try {
+        // IndexedDB 초기화
+        if (window.progressNoteDB) {
+            console.log('Clearing IndexedDB before logout...');
+            await window.progressNoteDB.clearAll();
+            console.log('IndexedDB cleared successfully');
+        }
+        
+        // 서버에 DB 초기화 요청
+        await fetch('/api/clear-database', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        console.log('Server database cleared successfully');
+    } catch (error) {
+        console.error('Error clearing database:', error);
+    }
+    
+    // 로그아웃 처리 후 로그인 페이지로 이동
+    try {
+        await fetch('/logout');
+    } catch (error) {
+        console.error('Error during logout:', error);
+    }
+    
+    window.location.href = '/';
+}
+
 // 지금 로그아웃
-function logoutNow() {
+async function logoutNow() {
     removeSessionWarning();
-    window.location.href = '/logout';
+    await clearDatabaseAndLogout();
 }
 
 // 세션 경고 제거
@@ -1180,26 +1212,14 @@ function handleSessionTimeout() {
     
     document.body.appendChild(timeoutModal);
     
-    document.getElementById('go-login-btn').addEventListener('click', () => {
-        // 로그아웃 처리 후 로그인 페이지로 이동
-        fetch('/logout')
-            .then(() => {
-                window.location.href = '/';
-            })
-            .catch(() => {
-                window.location.href = '/';
-            });
+    document.getElementById('go-login-btn').addEventListener('click', async () => {
+        // DB 초기화 후 로그아웃 처리
+        await clearDatabaseAndLogout();
     });
     
-    // 3초 후 자동으로 로그아웃 처리 후 로그인 페이지로 이동
-    setTimeout(() => {
-        fetch('/logout')
-            .then(() => {
-                window.location.href = '/';
-            })
-            .catch(() => {
-                window.location.href = '/';
-            });
+    // 3초 후 자동으로 DB 초기화 후 로그아웃 처리
+    setTimeout(async () => {
+        await clearDatabaseAndLogout();
     }, 3000);
 }
 

@@ -56,13 +56,13 @@ class ProgressNoteFetchClient:
             (성공 여부, 데이터 리스트 또는 None)
         """
         try:
-            # 기본값 설정: 2주 전부터 현재까지
+            # 기본값 설정: 1일 전부터 현재까지 (더 넓은 범위로 테스트)
             if start_date is None:
-                start_date = datetime.now() - timedelta(weeks=2)
+                start_date = datetime.now() - timedelta(days=1)
             if end_date is None:
                 end_date = datetime.now()
             
-            # 날짜 형식 변환 (ISO 8601)
+            # 날짜 형식 변환 (UTC 형식 - API 서버가 기대하는 형식)
             start_date_str = start_date.isoformat() + 'Z'
             end_date_str = end_date.isoformat() + 'Z'
             
@@ -72,31 +72,71 @@ class ProgressNoteFetchClient:
                 'limit': limit
             }
             
+            # CreatedDate 기준으로도 시도 (UTC 형식)
+            created_params = {
+                'createddate': [f'gt:{start_date_str}', f'lt:{end_date_str}'],
+                'limit': limit
+            }
+            
+            logger.info(f"Trying EventDate params: {params}")
+            logger.info(f"Also trying CreatedDate params: {created_params}")
+            
             logger.info(f"Fetching progress notes from {self.site}")
             logger.info(f"Date range: {start_date_str} to {end_date_str}")
+            logger.info(f"Start date (datetime): {start_date}")
+            logger.info(f"End date (datetime): {end_date}")
             logger.info(f"Limit: {limit}")
             logger.info(f"API URL: {self.api_url}")
             logger.info(f"Request params: {params}")
             
-            # API 요청
+            # API 요청 (EventDate 기준)
+            logger.info(f"Making API request to: {self.api_url}")
             response = self.session.get(
                 self.api_url,
                 params=params,
-                timeout=30
+                timeout=60  # 타임아웃 증가
             )
             
-            logger.info(f"API response status: {response.status_code}")
-            logger.info(f"API response headers: {dict(response.headers)}")
+            logger.info(f"API response status (EventDate): {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"Successfully fetched {len(data)} progress notes from {self.site}")
+                logger.info(f"Successfully fetched {len(data)} progress notes from {self.site} (EventDate)")
                 
                 # 응답 데이터 샘플 로깅
                 if data and len(data) > 0:
-                    logger.info("Response data sample:")
+                    logger.info("Response data sample (EventDate):")
                     for i, record in enumerate(data[:3]):
                         logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
+                else:
+                    logger.info("No data returned from API (EventDate)")
+                    logger.info(f"Response content: {response.text}")
+                    logger.info(f"Response headers: {dict(response.headers)}")
+                
+                # CreatedDate 기준으로도 시도
+                if not data or len(data) == 0:
+                    logger.info("Trying CreatedDate-based query...")
+                    created_response = self.session.get(
+                        self.api_url,
+                        params=created_params,
+                        timeout=60
+                    )
+                    
+                    logger.info(f"API response status (CreatedDate): {created_response.status_code}")
+                    
+                    if created_response.status_code == 200:
+                        created_data = created_response.json()
+                        logger.info(f"Successfully fetched {len(created_data)} progress notes from {self.site} (CreatedDate)")
+                        
+                        if created_data and len(created_data) > 0:
+                            logger.info("Response data sample (CreatedDate):")
+                            for i, record in enumerate(created_data[:3]):
+                                logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
+                        else:
+                            logger.info("No data returned from API (CreatedDate)")
+                            logger.info(f"CreatedDate response content: {created_response.text}")
+                        
+                        return True, created_data
                 
                 return True, data
             else:
@@ -150,6 +190,27 @@ class ProgressNoteFetchClient:
                     logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
         else:
             logger.info("No new records found in incremental update")
+            # 디버깅을 위해 전체 데이터 조회 시도
+            logger.info("Attempting to fetch all recent data for debugging...")
+            debug_success, debug_data = self.fetch_recent_progress_notes(days=1)
+            if debug_success and debug_data:
+                logger.info(f"Debug: Found {len(debug_data)} records in last 24 hours")
+                if len(debug_data) > 0:
+                    logger.info("Debug: Recent records:")
+                    for i, record in enumerate(debug_data[:3]):
+                        logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
+                    
+                    # 특정 ID 검색
+                    target_id = 302872
+                    found_record = next((r for r in debug_data if r.get('Id') == target_id), None)
+                    if found_record:
+                        logger.info(f"Found target record ID {target_id}:")
+                        logger.info(f"  EventDate: {found_record.get('EventDate')}")
+                        logger.info(f"  CreatedDate: {found_record.get('CreatedDate', 'N/A')}")
+                        logger.info(f"  Since date: {since_date}")
+                        logger.info(f"  Is EventDate > since_date: {found_record.get('EventDate') > since_date.isoformat()}")
+                    else:
+                        logger.info(f"Target record ID {target_id} not found in recent data")
             
         return success, data
 
