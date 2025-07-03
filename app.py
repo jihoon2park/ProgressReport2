@@ -697,19 +697,7 @@ def save_progress_note():
 # API 엔드포인트
 # ==============================
 
-@app.route('/get_server_ip', methods=['POST'])
-def get_server_ip():
-    """서버 IP 조회 API"""
-    site = request.json.get('site')
-    if site in SITE_SERVERS:
-        return jsonify({
-            'success': True,
-            'server_ip': SITE_SERVERS[site]
-        })
-    return jsonify({
-        'success': False,
-        'message': 'Invalid site selected'
-    })
+
 
 @app.route('/data/Client_list.json')
 def get_client_list():
@@ -740,44 +728,7 @@ def get_event_type_list():
     except FileNotFoundError:
         return jsonify([]), 404
 
-@app.route('/api/backup-status')
-@login_required
-def get_backup_status():
-    """백업 파일 상태 확인 (테스트용)"""
-    try:
-        backup_files = []
-        data_dir = 'data'
-        
-        # prepare_send.json 확인
-        main_file = os.path.join(data_dir, 'prepare_send.json')
-        main_file_exists = os.path.exists(main_file)
-        
-        # 백업 파일들 확인
-        for i in range(1, 1001):  # 1부터 1000까지
-            backup_filepath = os.path.join(data_dir, f'prepare_send_backup{i}.json')
-            if os.path.exists(backup_filepath):
-                file_stat = os.stat(backup_filepath)
-                backup_files.append({
-                    'number': i,
-                    'filename': f'prepare_send_backup{i}.json',
-                    'size': file_stat.st_size,
-                    'modified_time': datetime.fromtimestamp(file_stat.st_mtime).isoformat()
-                })
-        
-        # 수정 시간 순으로 정렬 (가장 오래된 것부터)
-        backup_files.sort(key=lambda x: x['modified_time'])
-        
-        return jsonify({
-            'main_file_exists': main_file_exists,
-            'backup_count': len(backup_files),
-            'max_backup_count': 1000,
-            'backup_files': backup_files[:10],  # 처음 10개만 반환
-            'oldest_backup': backup_files[0] if backup_files else None,
-            'newest_backup': backup_files[-1] if backup_files else None
-        })
-    except Exception as e:
-        logger.error(f"백업 상태 확인 중 오류: {str(e)}")
-        return jsonify({'error': 'Failed to get backup status'}), 500
+
 
 @app.route('/api/user-info')
 @login_required

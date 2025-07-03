@@ -75,6 +75,8 @@ class ProgressNoteFetchClient:
             logger.info(f"Fetching progress notes from {self.site}")
             logger.info(f"Date range: {start_date_str} to {end_date_str}")
             logger.info(f"Limit: {limit}")
+            logger.info(f"API URL: {self.api_url}")
+            logger.info(f"Request params: {params}")
             
             # API 요청
             response = self.session.get(
@@ -84,10 +86,18 @@ class ProgressNoteFetchClient:
             )
             
             logger.info(f"API response status: {response.status_code}")
+            logger.info(f"API response headers: {dict(response.headers)}")
             
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"Successfully fetched {len(data)} progress notes from {self.site}")
+                
+                # 응답 데이터 샘플 로깅
+                if data and len(data) > 0:
+                    logger.info("Response data sample:")
+                    for i, record in enumerate(data[:3]):
+                        logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
+                
                 return True, data
             else:
                 logger.error(f"API request failed: {response.status_code} - {response.text}")
@@ -126,7 +136,22 @@ class ProgressNoteFetchClient:
             (성공 여부, 데이터 리스트 또는 None)
         """
         end_date = datetime.now()
-        return self.fetch_progress_notes(since_date, end_date)
+        logger.info(f"Incremental update - since_date: {since_date}, end_date: {end_date}")
+        logger.info(f"Time difference: {end_date - since_date}")
+        
+        success, data = self.fetch_progress_notes(since_date, end_date)
+        
+        if success and data:
+            logger.info(f"Incremental update found {len(data)} records")
+            # 최신 기록 몇 개 로깅
+            if len(data) > 0:
+                logger.info("Latest records in incremental update:")
+                for i, record in enumerate(data[:5]):
+                    logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
+        else:
+            logger.info("No new records found in incremental update")
+            
+        return success, data
 
 def fetch_progress_notes_for_site(site: str, days: int = 14) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
     """
