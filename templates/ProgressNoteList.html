@@ -7,7 +7,7 @@
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f7f9fa; }
         .container { display: flex; height: 100vh; }
-        .left-panel { flex: 2; padding: 24px 16px 16px 24px; background: #fff; border-right: 1px solid #e0e0e0; overflow-y: auto; }
+        .left-panel { flex: 2; padding: 24px 16px 16px 24px; background: #fff; border-right: 1px solid #e0e0e0; overflow-y: auto; overflow-x: visible; }
         .right-panel { flex: 1; padding: 24px 24px 16px 24px; background: #f9fbfd; }
         .header { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; gap: 20px; }
         .btn-addnew { background: #28a745; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
@@ -16,7 +16,106 @@
         .btn-refresh:hover { background: #138496; }
         .btn-logout { background: #dc3545; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
         .btn-logout:hover { background: #c82333; }
-        table { width: 100%; border-collapse: collapse; background: #fff; table-layout: fixed; }
+        
+        /* 필터 스타일 */
+        .filter-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .filter-header:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .filter-header.active {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        
+
+        
+        .filter-icon {
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        
+        .filter-icon.active {
+            transform: rotate(180deg);
+        }
+        
+        .filter-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 99999;
+            min-width: 200px;
+            display: none;
+            margin-top: 2px;
+            font-size: 0.9em;
+            transform: translateZ(0);
+        }
+        
+        .filter-dropdown.show {
+            display: block;
+        }
+        
+        .filter-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        
+        .filter-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .filter-item.selected {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .filter-clear {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .filter-clear:hover {
+            background: #e9ecef;
+        }
+        
+        .filter-header-wrapper {
+            position: relative !important;
+        }
+        
+        th.filter-header-wrapper {
+            position: relative !important;
+            overflow: visible !important;
+        }
+        
+        table thead th {
+            position: relative !important;
+            overflow: visible !important;
+        }
+        
+        table { width: 100%; border-collapse: collapse; background: #fff; table-layout: fixed; overflow: visible; }
         th, td { padding: 8px 10px; border-bottom: 1px solid #e0e0e0; text-align: left; font-size: 0.98em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         th { background: #f1f5fa !important; font-weight: 600; color: #222 !important; }
         th, thead tr { background: #f1f5fa !important; }
@@ -140,6 +239,7 @@
     <button class="btn-addnew" onclick="openProgressNotePopup()">Add New</button>
     <button class="btn-refresh" onclick="refreshData()">Refresh</button>
     <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
+    <button style="background: #6c757d; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer;" onclick="testFilter()">Test Filter</button>
 </div>
 <div class="container">
     <div class="left-panel">
@@ -148,11 +248,27 @@
             <tr>
                 <th>Record ID</th>
                 <th>Service wing</th>
-                <th>Client</th>
+                <th class="filter-header-wrapper">
+                    <div class="filter-header" onclick="toggleFilter('client')">
+                        Client
+                        <span class="filter-icon" id="client-filter-icon">▼</span>
+                    </div>
+                    <div class="filter-dropdown" id="client-filter-dropdown">
+                        <!-- 필터 아이템들이 동적으로 추가됨 -->
+                    </div>
+                </th>
                 <th>Date</th>
                 <th>Time</th>
                 <th>Late entry</th>
-                <th>Event type</th>
+                <th class="filter-header-wrapper">
+                    <div class="filter-header" onclick="toggleFilter('eventType')">
+                        Event type
+                        <span class="filter-icon" id="eventType-filter-icon">▼</span>
+                    </div>
+                    <div class="filter-dropdown" id="eventType-filter-dropdown">
+                        <!-- 필터 아이템들이 동적으로 추가됨 -->
+                    </div>
+                </th>
                 <th>Care area(s)</th>
                 <th>Created by</th>
             </tr>
@@ -245,6 +361,213 @@
             }
         }
     });
+    
+    // 필터 관련 전역 변수
+    window.currentFilters = {
+        client: null,
+        eventType: null
+    };
+    
+    window.allNotes = []; // 모든 노트 데이터 저장
+    
+    // 필터 토글 함수
+    window.toggleFilter = function(filterType) {
+        console.log('toggleFilter called with:', filterType);
+        const dropdown = document.getElementById(`${filterType}-filter-dropdown`);
+        const icon = document.getElementById(`${filterType}-filter-icon`);
+        const header = document.querySelector(`[onclick="toggleFilter('${filterType}')"]`);
+        
+        console.log('dropdown element:', dropdown);
+        console.log('icon element:', icon);
+        console.log('header element:', header);
+        
+        // 다른 드롭다운 닫기
+        const allDropdowns = document.querySelectorAll('.filter-dropdown');
+        const allIcons = document.querySelectorAll('.filter-icon');
+        const allHeaders = document.querySelectorAll('.filter-header');
+        
+        allDropdowns.forEach(d => {
+            if (d !== dropdown) {
+                d.classList.remove('show');
+            }
+        });
+        
+        allIcons.forEach(i => {
+            if (i !== icon) {
+                i.classList.remove('active');
+            }
+        });
+        
+        allHeaders.forEach(h => {
+            if (h !== header) {
+                h.classList.remove('active');
+            }
+        });
+        
+        // 현재 드롭다운 토글
+        dropdown.classList.toggle('show');
+        icon.classList.toggle('active');
+        header.classList.toggle('active');
+        
+        console.log('dropdown show class:', dropdown.classList.contains('show'));
+        console.log('dropdown visible:', dropdown.offsetHeight > 0);
+        
+        // 드롭다운이 열릴 때 필터 옵션 생성
+        if (dropdown.classList.contains('show')) {
+            window.populateFilterOptions(filterType);
+            
+            // 드롭다운이 실제로 보이는지 확인
+            setTimeout(() => {
+                const rect = dropdown.getBoundingClientRect();
+                console.log('Dropdown position:', rect);
+                console.log('Dropdown dimensions:', rect.width, 'x', rect.height);
+                console.log('Dropdown visible:', rect.width > 0 && rect.height > 0);
+                
+                if (rect.width === 0 || rect.height === 0) {
+                    console.log('Dropdown is not visible, forcing display...');
+                    dropdown.style.display = 'block';
+                    dropdown.style.visibility = 'visible';
+                    dropdown.style.opacity = '1';
+                }
+            }, 10);
+        }
+    }
+    
+    // 필터 옵션 생성
+    window.populateFilterOptions = function(filterType) {
+        console.log('populateFilterOptions called with:', filterType);
+        console.log('window.allNotes:', window.allNotes);
+        
+        const dropdown = document.getElementById(`${filterType}-filter-dropdown`);
+        dropdown.innerHTML = '';
+        
+        // 고유한 값들 추출
+        const uniqueValues = [...new Set(window.allNotes.map(note => note[filterType]).filter(Boolean))].sort();
+        console.log('uniqueValues for', filterType, ':', uniqueValues);
+        
+        // 필터 아이템 생성
+        uniqueValues.forEach(value => {
+            const item = document.createElement('div');
+            item.className = 'filter-item';
+            item.textContent = value;
+            if (window.currentFilters[filterType] === value) {
+                item.classList.add('selected');
+            }
+            item.onclick = () => window.selectFilter(filterType, value);
+            dropdown.appendChild(item);
+        });
+        
+        // 필터 초기화 옵션 추가
+        const clearItem = document.createElement('div');
+        clearItem.className = 'filter-clear';
+        clearItem.textContent = 'Clear Filter';
+        clearItem.onclick = () => window.clearFilter(filterType);
+        dropdown.appendChild(clearItem);
+        
+        console.log('Filter options populated. Total items:', uniqueValues.length + 1);
+    }
+    
+    // 필터 선택
+    window.selectFilter = function(filterType, value) {
+        window.currentFilters[filterType] = value;
+        window.applyFilters();
+        window.toggleFilter(filterType); // 드롭다운 닫기
+    }
+    
+    // 필터 초기화
+    window.clearFilter = function(filterType) {
+        window.currentFilters[filterType] = null;
+        window.applyFilters();
+        window.toggleFilter(filterType); // 드롭다운 닫기
+    }
+    
+    // 필터 적용
+    window.applyFilters = function() {
+        const tbody = document.querySelector('#notesTable tbody');
+        const rows = tbody.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const clientCell = row.cells[2]; // Client 컬럼
+            const eventTypeCell = row.cells[6]; // Event type 컬럼
+            
+            const clientValue = clientCell.textContent.trim();
+            const eventTypeValue = eventTypeCell.textContent.trim();
+            
+            let showRow = true;
+            
+            // 클라이언트 필터 확인
+            if (window.currentFilters.client && clientValue !== window.currentFilters.client) {
+                showRow = false;
+            }
+            
+            // 이벤트 타입 필터 확인
+            if (window.currentFilters.eventType && eventTypeValue !== window.currentFilters.eventType) {
+                showRow = false;
+            }
+            
+            row.style.display = showRow ? '' : 'none';
+        });
+        
+        // 필터 상태 표시 업데이트
+        window.updateFilterStatus();
+    }
+    
+    // 필터 상태 표시 업데이트
+    window.updateFilterStatus = function() {
+        const clientIcon = document.getElementById('client-filter-icon');
+        const eventTypeIcon = document.getElementById('eventType-filter-icon');
+        
+        // 클라이언트 필터 상태
+        if (window.currentFilters.client) {
+            clientIcon.style.color = '#1976d2';
+            clientIcon.textContent = '●';
+        } else {
+            clientIcon.style.color = '';
+            clientIcon.textContent = '▼';
+        }
+        
+        // 이벤트 타입 필터 상태
+        if (window.currentFilters.eventType) {
+            eventTypeIcon.style.color = '#1976d2';
+            eventTypeIcon.textContent = '●';
+        } else {
+            eventTypeIcon.style.color = '';
+            eventTypeIcon.textContent = '▼';
+        }
+    }
+    
+    // 드롭다운 외부 클릭 시 닫기
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.filter-header-wrapper')) {
+            const dropdowns = document.querySelectorAll('.filter-dropdown');
+            const icons = document.querySelectorAll('.filter-icon');
+            
+            dropdowns.forEach(dropdown => dropdown.classList.remove('show'));
+            icons.forEach(icon => icon.classList.remove('active'));
+        }
+    });
+    
+    // 페이지 로드 시 필터 상태 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, initializing filter status');
+        if (window.updateFilterStatus) {
+            window.updateFilterStatus();
+        }
+    });
+    
+    // 테스트 함수
+    window.testFilter = function() {
+        console.log('=== Filter Test ===');
+        console.log('window.allNotes length:', window.allNotes ? window.allNotes.length : 'undefined');
+        console.log('window.currentFilters:', window.currentFilters);
+        console.log('window.toggleFilter function:', typeof window.toggleFilter);
+        
+        // 클라이언트 필터 테스트
+        if (window.toggleFilter) {
+            console.log('Testing client filter...');
+            window.toggleFilter('client');
+        }
+    }
 </script>
 <script src="/static/js/progressNoteDB.js"></script>
 <script src="/static/js/progressNoteList.js"></script>
