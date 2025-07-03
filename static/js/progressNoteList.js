@@ -231,7 +231,17 @@ function formatNoteDetail(note) {
 // Table rendering
 async function renderNotesTable() {
     await window.progressNoteDB.init();
-    const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 1000, sortBy: 'EventDate', sortOrder: 'desc' });
+    const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 10000, sortBy: 'EventDate', sortOrder: 'desc' });
+    
+    console.log(`Rendering table with ${notes.length} notes for site: ${currentSite}`);
+    
+    // 최신 데이터 로깅
+    if (notes.length > 0) {
+        console.log('Latest 5 notes in table:');
+        notes.slice(0, 5).forEach((note, index) => {
+            console.log(`${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
+        });
+    }
     
     // 전역 변수에 모든 노트 데이터 저장 (필터링용)
     window.allNotes = notes.map(note => mapNoteToRow(note));
@@ -315,69 +325,9 @@ async function initializeForSite(site) {
         // 2. Initialize IndexedDB
         await window.progressNoteDB.init();
         
-        // 3. Check existing data and incremental update
-        const { notes } = await window.progressNoteDB.getProgressNotes(site, { limit: 1 });
-        
-        if (notes.length === 0) {
-            console.log('No data in IndexedDB for site:', site, '. Fetching initial data from server...');
-            
-            // Get initial data
-            try {
-                await fetchAndSaveProgressNotes();
-            } catch (error) {
-                console.error('Failed to fetch initial data from server, using test data:', error);
-                
-                // Generate test data (use different client IDs for each site)
-                const testData = [
-                    {
-                        Id: 1,
-                        ClientServiceId: site === 'Ramsay' ? 1750 : 2114,
-                        EventDate: '2025-07-02T10:00:00',
-                        NotesPlainText: 'Test note 1',
-                        IsLateEntry: false,
-                        ProgressNoteEventType: { Description: 'Daily Note' },
-                        CareAreas: [{ Description: 'Personal Care' }],
-                        CreatedByName: 'Test User'
-                    },
-                    {
-                        Id: 2,
-                        ClientServiceId: site === 'Ramsay' ? 1751 : 2115,
-                        EventDate: '2025-07-02T11:00:00',
-                        NotesPlainText: 'Test note 2',
-                        IsLateEntry: true,
-                        ProgressNoteEventType: { Description: 'Incident Report' },
-                        CareAreas: [{ Description: 'Medication' }],
-                        CreatedByName: 'Test User 2'
-                    }
-                ];
-                
-                // Save test data to IndexedDB
-                await window.progressNoteDB.saveProgressNotes(site, testData);
-                console.log('Test data saved for site:', site);
-            }
-        } else {
-            console.log('Data exists in IndexedDB for site:', site, '. Checking for incremental updates...');
-            
-            // Check last update time
-            const lastUpdateTime = await window.progressNoteDB.getLastUpdateTime(site);
-            
-            if (lastUpdateTime) {
-                console.log('Last update time for site:', site, lastUpdateTime);
-                
-                // Try incremental update
-                try {
-                    await fetchIncrementalProgressNotes(lastUpdateTime);
-                } catch (error) {
-                    console.error('Failed to fetch incremental updates for site:', site, error);
-                    // Full refresh if incremental update fails
-                    console.log('Falling back to full refresh for site:', site);
-                    await fetchAndSaveProgressNotes();
-                }
-            } else {
-                console.log('No last update time found for site:', site, '. Performing full refresh...');
-                await fetchAndSaveProgressNotes();
-            }
-        }
+        // 3. Always fetch 2 weeks of data
+        console.log('Fetching 2 weeks of data for site:', site);
+        await fetchAndSaveProgressNotes();
         
         // 4. Table rendering
         await renderNotesTable();
@@ -420,9 +370,9 @@ async function fetchAndSaveProgressNotes() {
                 const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
                 console.log('IndexedDB save result:', saveResult);
                 
-                // Save last update time (use local time)
-                const localTime = new Date().toLocaleString();
-                await window.progressNoteDB.saveLastUpdateTime(currentSite, localTime);
+                // Save last update time (use UTC time for API compatibility)
+                const utcTime = new Date().toISOString();
+                await window.progressNoteDB.saveLastUpdateTime(currentSite, utcTime);
                 
                 console.log('Progress Note data saved successfully');
             } else {
@@ -445,23 +395,8 @@ async function refreshData() {
         showTopProgressBar(); // 로딩 상태 시작
         console.log('Manual refresh requested for site:', currentSite);
         
-        // 마지막 업데이트 시간 확인
-        const lastUpdateTime = await window.progressNoteDB.getLastUpdateTime(currentSite);
-        if (lastUpdateTime) {
-            // 시간 형식 변환 (UTC -> 로컬 시간)
-            let convertedTime = lastUpdateTime;
-            if (lastUpdateTime.includes('T') && lastUpdateTime.includes('Z')) {
-                // UTC 형식인 경우 로컬 시간으로 변환
-                const utcDate = new Date(lastUpdateTime);
-                convertedTime = utcDate.toLocaleString();
-                console.log('Converted UTC time to local:', lastUpdateTime, '->', convertedTime);
-            }
-            console.log('Attempting incremental refresh from:', convertedTime);
-            await fetchIncrementalProgressNotes(convertedTime);
-        } else {
-            console.log('No last update time found, performing full refresh');
-            await fetchAndSaveProgressNotes();
-        }
+        // Always fetch 2 weeks of data
+        await fetchAndSaveProgressNotes();
         
         // 테이블 다시 렌더링
         await renderNotesTable();
@@ -472,47 +407,10 @@ async function refreshData() {
     }
 }
 
-// 디버깅용: 강제 증분 업데이트 테스트
-async function testIncrementalUpdate() {
-    try {
-        console.log('=== Testing Incremental Update ===');
-        
-        // 현재 시간에서 1시간 전으로 설정 (로컬 시간 사용)
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toLocaleString();
-        console.log('Testing incremental update from:', oneHourAgo);
-        
-        const response = await fetch('/api/fetch-progress-notes-incremental', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                site: currentSite,
-                since_date: oneHourAgo
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        console.log('Test result:', result);
-        
-        if (result.success && result.data) {
-            console.log(`Found ${result.data.length} records in the last hour`);
-            result.data.forEach((note, index) => {
-                console.log(`${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
-            });
-        }
-        
-    } catch (error) {
-        console.error('Test failed:', error);
-    }
-}
-
-// 전역 함수로 노출
-window.testIncrementalUpdate = testIncrementalUpdate;
+// 전역 함수로 노출 (테스트용)
+window.testIncrementalUpdate = () => {
+    console.log('Incremental update is disabled. Use refreshData() instead.');
+};
 
 // 사이트 변경 시 호출할 함수 (URL 파라미터 변경 시)
 function handleSiteChange() {
@@ -534,59 +432,8 @@ function handleSiteChange() {
     }
 }
 
-// 증분 업데이트로 Progress Note 가져오기 및 저장
+// 증분 업데이트 함수는 제거됨 (항상 전체 데이터를 가져옴)
 async function fetchIncrementalProgressNotes(lastUpdateTime) {
-    try {
-        console.log('Starting incremental update from:', lastUpdateTime);
-        console.log('Current time (local):', new Date().toLocaleString());
-        console.log('Current time (UTC):', new Date().toISOString());
-        
-        const response = await fetch('/api/fetch-progress-notes-incremental', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                site: currentSite,
-                since_date: lastUpdateTime
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            console.log(`Successfully fetched ${result.count} new Progress Notes from server`);
-            console.log('Fetched data sample:', result.data ? result.data.slice(0, 3) : 'No data');
-            
-            if (result.data && result.data.length > 0) {
-                // 데이터 샘플 로깅
-                console.log('=== Incremental Update Data Sample ===');
-                result.data.slice(0, 5).forEach((note, index) => {
-                    console.log(`${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
-                });
-                
-                // IndexedDB에 저장
-                const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
-                console.log('IndexedDB incremental save result:', saveResult);
-                // Save last update time (use local time)
-                const localTime = new Date().toLocaleString();
-                await window.progressNoteDB.saveLastUpdateTime(currentSite, localTime);
-                console.log('Incremental update completed successfully');
-            } else {
-                console.log('No new Progress Notes found.');
-            }
-        } else {
-            throw new Error(result.message || 'Failed to fetch incremental Progress Notes');
-        }
-        
-        hideTopProgressBar();
-    } catch (error) {
-        hideTopProgressBar();
-        console.error('Failed to fetch incremental Progress Notes:', error);
-        throw error; // 상위 함수에서 처리하도록 에러를 다시 던짐
-    }
+    console.log('Incremental update is disabled. Fetching full data instead.');
+    await fetchAndSaveProgressNotes();
 } 

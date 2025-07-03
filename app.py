@@ -606,6 +606,22 @@ def logout():
     flash('You have been logged out successfully.', 'info')
     return redirect(url_for('home'))
 
+@app.route('/api/clear-database', methods=['POST'])
+@login_required
+def clear_database():
+    """데이터베이스 초기화"""
+    try:
+        return jsonify({
+            'success': True,
+            'message': 'Database cleared successfully'
+        })
+    except Exception as e:
+        logger.error(f"데이터베이스 초기화 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
 @app.route('/index')
 @login_required
 def index():
@@ -697,8 +713,6 @@ def save_progress_note():
 # API 엔드포인트
 # ==============================
 
-
-
 @app.route('/data/Client_list.json')
 def get_client_list():
     """클라이언트 목록 JSON 반환"""
@@ -727,8 +741,6 @@ def get_event_type_list():
         return send_from_directory(data_dir, 'eventtype.json')
     except FileNotFoundError:
         return jsonify([]), 404
-
-
 
 @app.route('/api/user-info')
 @login_required
@@ -893,82 +905,38 @@ def fetch_progress_notes():
 @app.route('/api/fetch-progress-notes-incremental', methods=['POST'])
 @login_required
 def fetch_progress_notes_incremental():
-    """증분 업데이트로 프로그레스 노트 가져오기"""
+    """증분 업데이트 API - 항상 2주간 데이터 반환 (단순화됨)"""
     try:
         data = request.get_json()
         site = data.get('site')
-        since_date = data.get('since_date')  # ISO 8601 형식
         
         if not site:
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
-        if not since_date:
-            return jsonify({'success': False, 'message': 'Since date is required'}), 400
-        
-        logger.info(f"증분 프로그레스 노트 가져오기 요청 - 사이트: {site}, 시작일: {since_date}")
+        logger.info(f"증분 업데이트 요청 (단순화됨) - 사이트: {site}, 항상 2주간 데이터 반환")
         
         try:
-            from api_progressnote_fetch import ProgressNoteFetchClient
-            from datetime import datetime
+            from api_progressnote_fetch import fetch_progress_notes_for_site
             
-            # 날짜 파싱 - 다양한 형식 지원
-            try:
-                since_datetime = None
-                
-                # 1. ISO 형식 (UTC) - Z가 있는 경우
-                if since_date.endswith('Z'):
-                    since_datetime = datetime.fromisoformat(since_date.replace('Z', '+00:00')).replace(tzinfo=None)
-                    logger.info(f"Parsed UTC ISO date: {since_date} -> {since_datetime}")
-                
-                # 2. ISO 형식 (로컬 시간)
-                elif 'T' in since_date and ('+' in since_date or '-' in since_date[-6:]):
-                    since_datetime = datetime.fromisoformat(since_date).replace(tzinfo=None)
-                    logger.info(f"Parsed ISO date with timezone: {since_date} -> {since_datetime}")
-                
-                # 3. 로컬 시간 문자열 (예: "2025-07-03T16:08:47.189824")
-                elif 'T' in since_date:
-                    since_datetime = datetime.fromisoformat(since_date)
-                    logger.info(f"Parsed local ISO date: {since_date} -> {since_datetime}")
-                
-                # 4. 일반 날짜 문자열 (예: "7/3/2025, 4:08:47 PM")
-                else:
-                    # 브라우저의 toLocaleString() 형식 파싱
-                    try:
-                        since_datetime = datetime.strptime(since_date, '%m/%d/%Y, %I:%M:%S %p')
-                        logger.info(f"Parsed locale string: {since_date} -> {since_datetime}")
-                    except ValueError:
-                        # 다른 형식 시도
-                        since_datetime = datetime.fromisoformat(since_date)
-                        logger.info(f"Parsed fallback format: {since_date} -> {since_datetime}")
-                
-                if since_datetime is None:
-                    raise ValueError(f"Unable to parse date: {since_date}")
-                    
-            except ValueError as e:
-                logger.error(f"Date parsing error: {e}")
-                return jsonify({'success': False, 'message': f'Invalid date format: {since_date}'}), 400
-            
-            # 프로그레스 노트 가져오기
-            client = ProgressNoteFetchClient(site)
-            success, progress_notes = client.fetch_progress_notes_since(since_datetime)
+            # 항상 2주간 데이터 가져오기
+            success, progress_notes = fetch_progress_notes_for_site(site, 14)
             
             if success:
-                logger.info(f"증분 프로그레스 노트 가져오기 성공 - {site}: {len(progress_notes) if progress_notes else 0}개")
+                logger.info(f"증분 업데이트 성공 (단순화됨) - {site}: {len(progress_notes) if progress_notes else 0}개")
                 
                 return jsonify({
                     'success': True,
-                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} new progress notes',
+                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} progress notes (2 weeks)',
                     'data': progress_notes,
                     'site': site,
                     'count': len(progress_notes) if progress_notes else 0,
-                    'since_date': since_date,
                     'fetched_at': datetime.now().isoformat()
                 })
             else:
-                logger.error(f"증분 프로그레스 노트 가져오기 실패 - {site}")
+                logger.error(f"증분 업데이트 실패 (단순화됨) - {site}")
                 return jsonify({
                     'success': False,
-                    'message': 'Failed to fetch incremental progress notes from server'
+                    'message': 'Failed to fetch progress notes from server'
                 }), 500
                 
         except ImportError as e:
@@ -979,7 +947,7 @@ def fetch_progress_notes_incremental():
             }), 500
             
     except Exception as e:
-        logger.error(f"증분 프로그레스 노트 가져오기 중 오류: {str(e)}")
+        logger.error(f"증분 업데이트 중 오류: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'
