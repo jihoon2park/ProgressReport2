@@ -14,113 +14,143 @@ def hash_password(password):
 USERS_DB = {
     "admin": {
         "password_hash": hash_password("password123"),
-        "display_name": "Administrator",
         "first_name": "Admin",
         "last_name": "User",
         "role": "admin",
-        "position": "System Administrator",
-        "email": "admin@hospital.com",
-        "department": "IT"
+        "position": "System Administrator"
     },
     "doctor1": {
         "password_hash": hash_password("password123"), 
-        "display_name": "Dr. Smith",
         "first_name": "John",
         "last_name": "Smith",
         "role": "doctor",
-        "position": "Doctor",
-        "email": "dr.smith@hospital.com",
-        "department": "Internal Medicine"
+        "position": "Doctor"
     },
     "physio1": {
         "password_hash": hash_password("password123"),
-        "display_name": "Physiotherapist Jones", 
         "first_name": "Sarah",
         "last_name": "Jones",
         "role": "physiotherapist",
-        "position": "Physiotherapist",
-        "email": "physio.jones@hospital.com",
-        "department": "Rehabilitation"
+        "position": "Physiotherapist"
     },
     "PaulVaska": {
         "password_hash": hash_password("password123"),
-        "display_name": "Dr. Paul Vaska",
         "first_name": "Paul",
         "last_name": "Vaska",
         "role": "doctor",
-        "position": "GP",
-        "email": "paul.vaska@hospital.com",
-        "department": "Internal Medicine"
+        "position": "GP"
     },
     "VadeenChandura": {
         "password_hash": hash_password("password123"),
-        "display_name": "Dr. Vadeen Chandura",
         "first_name": "Vadeen",
         "last_name": "Chandura",
         "role": "doctor",
-        "position": "GP",
-        "email": "vadeen.chandura@hospital.com",
-        "department": "Internal Medicine"
+        "position": "GP"
     },
     "PrasanthaWalgampola": {
         "password_hash": hash_password("password123"),
-        "display_name": "Dr. Prasantha Walgampola",
         "first_name": "Prasantha",
         "last_name": "Walgampola",
         "role": "doctor",
-        "position": "GP",
-        "email": "prasantha.walgampola@hospital.com",
-        "department": "Internal Medicine"
+        "position": "GP"
     },
     "KimWong": {
         "password_hash": hash_password("password123"),
-        "display_name": "Kim Wong",
         "first_name": "Kim",
         "last_name": "Wong",
         "role": "physiotherapist",
-        "position": "Physiotherapist",
-        "email": "kim.wong@hospital.com",
-        "department": "Rehabilitation"
+        "position": "Physiotherapist"
     },
     "PeterWang": {
         "password_hash": hash_password("password123"),
-        "display_name": "Peter Wang",
         "first_name": "Peter",
         "last_name": "Wang",
         "role": "physiotherapist",
-        "position": "Physiotherapist",
-        "email": "peter.wang@hospital.com",
-        "department": "Rehabilitation"
+        "position": "Physiotherapist"
     },
     "ThaiTrinh": {
         "password_hash": hash_password("password123"),
-        "display_name": "Thai Trinh",
         "first_name": "Thai",
         "last_name": "Trinh",
         "role": "physiotherapist",
-        "position": "Physiotherapist",
-        "email": "thai.trinh@hospital.com",
-        "department": "Rehabilitation"
+        "position": "Physiotherapist"
     },
     "EdmondGrosser": {
         "password_hash": hash_password("password123"),
-        "display_name": "Edmond Grosser",
         "first_name": "Edmond",
         "last_name": "Grosser",
         "role": "physiotherapist",
-        "position": "Physiotherapist",
-        "email": "edmond.grosser@hospital.com",
-        "department": "Rehabilitation"
+        "position": "Physiotherapist"
     },
     "SarahJones": {
         "password_hash": hash_password("password123"),
-        "display_name": "Sarah Jones",
         "first_name": "Sarah",
         "last_name": "Jones",
         "role": "physiotherapist",
-        "position": "Physiotherapist",
-        "email": "sarah.jones@hospital.com",
-        "department": "Rehabilitation"
+        "position": "Physiotherapist"
+    },
+    "LawJohn": {
+        "password_hash": hash_password("John123!"),
+        "first_name": "Siew Won (John)",
+        "last_name": "Law",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "LauKin": {
+        "password_hash": hash_password("Kin456@"),
+        "first_name": "Kin",
+        "last_name": "Lau",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "WorleyPaul": {
+        "password_hash": hash_password("Paul789#"),
+        "first_name": "Paul",
+        "last_name": "Worley",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "HorKC": {
+        "password_hash": hash_password("KC234$"),
+        "first_name": "Kok Chung (KC)",
+        "last_name": "Hor",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "SallehAudrey": {
+        "password_hash": hash_password("Audrey567%"),
+        "first_name": "Audrey",
+        "last_name": "Salleh",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "LiNini": {
+        "password_hash": hash_password("Nini890@"),
+        "first_name": "Xiaoni (Nini)",
+        "last_name": "Li",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "KiranantawatSoravee": {
+        "password_hash": hash_password("Soravee345&"),
+        "first_name": "Soravee",
+        "last_name": "Kiranantawat",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "BansalShiveta": {
+        "password_hash": hash_password("Shiveta678*"),
+        "first_name": "Shiveta",
+        "last_name": "Bansal",
+        "role": "doctor",
+        "position": "GP"
+    },
+    "BehanStephen": {
+        "password_hash": hash_password("Stephen901?"),
+        "first_name": "Stephen",
+        "last_name": "Behan",
+        "role": "doctor",
+        "position": "GP"
     }
 }
 
@@ -146,21 +176,4 @@ def authenticate_user(username, password):
         return True, safe_user
     return False, None
 
-# 환경변수에서 설정 읽기 (선택사항)
-def load_from_env():
-    """환경변수에서 사용자 설정 로드"""
-    # 예: ADMIN_PASSWORD=newpassword123
-    admin_password = os.getenv('ADMIN_PASSWORD')
-    if admin_password:
-        USERS_DB['admin']['password_hash'] = hash_password(admin_password)
-    
-    doctor_password = os.getenv('DOCTOR1_PASSWORD')
-    if doctor_password:
-        USERS_DB['doctor1']['password_hash'] = hash_password(doctor_password)
-    
-    physio_password = os.getenv('PHYSIO1_PASSWORD')
-    if physio_password:
-        USERS_DB['physio1']['password_hash'] = hash_password(physio_password)
-
-# 애플리케이션 시작 시 환경변수 로드
-load_from_env() 
+ 

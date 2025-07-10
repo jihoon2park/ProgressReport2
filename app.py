@@ -749,7 +749,6 @@ def get_user_info():
     try:
         user_info = {
             'username': current_user.username,
-            'display_name': current_user.display_name,
             'first_name': current_user.first_name,
             'last_name': current_user.last_name,
             'role': current_user.role,
@@ -786,7 +785,6 @@ def refresh_session():
             'message': 'Session refreshed successfully',
             'user_info': {
                 'username': user.username,
-                'display_name': user.display_name,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'role': user.role,
@@ -856,7 +854,7 @@ def fetch_progress_notes():
     try:
         data = request.get_json()
         site = data.get('site')
-        days = data.get('days', 14)  # 기본값: 14일
+        days = data.get('days', 7)  # 기본값: 7일
         force_refresh = data.get('force_refresh', False)  # 강제 새로고침
         
         if not site:
@@ -913,20 +911,20 @@ def fetch_progress_notes_incremental():
         if not site:
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
-        logger.info(f"증분 업데이트 요청 (단순화됨) - 사이트: {site}, 항상 2주간 데이터 반환")
+        logger.info(f"증분 업데이트 요청 (단순화됨) - 사이트: {site}, 항상 1주간 데이터 반환")
         
         try:
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
             # 항상 2주간 데이터 가져오기
-            success, progress_notes = fetch_progress_notes_for_site(site, 14)
+            success, progress_notes = fetch_progress_notes_for_site(site, 7)
             
             if success:
                 logger.info(f"증분 업데이트 성공 (단순화됨) - {site}: {len(progress_notes) if progress_notes else 0}개")
                 
                 return jsonify({
                     'success': True,
-                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} progress notes (2 weeks)',
+                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} progress notes (1 week)',
                     'data': progress_notes,
                     'site': site,
                     'count': len(progress_notes) if progress_notes else 0,

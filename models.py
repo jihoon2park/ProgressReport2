@@ -7,13 +7,12 @@ class User(UserMixin):
     def __init__(self, username, user_data):
         self.id = username
         self.username = username
-        self.display_name = user_data.get('display_name', username)
         self.first_name = user_data.get('first_name', '')
         self.last_name = user_data.get('last_name', '')
         self.role = user_data.get('role', '')
         self.position = user_data.get('position', '')
-        self.email = user_data.get('email', '')
-        self.department = user_data.get('department', '')
+        # display_name 속성 추가 (first_name과 last_name 조합)
+        self.display_name = f"{self.first_name} {self.last_name}".strip() if (self.first_name or self.last_name) else username
         
     def get_id(self):
         """Flask-Login에서 요구하는 사용자 ID 반환"""
@@ -31,13 +30,9 @@ class User(UserMixin):
         """익명 사용자인지 확인"""
         return False
         
-    def get_display_name(self):
-        """표시 이름 반환"""
-        return self.display_name
-        
     def get_full_name(self):
         """전체 이름 반환"""
-        return f"{self.first_name} {self.last_name}".strip()
+        return self.display_name
         
     def has_role(self, role):
         """특정 역할을 가지고 있는지 확인"""

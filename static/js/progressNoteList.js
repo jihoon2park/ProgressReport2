@@ -8,108 +8,92 @@ const currentSite = window.currentSite || new URLSearchParams(window.location.se
 // 전역 클라이언트 매핑 객체
 let clientMap = {};
 
-// Top progress bar control
-function showTopProgressBar() {
-    const bar = document.getElementById('top-progress-bar');
-    if (!bar) return;
+// Performance monitoring variables
+let performanceMetrics = {
+    startTime: null,
+    intervals: new Set(),
+    observers: new Set(),
+    eventListeners: new Set()
+};
+
+// Performance monitoring function
+function logPerformance(message, data = {}) {
+    // 성능 개선을 위해 로깅 제한
+    const isImportant = message.includes('error') || 
+                       message.includes('failed') || 
+                       message.includes('completed') ||
+                       message.includes('initialization');
     
-    // Record start time for minimum loading duration
-    bar._loadingStartTime = Date.now();
+    if (!isImportant) {
+        return; // 중요하지 않은 로그는 출력하지 않음
+    }
     
-    // Reset and show progress bar
-    bar.style.width = '0%';
-    bar.style.display = 'block';
+    const timestamp = Date.now();
+    const memory = performance.memory ? {
+        used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+        total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+        limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+    } : null;
     
-    // Animate progress bar with repeating animation
-    let progress = 0;
-    const animateProgress = () => {
-        progress += 2;
-        if (progress > 90) {
-            progress = 0;
-        }
-        bar.style.width = progress + '%';
-    };
+    console.log(`[PERF ${timestamp}] ${message}`, {
+        ...data,
+        memory,
+        intervals: performanceMetrics.intervals.size,
+        observers: performanceMetrics.observers.size,
+        eventListeners: performanceMetrics.eventListeners.size
+    });
+}
+
+// Cleanup function to prevent memory leaks
+function cleanup() {
+    logPerformance('Starting cleanup');
     
-    // Start animation
-    bar._progressInterval = setInterval(animateProgress, 100);
+    // Clear all intervals
+    performanceMetrics.intervals.forEach(intervalId => {
+        clearInterval(intervalId);
+    });
+    performanceMetrics.intervals.clear();
     
-    // Disable refresh button and show loading state
+    // Disconnect all observers
+    performanceMetrics.observers.forEach(observer => {
+        observer.disconnect();
+    });
+    performanceMetrics.observers.clear();
+    
+    // Remove event listeners (if we had stored references)
+    performanceMetrics.eventListeners.clear();
+    
+    // Clear global variables
+    if (window.allNotes) {
+        window.allNotes.length = 0;
+    }
+    
+    logPerformance('Cleanup completed');
+}
+
+// Refresh button control
+function disableRefreshButton() {
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
         refreshBtn.disabled = true;
         refreshBtn.textContent = 'Loading...';
         refreshBtn.style.opacity = '0.6';
         refreshBtn.style.cursor = 'not-allowed';
-    }
-    
-    // Show loading message in table area
-    const tableContainer = document.getElementById('notesTable');
-    if (tableContainer) {
-        const loadingMsg = document.createElement('div');
-        loadingMsg.id = 'loadingMessage';
-        loadingMsg.style.cssText = `
-            text-align: center;
-            padding: 20px;
-            color: #666;
-            font-size: 14px;
-            background: #f9f9f9;
-            border-radius: 8px;
-            margin: 10px 0;
-            border: 1px solid #e0e0e0;
-        `;
-        loadingMsg.innerHTML = `
-            <div style="margin-bottom: 10px;">
-                <div style="width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
-            </div>
-            Loading data from Manad plus server...
-        `;
-        tableContainer.parentNode.insertBefore(loadingMsg, tableContainer);
+        
+        // 10초 후 자동으로 다시 활성화
+        setTimeout(() => {
+            enableRefreshButton();
+        }, 10000);
     }
 }
 
-function hideTopProgressBar() {
-    const bar = document.getElementById('top-progress-bar');
-    if (!bar) return;
-    
-    // Calculate elapsed time
-    const elapsedTime = Date.now() - (bar._loadingStartTime || 0);
-    const minLoadingTime = 10000; // 10 seconds minimum
-    const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-    
-    // If minimum time hasn't passed, wait
-    if (remainingTime > 0) {
-        setTimeout(() => {
-            hideTopProgressBar();
-        }, remainingTime);
-        return;
-    }
-    
-    // Stop the animation
-    if (bar._progressInterval) {
-        clearInterval(bar._progressInterval);
-        bar._progressInterval = null;
-    }
-    
-    // Complete the progress bar
-    bar.style.width = '100%';
-    setTimeout(() => {
-        bar.style.display = 'none';
-        bar.style.width = '0%';
-    }, 350);
-    
-    // Re-enable refresh button and restore original state
+function enableRefreshButton() {
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
         refreshBtn.disabled = false;
         refreshBtn.textContent = 'Refresh';
         refreshBtn.style.opacity = '1';
         refreshBtn.style.cursor = 'pointer';
-    }
-    
-    // Remove loading message
-    const loadingMsg = document.getElementById('loadingMessage');
-    if (loadingMsg) {
-        loadingMsg.remove();
     }
 }
 
@@ -186,7 +170,6 @@ function mapNoteToRow(note) {
     }
     
     return {
-        recordId: note.Id || note.ClientServiceId || '',
         serviceWing: serviceWing,
         client: clientName,
         date: note.EventDate ? note.EventDate.split('T')[0] : '',
@@ -230,17 +213,28 @@ function formatNoteDetail(note) {
 
 // Table rendering
 async function renderNotesTable() {
+    const measure = window.performanceMonitor.startMeasure('renderNotesTable');
+    const startTime = Date.now();
+    
     await window.progressNoteDB.init();
     const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 10000, sortBy: 'EventDate', sortOrder: 'desc' });
     
-    console.log(`Rendering table with ${notes.length} notes for site: ${currentSite}`);
+    logPerformance(`Rendering table with ${notes.length} notes for site: ${currentSite}`, { 
+        notesCount: notes.length,
+        loadTime: Date.now() - startTime 
+    });
     
-    // 최신 데이터 로깅
+    // 최신 데이터 로깅 (성능 개선을 위해 간소화)
     if (notes.length > 0) {
-        console.log('Latest 5 notes in table:');
-        notes.slice(0, 5).forEach((note, index) => {
-            console.log(`${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
-        });
+        // 성능 개선을 위해 상세 로깅 제거
+        // logPerformance('Latest 5 notes in table:', {
+        //     notes: notes.slice(0, 5).map((note, index) => ({
+        //         index: index + 1,
+        //         id: note.Id,
+        //         eventDate: note.EventDate,
+        //         createdDate: note.CreatedDate || 'N/A'
+        //     }))
+        // });
     }
     
     // 전역 변수에 모든 노트 데이터 저장 (필터링용)
@@ -248,6 +242,9 @@ async function renderNotesTable() {
     
     const tbody = document.querySelector('#notesTable tbody');
     tbody.innerHTML = '';
+    
+    // Batch DOM operations for better performance
+    const fragment = document.createDocumentFragment();
     
     notes.forEach((note, idx) => {
         const rowData = mapNoteToRow(note);
@@ -259,8 +256,10 @@ async function renderNotesTable() {
             tr.appendChild(td);
         });
         tr.addEventListener('click', () => selectNote(idx, notes));
-        tbody.appendChild(tr);
+        fragment.appendChild(tr);
     });
+    
+    tbody.appendChild(fragment);
     
     // 필터 적용 (기존 필터가 있는 경우)
     if (window.currentFilters && (window.currentFilters.client || window.currentFilters.eventType)) {
@@ -271,6 +270,13 @@ async function renderNotesTable() {
     if (notes.length > 0) {
         selectNote(0, notes);
     }
+    
+    logPerformance('Table rendering completed', { 
+        totalTime: Date.now() - startTime,
+        rowsRendered: notes.length 
+    });
+    
+    measure.end();
 }
 
 // Show details when row is selected
@@ -286,8 +292,8 @@ function selectNote(idx, notes) {
 
 // Execute on page load
 window.addEventListener('DOMContentLoaded', async () => {
-    console.log('Page loaded - starting initialization');
-    console.log('Current site:', currentSite);
+    performanceMetrics.startTime = Date.now();
+    logPerformance('Page loaded - starting initialization', { currentSite });
     
     // 사이트 제목 업데이트
     const siteTitle = document.getElementById('siteTitle');
@@ -301,7 +307,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Detect URL change (browser back/forward)
     window.addEventListener('popstate', handleSiteChange);
     
-    // Detect URL change (programmatic)
+    // Detect URL change (programmatic) - with proper cleanup
     let currentUrl = window.location.href;
     const observer = new MutationObserver(() => {
         if (window.location.href !== currentUrl) {
@@ -310,14 +316,22 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     });
     observer.observe(document, { subtree: true, childList: true });
+    performanceMetrics.observers.add(observer);
+    
+    // Add cleanup on page unload
+    window.addEventListener('beforeunload', cleanup);
+    window.addEventListener('pagehide', cleanup);
+    
+    logPerformance('Initialization completed');
 });
 
 // Site-specific initialization function
 async function initializeForSite(site) {
-    console.log(`Initializing for site: ${site}`);
+    logPerformance(`Initializing for site: ${site}`);
     
     try {
-        showTopProgressBar(); // 로딩 상태 시작
+        // Refresh 버튼 비활성화
+        disableRefreshButton();
         
         // 1. Load client mapping first (differs by site)
         await loadClientMap();
@@ -325,18 +339,17 @@ async function initializeForSite(site) {
         // 2. Initialize IndexedDB
         await window.progressNoteDB.init();
         
-        // 3. Always fetch 2 weeks of data
-        console.log('Fetching 2 weeks of data for site:', site);
+        // 3. Always fetch 1 week of data
+        logPerformance('Fetching 1 week of data for site:', { site });
         await fetchAndSaveProgressNotes();
         
         // 4. Table rendering
         await renderNotesTable();
         
-        console.log('Site initialization completed for:', site);
-        hideTopProgressBar(); // 로딩 상태 종료
+        logPerformance('Site initialization completed for:', { site });
     } catch (error) {
-        hideTopProgressBar(); // 에러 시에도 로딩 상태 종료
         console.error('Error during site initialization for:', site, error);
+        logPerformance('Site initialization failed:', { site, error: error.message });
     }
 }
 
@@ -352,7 +365,7 @@ async function fetchAndSaveProgressNotes() {
             },
             body: JSON.stringify({
                 site: currentSite,
-                days: 14
+                days: 7
             })
         });
         
@@ -381,10 +394,7 @@ async function fetchAndSaveProgressNotes() {
         } else {
             throw new Error(result.message || 'Failed to fetch Progress Notes');
         }
-        
-        hideTopProgressBar();
     } catch (error) {
-        hideTopProgressBar();
         console.error('Failed to fetch Progress Notes:', error);
     }
 }
@@ -392,17 +402,17 @@ async function fetchAndSaveProgressNotes() {
 // 수동 새로고침 함수
 async function refreshData() {
     try {
-        showTopProgressBar(); // 로딩 상태 시작
         console.log('Manual refresh requested for site:', currentSite);
         
-        // Always fetch 2 weeks of data
+        // Refresh 버튼 비활성화
+        disableRefreshButton();
+        
+        // Always fetch 1 week of data
         await fetchAndSaveProgressNotes();
         
         // 테이블 다시 렌더링
         await renderNotesTable();
-        hideTopProgressBar(); // 테이블 렌더링 끝난 후 프로그레스 바 닫기
     } catch (error) {
-        hideTopProgressBar();
         console.error('Refresh failed for site:', currentSite, error);
     }
 }
@@ -418,7 +428,7 @@ function handleSiteChange() {
     const newSite = urlParams.get('site') || 'Ramsay';
     
     if (newSite !== currentSite) {
-        console.log('Site changed from', currentSite, 'to', newSite);
+        logPerformance('Site changed from', { from: currentSite, to: newSite });
         currentSite = newSite;
         
         // Update site title
@@ -432,8 +442,149 @@ function handleSiteChange() {
     }
 }
 
-// 증분 업데이트 함수는 제거됨 (항상 전체 데이터를 가져옴)
+// 증분 업데이트 함수는 제거됨 (항상 1주일 데이터를 가져옴)
 async function fetchIncrementalProgressNotes(lastUpdateTime) {
-    console.log('Incremental update is disabled. Fetching full data instead.');
+    console.log('Incremental update is disabled. Fetching 1 week of data instead.');
     await fetchAndSaveProgressNotes();
-} 
+}
+
+// Performance debugging tools (available in console)
+window.debugPerformance = {
+    // 현재 성능 상태 출력
+    status: () => {
+        const memory = performance.memory ? {
+            used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+            total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+            limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+        } : null;
+        
+        console.log('=== Performance Status ===');
+        console.log('Memory:', memory);
+        console.log('Active intervals:', performanceMetrics.intervals.size);
+        console.log('Active observers:', performanceMetrics.observers.size);
+        console.log('Event listeners:', performanceMetrics.eventListeners.size);
+        console.log('All notes count:', window.allNotes ? window.allNotes.length : 0);
+        console.log('Client map size:', Object.keys(clientMap).length);
+        
+        // List active intervals
+        if (performanceMetrics.intervals.size > 0) {
+            console.log('Active interval IDs:', Array.from(performanceMetrics.intervals));
+        }
+        
+        // List active observers
+        if (performanceMetrics.observers.size > 0) {
+            console.log('Active observers:', Array.from(performanceMetrics.observers));
+        }
+    },
+    
+    // 강제 정리
+    cleanup: () => {
+        cleanup();
+        console.log('Forced cleanup completed');
+    },
+    
+    // 메모리 사용량 모니터링 시작
+    startMemoryMonitoring: () => {
+        if (window.debugPerformance.memoryInterval) {
+            clearInterval(window.debugPerformance.memoryInterval);
+        }
+        
+        window.debugPerformance.memoryInterval = setInterval(() => {
+            const memory = performance.memory;
+            if (memory) {
+                const used = Math.round(memory.usedJSHeapSize / 1024 / 1024);
+                const total = Math.round(memory.totalJSHeapSize / 1024 / 1024);
+                const limit = Math.round(memory.jsHeapSizeLimit / 1024 / 1024);
+                
+                console.log(`Memory: ${used}MB / ${total}MB (${limit}MB limit)`);
+                
+                // 메모리 사용량이 80%를 넘으면 경고
+                if (used / limit > 0.8) {
+                    console.warn('⚠️ High memory usage detected!');
+                }
+            }
+        }, 5000); // 5초마다 체크
+        
+        console.log('Memory monitoring started');
+    },
+    
+    // 메모리 모니터링 중지
+    stopMemoryMonitoring: () => {
+        if (window.debugPerformance.memoryInterval) {
+            clearInterval(window.debugPerformance.memoryInterval);
+            window.debugPerformance.memoryInterval = null;
+            console.log('Memory monitoring stopped');
+        }
+    },
+    
+    // 가비지 컬렉션 강제 실행 (가능한 경우)
+    forceGC: () => {
+        if (window.gc) {
+            window.gc();
+            console.log('Garbage collection forced');
+        } else {
+            console.log('Garbage collection not available (use --expose-gc flag)');
+        }
+    }
+};
+
+// Chrome DevTools Performance Panel Integration
+if (window.chrome && window.chrome.devtools) {
+    // DevTools가 열려있을 때만 실행
+    window.addEventListener('devtoolschange', (e) => {
+        if (e.detail.open) {
+            console.log('DevTools opened - enabling detailed performance monitoring');
+            logPerformance('DevTools opened');
+        }
+    });
+}
+
+// Performance monitoring for Chrome DevTools
+window.performanceMonitor = {
+    // 성능 마커 추가
+    mark: (name) => {
+        if (performance.mark) {
+            performance.mark(name);
+        }
+        logPerformance(`Mark: ${name}`);
+    },
+    
+    // 성능 측정
+    measure: (name, startMark, endMark) => {
+        if (performance.measure) {
+            try {
+                const measure = performance.measure(name, startMark, endMark);
+                logPerformance(`Measure: ${name}`, {
+                    duration: Math.round(measure.duration),
+                    startTime: Math.round(measure.startTime)
+                });
+                return measure;
+            } catch (e) {
+                console.warn(`Failed to measure ${name}:`, e);
+            }
+        }
+    },
+    
+    // 성능 측정 시작
+    startMeasure: (name) => {
+        const startMark = `${name}-start`;
+        performance.mark(startMark);
+        return {
+            end: () => {
+                const endMark = `${name}-end`;
+                performance.mark(endMark);
+                window.performanceMonitor.measure(name, startMark, endMark);
+            }
+        };
+    }
+};
+
+// 페이지 로드 시 디버깅 도구 안내
+console.log('Performance debugging tools available:');
+console.log('- debugPerformance.status() - 현재 성능 상태 확인');
+console.log('- debugPerformance.cleanup() - 강제 정리');
+console.log('- debugPerformance.startMemoryMonitoring() - 메모리 모니터링 시작');
+console.log('- debugPerformance.stopMemoryMonitoring() - 메모리 모니터링 중지');
+console.log('- debugPerformance.forceGC() - 가비지 컬렉션 강제 실행');
+console.log('- performanceMonitor.mark("name") - 성능 마커 추가');
+console.log('- performanceMonitor.startMeasure("name") - 성능 측정 시작'); 
