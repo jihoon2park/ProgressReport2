@@ -801,17 +801,39 @@ function populateDropdowns(data) {
 function initializeNotesResizeObserver() {
     if (!DOM.notes) return;
     
-    // ResizeObserver로 textarea 크기 변화 감지
+    let resizeTimeout = null;
+    let lastHeight = 0;
+    
+    // ResizeObserver로 textarea 크기 변화 감지 (스로틀링 적용)
     if (window.ResizeObserver) {
         const resizeObserver = new ResizeObserver(entries => {
-            adjustFloatingButtonsPosition();
+            // 스로틀링으로 과도한 호출 방지
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
+            }
+            resizeTimeout = setTimeout(() => {
+                const currentHeight = DOM.notes.offsetHeight;
+                // 높이가 실제로 변경되었을 때만 조정
+                if (Math.abs(currentHeight - lastHeight) > 10) {
+                    adjustFloatingButtonsPosition();
+                    lastHeight = currentHeight;
+                }
+            }, 100);
         });
         resizeObserver.observe(DOM.notes);
     }
     
-    // Notes 내용 변화 감지
-    DOM.notes.addEventListener('input', adjustFloatingButtonsPosition);
-    DOM.notes.addEventListener('scroll', adjustFloatingButtonsPosition);
+    // Notes 내용 변화 감지 (스로틀링 적용)
+    let inputTimeout = null;
+    DOM.notes.addEventListener('input', () => {
+        if (inputTimeout) {
+            clearTimeout(inputTimeout);
+        }
+        inputTimeout = setTimeout(adjustFloatingButtonsPosition, 200);
+    });
+    
+    // 스크롤 이벤트는 제거 (성능 개선)
+    // DOM.notes.addEventListener('scroll', adjustFloatingButtonsPosition);
     
     // 초기 위치 설정
     setTimeout(adjustFloatingButtonsPosition, 100);
@@ -844,7 +866,8 @@ function adjustFloatingButtonsPosition() {
         floatingActions.style.zIndex = 'auto';
     }
     
-    console.log(`Notes height: ${notesHeight}px, Scroll height: ${notesScrollHeight}px, Has scrollbar: ${hasScrollbar}`);
+    // 성능 개선을 위해 로그 제거
+    // console.log(`Notes height: ${notesHeight}px, Scroll height: ${notesScrollHeight}px, Has scrollbar: ${hasScrollbar}`);
 }
 
 // 세션 새로고침 함수
@@ -881,10 +904,11 @@ function startSessionTimeoutMonitoring() {
     // 기존 인터벌이 있다면 정리
     if (window.sessionCheckInterval) {
         clearInterval(window.sessionCheckInterval);
+        window.sessionCheckInterval = null;
     }
     
-    // 10초마다 세션 상태 확인 (더 정확한 실시간 업데이트를 위해)
-    sessionCheckInterval = setInterval(checkSessionStatus, 10000);
+    // 60초마다 세션 상태 확인 (성능 개선을 위해 간격 더 증가)
+    sessionCheckInterval = setInterval(checkSessionStatus, 60000);
     window.sessionCheckInterval = sessionCheckInterval;
     
     // 초기 세션 상태 확인
@@ -910,17 +934,16 @@ function checkSessionStatus() {
                 const remainingSeconds = data.remaining_seconds;
                 const remainingMinutes = Math.floor(remainingSeconds / 60);
                 
-                console.log(`[${new Date().toISOString()}] session remaining time: ${remainingMinutes}min ${remainingSeconds % 60}sec`);
-                
-                // 1분 이하로 남았을 때 로그 추가
+                // 1분 이하로 남았을 때만 로그 출력 (성능 개선)
                 if (remainingSeconds <= 60) {
+                    console.log(`[${new Date().toISOString()}] session remaining time: ${remainingMinutes}min ${remainingSeconds % 60}sec`);
                     console.log(`⚠️ 세션 만료 임박: ${remainingSeconds}초 남음`);
                 }
                 
-                // 1분 남았을 때 경고 (자동 연장은 하지 않음)
-                if (remainingSeconds <= 60 && remainingSeconds > 0) {
-                    showSessionWarning(remainingSeconds);
-                }
+                // 1분 남았을 때 경고 (성능 개선을 위해 비활성화)
+                // if (remainingSeconds <= 60 && remainingSeconds > 0) {
+                //     showSessionWarning(remainingSeconds);
+                // }
                 
                 // 이미 경고가 표시되고 있으면 남은 시간 업데이트
                 if (sessionWarningId && remainingSeconds > 0) {
@@ -1223,9 +1246,10 @@ function handleSessionTimeout() {
     }, 3000);
 }
 
-// 사용자 활동 감지 (세션 연장)
+// 사용자 활동 감지 (세션 연장) - 성능 최적화
 function setupActivityDetection() {
-    console.log('사용자 활동 감지 설정');
+    // 성능 개선을 위해 로그 제거
+    // console.log('사용자 활동 감지 설정');
     
     // 사용자 활동 이벤트들 (의미 있는 활동만 감지)
     const activityEvents = [
@@ -1233,11 +1257,21 @@ function setupActivityDetection() {
     ];
     
     let activityTimeout = null;
+    let lastActivityTime = 0;
+    const THROTTLE_DELAY = 2000; // 2초로 증가 (성능 개선)
     
     activityEvents.forEach(event => {
         document.addEventListener(event, () => {
+            const now = Date.now();
+            
+            // 스로틀링으로 과도한 이벤트 처리 방지
+            if (now - lastActivityTime < THROTTLE_DELAY) {
+                return;
+            }
+            lastActivityTime = now;
+            
             // 마지막 활동 시간 기록
-            sessionStorage.setItem('lastActivity', Date.now().toString());
+            sessionStorage.setItem('lastActivity', now.toString());
             
             // 기존 타임아웃 클리어
             if (activityTimeout) {
@@ -1273,10 +1307,12 @@ function checkSessionStatusForAutoExtension() {
                 
                 // 1분 이하로 남았을 때만 자동 연장
                 if (remainingSeconds <= 60 && remainingSeconds > 0) {
-                    console.log(`자동 세션 연장 시도 (남은 시간: ${remainingSeconds}초)`);
+                    // 성능 개선을 위해 로그 제거
+                    // console.log(`자동 세션 연장 시도 (남은 시간: ${remainingSeconds}초)`);
                     extendSessionSilently();
                 } else {
-                    console.log(`자동 세션 연장 건너뜀 (남은 시간: ${remainingSeconds}초)`);
+                    // 성능 개선을 위해 로그 제거
+                    // console.log(`자동 세션 연장 건너뜀 (남은 시간: ${remainingSeconds}초)`);
                 }
             }
         })
@@ -1302,7 +1338,8 @@ function extendSessionSilently() {
     })
     .then(data => {
         if (data.success) {
-            console.log('조용한 세션 연장 성공 (1분 이하 남은 경우)');
+            // 성능 개선을 위해 로그 제거
+            // console.log('조용한 세션 연장 성공 (1분 이하 남은 경우)');
         }
     })
     .catch(error => {
