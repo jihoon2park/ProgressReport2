@@ -56,9 +56,9 @@ class ProgressNoteFetchClient:
             (성공 여부, 데이터 리스트 또는 None)
         """
         try:
-            # 기본값 설정: 1일 전부터 현재까지 (더 넓은 범위로 테스트)
+            # 기본값 설정: 7일 전부터 현재까지
             if start_date is None:
-                start_date = datetime.now() - timedelta(days=1)
+                start_date = datetime.now() - timedelta(days=7)
             if end_date is None:
                 end_date = datetime.now()
             
@@ -66,13 +66,13 @@ class ProgressNoteFetchClient:
             start_date_str = start_date.isoformat() + 'Z'
             end_date_str = end_date.isoformat() + 'Z'
             
-            # API 파라미터 구성
+            # API 파라미터 구성 (EventDate 기준으로 변경)
             params = {
                 'date': [f'gt:{start_date_str}', f'lt:{end_date_str}'],
                 'limit': limit
             }
             
-            # CreatedDate 기준으로도 시도 (UTC 형식)
+            # CreatedDate 기준으로도 시도 (UTC 형식) - 백업용
             created_params = {
                 'createddate': [f'gt:{start_date_str}', f'lt:{end_date_str}'],
                 'limit': limit
@@ -113,9 +113,9 @@ class ProgressNoteFetchClient:
                     logger.info(f"Response content: {response.text}")
                     logger.info(f"Response headers: {dict(response.headers)}")
                 
-                # CreatedDate 기준으로도 시도
+                # CreatedDate 기준으로도 시도 (EventDate에 데이터가 없을 경우 백업으로 시도)
                 if not data or len(data) == 0:
-                    logger.info("Trying CreatedDate-based query...")
+                    logger.info("Trying CreatedDate-based query as backup...")
                     created_response = self.session.get(
                         self.api_url,
                         params=created_params,
@@ -227,6 +227,7 @@ def fetch_progress_notes_for_site(site: str, days: int = 14) -> tuple[bool, Opti
     """
     try:
         client = ProgressNoteFetchClient(site)
+        logger.info(f"Fetching progress notes for site {site} with {days} days range")
         return client.fetch_recent_progress_notes(days)
     except Exception as e:
         logger.error(f"Error creating client for site {site}: {str(e)}")

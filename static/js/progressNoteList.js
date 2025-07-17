@@ -217,12 +217,20 @@ async function renderNotesTable() {
     const startTime = Date.now();
     
     await window.progressNoteDB.init();
-    const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 10000, sortBy: 'EventDate', sortOrder: 'desc' });
+    const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 10000, sortBy: 'eventDate', sortOrder: 'desc' });
     
     logPerformance(`Rendering table with ${notes.length} notes for site: ${currentSite}`, { 
         notesCount: notes.length,
         loadTime: Date.now() - startTime 
     });
+    
+    // 최신 데이터 로깅 (디버깅용)
+    if (notes.length > 0) {
+        console.log('Latest 5 notes from IndexedDB:');
+        notes.slice(0, 5).forEach((note, index) => {
+            console.log(`  ${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
+        });
+    }
     
     // 최신 데이터 로깅 (성능 개선을 위해 간소화)
     if (notes.length > 0) {
@@ -261,10 +269,7 @@ async function renderNotesTable() {
     
     tbody.appendChild(fragment);
     
-    // 필터 적용 (기존 필터가 있는 경우)
-    if (window.currentFilters && (window.currentFilters.client || window.currentFilters.eventType)) {
-        window.applyFilters();
-    }
+
     
     // Auto-select first visible row
     if (notes.length > 0) {
@@ -339,8 +344,9 @@ async function initializeForSite(site) {
         // 2. Initialize IndexedDB
         await window.progressNoteDB.init();
         
-        // 3. Always fetch 1 week of data
-        logPerformance('Fetching 1 week of data for site:', { site });
+        // 3. Clear existing data and fetch 1 week of data
+        logPerformance('Clearing existing data and fetching 1 week of data for site:', { site });
+        await window.progressNoteDB.deleteProgressNotes(site);
         await fetchAndSaveProgressNotes();
         
         // 4. Table rendering
@@ -365,7 +371,7 @@ async function fetchAndSaveProgressNotes() {
             },
             body: JSON.stringify({
                 site: currentSite,
-                days: 7
+                days: 7  // 1주일 데이터만 가져오기
             })
         });
         
@@ -407,7 +413,8 @@ async function refreshData() {
         // Refresh 버튼 비활성화
         disableRefreshButton();
         
-        // Always fetch 1 week of data
+        // Clear existing data and fetch 1 week of data
+        await window.progressNoteDB.deleteProgressNotes(currentSite);
         await fetchAndSaveProgressNotes();
         
         // 테이블 다시 렌더링

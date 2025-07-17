@@ -903,7 +903,7 @@ def fetch_progress_notes():
 @app.route('/api/fetch-progress-notes-incremental', methods=['POST'])
 @login_required
 def fetch_progress_notes_incremental():
-    """증분 업데이트 API - 항상 2주간 데이터 반환 (단순화됨)"""
+    """증분 업데이트 API - 항상 7일간 데이터 반환 (단순화됨)"""
     try:
         data = request.get_json()
         site = data.get('site')
@@ -911,12 +911,12 @@ def fetch_progress_notes_incremental():
         if not site:
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
-        logger.info(f"증분 업데이트 요청 (단순화됨) - 사이트: {site}, 항상 1주간 데이터 반환")
+        logger.info(f"증분 업데이트 요청 (단순화됨) - 사이트: {site}, 항상 7일간 데이터 반환")
         
         try:
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
-            # 항상 2주간 데이터 가져오기
+            # 항상 7일간 데이터 가져오기
             success, progress_notes = fetch_progress_notes_for_site(site, 7)
             
             if success:
