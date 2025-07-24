@@ -34,60 +34,18 @@ USERS_DB = {
         "position": "Physiotherapist"
     },
     "PaulVaska": {
-        "password_hash": hash_password("password123"),
+        "password_hash": hash_password("Paul123!"),
         "first_name": "Paul",
         "last_name": "Vaska",
         "role": "doctor",
         "position": "GP"
     },
-    "VadeenChandura": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Vadeen",
-        "last_name": "Chandura",
-        "role": "doctor",
-        "position": "GP"
-    },
-    "PrasanthaWalgampola": {
-        "password_hash": hash_password("password123"),
+    "walgampola": {
+        "password_hash": hash_password("1Prasanta"),
         "first_name": "Prasantha",
         "last_name": "Walgampola",
         "role": "doctor",
         "position": "GP"
-    },
-    "KimWong": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Kim",
-        "last_name": "Wong",
-        "role": "physiotherapist",
-        "position": "Physiotherapist"
-    },
-    "PeterWang": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Peter",
-        "last_name": "Wang",
-        "role": "physiotherapist",
-        "position": "Physiotherapist"
-    },
-    "ThaiTrinh": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Thai",
-        "last_name": "Trinh",
-        "role": "physiotherapist",
-        "position": "Physiotherapist"
-    },
-    "EdmondGrosser": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Edmond",
-        "last_name": "Grosser",
-        "role": "physiotherapist",
-        "position": "Physiotherapist"
-    },
-    "SarahJones": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Sarah",
-        "last_name": "Jones",
-        "role": "physiotherapist",
-        "position": "Physiotherapist"
     },
     "LawJohn": {
         "password_hash": hash_password("John123!"),
