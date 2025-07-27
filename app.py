@@ -532,6 +532,21 @@ def login():
             logger.info("인증 성공")
             
             try:
+                # location 정책 적용
+                user_location = user_info.get('location', [])
+                # location이 All이거나 2개 이상이면 모든 사이트 허용
+                if (isinstance(user_location, list) and (len(user_location) > 1 or (len(user_location) == 1 and user_location[0].lower() == 'all'))) or (isinstance(user_location, str) and user_location.lower() == 'all'):
+                    allowed_sites = list(SITE_SERVERS.keys())
+                else:
+                    # location이 1개면 해당 사이트만 허용
+                    allowed_sites = user_location if isinstance(user_location, list) else [user_location]
+                    # site 값을 무조건 allowed_sites[0]로 강제 설정
+                    site = allowed_sites[0] if allowed_sites else site
+
+                if site not in allowed_sites:
+                    flash(f'You are not allowed to access {site}.', 'error')
+                    return redirect(url_for('home'))
+
                 # 클라이언트 정보 가져오기 (실패해도 로그인 진행)
                 client_success, client_info = fetch_client_information(site)
                 
@@ -557,6 +572,8 @@ def login():
                     
                     # 세션에 추가 정보 저장
                     session['site'] = site
+                    session['allowed_sites'] = allowed_sites # 허용된 사이트 정보 저장
+                    logger.info(f"세션 저장: site={site}, allowed_sites={allowed_sites}")
                     
                     flash('Login successful!', 'success')
                     logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
@@ -579,6 +596,8 @@ def login():
                     
                     # 세션에 추가 정보 저장
                     session['site'] = site
+                    session['allowed_sites'] = allowed_sites # 허용된 사이트 정보 저장
+                    logger.info(f"세션 저장: site={site}, allowed_sites={allowed_sites}")
                     
                     flash('Login successful! (Some data may not be available)', 'success')
                     logger.info(f"로그인 성공 (API 오류 있음) - 사용자: {username}, 사이트: {site}")
@@ -632,7 +651,15 @@ def index():
 @app.route('/progress-notes')
 @login_required
 def progress_notes():
+    allowed_sites = session.get('allowed_sites', [])
     site = request.args.get('site', session.get('site', 'Ramsay'))
+    logger.info(f"progress_notes: allowed_sites={allowed_sites}, site={site}")
+    # location이 1개면 무조건 그 사이트로 강제
+    if isinstance(allowed_sites, list) and len(allowed_sites) == 1:
+        forced_site = allowed_sites[0]
+        if site != forced_site:
+            return redirect(url_for('progress_notes', site=forced_site))
+        site = forced_site
     return render_template('ProgressNoteList.html', site=site)
 
 @app.route('/save_progress_note', methods=['POST'])
