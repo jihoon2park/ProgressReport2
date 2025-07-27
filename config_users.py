@@ -17,98 +17,96 @@ USERS_DB = {
         "first_name": "Admin",
         "last_name": "User",
         "role": "admin",
-        "position": "System Administrator"
-    },
-    "doctor1": {
-        "password_hash": hash_password("password123"), 
-        "first_name": "John",
-        "last_name": "Smith",
-        "role": "doctor",
-        "position": "Doctor"
-    },
-    "physio1": {
-        "password_hash": hash_password("password123"),
-        "first_name": "Sarah",
-        "last_name": "Jones",
-        "role": "physiotherapist",
-        "position": "Physiotherapist"
+        "position": "System Administrator",
+        "location": ["All"]
     },
     "PaulVaska": {
         "password_hash": hash_password("Paul123!"),
         "first_name": "Paul",
         "last_name": "Vaska",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["All"]
     },
     "walgampola": {
         "password_hash": hash_password("1Prasanta"),
         "first_name": "Prasantha",
         "last_name": "Walgampola",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Parafield Gardens"]
     },
-    "LawJohn": {
+   "LawJohn": {
         "password_hash": hash_password("John123!"),
         "first_name": "Siew Won (John)",
         "last_name": "Law",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "LauKin": {
         "password_hash": hash_password("Kin456@"),
         "first_name": "Kin",
         "last_name": "Lau",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "WorleyPaul": {
         "password_hash": hash_password("Paul789#"),
         "first_name": "Paul",
         "last_name": "Worley",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "HorKC": {
         "password_hash": hash_password("KC234$"),
         "first_name": "Kok Chung (KC)",
         "last_name": "Hor",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "SallehAudrey": {
         "password_hash": hash_password("Audrey567%"),
         "first_name": "Audrey",
         "last_name": "Salleh",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "LiNini": {
         "password_hash": hash_password("Nini890@"),
         "first_name": "Xiaoni (Nini)",
         "last_name": "Li",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "KiranantawatSoravee": {
         "password_hash": hash_password("Soravee345&"),
         "first_name": "Soravee",
         "last_name": "Kiranantawat",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "BansalShiveta": {
         "password_hash": hash_password("Shiveta678*"),
         "first_name": "Shiveta",
         "last_name": "Bansal",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     },
     "BehanStephen": {
         "password_hash": hash_password("Stephen901?"),
         "first_name": "Stephen",
         "last_name": "Behan",
         "role": "doctor",
-        "position": "GP"
+        "position": "GP",
+        "location": ["Yankalilla"]
     }
 }
 
