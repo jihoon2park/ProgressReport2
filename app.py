@@ -885,14 +885,29 @@ def fetch_progress_notes():
         force_refresh = data.get('force_refresh', False)  # 강제 새로고침
         
         if not site:
+            logger.error("Site parameter is missing in request")
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
         logger.info(f"프로그레스 노트 가져오기 요청 - 사이트: {site}, 일수: {days}")
+        logger.info(f"Request data: {data}")
+        
+        # 사이트 서버 설정 확인
+        from config import SITE_SERVERS
+        if site not in SITE_SERVERS:
+            logger.error(f"Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}")
+            return jsonify({
+                'success': False, 
+                'message': f'Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}'
+            }), 400
+        
+        server_ip = SITE_SERVERS[site]
+        logger.info(f"Target server for {site}: {server_ip}")
         
         try:
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
             # 프로그레스 노트 가져오기
+            logger.info(f"Calling fetch_progress_notes_for_site for {site}")
             success, progress_notes = fetch_progress_notes_for_site(site, days)
             
             if success:
@@ -919,9 +934,21 @@ def fetch_progress_notes():
                 'success': False,
                 'message': 'Progress note fetch module not available'
             }), 500
+        except Exception as e:
+            logger.error(f"fetch_progress_notes_for_site 호출 중 오류: {str(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return jsonify({
+                'success': False,
+                'message': f'Error in fetch_progress_notes_for_site: {str(e)}'
+            }), 500
             
     except Exception as e:
         logger.error(f"프로그레스 노트 가져오기 중 오류: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'

@@ -25,6 +25,7 @@ class ProgressNoteFetchClient:
         self.server_ip = SITE_SERVERS.get(site)
         
         if not self.server_ip:
+            logger.error(f"Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}")
             raise ValueError(f"Unknown site: {site}")
         
         # server_ip에 이미 포트가 포함되어 있으므로 그대로 사용
@@ -39,6 +40,7 @@ class ProgressNoteFetchClient:
         
         logger.info(f"ProgressNoteFetchClient initialized for site: {site} ({self.server_ip})")
         logger.info(f"API URL: {self.api_url}")
+        logger.info(f"Session headers: {dict(self.session.headers)}")
     
     def fetch_progress_notes(self, 
                            start_date: Optional[datetime] = None,
@@ -145,9 +147,16 @@ class ProgressNoteFetchClient:
                 
         except requests.RequestException as e:
             logger.error(f"Network error while fetching progress notes from {self.site}: {str(e)}")
+            logger.error(f"RequestException type: {type(e).__name__}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response text: {e.response.text}")
             return False, None
         except Exception as e:
             logger.error(f"Unexpected error while fetching progress notes from {self.site}: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False, None
     
     def fetch_recent_progress_notes(self, days: int = 14) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
