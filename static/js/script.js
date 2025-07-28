@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     window.sessionInitialized = true;
+    
     // Check if we're in popup mode (iframe)
     if (window.parent !== window) {
         // Hide header buttons in popup mode
@@ -36,13 +37,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Initialize DOM references
-    initializeDOMElements();
+    // Check if we're on the progress note form page (index.html)
+    const isProgressNotePage = document.getElementById('createDate') && document.getElementById('createTime');
     
-    // Initialize UI components
-    initializeUI();
+    if (isProgressNotePage) {
+        // Initialize DOM references
+        initializeDOMElements();
+        
+        // Initialize UI components
+        initializeUI();
+    } else {
+        console.log('Not on progress note form page, skipping form-specific initialization');
+    }
     
-    // Session refresh (user information update)
+    // Session refresh (user information update) - always run
     refreshUserSession();
     
     // Start session timeout monitoring (중복 실행 방지)
@@ -54,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Session monitoring already started, skipping...');
     }
     
-    // User activity detection (session extension)
+    // User activity detection (session extension) - always run
     setupActivityDetection();
     
 

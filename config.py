@@ -10,9 +10,9 @@ SITE_SERVERS = {
 # 사이트별 API 키
 SITE_API_KEYS = {
     'Parafield Gardens': 'qPh+xiaSIvRCqQ5nB6gNBQl12IMLFED4C5s/xfjQ88k=',
-    'Nerrilda': 'rcPYmmujoPHYwZ7w6U4nKttH2lt2GgLnnRD7BUwvm58=',
+    'Nerrilda': 'UYlsB9uLJt8pqc+82WKzLYcIH+hxWsF3IJCemHkc77w=',
     'Ramsay': 'DtQEnNJohGnYnzQory++De2NijWqINO+enhDdBNHYTM=',
-    'West Park': 'YjTVon6NmDLeIUF3S3kyWyJtiB+cHOtxiIxXYb0Z6zw=',
+    'West Park': 'oWhTkk0QwiXk/TWrqDDQNHpC30/htIVqwIZf8Fc+kaw=',
     'Yankalilla': 'RhU1zjQMJs2/BK/USVmVywy5SdimDTm28BRguF70c+I='
 }
 
