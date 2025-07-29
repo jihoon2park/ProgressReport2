@@ -502,6 +502,9 @@ def get_server_status():
 def home():
     """홈 페이지"""
     if current_user.is_authenticated:
+        # ROD 사용자인 경우 전용 대시보드로 이동
+        if current_user.username.upper() == 'ROD':
+            return redirect(url_for('rod_dashboard'))
         return redirect(url_for('progress_notes'))
     return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
 
@@ -578,7 +581,11 @@ def login():
                     flash('Login successful!', 'success')
                     logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
                     
-                    return redirect(url_for('progress_notes', site=site))
+                    # ROD 사용자인 경우 전용 대시보드로 이동
+                    if username.upper() == 'ROD':
+                        return redirect(url_for('rod_dashboard', site=site))
+                    else:
+                        return redirect(url_for('progress_notes', site=site))
                 except Exception as e:
                     logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
                     flash('Error occurred while saving data.', 'error')
@@ -602,7 +609,11 @@ def login():
                     flash('Login successful! (Some data may not be available)', 'success')
                     logger.info(f"로그인 성공 (API 오류 있음) - 사용자: {username}, 사이트: {site}")
                     
-                    return redirect(url_for('progress_notes', site=site))
+                    # ROD 사용자인 경우 전용 대시보드로 이동
+                    if username.upper() == 'ROD':
+                        return redirect(url_for('rod_dashboard', site=site))
+                    else:
+                        return redirect(url_for('progress_notes', site=site))
                 except Exception as login_error:
                     logger.error(f"로그인 처리 중 오류: {str(login_error)}")
                     flash('Login failed due to system error.', 'error')
@@ -647,6 +658,32 @@ def index():
     """Progress Note 입력 페이지"""
     site = request.args.get('site', session.get('site', 'Ramsay'))
     return render_template('index.html', selected_site=site, current_user=current_user)
+
+@app.route('/rod-dashboard')
+@login_required
+def rod_dashboard():
+    """ROD 전용 대시보드"""
+    # ROD 사용자가 아닌 경우 접근 제한
+    if current_user.username.upper() != 'ROD':
+        flash('Access denied. This dashboard is for ROD users only.', 'error')
+        return redirect(url_for('progress_notes'))
+    
+    allowed_sites = session.get('allowed_sites', [])
+    site = request.args.get('site', session.get('site', 'Parafield Gardens'))
+    
+    # 모든 사이트 정보 가져오기
+    sites_info = []
+    for site_name in SITE_SERVERS.keys():
+        sites_info.append({
+            'name': site_name,
+            'server': SITE_SERVERS[site_name],
+            'is_selected': site_name == site
+        })
+    
+    return render_template('RODDashboard.html', 
+                         site=site, 
+                         sites=sites_info,
+                         current_user=current_user)
 
 @app.route('/progress-notes')
 @login_required
@@ -768,6 +805,224 @@ def get_event_type_list():
         return send_from_directory(data_dir, 'eventtype.json')
     except FileNotFoundError:
         return jsonify([]), 404
+
+@app.route('/api/rod-residence-status')
+@login_required
+def get_rod_residence_status():
+    """Resident of the day 현황을 가져옵니다."""
+    try:
+        site = request.args.get('site', 'Parafield Gardens')
+        year = int(request.args.get('year', datetime.now().year))
+        month = int(request.args.get('month', datetime.now().month))
+        
+        logger.info(f"Fetching Resident of the day status for {site} - {year}/{month}")
+        
+        # Resident of the day 노트와 클라이언트 데이터 가져오기
+        from api_progressnote_fetch import fetch_residence_of_day_notes_with_client_data
+        residence_status = fetch_residence_of_day_notes_with_client_data(site, year, month)
+        
+        if not residence_status:
+            logger.warning(f"No residence status data found for {site}")
+            return jsonify({'error': 'No data found'}), 404
+        
+        # 통계 계산
+        total_residences = len(residence_status)
+        total_rn_en_notes = sum(1 for status in residence_status.values() if status.get('rn_en_has_note', False))
+        total_pca_notes = sum(1 for status in residence_status.values() if status.get('pca_has_note', False))
+        
+        # 전체 노트 개수 계산
+        total_rn_en_count = sum(status.get('rn_en_count', 0) for status in residence_status.values())
+        total_pca_count = sum(status.get('pca_count', 0) for status in residence_status.values())
+        total_notes_count = total_rn_en_count + total_pca_count
+        
+        # 전체 완료율 계산 (RN/EN과 PCA 모두 완료된 Residence 비율)
+        completed_residences = sum(1 for status in residence_status.values() 
+                                if status.get('rn_en_has_note', False) and status.get('pca_has_note', False))
+        overall_completion_rate = round((completed_residences / total_residences * 100) if total_residences > 0 else 0, 1)
+        
+        logger.info(f"Resident of the day status processed: {total_residences} residences, {total_rn_en_notes} RN/EN notes, {total_pca_notes} PCA notes, {completed_residences} completed, {overall_completion_rate}% completion rate")
+        logger.info(f"Total notes found: {total_notes_count} (RN/EN: {total_rn_en_count}, PCA: {total_pca_count})")
+        
+        return jsonify({
+            'residence_status': list(residence_status.values()),
+            'total_residences': total_residences,
+            'total_rn_en_notes': total_rn_en_notes,
+            'total_pca_notes': total_pca_notes,
+            'total_rn_en_count': total_rn_en_count,
+            'total_pca_count': total_pca_count,
+            'total_notes_count': total_notes_count,
+            'overall_completion_rate': overall_completion_rate
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in get_rod_residence_status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rod-residence-list', methods=['POST'])
+@login_required
+def get_rod_residence_list():
+    """ROD 전용 Residence 목록 반환 (빈 테이블용)"""
+    try:
+        # ROD 사용자만 접근 가능
+        if current_user.username.upper() != 'ROD':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+
+        data = request.get_json()
+        site = data.get('site', 'Parafield Gardens')
+
+        try:
+            from api_client import fetch_client_information
+            
+            # 클라이언트 데이터 가져오기
+            client_success, client_data = fetch_client_information(site)
+            
+            if not client_success:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to fetch client data'
+                }), 500
+
+            # 클라이언트 데이터에서 Residence 목록 추출
+            residences = []
+            if isinstance(client_data, list):
+                residences = client_data
+            elif isinstance(client_data, dict) and 'clients' in client_data:
+                residences = client_data['clients']
+            elif isinstance(client_data, dict) and 'data' in client_data:
+                residences = client_data['data']
+            else:
+                # 기본 Residence 목록 사용
+                residences = [
+                    "Residence A", "Residence B", "Residence C", "Residence D", "Residence E",
+                    "Residence F", "Residence G", "Residence H", "Residence I", "Residence J"
+                ]
+
+            # Residence 정보 추출
+            residence_status = []
+            for residence in residences:
+                residence_name = None
+                preferred_name = None
+                wing_name = None
+                
+                if isinstance(residence, dict):
+                    # 실제 클라이언트 데이터 필드 사용
+                    first_name = residence.get('FirstName', '')
+                    surname = residence.get('Surname', '')
+                    last_name = residence.get('LastName', '')
+                    preferred_name = residence.get('PreferredName', '')
+                    wing_name = residence.get('WingName', '')
+                    
+                    # Residence Name에는 FirstName + Surname 조합 사용
+                    if first_name and surname:
+                        residence_name = f"{first_name} {surname}"
+                    elif first_name and last_name:
+                        residence_name = f"{first_name} {last_name}"
+                    elif first_name:
+                        residence_name = first_name
+                    else:
+                        residence_name = ''
+                    
+                    # ID를 사용한 fallback
+                    if not residence_name and 'PersonId' in residence:
+                        residence_name = f"Client_{residence['PersonId']}"
+                    elif not residence_name and 'id' in residence:
+                        residence_name = f"Client_{residence['id']}"
+                        
+                elif isinstance(residence, str):
+                    residence_name = residence
+                
+                if residence_name:
+                                    residence_status.append({
+                    'residence_name': residence_name,
+                    'preferred_name': preferred_name or '',
+                    'wing_name': wing_name or '',
+                    'rn_en_has_note': False,
+                    'pca_has_note': False,
+                    'rn_en_authors': [],
+                    'pca_authors': []
+                })
+
+            return jsonify({
+                'success': True,
+                'site': site,
+                'residence_status': residence_status,
+                'total_residences': len(residence_status)
+            })
+
+        except Exception as e:
+            logger.error(f"Error fetching residence list for site {site}: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f'Error: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"ROD Residence list 조회 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/rod-stats', methods=['POST'])
+@login_required
+def get_rod_stats():
+    """ROD 전용 통계 정보 반환"""
+    try:
+        # ROD 사용자만 접근 가능
+        if current_user.username.upper() != 'ROD':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        data = request.get_json()
+        site = data.get('site', 'Parafield Gardens')
+        
+        # 실제 통계 데이터를 가져오는 로직 (현재는 모의 데이터)
+        stats = {
+            'totalNotes': 0,
+            'todayNotes': 0,
+            'activeUsers': 0,
+            'systemStatus': '🟢'
+        }
+        
+        try:
+            # 프로그레스 노트 수 가져오기
+            from api_progressnote_fetch import fetch_progress_notes_for_site
+            success, progress_notes = fetch_progress_notes_for_site(site, 30)  # 30일간
+            
+            if success and progress_notes:
+                stats['totalNotes'] = len(progress_notes)
+                
+                # 오늘 날짜의 노트 수 계산
+                today = datetime.now().date()
+                today_notes = [note for note in progress_notes 
+                             if note.get('EventDate') and 
+                             datetime.fromisoformat(note['EventDate'].replace('Z', '+00:00')).date() == today]
+                stats['todayNotes'] = len(today_notes)
+            
+            # 활성 사용자 수 (모의 데이터)
+            stats['activeUsers'] = len([user for user in ['admin', 'PaulVaska', 'walgampola', 'ROD'] 
+                                      if user != current_user.username])
+            
+        except Exception as e:
+            logger.error(f"통계 데이터 가져오기 중 오류: {str(e)}")
+            # 오류 시에도 기본 통계 반환
+            stats['totalNotes'] = 0
+            stats['todayNotes'] = 0
+            stats['activeUsers'] = 1
+            stats['systemStatus'] = '🟡'
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'site': site,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"ROD 통계 조회 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
 
 @app.route('/api/user-info')
 @login_required

@@ -39,6 +39,8 @@ class APIClient:
                 logger.error(f"Error response: {e.response.text}")
             raise e
 
+
+
 def fetch_client_information(site):
     """클라이언트 정보를 가져오고 처리하는 함수"""
     logger.info(f"클라이언트 정보 요청 시작 - 사이트: {site}")
@@ -50,3 +52,4 @@ def fetch_client_information(site):
     except requests.RequestException as e:
         logger.error(f"클라이언트 정보 가져오기 실패 - 사이트: {site}, 에러: {str(e)}")
         return False, None
+
