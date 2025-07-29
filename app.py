@@ -502,9 +502,14 @@ def get_server_status():
 def home():
     """홈 페이지"""
     if current_user.is_authenticated:
-        # ROD 사용자인 경우 전용 대시보드로 이동
-        if current_user.username.upper() == 'ROD':
+        logger.info(f"홈 페이지 접근 - 사용자: {current_user.username}, 인증: {current_user.is_authenticated}")
+        # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
+        username_upper = current_user.username.upper()
+        logger.info(f"사용자명 확인: {current_user.username} -> {username_upper}")
+        if username_upper == 'ROD':
+            logger.info(f"ROD 사용자 감지 - rod_dashboard로 리다이렉트")
             return redirect(url_for('rod_dashboard'))
+        logger.info(f"일반 사용자 - progress_notes로 리다이렉트")
         return redirect(url_for('progress_notes'))
     return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
 
@@ -581,10 +586,14 @@ def login():
                     flash('Login successful!', 'success')
                     logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
                     
-                    # ROD 사용자인 경우 전용 대시보드로 이동
-                    if username.upper() == 'ROD':
+                    # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
+                    username_upper = username.upper()
+                    logger.info(f"로그인 사용자명 확인: {username} -> {username_upper}")
+                    if username_upper == 'ROD':
+                        logger.info(f"로그인 성공 - ROD 사용자 감지, rod_dashboard로 리다이렉트")
                         return redirect(url_for('rod_dashboard', site=site))
                     else:
+                        logger.info(f"로그인 성공 - 일반 사용자, progress_notes로 리다이렉트")
                         return redirect(url_for('progress_notes', site=site))
                 except Exception as e:
                     logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
@@ -609,10 +618,14 @@ def login():
                     flash('Login successful! (Some data may not be available)', 'success')
                     logger.info(f"로그인 성공 (API 오류 있음) - 사용자: {username}, 사이트: {site}")
                     
-                    # ROD 사용자인 경우 전용 대시보드로 이동
-                    if username.upper() == 'ROD':
+                    # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
+                    username_upper = username.upper()
+                    logger.info(f"로그인 사용자명 확인 (API 오류 있음): {username} -> {username_upper}")
+                    if username_upper == 'ROD':
+                        logger.info(f"로그인 성공 (API 오류 있음) - ROD 사용자 감지, rod_dashboard로 리다이렉트")
                         return redirect(url_for('rod_dashboard', site=site))
                     else:
+                        logger.info(f"로그인 성공 (API 오류 있음) - 일반 사용자, progress_notes로 리다이렉트")
                         return redirect(url_for('progress_notes', site=site))
                 except Exception as login_error:
                     logger.error(f"로그인 처리 중 오류: {str(login_error)}")
@@ -663,8 +676,10 @@ def index():
 @login_required
 def rod_dashboard():
     """ROD 전용 대시보드"""
-    # ROD 사용자가 아닌 경우 접근 제한
-    if current_user.username.upper() != 'ROD':
+    # ROD 사용자가 아닌 경우 접근 제한 (대소문자 구분 안함)
+    username_upper = current_user.username.upper()
+    logger.info(f"ROD 대시보드 접근 시도 - 사용자명 확인: {current_user.username} -> {username_upper}")
+    if username_upper != 'ROD':
         flash('Access denied. This dashboard is for ROD users only.', 'error')
         return redirect(url_for('progress_notes'))
     
