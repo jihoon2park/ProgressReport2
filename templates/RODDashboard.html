@@ -563,6 +563,25 @@
                 });
 
                 if (!listResponse.ok) {
+                    if (listResponse.status === 401) {
+                        // 세션 만료 시 자동 연장 시도
+                        console.log('세션 만료 감지 - 자동 연장 시도');
+                        const extendResponse = await fetch('/api/extend-session', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (extendResponse.ok) {
+                            // 연장 성공 시 다시 시도
+                            console.log('세션 연장 성공 - 다시 시도');
+                            return loadResidenceStatus();
+                        } else {
+                            // 연장 실패 시 로그인 페이지로 이동
+                            alert('Session expired. Please login again.');
+                            window.location.href = '/';
+                            return;
+                        }
+                    }
                     throw new Error(`HTTP error! status: ${listResponse.status}`);
                 }
 
@@ -588,6 +607,25 @@
                     });
 
                     if (!statusResponse.ok) {
+                        if (statusResponse.status === 401) {
+                            // 세션 만료 시 자동 연장 시도
+                            console.log('세션 만료 감지 - 자동 연장 시도');
+                            const extendResponse = await fetch('/api/extend-session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                            
+                            if (extendResponse.ok) {
+                                // 연장 성공 시 다시 시도
+                                console.log('세션 연장 성공 - 다시 시도');
+                                return loadResidenceStatus();
+                            } else {
+                                // 연장 실패 시 로그인 페이지로 이동
+                                alert('Session expired. Please login again.');
+                                window.location.href = '/';
+                                return;
+                            }
+                        }
                         throw new Error(`HTTP error! status: ${statusResponse.status}`);
                     }
 

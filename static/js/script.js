@@ -12,8 +12,8 @@ const DOM = {};
 let sessionTimeoutId = null;
 let sessionWarningId = null;
 let sessionCheckInterval = null;
-const SESSION_TIMEOUT_MINUTES = 5;
-const SESSION_WARNING_MINUTES = 1;
+const SESSION_TIMEOUT_MINUTES = 10;
+const SESSION_WARNING_MINUTES = 2;
 
 // 중복 실행 방지를 위한 플래그 (전역 변수로 설정)
 if (typeof window.sessionMonitoringStarted === 'undefined') {
@@ -928,9 +928,16 @@ function checkSessionStatus() {
     fetch('/api/session-status')
         .then(response => {
             if (response.status === 401) {
-                // 세션 만료: 즉시 로그아웃 처리
-                handleSessionTimeout();
-                return Promise.reject('Session expired');
+                // 세션 만료: 자동 세션 연장 시도 후 실패하면 로그아웃
+                console.log('세션 만료 감지 - 자동 연장 시도');
+                return extendSessionSilently().then(() => {
+                    // 연장 성공 시 다시 상태 확인
+                    return fetch('/api/session-status');
+                }).catch(() => {
+                    // 연장 실패 시 로그아웃
+                    handleSessionTimeout();
+                    return Promise.reject('Session expired');
+                });
             }
             if (!response.ok) {
                 throw new Error('Session status check failed');
@@ -1300,9 +1307,16 @@ function checkSessionStatusForAutoExtension() {
     fetch('/api/session-status')
         .then(response => {
             if (response.status === 401) {
-                // 세션 만료: 즉시 로그아웃 처리
-                handleSessionTimeout();
-                return Promise.reject('Session expired');
+                // 세션 만료: 자동 세션 연장 시도
+                console.log('자동 연장 중 세션 만료 감지 - 연장 시도');
+                return extendSessionSilently().then(() => {
+                    // 연장 성공 시 다시 상태 확인
+                    return fetch('/api/session-status');
+                }).catch(() => {
+                    // 연장 실패 시 로그아웃
+                    handleSessionTimeout();
+                    return Promise.reject('Session expired');
+                });
             }
             if (!response.ok) {
                 throw new Error('Session status check failed');
