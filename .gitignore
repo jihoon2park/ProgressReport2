@@ -31,8 +31,8 @@ env.bak/
 venv.bak/
 
 # 보안 관련 파일 (중요!)
-config_users.py
-config_secrets.py
+#config_users.py
+#config_secrets.py
 *.key
 *.pem
 *.crt
@@ -81,4 +81,16 @@ instance/
 # 임시 파일
 *.tmp
 *.temp 
+<<<<<<< HEAD
+>>>>>>> develop
+=======
+templates/structure.html
+__pycache__/config_users.cpython-311.pyc
+__pycache__/config_users.cpython-311.pyc
+__pycache__/config_users.cpython-311.pyc
+/__pycache__
+__pycache__/config.cpython-311.pyc
+__pycache__/api_client.cpython-311.pyc
+__pycache__/config.cpython-311.pyc
+__pycache__/config_users.cpython-311.pyc
 >>>>>>> develop

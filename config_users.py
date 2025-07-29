@@ -107,6 +107,14 @@ USERS_DB = {
         "role": "doctor",
         "position": "GP",
         "location": ["Yankalilla"]
+    },
+    "ROD": {
+        "password_hash": hash_password("rod123!"),
+        "first_name": "ROD",
+        "last_name": "User",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["All"]
     }
 }
 

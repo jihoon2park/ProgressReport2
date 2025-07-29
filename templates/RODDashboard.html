@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROD Dashboard - Progress Report System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --light-bg: #ecf0f1;
+            --dark-text: #2c3e50;
+            --border-color: #bdc3c7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--dark-text);
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-info h1 {
+            font-size: 2.5em;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header-info p {
+            font-size: 1.2em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+
+        .user-role {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light-bg);
+        }
+
+        .card-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: white;
+        }
+
+        .icon-stats { background: var(--secondary-color); }
+        .icon-sites { background: var(--success-color); }
+        .icon-actions { background: var(--warning-color); }
+        .icon-system { background: var(--accent-color); }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: var(--light-bg);
+            border-radius: 10px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .site-list {
+            list-style: none;
+        }
+
+        .site-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--light-bg);
+        }
+
+        .site-item:last-child {
+            border-bottom: none;
+        }
+
+        .site-name {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .site-server {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            font-family: 'Courier New', monospace;
+        }
+
+        .site-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .status-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .action-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .system-info {
+            background: var(--light-bg);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .info-value {
+            color: #7f8c8d;
+            font-family: 'Courier New', monospace;
+        }
+
+        .logout-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        .site-selector {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .site-label {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1.1em;
+            white-space: nowrap;
+        }
+
+        .site-select {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid var(--light-bg);
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            color: var(--primary-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .site-select:hover {
+            border-color: var(--secondary-color);
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
+        }
+
+        .site-select:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .dashboard-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .header-info h1 {
+                font-size: 2em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        .refresh-btn {
+            background: var(--warning-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: #e67e22;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <div class="header-info">
+                <h1>Resident of the day</h1>
+                <p>Progress Report System - Administrative Overview</p>
+                <p>Selected Site: <strong>{{ site }}</strong></p>
+            </div>
+            <div class="user-info">
+                <div class="user-name">{{ current_user.display_name }}</div>
+                <div class="user-role">{{ current_user.role }} - {{ current_user.position }}</div>
+                <button class="logout-btn" onclick="window.location.href='/logout'">Logout</button>
+            </div>
+        </div>
+
+        <!-- Site Selector -->
+        <div class="site-selector">
+            <span class="site-label">Select Site</span>
+            <select id="siteSelect" class="site-select" onchange="changeSite(this.value)">
+                {% for site_info in sites %}
+                <option value="{{ site_info.name }}" {% if site_info.is_selected %}selected{% endif %}>
+                    {{ site_info.name }} ({{ site_info.server }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+                            <!-- Resident of the day Status Card -->
+            <div class="dashboard-card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <div class="card-title">Resident of the day Status</div>
+                    <div class="card-icon icon-actions">📋</div>
+                </div>
+                
+                <!-- Month/Year Selector -->
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+                    <label for="monthSelect" style="font-weight: 600; color: var(--primary-color);">Month:</label>
+                    <select id="monthSelect" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                    
+                    <label for="yearSelect" style="font-weight: 600; color: var(--primary-color);">Year:</label>
+                    <select id="yearSelect" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <option value="2024">2024</option>
+                        <option value="2025" selected>2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                    
+                    <button onclick="loadResidenceStatus()" style="padding: 10px 20px; background: var(--secondary-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        🔄 Load Status
+                    </button>
+                </div>
+                
+                <!-- Summary Stats -->
+                <div id="summaryStats" style="display: none; background: var(--light-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: 700; color: var(--success-color);" id="overallCompletionRate">-</div>
+                            <div style="font-size: 0.9em; color: #7f8c8d;">Overall Completion Rate</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: 700; color: var(--secondary-color);" id="totalResidences">-</div>
+                            <div style="font-size: 0.9em; color: #7f8c8d;">Total Residences</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color);" id="totalNurseNotes">-</div>
+                            <div style="font-size: 0.9em; color: #7f8c8d;">RN/EN Notes</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: 700; color: var(--warning-color);" id="totalCarerNotes">-</div>
+                            <div style="font-size: 0.9em; color: #7f8c8d;">PCA Notes</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: 700; color: var(--accent-color);" id="totalNotesCount">-</div>
+                            <div style="font-size: 0.9em; color: #7f8c8d;">Total Notes Found</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Status Table -->
+                <div style="overflow-x: auto;">
+                    <table id="residenceTable" style="width: 100%; border-collapse: collapse; display: none;">
+                                        <thead>
+                    <tr style="background: var(--light-bg);">
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Residence Name</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Preferred Name</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Wing</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color);">ROD by RN/EN</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color);">ROD by PCA</th>
+                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color);">Count</th>
+                    </tr>
+                </thead>
+                        <tbody id="residenceTableBody">
+                            <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Loading indicator -->
+                <div id="loadingIndicator" style="display: none; text-align: center; padding: 40px;">
+                    <div style="font-size: 1.2em; color: var(--secondary-color);">Loading Resident of the day status...</div>
+                </div>
+                
+                <!-- Error message -->
+                <div id="errorMessage" style="display: none; background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <div id="errorText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentSite = '{{ site }}';
+        let sessionStartTime = new Date();
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('ROD Dashboard initialized');
+            
+            // Set current month and year
+            const now = new Date();
+            document.getElementById('monthSelect').value = now.getMonth() + 1;
+            document.getElementById('yearSelect').value = now.getFullYear();
+            
+            // Auto-load current month status
+            loadResidenceStatus();
+        });
+
+        // Change site function
+        function changeSite(siteName) {
+            currentSite = siteName;
+            window.location.href = `/rod-dashboard?site=${encodeURIComponent(siteName)}`;
+        }
+
+                // Load Resident of the day status (two-step process)
+        async function loadResidenceStatus() {
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+
+            // Show loading indicator
+            document.getElementById('loadingIndicator').style.display = 'block';
+            document.getElementById('residenceTable').style.display = 'none';
+            document.getElementById('summaryStats').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+
+            try {
+                // Step 1: Load residence list (empty table)
+                const listResponse = await fetch('/api/rod-residence-list', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        site: currentSite
+                    })
+                });
+
+                if (!listResponse.ok) {
+                    throw new Error(`HTTP error! status: ${listResponse.status}`);
+                }
+
+                const listData = await listResponse.json();
+
+                if (listData.success) {
+                    // Display empty table first
+                    displayResidenceStatus({
+                        residence_status: listData.residence_status,
+                        total_residences: listData.total_residences,
+                        total_notes: 0,
+                        total_nurse_notes: 0,
+                        total_carer_notes: 0,
+                        overall_completion_rate: 0
+                    });
+
+                    // Step 2: Load progress notes and update status
+                    const statusResponse = await fetch(`/api/rod-residence-status?site=${encodeURIComponent(currentSite)}&month=${month}&year=${year}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (!statusResponse.ok) {
+                        throw new Error(`HTTP error! status: ${statusResponse.status}`);
+                    }
+
+                    const statusData = await statusResponse.json();
+
+                    if (statusData.residence_status) {
+                        // Update with actual status
+                        displayResidenceStatus(statusData);
+                    } else {
+                        console.warn('Failed to load status data:', statusData.error);
+                        // Keep the empty table displayed
+                    }
+                } else {
+                    throw new Error(listData.message || 'Failed to load residence list');
+                }
+            } catch (error) {
+                console.error('Error loading residence status:', error);
+                document.getElementById('errorText').textContent = `Error: ${error.message}`;
+                document.getElementById('errorMessage').style.display = 'block';
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        // Display Resident of the day status
+        function displayResidenceStatus(data) {
+            // Update summary stats
+            document.getElementById('overallCompletionRate').textContent = data.overall_completion_rate + '%';
+            document.getElementById('totalResidences').textContent = data.total_residences;
+            document.getElementById('totalNurseNotes').textContent = data.total_rn_en_notes;
+            document.getElementById('totalCarerNotes').textContent = data.total_pca_notes;
+            document.getElementById('totalNotesCount').textContent = data.total_notes_count || 0;
+            document.getElementById('summaryStats').style.display = 'block';
+            
+            // Populate table
+            const tbody = document.getElementById('residenceTableBody');
+            tbody.innerHTML = '';
+            
+                        data.residence_status.forEach(residence => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid var(--border-color)';
+
+                const residenceCell = document.createElement('td');
+                residenceCell.style.padding = '12px';
+                residenceCell.style.fontWeight = '600';
+                residenceCell.textContent = residence.residence_name || '-';
+
+                const preferredCell = document.createElement('td');
+                preferredCell.style.padding = '12px';
+                preferredCell.textContent = residence.preferred_name || '-';
+
+                const wingCell = document.createElement('td');
+                wingCell.style.padding = '12px';
+                wingCell.textContent = residence.wing_name || '-';
+
+                const rnEnCell = document.createElement('td');
+                rnEnCell.style.padding = '12px';
+                rnEnCell.style.textAlign = 'center';
+                if (residence.rn_en_has_note) {
+                    rnEnCell.innerHTML = '<span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">✅</span>';
+                } else {
+                    rnEnCell.innerHTML = '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">❌</span>';
+                }
+
+                const pcaCell = document.createElement('td');
+                pcaCell.style.padding = '12px';
+                pcaCell.style.textAlign = 'center';
+                if (residence.pca_has_note) {
+                    pcaCell.innerHTML = '<span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">✅</span>';
+                } else {
+                    pcaCell.innerHTML = '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">❌</span>';
+                }
+
+                const countCell = document.createElement('td');
+                countCell.style.padding = '12px';
+                countCell.style.textAlign = 'center';
+                countCell.style.fontWeight = '600';
+                const totalCount = (residence.rn_en_count || 0) + (residence.pca_count || 0);
+                countCell.textContent = totalCount > 0 ? totalCount : '-';
+
+                row.appendChild(residenceCell);
+                row.appendChild(preferredCell);
+                row.appendChild(wingCell);
+                row.appendChild(rnEnCell);
+                row.appendChild(pcaCell);
+                row.appendChild(countCell);
+
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('residenceTable').style.display = 'table';
+        }
+
+        // View residence notes
+        function viewResidenceNotes(residenceName, notes) {
+            let details = `Residence: ${residenceName}\n\n`;
+            
+            if (notes && notes.length > 0) {
+                notes.forEach((note, index) => {
+                    const user = note.CreatedByUser || {};
+                    const author = `${user.FirstName || ''} ${user.LastName || ''}`.trim();
+                    const eventDate = note.EventDate ? new Date(note.EventDate).toLocaleDateString() : 'N/A';
+                    const title = note.NotesDetailTitle || 'No title';
+                    const text = note.NotesPlainText || 'No content';
+                    
+                    details += `Note ${index + 1}:\n`;
+                    details += `- Author: ${author}\n`;
+                    details += `- Date: ${eventDate}\n`;
+                    details += `- Title: ${title}\n`;
+                    details += `- Content: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}\n\n`;
+                });
+            } else {
+                details += 'No notes found for this residence.';
+            }
+            
+            alert(details);
+        }
+
+    </script>
+</body>
+</html> 
