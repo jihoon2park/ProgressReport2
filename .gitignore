@@ -1,5 +1,4 @@
 # Python
-/__pycache__
 __pycache__/
 *.py[cod]
 *$py.class
@@ -37,12 +36,7 @@ venv.bak/
 *.pem
 *.crt
 
-<<<<<<< HEAD
-# 데이터 파일
-/data
-=======
 # 데이터 파일 - JSON 파일 모두 제외
->>>>>>> develop
 data/
 *.json
 data/*.json
@@ -73,25 +67,15 @@ instance/
 
 # 백업 파일
 *.bak
-<<<<<<< HEAD
-*~ 
-=======
 *~
 
 # 임시 파일
 *.tmp
 *.temp 
-<<<<<<< HEAD
->>>>>>> develop
-=======
 templates/structure.html
-__pycache__/config_users.cpython-311.pyc
-__pycache__/config_users.cpython-311.pyc
-__pycache__/config_users.cpython-311.pyc
 /__pycache__
 __pycache__/config.cpython-311.pyc
 __pycache__/api_client.cpython-311.pyc
 __pycache__/config.cpython-311.pyc
 __pycache__/config_users.cpython-311.pyc
->>>>>>> develop
-config_users.py
+__pycache__/api_client.cpython-311.pyc
