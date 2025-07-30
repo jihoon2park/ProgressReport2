@@ -94,3 +94,4 @@ __pycache__/api_client.cpython-311.pyc
 __pycache__/config.cpython-311.pyc
 __pycache__/config_users.cpython-311.pyc
 >>>>>>> develop
+config_users.py
