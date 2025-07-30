@@ -448,7 +448,7 @@
                     <label for="yearSelect" style="font-weight: 600; color: var(--primary-color);">Year:</label>
                     <select id="yearSelect" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
                         <option value="2024">2024</option>
-                        <option value="2025" selected>2025</option>
+                        <option value="2025">2025</option>
                         <option value="2026">2026</option>
                     </select>
                     
@@ -524,10 +524,16 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('ROD Dashboard initialized');
             
-            // Set current month and year
+            // Set current month and year based on today's date
             const now = new Date();
-            document.getElementById('monthSelect').value = now.getMonth() + 1;
-            document.getElementById('yearSelect').value = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            
+            // Set month dropdown to current month
+            document.getElementById('monthSelect').value = currentMonth;
+            
+            // Set year dropdown to current year
+            document.getElementById('yearSelect').value = currentYear;
             
             // Auto-load current month status
             loadResidenceStatus();
@@ -563,6 +569,25 @@
                 });
 
                 if (!listResponse.ok) {
+                    if (listResponse.status === 401) {
+                        // 세션 만료 시 자동 연장 시도
+                        console.log('세션 만료 감지 - 자동 연장 시도');
+                        const extendResponse = await fetch('/api/extend-session', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (extendResponse.ok) {
+                            // 연장 성공 시 다시 시도
+                            console.log('세션 연장 성공 - 다시 시도');
+                            return loadResidenceStatus();
+                        } else {
+                            // 연장 실패 시 로그인 페이지로 이동
+                            alert('Session expired. Please login again.');
+                            window.location.href = '/';
+                            return;
+                        }
+                    }
                     throw new Error(`HTTP error! status: ${listResponse.status}`);
                 }
 
@@ -588,6 +613,25 @@
                     });
 
                     if (!statusResponse.ok) {
+                        if (statusResponse.status === 401) {
+                            // 세션 만료 시 자동 연장 시도
+                            console.log('세션 만료 감지 - 자동 연장 시도');
+                            const extendResponse = await fetch('/api/extend-session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                            
+                            if (extendResponse.ok) {
+                                // 연장 성공 시 다시 시도
+                                console.log('세션 연장 성공 - 다시 시도');
+                                return loadResidenceStatus();
+                            } else {
+                                // 연장 실패 시 로그인 페이지로 이동
+                                alert('Session expired. Please login again.');
+                                window.location.href = '/';
+                                return;
+                            }
+                        }
                         throw new Error(`HTTP error! status: ${statusResponse.status}`);
                     }
 

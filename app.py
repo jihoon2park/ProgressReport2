@@ -71,9 +71,9 @@ app = Flask(__name__, static_url_path='/static')
 app.secret_key = flask_config['SECRET_KEY']
 app.config['DEBUG'] = flask_config['DEBUG']
 
-# 세션 타임아웃 설정 (5분)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
-app.config['REMEMBER_COOKIE_DURATION'] = timedelta(minutes=5)
+# 세션 타임아웃 설정 (10분으로 연장)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(minutes=10)
 
 # Flask-Login 설정
 login_manager = LoginManager()
@@ -1097,8 +1097,8 @@ def refresh_session():
 def get_session_status():
     """세션 상태 확인"""
     try:
-        # 세션 만료 시간 계산 (5분)
-        session_lifetime = timedelta(minutes=5)
+        # 세션 만료 시간 계산 (10분)
+        session_lifetime = timedelta(minutes=10)
         session_created = session.get('_created', datetime.now())
         
         if isinstance(session_created, str):
