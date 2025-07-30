@@ -73,11 +73,9 @@ instance/
 *.tmp
 *.temp 
 templates/structure.html
-__pycache__/config_users.cpython-311.pyc
-__pycache__/config_users.cpython-311.pyc
-__pycache__/config_users.cpython-311.pyc
 /__pycache__
 __pycache__/config.cpython-311.pyc
 __pycache__/api_client.cpython-311.pyc
 __pycache__/config.cpython-311.pyc
 __pycache__/config_users.cpython-311.pyc
+__pycache__/api_client.cpython-311.pyc
