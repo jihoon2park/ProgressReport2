@@ -54,6 +54,8 @@
         .btn-refresh:hover { background: #138496; }
         .btn-logout { background: #dc3545; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
         .btn-logout:hover { background: #c82333; }
+        .btn-admin { background: #6f42c1; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
+        .btn-admin:hover { background: #5a32a3; }
         
         /* site-info-line 오버라이드 */
         .site-info-line {
@@ -284,6 +286,9 @@
     <div class="header-buttons">
         <button class="btn-addnew" onclick="openProgressNotePopup()">Add New</button>
         <button id="refreshBtn" class="btn-refresh" onclick="refreshData()">Refresh</button>
+        {% if current_user.role == 'admin' %}
+        <button class="btn-admin" onclick="window.location.href='/log-viewer'">Log Viewer</button>
+        {% endif %}
         <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
     </div>
 </div>

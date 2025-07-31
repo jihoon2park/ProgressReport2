@@ -99,6 +99,20 @@ body {
     background: #c82333;
 }
 
+.btn-admin {
+    background: #6f42c1;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.btn-admin:hover {
+    background: #5a32a3;
+}
+
 .window-controls span {
     margin-left: 5px;
     cursor: pointer;
