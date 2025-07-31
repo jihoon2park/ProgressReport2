@@ -31,6 +31,7 @@ from config import SITE_SERVERS, API_HEADERS
 from config_users import authenticate_user, get_user
 from config_env import get_flask_config, print_current_config
 from models import load_user, User
+from usage_logger import usage_logger
 
 # 환경별 설정 로딩
 flask_config = get_flask_config()
@@ -527,6 +528,15 @@ def login():
         site = request.form.get('site')
         
         logger.info(f"로그인 시도 - 사용자: {username}, 사이트: {site}")
+        
+        # 접속 로그 기록
+        user_info = {
+            "username": username,
+            "display_name": username,
+            "role": "unknown",
+            "position": "unknown"
+        }
+        usage_logger.log_access(user_info)
 
         # 입력값 검증
         if not all([username, password, site]):
@@ -586,6 +596,15 @@ def login():
                     flash('Login successful!', 'success')
                     logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
                     
+                    # 로그인 성공 로그 기록
+                    success_user_info = {
+                        "username": username,
+                        "display_name": user_info.get('display_name', username),
+                        "role": user_info.get('role', 'unknown'),
+                        "position": user_info.get('position', 'unknown')
+                    }
+                    usage_logger.log_access(success_user_info)
+                    
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
                     logger.info(f"로그인 사용자명 확인: {username} -> {username_upper}")
@@ -644,6 +663,16 @@ def login():
 @app.route('/logout')
 def logout():
     """로그아웃 처리"""
+    # 로그아웃 로그 기록
+    if current_user.is_authenticated:
+        user_info = {
+            "username": current_user.username,
+            "display_name": current_user.display_name,
+            "role": current_user.role,
+            "position": current_user.position
+        }
+        usage_logger.log_access(user_info)
+    
     logout_user()
     session.clear()
     flash('You have been logged out successfully.', 'info')
@@ -686,6 +715,15 @@ def rod_dashboard():
     allowed_sites = session.get('allowed_sites', [])
     site = request.args.get('site', session.get('site', 'Parafield Gardens'))
     
+    # 접속 로그 기록
+    user_info = {
+        "username": current_user.username,
+        "display_name": current_user.display_name,
+        "role": current_user.role,
+        "position": current_user.position
+    }
+    usage_logger.log_access(user_info)
+    
     # 모든 사이트 정보 가져오기
     sites_info = []
     for site_name in SITE_SERVERS.keys():
@@ -712,6 +750,16 @@ def progress_notes():
         if site != forced_site:
             return redirect(url_for('progress_notes', site=forced_site))
         site = forced_site
+    
+    # 접속 로그 기록
+    user_info = {
+        "username": current_user.username,
+        "display_name": current_user.display_name,
+        "role": current_user.role,
+        "position": current_user.position
+    }
+    usage_logger.log_access(user_info)
+    
     return render_template('ProgressNoteList.html', site=site)
 
 @app.route('/save_progress_note', methods=['POST'])
@@ -726,6 +774,14 @@ def save_progress_note():
             return jsonify({'success': False, 'message': 'Data is empty'})
         
         logger.info(f"Received form data: {form_data}")
+        
+        # 사용자 정보 수집
+        user_info = {
+            "username": current_user.username if current_user else None,
+            "display_name": current_user.display_name if current_user else None,
+            "role": current_user.role if current_user else None,
+            "position": current_user.position if current_user else None
+        }
         
         # Progress Note JSON 형식으로 변환
         progress_note = create_progress_note_json(form_data)
@@ -750,6 +806,8 @@ def save_progress_note():
             
             if api_success:
                 logger.info("Progress Note API 전송 성공")
+                # 성공 로그 기록
+                usage_logger.log_progress_note(form_data, user_info, success=True)
                 return jsonify({
                     'success': True, 
                     'message': 'Progress Note saved and sent to API successfully.',
@@ -758,6 +816,8 @@ def save_progress_note():
                 })
             else:
                 logger.warning(f"Progress Note API 전송 실패: {api_response}")
+                # 실패 로그 기록
+                usage_logger.log_progress_note(form_data, user_info, success=False, error_message=api_response)
                 # 파일 저장은 성공했지만 API 전송 실패
                 return jsonify({
                     'success': True,  # 파일 저장은 성공
@@ -768,6 +828,8 @@ def save_progress_note():
                 })
         except ImportError as e:
             logger.error(f"API 모듈 import 오류: {str(e)}")
+            # 실패 로그 기록
+            usage_logger.log_progress_note(form_data, user_info, success=False, error_message=f"Import error: {str(e)}")
             return jsonify({
                 'success': True,  # 파일 저장은 성공
                 'message': 'Progress Note saved but API module not available.',
@@ -776,6 +838,8 @@ def save_progress_note():
             })
         except Exception as e:
             logger.error(f"API 전송 중 예상치 못한 오류: {str(e)}")
+            # 실패 로그 기록
+            usage_logger.log_progress_note(form_data, user_info, success=False, error_message=str(e))
             return jsonify({
                 'success': True,  # 파일 저장은 성공
                 'message': 'Progress Note saved but API transmission failed.',
@@ -786,6 +850,14 @@ def save_progress_note():
             
     except Exception as e:
         logger.error(f"Progress Note saving error: {str(e)}")
+        # 전체 실패 로그 기록
+        user_info = {
+            "username": current_user.username if current_user else None,
+            "display_name": current_user.display_name if current_user else None,
+            "role": current_user.role if current_user else None,
+            "position": current_user.position if current_user else None
+        }
+        usage_logger.log_progress_note(form_data, user_info, success=False, error_message=str(e))
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
 
 # ==============================
@@ -1317,6 +1389,123 @@ def serve_data_file(filename):
         return jsonify({'error': 'File not found'}), 404
     
     return send_from_directory(data_dir, filename)
+
+@app.route('/log-viewer')
+@login_required
+def log_viewer():
+    """로그 뷰어 페이지"""
+    # 관리자만 접근 허용
+    if current_user.role != 'admin':
+        flash('Access denied. This page is for administrators only.', 'error')
+        return redirect(url_for('progress_notes'))
+    
+    # 접속 로그 기록
+    user_info = {
+        "username": current_user.username,
+        "display_name": current_user.display_name,
+        "role": current_user.role,
+        "position": current_user.position
+    }
+    usage_logger.log_access(user_info)
+    
+    return render_template('LogViewer.html', current_user=current_user)
+
+@app.route('/api/logs/summary')
+@login_required
+def get_log_summary():
+    """로그 요약 정보 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        log_type = request.args.get('type', 'access')
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str)
+        if end_date_str:
+            end_date = datetime.fromisoformat(end_date_str)
+        
+        summary = usage_logger.get_log_summary(start_date, end_date, log_type)
+        
+        if summary:
+            return jsonify({
+                'success': True,
+                'summary': summary
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get log summary'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting log summary: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/logs/details')
+@login_required
+def get_log_details():
+    """로그 상세 정보 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        log_type = request.args.get('type', 'progress_notes')
+        date_str = request.args.get('date')
+        
+        if not date_str:
+            return jsonify({'success': False, 'message': 'Date parameter is required'}), 400
+        
+        # 해당 날짜의 로그 파일 경로
+        log_file = usage_logger.get_daily_log_file(log_type, datetime.fromisoformat(date_str))
+        
+        if not log_file.exists():
+            return jsonify({'success': False, 'message': 'No logs found for this date'}), 404
+        
+        # 로그 파일 읽기
+        with open(log_file, 'r', encoding='utf-8') as f:
+            logs = json.load(f)
+        
+        # progress_notes 로그인 경우 상세 정보 포함
+        if log_type == 'progress_notes':
+            for log_entry in logs:
+                # 성공/실패 상태에 따른 스타일 클래스 추가
+                success = log_entry.get('result', {}).get('success', True)
+                log_entry['status_class'] = 'success' if success else 'error'
+                log_entry['status_text'] = 'Success' if success else 'Failed'
+                
+                # 타임스탬프를 읽기 쉬운 형식으로 변환
+                timestamp = log_entry.get('timestamp', '')
+                if timestamp:
+                    try:
+                        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        log_entry['formatted_time'] = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        log_entry['formatted_time'] = timestamp
+        
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'date': date_str,
+            'type': log_type
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting log details: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
 
 # ==============================
 # 앱 실행
