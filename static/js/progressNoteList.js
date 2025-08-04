@@ -139,6 +139,42 @@ async function loadClientMap() {
     }
 }
 
+// Load event types for filtering
+async function loadEventTypes() {
+    try {
+        console.log('Loading event types...');
+        
+        const response = await fetch('/data/eventtype.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const eventTypeData = await response.json();
+        console.log(`Loaded ${eventTypeData.length} event type records`);
+        
+        return eventTypeData;
+    } catch (error) {
+        console.error('Failed to load event types:', error);
+        return [];
+    }
+}
+
+// Get Resident of the day event type names for filtering
+async function getResidentOfDayEventTypeNames() {
+    try {
+        const eventTypes = await loadEventTypes();
+        const residentOfDayTypes = eventTypes
+            .filter(et => et.Description && et.Description.toLowerCase().includes('resident of the day'))
+            .map(et => et.Description);
+        
+        console.log(`Found ${residentOfDayTypes.length} Resident of the day event types:`, residentOfDayTypes);
+        return residentOfDayTypes;
+    } catch (error) {
+        console.error('Failed to get Resident of the day event type names:', error);
+        return [];
+    }
+}
+
 // Field mapping (API data → table column)
 function mapNoteToRow(note) {
     // Convert to string for mapping (resolve type mismatch)
@@ -347,6 +383,9 @@ async function initializeForSite(site) {
         // 3. Clear existing data and fetch 1 week of data
         logPerformance('Clearing existing data and fetching 1 week of data for site:', { site });
         await window.progressNoteDB.deleteProgressNotes(site);
+        
+        // 일반 프로그레스 노트 목록: 모든 노트 가져오기 (성능 최적화를 위해 기본 limit 사용)
+        console.log('Fetching all progress notes for general list view');
         await fetchAndSaveProgressNotes();
         
         // 4. Table rendering
@@ -360,19 +399,30 @@ async function initializeForSite(site) {
 }
 
 // Fetch Progress Notes from server and save (full refresh)
-async function fetchAndSaveProgressNotes() {
+async function fetchAndSaveProgressNotes(eventTypes = null) {
     try {
         console.log('Starting to fetch Progress Notes from server...');
+        
+        // Prepare request body
+        const requestBody = {
+            site: currentSite,
+            days: 7  // 1주일 데이터만 가져오기
+        };
+        
+        // Add event types if specified
+        if (eventTypes && eventTypes.length > 0) {
+            requestBody.event_types = eventTypes;
+            console.log(`Fetching progress notes with event type filtering: ${eventTypes.join(', ')}`);
+        } else {
+            console.log('Fetching all progress notes (no event type filtering)');
+        }
         
         const response = await fetch('/api/fetch-progress-notes', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                site: currentSite,
-                days: 7  // 1주일 데이터만 가져오기
-            })
+            body: JSON.stringify(requestBody)
         });
         
         if (!response.ok) {
@@ -415,6 +465,9 @@ async function refreshData() {
         
         // Clear existing data and fetch 1 week of data
         await window.progressNoteDB.deleteProgressNotes(currentSite);
+        
+        // 일반 프로그레스 노트 목록: 모든 노트 가져오기 (성능 최적화를 위해 기본 limit 사용)
+        console.log('Fetching all progress notes for general list view');
         await fetchAndSaveProgressNotes();
         
         // 테이블 다시 렌더링

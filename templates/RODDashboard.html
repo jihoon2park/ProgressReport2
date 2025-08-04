@@ -388,9 +388,114 @@
         .refresh-btn:hover {
             background: #e67e22;
         }
+
+        /* New styles for popups */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .popup-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .popup-content h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .popup-content p {
+            color: #555;
+            margin-bottom: 25px;
+            font-size: 1em;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid var(--secondary-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .popup-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .btn-cancel, .btn-retry {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .btn-cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-cancel:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-retry {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-retry:hover {
+            background: #2980b9;
+        }
     </style>
 </head>
 <body>
+    <!-- Loading Popup -->
+    <div id="loadingPopup" class="popup-overlay" style="display: none;">
+        <div class="popup-content">
+            <div class="loading-spinner"></div>
+            <h3>Loading Data...</h3>
+            <p>Please wait while we fetch the data. (May take up to 2 minutes)</p>
+        </div>
+    </div>
+
+    <!-- Retry Confirmation Popup -->
+    <div id="retryPopup" class="popup-overlay" style="display: none;">
+        <div class="popup-content">
+            <h3>Data Loading Failed</h3>
+            <p>An error occurred while loading the data.</p>
+            <p>Would you like to try again?</p>
+            <div class="popup-buttons">
+                <button onclick="hideRetryPopup()" class="btn-cancel">Cancel</button>
+                <button onclick="retryLoadData()" class="btn-retry">Retry</button>
+            </div>
+        </div>
+    </div>
+
     <div class="dashboard-container">
         <!-- Dashboard Header -->
         <div class="dashboard-header">
@@ -455,6 +560,7 @@
                     <button onclick="loadResidenceStatus()" style="padding: 10px 20px; background: var(--secondary-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
                         🔄 Load Status
                     </button>
+
                 </div>
                 
                 <!-- Summary Stats -->
@@ -545,31 +651,30 @@
             window.location.href = `/rod-dashboard?site=${encodeURIComponent(siteName)}`;
         }
 
-                // Load Resident of the day status (two-step process)
+        // Load Resident of the day status (simplified - no redundant client fetch)
         async function loadResidenceStatus() {
+            try {
+                showLoadingPopup();
+                
             const month = parseInt(document.getElementById('monthSelect').value);
             const year = parseInt(document.getElementById('yearSelect').value);
 
-            // Show loading indicator
-            document.getElementById('loadingIndicator').style.display = 'block';
-            document.getElementById('residenceTable').style.display = 'none';
-            document.getElementById('summaryStats').style.display = 'none';
-            document.getElementById('errorMessage').style.display = 'none';
-
-            try {
-                // Step 1: Load residence list (empty table)
-                const listResponse = await fetch('/api/rod-residence-list', {
+                // Load ROD data directly (server will handle client data fetching)
+                const rodResponse = await fetch('/api/fetch-progress-notes', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        site: currentSite
+                        site: currentSite,
+                        year: year,
+                        month: month,
+                        event_types: []  // 서버에서 동적으로 처리
                     })
                 });
 
-                if (!listResponse.ok) {
-                    if (listResponse.status === 401) {
+                if (!rodResponse.ok) {
+                    if (rodResponse.status === 401) {
                         // 세션 만료 시 자동 연장 시도
                         console.log('세션 만료 감지 - 자동 연장 시도');
                         const extendResponse = await fetch('/api/extend-session', {
@@ -580,97 +685,168 @@
                         if (extendResponse.ok) {
                             // 연장 성공 시 다시 시도
                             console.log('세션 연장 성공 - 다시 시도');
+                            hideLoadingPopup();
                             return loadResidenceStatus();
                         } else {
                             // 연장 실패 시 로그인 페이지로 이동
+                            hideLoadingPopup();
                             alert('Session expired. Please login again.');
                             window.location.href = '/';
                             return;
                         }
                     }
-                    throw new Error(`HTTP error! status: ${listResponse.status}`);
+                    throw new Error(`HTTP error! status: ${rodResponse.status}`);
                 }
 
-                const listData = await listResponse.json();
-
-                if (listData.success) {
-                    // Display empty table first
-                    displayResidenceStatus({
-                        residence_status: listData.residence_status,
-                        total_residences: listData.total_residences,
-                        total_notes: 0,
-                        total_nurse_notes: 0,
-                        total_carer_notes: 0,
-                        overall_completion_rate: 0
-                    });
-
-                    // Step 2: Load progress notes and update status
-                    const statusResponse = await fetch(`/api/rod-residence-status?site=${encodeURIComponent(currentSite)}&month=${month}&year=${year}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
-
-                    if (!statusResponse.ok) {
-                        if (statusResponse.status === 401) {
-                            // 세션 만료 시 자동 연장 시도
-                            console.log('세션 만료 감지 - 자동 연장 시도');
-                            const extendResponse = await fetch('/api/extend-session', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' }
-                            });
-                            
-                            if (extendResponse.ok) {
-                                // 연장 성공 시 다시 시도
-                                console.log('세션 연장 성공 - 다시 시도');
-                                return loadResidenceStatus();
-                            } else {
-                                // 연장 실패 시 로그인 페이지로 이동
-                                alert('Session expired. Please login again.');
-                                window.location.href = '/';
-                                return;
-                            }
-                        }
-                        throw new Error(`HTTP error! status: ${statusResponse.status}`);
-                    }
-
-                    const statusData = await statusResponse.json();
-
-                    if (statusData.residence_status) {
-                        // Update with actual status
-                        displayResidenceStatus(statusData);
-                    } else {
-                        console.warn('Failed to load status data:', statusData.error);
-                        // Keep the empty table displayed
-                    }
-                } else {
-                    throw new Error(listData.message || 'Failed to load residence list');
+                const rodData = await rodResponse.json();
+                
+                if (!rodData.success) {
+                    throw new Error(rodData.message || 'Failed to load ROD data');
                 }
+
+                // The server returns processed ROD data, so we can display it directly
+                // Create the display structure from the processed data
+                const displayData = {
+                    rodStatus: rodData.data,
+                    summary: {
+                        totalResidences: Object.keys(rodData.data).length,
+                        totalRnEnNotes: Object.values(rodData.data).filter(r => r.rn_en_has_note).length,
+                        totalPcaNotes: Object.values(rodData.data).filter(r => r.pca_has_note).length,
+                        totalNotesCount: Object.values(rodData.data).reduce((sum, r) => sum + r.total_count, 0),
+                        completedResidences: Object.values(rodData.data).filter(r => r.rn_en_has_note && r.pca_has_note).length,
+                        overallCompletionRate: Object.values(rodData.data).filter(r => r.rn_en_has_note && r.pca_has_note).length / Object.keys(rodData.data).length * 100
+                    }
+                };
+                
+                // Display the data
+                displayResidenceStatus(displayData);
+                
+                // Hide loading popup
+                hideLoadingPopup();
+
             } catch (error) {
                 console.error('Error loading residence status:', error);
-                document.getElementById('errorText').textContent = `Error: ${error.message}`;
-                document.getElementById('errorMessage').style.display = 'block';
-            } finally {
-                document.getElementById('loadingIndicator').style.display = 'none';
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    site: currentSite,
+                    month: month,
+                    year: year
+                });
+                hideLoadingPopup();
+                showRetryPopup(error.message);
             }
         }
 
+        // Show loading popup
+        function showLoadingPopup() {
+            document.getElementById('loadingPopup').style.display = 'flex';
+        }
+
+        // Hide loading popup
+        function hideLoadingPopup() {
+            document.getElementById('loadingPopup').style.display = 'none';
+        }
+
+        // Show retry popup
+        function showRetryPopup(errorMessage) {
+            document.getElementById('retryPopup').style.display = 'flex';
+            // Store error message for retry
+            window.lastErrorMessage = errorMessage;
+            
+            // Update the error message in the popup
+            const errorTextElement = document.querySelector('#retryPopup .popup-content p:nth-child(3)');
+            if (errorTextElement) {
+                errorTextElement.textContent = `Error: ${errorMessage}`;
+            }
+        }
+
+        // Hide retry popup
+        function hideRetryPopup() {
+            document.getElementById('retryPopup').style.display = 'none';
+        }
+
+        // Retry loading data
+        function retryLoadData() {
+            hideRetryPopup();
+            loadResidenceStatus();
+        }
+
+
         // Display Resident of the day status
         function displayResidenceStatus(data) {
+            console.log('Displaying ROD data:', data);
+            
+            // Check if we have the expected data structure
+            if (!data || typeof data !== 'object') {
+                console.error('Invalid data structure received:', data);
+                return;
+            }
+            
+            // Handle different possible data structures
+            let rodStatus = {};
+            let summary = {};
+            
+            if (data.rodStatus) {
+                // New structure from server
+                rodStatus = data.rodStatus;
+                summary = data.summary || {};
+            } else if (data.residence_status) {
+                // Old structure from processRODData
+                rodStatus = {};
+                data.residence_status.forEach(residence => {
+                    rodStatus[residence.residence_name] = residence;
+                });
+                summary = {
+                    totalResidences: data.total_residences || 0,
+                    totalRnEnNotes: data.total_rn_en_notes || 0,
+                    totalPcaNotes: data.total_pca_notes || 0,
+                    totalNotesCount: data.total_notes_count || 0,
+                    overallCompletionRate: data.overall_completion_rate || 0
+                };
+            } else if (data.data) {
+                // Direct server response structure
+                rodStatus = data.data;
+                summary = {
+                    totalResidences: Object.keys(data.data).length,
+                    totalRnEnNotes: Object.values(data.data).filter(r => r.rn_en_has_note).length,
+                    totalPcaNotes: Object.values(data.data).filter(r => r.pca_has_note).length,
+                    totalNotesCount: Object.values(data.data).reduce((sum, r) => sum + (r.total_count || 0), 0),
+                    overallCompletionRate: Object.values(data.data).filter(r => r.rn_en_has_note && r.pca_has_note).length / Object.keys(data.data).length * 100
+                };
+            } else {
+                console.error('Unknown data structure:', data);
+                return;
+            }
+            
+            console.log('Processed rodStatus:', rodStatus);
+            console.log('Processed summary:', summary);
+            
             // Update summary stats
-            document.getElementById('overallCompletionRate').textContent = data.overall_completion_rate + '%';
-            document.getElementById('totalResidences').textContent = data.total_residences;
-            document.getElementById('totalNurseNotes').textContent = data.total_rn_en_notes;
-            document.getElementById('totalCarerNotes').textContent = data.total_pca_notes;
-            document.getElementById('totalNotesCount').textContent = data.total_notes_count || 0;
+            document.getElementById('overallCompletionRate').textContent = Math.round(summary.overallCompletionRate || 0) + '%';
+            document.getElementById('totalResidences').textContent = summary.totalResidences || 0;
+            document.getElementById('totalNurseNotes').textContent = summary.totalRnEnNotes || 0;
+            document.getElementById('totalCarerNotes').textContent = summary.totalPcaNotes || 0;
+            document.getElementById('totalNotesCount').textContent = summary.totalNotesCount || 0;
             document.getElementById('summaryStats').style.display = 'block';
             
             // Populate table
             const tbody = document.getElementById('residenceTableBody');
             tbody.innerHTML = '';
             
-                        data.residence_status.forEach(residence => {
+            if (Object.keys(rodStatus).length === 0) {
+                console.warn('No residence data to display');
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 6;
+                cell.style.textAlign = 'center';
+                cell.style.padding = '20px';
+                cell.style.color = '#7f8c8d';
+                cell.textContent = 'No residence data available';
+                row.appendChild(cell);
+                tbody.appendChild(row);
+            } else {
+                Object.values(rodStatus).forEach(residence => {
                 const row = document.createElement('tr');
                 row.style.borderBottom = '1px solid var(--border-color)';
 
@@ -721,8 +897,163 @@
 
                 tbody.appendChild(row);
             });
+            }
             
             document.getElementById('residenceTable').style.display = 'table';
+        }
+
+        // Process ROD data from server response
+        function processRODData(residences, progressNotes) {
+            console.log('Processing ROD data:', { residences: residences.length, progressNotes: progressNotes ? progressNotes.length : 0 });
+            
+            // Debug: Log residence data structure
+            if (residences.length > 0) {
+                console.log('Sample residence data:', residences[0]);
+                console.log('Available residence fields:', Object.keys(residences[0]));
+            }
+            
+            const rodStatus = {};
+            
+            // Initialize all residences
+            residences.forEach(residence => {
+                rodStatus[residence.residence_name] = {
+                    residence_name: residence.residence_name,
+                    preferred_name: residence.preferred_name || '',
+                    wing_name: residence.wing_name || '',
+                    rn_en_has_note: false,
+                    pca_has_note: false,
+                    rn_en_count: 0,
+                    pca_count: 0,
+                    total_count: 0,
+                    rn_en_authors: [],
+                    pca_authors: []
+                };
+            });
+
+            // Process progress notes to find ROD entries
+            if (progressNotes && Array.isArray(progressNotes)) {
+                console.log('Processing progress notes...');
+                
+                // Debug: Log first progress note structure
+                if (progressNotes.length > 0) {
+                    console.log('Sample progress note data:', progressNotes[0]);
+                    console.log('Available progress note fields:', Object.keys(progressNotes[0]));
+                }
+                
+                progressNotes.forEach((note, index) => {
+                    // More flexible event type extraction
+                    let eventType = '';
+                    if (note.ProgressNoteEventType && note.ProgressNoteEventType.Description) {
+                        eventType = note.ProgressNoteEventType.Description;
+                    } else if (note.EventType) {
+                        eventType = note.EventType;
+                    } else if (note.eventType) {
+                        eventType = note.eventType;
+                    }
+                    
+                    // More flexible client service ID extraction
+                    let clientServiceId = note.ClientServiceId || note.clientServiceId || note.ClientServiceID || note.clientServiceID;
+                    
+                    console.log(`Note ${index + 1}:`, {
+                        eventType: eventType,
+                        clientServiceId: clientServiceId,
+                        noteId: note.Id || note.id,
+                        rawEventType: note.ProgressNoteEventType
+                    });
+                    
+                    // Find the residence for this note - try multiple field names
+                    let residence = null;
+                    if (clientServiceId) {
+                        residence = residences.find(r => 
+                            r.MainClientServiceId === clientServiceId ||
+                            r.mainClientServiceId === clientServiceId ||
+                            r.ClientServiceId === clientServiceId ||
+                            r.clientServiceId === clientServiceId ||
+                            r.MainClientServiceID === clientServiceId ||
+                            r.mainClientServiceID === clientServiceId
+                        );
+                    }
+                    
+                    if (residence) {
+                        const residenceName = residence.residence_name;
+                        console.log(`Found matching residence: ${residenceName} for clientServiceId: ${clientServiceId}`);
+                        
+                        // More flexible event type matching (case-insensitive, handles spaces)
+                        const normalizedEventType = eventType.toLowerCase().replace(/\s+/g, ' ');
+                        
+                        if (normalizedEventType.includes('resident of the day (rn') || 
+                            normalizedEventType.includes('resident of the day (rn/en') ||
+                            normalizedEventType.includes('resident of the day (rn/ en')) {
+                            rodStatus[residenceName].rn_en_has_note = true;
+                            rodStatus[residenceName].rn_en_count++;
+                            console.log(`✅ RN note found for ${residenceName} (EventType: ${eventType})`);
+                            
+                            // Add author
+                            const author = note.CreatedByUser || note.createdByUser;
+                            if (author) {
+                                const authorName = `${author.FirstName || author.firstName || ''} ${author.LastName || author.lastName || ''}`.trim();
+                                if (authorName) {
+                                    rodStatus[residenceName].rn_en_authors.push(authorName);
+                                }
+                            }
+                        } else if (normalizedEventType.includes('resident of the day (pca')) {
+                            rodStatus[residenceName].pca_has_note = true;
+                            rodStatus[residenceName].pca_count++;
+                            console.log(`✅ PCA note found for ${residenceName} (EventType: ${eventType})`);
+                            
+                            // Add author
+                            const author = note.CreatedByUser || note.createdByUser;
+                            if (author) {
+                                const authorName = `${author.FirstName || author.firstName || ''} ${author.LastName || author.lastName || ''}`.trim();
+                                if (authorName) {
+                                    rodStatus[residenceName].pca_authors.push(authorName);
+                                }
+                            }
+                        } else {
+                            console.log(`⚠️ Non-ROD event type: ${eventType} for ${residenceName}`);
+                        }
+                    } else {
+                        console.log(`❌ No matching residence found for clientServiceId: ${clientServiceId}`);
+                        console.log(`Available residence IDs:`, residences.map(r => ({
+                            name: r.residence_name,
+                            mainId: r.MainClientServiceId,
+                            clientId: r.ClientServiceId
+                        })));
+                    }
+                });
+            } else {
+                console.log('No progress notes to process');
+            }
+
+            // Calculate totals
+            Object.values(rodStatus).forEach(residence => {
+                residence.total_count = residence.rn_en_count + residence.pca_count;
+            });
+
+            // Calculate summary statistics
+            const totalResidences = Object.keys(rodStatus).length;
+            const totalRnEnNotes = Object.values(rodStatus).filter(r => r.rn_en_has_note).length;
+            const totalPcaNotes = Object.values(rodStatus).filter(r => r.pca_has_note).length;
+            const totalNotesCount = Object.values(rodStatus).reduce((sum, r) => sum + r.total_count, 0);
+            const completedResidences = Object.values(rodStatus).filter(r => r.rn_en_has_note && r.pca_has_note).length;
+            const overallCompletionRate = totalResidences > 0 ? Math.round((completedResidences / totalResidences) * 100) : 0;
+
+            console.log('Final ROD status summary:', {
+                totalResidences,
+                totalRnEnNotes,
+                totalPcaNotes,
+                totalNotesCount,
+                overallCompletionRate
+            });
+
+            return {
+                residence_status: Object.values(rodStatus),
+                total_residences: totalResidences,
+                total_rn_en_notes: totalRnEnNotes,
+                total_pca_notes: totalPcaNotes,
+                total_notes_count: totalNotesCount,
+                overall_completion_rate: overallCompletionRate
+            };
         }
 
         // View residence notes

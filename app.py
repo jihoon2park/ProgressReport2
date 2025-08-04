@@ -1019,15 +1019,19 @@ def get_rod_residence_list():
                     residence_name = residence
                 
                 if residence_name:
-                                    residence_status.append({
-                    'residence_name': residence_name,
-                    'preferred_name': preferred_name or '',
-                    'wing_name': wing_name or '',
-                    'rn_en_has_note': False,
-                    'pca_has_note': False,
-                    'rn_en_authors': [],
-                    'pca_authors': []
-                })
+                    # MainClientServiceId 필드 추가
+                    main_client_service_id = residence.get('MainClientServiceId') or residence.get('ClientServiceId') or residence.get('Id')
+                    
+                    residence_status.append({
+                        'residence_name': residence_name,
+                        'preferred_name': preferred_name or '',
+                        'wing_name': wing_name or '',
+                        'MainClientServiceId': main_client_service_id,  # 매칭용 ID 추가
+                        'rn_en_has_note': False,
+                        'pca_has_note': False,
+                        'rn_en_authors': [],
+                        'pca_authors': []
+                    })
 
             return jsonify({
                 'success': True,
@@ -1225,12 +1229,15 @@ def fetch_progress_notes():
         site = data.get('site')
         days = data.get('days', 7)  # 기본값: 7일
         force_refresh = data.get('force_refresh', False)  # 강제 새로고침
+        event_types = data.get('event_types', [])  # 이벤트 타입 필터
+        year = data.get('year')  # 년도
+        month = data.get('month')  # 월
         
         if not site:
             logger.error("Site parameter is missing in request")
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
-        logger.info(f"프로그레스 노트 가져오기 요청 - 사이트: {site}, 일수: {days}")
+        logger.info(f"프로그레스 노트 가져오기 요청 - 사이트: {site}, 일수: {days}, 이벤트타입: {event_types}")
         logger.info(f"Request data: {data}")
         
         # 사이트 서버 설정 확인
@@ -1246,11 +1253,39 @@ def fetch_progress_notes():
         logger.info(f"Target server for {site}: {server_ip}")
         
         try:
-            from api_progressnote_fetch import fetch_progress_notes_for_site
-            
-            # 프로그레스 노트 가져오기
-            logger.info(f"Calling fetch_progress_notes_for_site for {site}")
-            success, progress_notes = fetch_progress_notes_for_site(site, days)
+            # ROD 대시보드 요청인지 확인 (year, month가 제공되고 event_types가 None이거나 빈 배열인 경우)
+            if year is not None and month is not None and (not event_types or len(event_types) == 0):
+                logger.info(f"ROD Dashboard request detected for {site} - {year}/{month}")
+                from api_progressnote_fetch import fetch_residence_of_day_notes_with_client_data
+                
+                # 실시간 클라이언트 데이터와 함께 ROD 로직 사용
+                residence_status = fetch_residence_of_day_notes_with_client_data(site, year, month)
+                
+                if residence_status:
+                    logger.info(f"ROD data fetched successfully for {site}: {len(residence_status)} residences")
+                    return jsonify({
+                        'success': True,
+                        'message': f'Successfully fetched ROD data for {len(residence_status)} residences',
+                        'data': residence_status,
+                        'site': site,
+                        'count': len(residence_status),
+                        'fetched_at': datetime.now().isoformat()
+                    })
+                else:
+                    logger.warning(f"No ROD data found for {site}")
+                    return jsonify({
+                        'success': True,
+                        'message': 'No ROD data found',
+                        'data': {},
+                        'site': site,
+                        'count': 0,
+                        'fetched_at': datetime.now().isoformat()
+                    })
+            else:
+                # 일반적인 프로그레스 노트 요청
+                from api_progressnote_fetch import fetch_progress_notes_for_site
+                logger.info(f"Calling fetch_progress_notes_for_site for {site} with event_types: {event_types}")
+                success, progress_notes = fetch_progress_notes_for_site(site, days, event_types, year, month)
             
             if success:
                 logger.info(f"프로그레스 노트 가져오기 성공 - {site}: {len(progress_notes) if progress_notes else 0}개")
@@ -1506,6 +1541,40 @@ def get_log_details():
             'success': False,
             'message': f'Error: {str(e)}'
         }), 500
+
+@app.route('/api/log-rod-debug', methods=['POST'])
+@login_required
+def log_rod_debug():
+    """Log ROD debug information to file instead of console"""
+    try:
+        debug_data = request.get_json()
+        if not debug_data:
+            return jsonify({'success': False, 'message': 'No debug data provided'})
+        
+        # Create logs directory if it doesn't exist
+        logs_dir = os.path.join(os.getcwd(), 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        filename = f'rod_debug_{timestamp}.json'
+        filepath = os.path.join(logs_dir, filename)
+        
+        # Add server timestamp and user info
+        debug_data['server_timestamp'] = datetime.now().isoformat()
+        debug_data['user'] = current_user.username if current_user.is_authenticated else 'Unknown'
+        
+        # Save to file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(debug_data, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"ROD debug log saved to: {filepath}")
+        return jsonify({'success': True, 'message': 'Debug log saved'})
+        
+    except Exception as e:
+        logger.error(f"Error saving ROD debug log: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
 
 # ==============================
 # 앱 실행

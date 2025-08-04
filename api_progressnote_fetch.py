@@ -47,77 +47,95 @@ class ProgressNoteFetchClient:
     def fetch_progress_notes(self, 
                            start_date: Optional[datetime] = None,
                            end_date: Optional[datetime] = None,
-                           limit: int = 1000,
+                           limit: int = 500, # Default limit
                            progress_note_event_type_id: Optional[int] = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
-        프로그레스 노트를 가져옵니다.
-        EventType 필터를 우선적으로 적용하여 데이터 양을 줄이고 성능을 개선합니다.
+        특정 조건에 맞는 프로그레스 노트를 가져옵니다.
         
         Args:
-            start_date: 시작 날짜 (기본값: 2주 전)
+            start_date: 시작 날짜 (기본값: 14일 전)
             end_date: 종료 날짜 (기본값: 현재 시간)
-            limit: 가져올 최대 개수
-            progress_note_event_type_id: 특정 EventType ID로 필터링 (성능 개선을 위해 우선 적용)
+            limit: 가져올 최대 개수 (기본값: 500)
+            progress_note_event_type_id: 특정 이벤트 타입 ID로 필터링
             
         Returns:
             (성공 여부, 데이터 리스트 또는 None)
         """
         try:
-            # 기본값 설정: 7일 전부터 현재까지
+            # 기본값 설정
             if start_date is None:
-                start_date = datetime.now() - timedelta(days=7)
+                start_date = datetime.now() - timedelta(days=14)
             if end_date is None:
                 end_date = datetime.now()
             
-            # 날짜 형식 변환 (UTC 형식 - API 서버가 기대하는 형식)
-            start_date_str = start_date.isoformat() + 'Z'
-            end_date_str = end_date.isoformat() + 'Z'
-            
-            # API 파라미터 구성 (EventType 필터를 우선적으로 적용)
+            # API 파라미터 설정
             params = {}
             
-            # EventType 필터를 먼저 적용 (데이터 양을 크게 줄임)
+            # 날짜 형식 변환
+            start_date_str = start_date.strftime('%Y-%m-%d')
+            end_date_str = end_date.strftime('%Y-%m-%d')
+            
+            # 이벤트 타입 필터링
             if progress_note_event_type_id is not None:
                 params['progressNoteEventTypeId'] = progress_note_event_type_id
-                logger.info(f"Applying EventType filter: ID {progress_note_event_type_id}")
             
-            # 날짜 필터 적용
-            params['date'] = [f'gt:{start_date_str}', f'lt:{end_date_str}']
+            # 날짜 필터 적용 - inclusive 범위 사용 (gte: >=, lte: <=)
+            params['date'] = [f'gte:{start_date_str}', f'lte:{end_date_str}']
             
-            # Limit 파라미터 (None이면 제외)
-            if limit is not None:
+            # Limit 파라미터 (이벤트 타입 필터링이 있을 때는 제한 없음, 그렇지 않으면 기본값 사용)
+            if progress_note_event_type_id is not None:
+                # 이벤트 타입으로 필터링할 때는 limit 제거 (성능 최적화)
+                pass  # Verbose logging removed
+            elif limit is not None:
                 params['limit'] = limit
             
-            logger.info(f"Fetching progress notes from {self.site}")
-            logger.info(f"Date range: {start_date_str} to {end_date_str}")
-            logger.info(f"EventType filter: {progress_note_event_type_id}")
-            logger.info(f"Limit: {limit}")
-            logger.info(f"Optimized params: {params}")
-            
-            # API 요청 (EventType 필터가 적용된 상태로)
-            logger.info(f"Making optimized API request to: {self.api_url}")
+            # API 요청
             response = self.session.get(
                 self.api_url,
                 params=params,
-                timeout=30  # EventType 필터로 데이터 양이 줄어들어 타임아웃 단축
+                timeout=120  # 타임아웃을 2분으로 증가
             )
-            
-            logger.info(f"API response status: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"Successfully fetched {len(data)} progress notes from {self.site}")
                 
-                # 성능 개선 로그
-                if progress_note_event_type_id is not None:
-                    logger.info(f"Performance improvement: Fetched only {len(data)} notes with EventType filter instead of all notes")
-                
-                # 응답 데이터 샘플 로깅 (간소화)
+                # 응답 데이터 샘플 로깅 (파일로만 저장)
                 if data and len(data) > 0:
-                    logger.info("Response data sample:")
-                    for i, record in enumerate(data[:2]):  # 샘플 수 줄임
+                    debug_info = {
+                        'timestamp': datetime.now().isoformat(),
+                        'site': self.site,
+                        'api_url': self.api_url,
+                        'params': params,
+                        'date_range': f"{start_date_str} to {end_date_str}",
+                        'event_type_filter': progress_note_event_type_id,
+                        'limit': params.get('limit'),
+                        'response_status': response.status_code,
+                        'records_fetched': len(data),
+                        'sample_records': []
+                    }
+                    
+                    for i, record in enumerate(data[:3]):
                         event_type = record.get('ProgressNoteEventType', {})
-                        logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, EventType: {event_type.get('Description', 'N/A')}")
+                        debug_info['sample_records'].append({
+                            'index': i+1,
+                            'id': record.get('Id'),
+                            'event_date': record.get('EventDate'),
+                            'event_type': event_type.get('Description', 'N/A')
+                        })
+                    
+                    # Save debug info to file
+                    try:
+                        logs_dir = os.path.join(os.getcwd(), 'logs')
+                        os.makedirs(logs_dir, exist_ok=True)
+                        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+                        filename = f'api_debug_{timestamp}.json'
+                        filepath = os.path.join(logs_dir, filename)
+                        
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            json.dump(debug_info, f, indent=2, ensure_ascii=False)
+                    except Exception as e:
+                        logger.error(f"Failed to save debug log: {str(e)}")
                 else:
                     logger.info("No data returned from API")
                 
@@ -126,8 +144,11 @@ class ProgressNoteFetchClient:
                 logger.error(f"API request failed: {response.status_code} - {response.text}")
                 return False, None
                 
-        except requests.RequestException as e:
-            logger.error(f"Network error while fetching progress notes from {self.site}: {str(e)}")
+        except requests.exceptions.Timeout:
+            logger.error(f"Request timed out after 120 seconds for {self.site}")
+            return False, None
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error while fetching progress notes from {self.site}: {str(e)}")
             return False, None
         except Exception as e:
             logger.error(f"Unexpected error while fetching progress notes from {self.site}: {str(e)}")
@@ -173,44 +194,251 @@ class ProgressNoteFetchClient:
                     logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
         else:
             logger.info("No new records found in incremental update")
-            # 디버깅을 위해 전체 데이터 조회 시도
-            logger.info("Attempting to fetch all recent data for debugging...")
-            debug_success, debug_data = self.fetch_recent_progress_notes(days=1)
-            if debug_success and debug_data:
-                logger.info(f"Debug: Found {len(debug_data)} records in last 24 hours")
-                if len(debug_data) > 0:
-                    logger.info("Debug: Recent records:")
-                    for i, record in enumerate(debug_data[:3]):
-                        logger.info(f"  {i+1}. ID: {record.get('Id')}, EventDate: {record.get('EventDate')}, CreatedDate: {record.get('CreatedDate', 'N/A')}")
-                    
-                    # 특정 ID 검색
-                    target_id = 302872
-                    found_record = next((r for r in debug_data if r.get('Id') == target_id), None)
-                    if found_record:
-                        logger.info(f"Found target record ID {target_id}:")
-                        logger.info(f"  EventDate: {found_record.get('EventDate')}")
-                        logger.info(f"  CreatedDate: {found_record.get('CreatedDate', 'N/A')}")
-                        logger.info(f"  Since date: {since_date}")
-                        logger.info(f"  Is EventDate > since_date: {found_record.get('EventDate') > since_date.isoformat()}")
-                    else:
-                        logger.info(f"Target record ID {target_id} not found in recent data")
             
         return success, data
 
-def fetch_progress_notes_for_site(site: str, days: int = 14) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+    def fetch_rod_progress_notes(self, year: int, month: int, event_types: List[str] = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+        """
+        ROD 대시보드용 프로그레스 노트를 가져옵니다.
+        
+        Args:
+            year: 년도
+            month: 월
+            event_types: 필터링할 이벤트 타입 리스트 (None이면 자동으로 "Resident of the day" 이벤트 타입 찾기)
+            
+        Returns:
+            (성공 여부, 데이터 리스트 또는 None)
+        """
+        try:
+            logger.info(f"Fetching ROD progress notes for {year}-{month}, event_types: {event_types}")
+            
+            # 년도/월에 해당하는 날짜 범위 계산
+            start_date = datetime(year, month, 1)
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = datetime(year, month + 1, 1) - timedelta(days=1)
+            
+            logger.info(f"Date range: {start_date} to {end_date}")
+            
+            # 이벤트 타입이 제공되지 않았으면 "Resident of the day" 이벤트 타입 자동 찾기
+            if not event_types or len(event_types) == 0:
+                logger.info("No event types provided, searching for 'Resident of the day' event types")
+                event_types = self.find_resident_of_day_event_types()
+                if not event_types:
+                    logger.error("No Resident of the day event types found")
+                    return False, None
+                logger.info(f"Found Resident of the day event types: {event_types}")
+            
+            # 이벤트 타입 ID 찾기
+            event_type_ids = []
+            for event_type_name in event_types:
+                event_type_id = self._find_event_type_id(event_type_name)
+                if event_type_id:
+                    event_type_ids.append(event_type_id)
+                    logger.info(f"Found event type ID {event_type_id} for '{event_type_name}'")
+                else:
+                    logger.warning(f"Event type '{event_type_name}' not found")
+            
+            if not event_type_ids:
+                logger.error("No valid event type IDs found")
+                return False, None
+            
+            # 각 이벤트 타입별로 프로그레스 노트 가져오기
+            all_notes = []
+            for event_type_id in event_type_ids:
+                logger.info(f"Fetching notes for event type ID: {event_type_id}")
+                success, notes = self.fetch_progress_notes(
+                    start_date=start_date,
+                    end_date=end_date,
+                    progress_note_event_type_id=event_type_id
+                )
+                
+                if success and notes:
+                    logger.info(f"Found {len(notes)} notes for event type ID {event_type_id}")
+                    all_notes.extend(notes)
+                else:
+                    logger.warning(f"No notes found for event type ID {event_type_id}")
+            
+            logger.info(f"Total ROD notes found: {len(all_notes)}")
+            return True, all_notes
+            
+        except Exception as e:
+            logger.error(f"Error fetching ROD progress notes: {str(e)}")
+            return False, None
+    
+    def fetch_progress_notes_by_event_types(self, days: int, event_types: List[str]) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+        """
+        특정 이벤트 타입들로 필터링된 프로그레스 노트를 가져옵니다.
+        
+        Args:
+            days: 가져올 일수
+            event_types: 필터링할 이벤트 타입 리스트
+            
+        Returns:
+            (성공 여부, 데이터 리스트 또는 None)
+        """
+        try:
+            logger.info(f"Fetching progress notes by event types: {event_types} for {days} days")
+            
+            # 날짜 범위 계산
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            
+            logger.info(f"Date range: {start_date} to {end_date}")
+            
+            # 이벤트 타입 ID 찾기
+            event_type_ids = []
+            for event_type_name in event_types:
+                event_type_id = self._find_event_type_id(event_type_name)
+                if event_type_id:
+                    event_type_ids.append(event_type_id)
+                    logger.info(f"Found event type ID {event_type_id} for '{event_type_name}'")
+                else:
+                    logger.warning(f"Event type '{event_type_name}' not found")
+            
+            if not event_type_ids:
+                logger.error("No valid event type IDs found")
+                return False, None
+            
+            # 각 이벤트 타입별로 프로그레스 노트 가져오기 (성능 최적화: limit 제거)
+            all_notes = []
+            for event_type_id in event_type_ids:
+                logger.info(f"Fetching notes for event type ID: {event_type_id}")
+                success, notes = self.fetch_progress_notes(
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=None,  # 성능 최적화: limit 제거
+                    progress_note_event_type_id=event_type_id
+                )
+                
+                if success and notes:
+                    logger.info(f"Found {len(notes)} notes for event type ID {event_type_id}")
+                    all_notes.extend(notes)
+                else:
+                    logger.warning(f"No notes found for event type ID {event_type_id}")
+            
+            logger.info(f"Total notes found for event types: {len(all_notes)}")
+            return True, all_notes
+            
+        except Exception as e:
+            logger.error(f"Error fetching progress notes by event types: {str(e)}")
+            return False, None
+    
+    def find_resident_of_day_event_types(self) -> List[str]:
+        """
+        "Resident of the day" 관련 이벤트 타입들을 찾습니다.
+        
+        Returns:
+            "Resident of the day" 관련 이벤트 타입 이름 리스트
+        """
+        try:
+            logger.info(f"Finding Resident of the day event types for site: {self.site}")
+            from app import fetch_event_type_information
+            success, event_types = fetch_event_type_information(self.site)
+            
+            if not success or not event_types:
+                logger.error(f"Failed to fetch event types for site {self.site}")
+                return []
+            
+            logger.info(f"Searching through {len(event_types)} event types for 'Resident of the day'")
+            resident_of_day_types = []
+            
+            for event_type in event_types:
+                description = event_type.get('Description', '')
+                event_id = event_type.get('Id')
+                
+                if 'resident of the day' in description.lower():
+                    logger.info(f"Found Resident of the day event type: '{description}' (ID: {event_id})")
+                    resident_of_day_types.append(description)
+            
+            logger.info(f"Found {len(resident_of_day_types)} Resident of the day event types: {resident_of_day_types}")
+            return resident_of_day_types
+            
+        except Exception as e:
+            logger.error(f"Error finding Resident of the day event types: {str(e)}")
+            return []
+    
+    def _find_event_type_id(self, event_type_name: str) -> Optional[int]:
+        """
+        이벤트 타입 이름으로 ID를 찾습니다.
+        
+        Args:
+            event_type_name: 이벤트 타입 이름
+            
+        Returns:
+            이벤트 타입 ID 또는 None
+        """
+        try:
+            logger.info(f"Finding event type ID for '{event_type_name}' in site: {self.site}")
+            # 이벤트 타입 목록 가져오기
+            from app import fetch_event_type_information
+            success, event_types = fetch_event_type_information(self.site)
+            
+            if not success or not event_types:
+                logger.error(f"Failed to fetch event types for site {self.site}")
+                return None
+            
+            logger.info(f"Found {len(event_types)} event types for site {self.site}")
+            # 이벤트 타입 이름으로 ID 찾기
+            for event_type in event_types:
+                description = event_type.get('Description', '')
+                event_id = event_type.get('Id')
+                if event_type_name.lower() in description.lower():
+                    logger.info(f"Found matching event type: '{description}' (ID: {event_id})")
+                    return event_id
+            
+            logger.warning(f"Event type '{event_type_name}' not found in {len(event_types)} available types")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding event type ID for '{event_type_name}': {str(e)}")
+            return None
+
+def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
     """
     특정 사이트의 프로그레스 노트를 가져오는 편의 함수
     
     Args:
         site: 사이트명
         days: 가져올 일수
+        event_types: 필터링할 이벤트 타입 리스트
+        year: 년도 (ROD 대시보드용)
+        month: 월 (ROD 대시보드용)
         
     Returns:
         (성공 여부, 데이터 리스트 또는 None)
     """
     try:
         client = ProgressNoteFetchClient(site)
-        logger.info(f"Fetching progress notes for site {site} with {days} days range")
+        logger.info(f"Fetching progress notes for site {site} with {days} days range, event_types: {event_types}")
+        
+        # ROD 대시보드용 특별 처리 (year와 month가 제공되고 event_types가 null이거나 빈 배열인 경우)
+        logger.info(f"Checking ROD mode conditions: year={year}, month={month}, event_types={event_types}, event_types type={type(event_types)}")
+        logger.info(f"Condition check: year is not None = {year is not None}, month is not None = {month is not None}")
+        logger.info(f"Condition check: not event_types = {not event_types}, len(event_types) == 0 = {len(event_types) == 0 if event_types else 'N/A'}")
+        
+        # ROD 모드 조건: year와 month가 있고, event_types가 None이거나 빈 배열이거나 빈 문자열 리스트인 경우
+        is_rod_mode = (year is not None and 
+                      month is not None and 
+                      (event_types is None or 
+                       len(event_types) == 0 or 
+                       (isinstance(event_types, list) and all(not et for et in event_types))))
+        
+        logger.info(f"ROD mode determination: {is_rod_mode}")
+        
+        if is_rod_mode:
+            logger.info(f"ROD dashboard mode - fetching for year: {year}, month: {month}, event_types: {event_types}")
+            return client.fetch_rod_progress_notes(year, month, event_types)
+        else:
+            # 일반적인 프로그레스 노트 요청
+            if event_types:
+                # 이벤트 타입별로 필터링하여 가져오기
+                logger.info(f"General request with event type filtering: {event_types}")
+                return client.fetch_progress_notes_by_event_types(days, event_types)
+            else:
+                # 일반 프로그레스 노트 요청: 모든 노트 가져오기
+                logger.info("No event types specified, fetching all progress notes")
         return client.fetch_recent_progress_notes(days)
     except Exception as e:
         logger.error(f"Error creating client for site {site}: {str(e)}")
@@ -320,7 +548,6 @@ def find_resident_of_day_event_types(event_types: List[Dict[str, Any]]) -> tuple
 def fetch_residence_of_day_notes_with_client_data(site, year, month):
     """
     특정 년월의 "Resident of the day" 노트를 클라이언트 데이터와 함께 가져옵니다.
-    EventType 필터를 적용하여 데이터 양을 줄이고 성능을 개선합니다.
     
     Args:
         site (str): 사이트 이름
@@ -333,6 +560,15 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
     try:
         logger.info(f"Fetching Resident of the day notes for {site} - {year}/{month}")
         
+        # Create debug info for file logging
+        debug_info = {
+            'timestamp': datetime.now().isoformat(),
+            'site': site,
+            'year': year,
+            'month': month,
+            'steps': []
+        }
+        
         # 1. 클라이언트 정보 가져오기
         from api_client import fetch_client_information
         client_success, client_data = fetch_client_information(site)
@@ -340,12 +576,38 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
             logger.error(f"Failed to fetch client data for {site}")
             return {}
         
+        debug_info['steps'].append({
+            'step': 'client_data_fetch',
+            'success': client_success,
+            'client_count': len(client_data) if client_data else 0,
+            'sample_clients': []
+        })
+        
+        # Add sample client data to debug info
+        if client_data:
+            for i, client in enumerate(client_data[:3]):
+                first_name = client.get('FirstName', '')
+                surname = client.get('Surname', '')
+                last_name = client.get('LastName', '')
+                main_id = client.get('MainClientServiceId', '')
+                debug_info['steps'][-1]['sample_clients'].append({
+                    'index': i+1,
+                    'name': f"{first_name} {surname or last_name}",
+                    'main_client_service_id': main_id
+                })
+        
         # 2. 날짜 범위 설정
         start_date = datetime(year, month, 1)
         if month == 12:
             end_date = datetime(year + 1, 1, 1)
         else:
             end_date = datetime(year, month + 1, 1)
+        
+        debug_info['steps'].append({
+            'step': 'date_range_setup',
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat()
+        })
         
         # 3. 사이트별 Resident of the day 관련 EventType ID들 동적 찾기
         event_success, event_types = fetch_event_types_for_site(site)
@@ -355,46 +617,142 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
         
         rn_en_id, pca_id = find_resident_of_day_event_types(event_types)
         
+        debug_info['steps'].append({
+            'step': 'event_type_fetch',
+            'success': event_success,
+            'event_types_count': len(event_types) if event_types else 0,
+            'rn_en_id': rn_en_id,
+            'pca_id': pca_id
+        })
+        
         if not rn_en_id and not pca_id:
             logger.warning(f"No Resident of the day event types found for {site}")
             return {}
         
-        # 4. 각 EventType별로 노트 가져오기 (필터링 적용)
+        # 4. 모든 Resident of the day 노트를 한 번에 가져오기 (최적화)
         all_resident_notes = []
         event_type_mapping = {}  # 노트를 RN/EN과 PCA로 분류하기 위한 매핑
+        rn_en_notes = []  # RN/EN 노트만 따로 저장
+        pca_notes = []    # PCA 노트만 따로 저장
         
-        for event_type_id, event_type_name in [(rn_en_id, "RN/EN"), (pca_id, "PCA")]:
-            if event_type_id is None:
-                logger.warning(f"No {event_type_name} event type found for {site}")
-                continue
-                
-            logger.info(f"Fetching notes for EventType ID {event_type_id} ({event_type_name})")
-            
-            # 특정 EventType과 날짜 범위로 필터링하여 노트 가져오기
+        # RN/EN과 PCA 이벤트 타입 ID를 모두 포함하여 한 번에 가져오기
+        event_type_ids = []
+        if rn_en_id:
+            event_type_ids.append(rn_en_id)
+        if pca_id:
+            event_type_ids.append(pca_id)
+        
+        if event_type_ids:
+            # 모든 이벤트 타입을 한 번에 가져오기
             client = ProgressNoteFetchClient(site)
-            success, notes = client.fetch_progress_notes(
-                start_date=start_date,
-                end_date=end_date,
-                limit=None,  # ROD 대시보드는 제한 없음
-                progress_note_event_type_id=event_type_id  # EventType 필터 적용
-            )
             
-            if success and notes:
-                logger.info(f"Found {len(notes)} notes for EventType ID {event_type_id} ({event_type_name})")
-                all_resident_notes.extend(notes)
+            # 날짜 범위를 조금 더 넓게 설정 (전후 1일 포함)
+            extended_start_date = start_date - timedelta(days=1)
+            extended_end_date = end_date + timedelta(days=1)
+            
+            debug_info['steps'].append({
+                'step': 'fetch_notes_optimized',
+                'event_type_ids': event_type_ids,
+                'date_range': f"{extended_start_date.isoformat()} to {extended_end_date.isoformat()}",
+                'notes_fetched': 0
+            })
+            
+            # 각 이벤트 타입별로 개별 호출 (API가 OR 조건을 지원하지 않는 경우)
+            for event_type_id in event_type_ids:
+                success, notes = client.fetch_progress_notes(
+                    start_date=extended_start_date,
+                    end_date=extended_end_date,
+                    limit=None,  # 제한 없음
+                    progress_note_event_type_id=event_type_id
+                )
                 
-                # 노트를 타입별로 분류
-                for note in notes:
-                    event_type_mapping[note.get('Id')] = event_type_name
-            else:
-                logger.warning(f"No notes found for EventType ID {event_type_id} ({event_type_name})")
+                if success and notes is not None:
+                    all_resident_notes.extend(notes)
+                    
+                    # 노트를 타입별로 분류
+                    event_type_name = "RN/EN" if event_type_id == rn_en_id else "PCA"
+                    for note in notes:
+                        event_type_mapping[note.get('Id')] = event_type_name
+                    
+                    # Event Type별로 노트 분리 저장
+                    if event_type_name == "RN/EN":
+                        rn_en_notes = notes
+                    elif event_type_name == "PCA":
+                        pca_notes = notes
+                    
+                    debug_info['steps'][-1]['notes_fetched'] += len(notes)
+                    logger.info(f"Fetched {len(notes)} notes for event type ID {event_type_id} ({event_type_name})")
+                else:
+                    logger.warning(f"No notes found for EventType ID {event_type_id}")
+        else:
+            logger.warning("No Resident of the day event types found")
         
-        logger.info(f"Total Resident of the day notes found: {len(all_resident_notes)}")
+        # Progress Note를 JSON 파일로 저장 (Event Type별로 분리)
+        try:
+            logs_dir = os.path.join(os.getcwd(), 'data')
+            os.makedirs(logs_dir, exist_ok=True)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            # RN/EN 노트 저장
+            if rn_en_notes:
+                rn_en_filename = f'progress_notes_rn_en_{site}_{year}_{month:02d}_{timestamp}.json'
+                rn_en_filepath = os.path.join(logs_dir, rn_en_filename)
+                with open(rn_en_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(rn_en_notes, f, indent=2, ensure_ascii=False)
+                logger.info(f"RN/EN notes saved to: {rn_en_filename}")
+            
+            # PCA 노트 저장
+            if pca_notes:
+                pca_filename = f'progress_notes_pca_{site}_{year}_{month:02d}_{timestamp}.json'
+                pca_filepath = os.path.join(logs_dir, pca_filename)
+                with open(pca_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(pca_notes, f, indent=2, ensure_ascii=False)
+                logger.info(f"PCA notes saved to: {pca_filename}")
+                
+        except Exception as e:
+            logger.error(f"Failed to save progress notes to JSON files: {str(e)}")
+        
+        debug_info['steps'].append({
+            'step': 'total_notes_summary',
+            'total_notes': len(all_resident_notes),
+            'sample_notes': []
+        })
+        
+        # Add sample notes to debug info
+        if all_resident_notes:
+            for i, note in enumerate(all_resident_notes[:3]):
+                debug_info['steps'][-1]['sample_notes'].append({
+                    'index': i+1,
+                    'id': note.get('Id'),
+                    'client_service_id': note.get('ClientServiceId'),
+                    'event_type': note.get('ProgressNoteEventType', {}).get('Description', 'N/A'),
+                    'event_date': note.get('EventDate', 'N/A')
+                })
         
         # 5. Residence별로 노트 매칭 및 상태 생성
         residence_status = {}
         
-        for residence in client_data:
+        # 클라이언트 데이터 구조 확인 및 처리
+        logger.info(f"Client data type: {type(client_data)}")
+        if isinstance(client_data, dict):
+            logger.info(f"Client data keys: {list(client_data.keys())}")
+            # 딕셔너리인 경우 values()를 사용
+            client_list = list(client_data.values()) if client_data else []
+        elif isinstance(client_data, list):
+            logger.info(f"Client data length: {len(client_data)}")
+            client_list = client_data
+        else:
+            logger.error(f"Unexpected client data type: {type(client_data)}")
+            client_list = []
+        
+        logger.info(f"Processing {len(client_list)} clients")
+        
+        # 클라이언트 데이터 구조 확인
+        if client_list:
+            logger.info(f"First client sample: {client_list[0]}")
+            logger.info(f"First client keys: {list(client_list[0].keys()) if isinstance(client_list[0], dict) else 'Not a dict'}")
+        
+        for residence in client_list:
             if isinstance(residence, dict):
                 first_name = residence.get('FirstName', '')
                 surname = residence.get('Surname', '')
@@ -402,7 +760,7 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                 preferred_name = residence.get('PreferredName', '')
                 wing_name = residence.get('WingName', '')
                 
-                # Residence 이름 생성
+                # Residence 이름 생성 - FirstName과 Surname/LastName 조합
                 if first_name and surname:
                     residence_name = f"{first_name} {surname}"
                 elif first_name and last_name:
@@ -412,89 +770,117 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                 else:
                     continue
                 
-                # Residence의 ClientServiceId 찾기
-                residence_client_service_id = residence.get('MainClientServiceId')
+                # Residence의 ClientRecordId 찾기 (실시간 API 데이터에서는 다른 필드명 사용)
+                residence_client_record_id = residence.get('ClientRecordId') or residence.get('Id') or residence.get('ClientId')
                 
-                if residence_name and residence_client_service_id:
+                # 디버깅: Barrie McAskill 케이스 특별 로깅
+                if 'Barrie' in residence_name or 'McAskill' in residence_name:
+                    logger.info(f"=== Barrie McAskill Debug ===")
+                    logger.info(f"Residence Name: {residence_name}")
+                    logger.info(f"ClientRecordId: {residence_client_record_id}")
+                    logger.info(f"All residence fields: {list(residence.keys())}")
+                    logger.info(f"Available fields: {list(residence.keys())}")
+                
+                # 모든 resident를 화면에 표시 (노트가 없어도 표시)
+                residence_notes = []
+                
+                if residence_client_record_id:
                     # 해당 Residence의 노트 찾기
-                    residence_notes = []
-                    
                     for note in all_resident_notes:
-                        note_client_service_id = note.get('ClientServiceId')
-                        if note_client_service_id and note_client_service_id == residence_client_service_id:
-                            residence_notes.append(note)
-                    
-                    logger.info(f"Found {len(residence_notes)} notes for residence: {residence_name}")
-                    
-                    # RN/EN과 PCA 노트 분리 (동적으로 찾은 이벤트 타입 ID 사용)
-                    rn_en_notes = []
-                    pca_notes = []
-                    
-                    for note in residence_notes:
-                        note_id = note.get('Id')
-                        event_type_name = event_type_mapping.get(note_id)
+                        note_client_id = note.get('ClientId')  # Progress Note의 ClientId 확인
                         
-                        if event_type_name == "RN/EN":
-                            rn_en_notes.append(note)
-                        elif event_type_name == "PCA":
-                            pca_notes.append(note)
-                    
-                    # 상태 정보 생성
-                    residence_status[residence_name] = {
-                        'residence_name': residence_name,
-                        'preferred_name': preferred_name or '',
-                        'wing_name': wing_name or '',
-                        'rn_en_notes': rn_en_notes,
-                        'pca_notes': pca_notes,
-                        'rn_en_has_note': len(rn_en_notes) > 0,
-                        'pca_has_note': len(pca_notes) > 0,
-                        'rn_en_count': len(rn_en_notes),
-                        'pca_count': len(pca_notes),
-                        'total_count': len(rn_en_notes) + len(pca_notes),
-                        'rn_en_authors': [],
-                        'pca_authors': []
-                    }
-                    
-                    # RN/EN authors 추가
-                    for note in rn_en_notes:
-                        created_by = note.get('CreatedByUser', {})
-                        if created_by:
-                            first_name = created_by.get('FirstName', '')
-                            last_name = created_by.get('LastName', '')
-                            author_name = f"{first_name} {last_name}".strip()
-                            if author_name:
-                                residence_status[residence_name]['rn_en_authors'].append(author_name)
-                            else:
-                                residence_status[residence_name]['rn_en_authors'].append('Unknown')
+                        # 디버깅: Barrie McAskill 케이스 특별 로깅
+                        if 'Barrie' in residence_name or 'McAskill' in residence_name:
+                            logger.info(f"Checking note ClientId: {note_client_id} vs residence ClientRecordId: {residence_client_record_id}")
+                        
+                        # 매칭 로직: ClientRecordId로만 매칭
+                        if note_client_id == residence_client_record_id:
+                            residence_notes.append(note)
+                            # 디버깅: 매칭 성공 로그
+                            if 'Barrie' in residence_name or 'McAskill' in residence_name:
+                                logger.info(f"✅ MATCH FOUND for {residence_name}: Note ID {note.get('Id')} via ClientRecordId")
                         else:
-                            residence_status[residence_name]['rn_en_authors'].append('Unknown')
+                            # 디버깅: 매칭 실패 로그
+                            if 'Barrie' in residence_name or 'McAskill' in residence_name:
+                                logger.info(f"❌ NO MATCH for {residence_name}: Note ClientId {note_client_id} != Residence ClientRecordId {residence_client_record_id}")
+                
+                # 디버깅: Barrie McAskill 케이스 결과
+                if 'Barrie' in residence_name or 'McAskill' in residence_name:
+                    logger.info(f"Total notes found for {residence_name}: {len(residence_notes)}")
+                    for note in residence_notes:
+                        logger.info(f"  - Note ID: {note.get('Id')}, EventType: {note.get('ProgressNoteEventType', {}).get('Description', 'N/A')}")
+                
+                # Residence별 상태 생성 (노트가 없어도 생성)
+                rn_en_has_note = False
+                pca_has_note = False
+                rn_en_count = 0
+                pca_count = 0
+                rn_en_authors = []
+                pca_authors = []
+                
+                for note in residence_notes:
+                    note_id = note.get('Id')
+                    event_type_name = event_type_mapping.get(note_id)
                     
-                    # PCA authors 추가
-                    for note in pca_notes:
-                        created_by = note.get('CreatedByUser', {})
+                    if event_type_name == "RN/EN":
+                        rn_en_has_note = True
+                        rn_en_count += 1
+                        
+                        # 작성자 정보 추가
+                        created_by = note.get('CreatedByUser')
                         if created_by:
-                            first_name = created_by.get('FirstName', '')
-                            last_name = created_by.get('LastName', '')
-                            author_name = f"{first_name} {last_name}".strip()
+                            author_name = f"{created_by.get('FirstName', '')} {created_by.get('LastName', '')}".strip()
                             if author_name:
-                                residence_status[residence_name]['pca_authors'].append(author_name)
-                            else:
-                                residence_status[residence_name]['pca_authors'].append('Unknown')
-                        else:
-                            residence_status[residence_name]['pca_authors'].append('Unknown')
+                                rn_en_authors.append(author_name)
+                    elif event_type_name == "PCA":
+                        pca_has_note = True
+                        pca_count += 1
+                        
+                        # 작성자 정보 추가
+                        created_by = note.get('CreatedByUser')
+                        if created_by:
+                            author_name = f"{created_by.get('FirstName', '')} {created_by.get('LastName', '')}".strip()
+                            if author_name:
+                                pca_authors.append(author_name)
+                
+                residence_status[residence_name] = {
+                    'residence_name': residence_name,
+                    'preferred_name': preferred_name,
+                    'wing_name': wing_name,
+                    'rn_en_has_note': rn_en_has_note,
+                    'pca_has_note': pca_has_note,
+                    'rn_en_count': rn_en_count,
+                    'pca_count': pca_count,
+                    'total_count': rn_en_count + pca_count,
+                    'rn_en_authors': rn_en_authors,
+                    'pca_authors': pca_authors
+                }
         
-        # 6. 데이터 저장 (검증용)
-        save_data_to_file(site, year, month, all_resident_notes, residence_status)
+        # Save debug info to file
+        try:
+            logs_dir = os.path.join(os.getcwd(), 'logs')
+            os.makedirs(logs_dir, exist_ok=True)
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+            filename = f'rod_processing_{site}_{year}_{month:02d}_{timestamp}.json'
+            filepath = os.path.join(logs_dir, filename)
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(debug_info, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Failed to save ROD processing debug log: {str(e)}")
         
-        logger.info(f"Resident of the day status processing completed for {site} - {year}/{month}")
-        logger.info(f"Performance improvement: Fetched only {len(all_resident_notes)} notes instead of all notes")
+        logger.info(f"ROD processing completed for {site}: {len(residence_status)} residences")
+        logger.info(f"Residence status keys: {list(residence_status.keys())}")
+        if len(residence_status) == 0:
+            logger.warning("No residences found in residence_status!")
+            logger.info(f"Client data sample: {client_list[:2] if client_list else 'No client data'}")
         return residence_status
         
     except Exception as e:
         logger.error(f"Error in fetch_residence_of_day_notes_with_client_data: {str(e)}")
         return {}
 
-def save_data_to_file(site: str, year: int, month: int, all_notes: list, residence_status: dict):
+def save_data_to_file(site: str, year: int, month: int, all_notes: list, residence_status: dict, debug_info: dict = None):
     """
     받은 데이터를 JSON 파일로 저장합니다.
     
@@ -504,6 +890,7 @@ def save_data_to_file(site: str, year: int, month: int, all_notes: list, residen
         month (int): 월
         all_notes (list): 모든 Progress Note 데이터
         residence_status (dict): Residence별 상태 정보
+        debug_info (dict): 디버깅 정보 (선택사항)
     """
     try:
         # 파일명 생성
@@ -523,6 +910,10 @@ def save_data_to_file(site: str, year: int, month: int, all_notes: list, residen
             'raw_progress_notes': all_notes,
             'processed_residence_status': residence_status
         }
+        
+        # 디버깅 정보가 있으면 추가
+        if debug_info:
+            data_to_save['debug_info'] = debug_info
         
         # JSON 파일로 저장
         with open(filepath, 'w', encoding='utf-8') as f:
