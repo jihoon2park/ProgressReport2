@@ -276,5 +276,361 @@ class UsageLogger:
             self.logger.error(f"Error getting log summary: {str(e)}")
             return None
 
+    def get_access_log_hourly_summary(self, start_date=None, end_date=None):
+        """Access log의 시간별 사용자 활동 요약 반환"""
+        try:
+            if start_date is None:
+                start_date = datetime.now().replace(day=1)
+            if end_date is None:
+                end_date = datetime.now()
+            
+            hourly_summary = {
+                "period": {
+                    "start": start_date.isoformat(),
+                    "end": end_date.isoformat()
+                },
+                "total_entries": 0,
+                "unique_users": set(),
+                "hourly_activity": {},  # 시간별 활동
+                "user_activity": {},    # 사용자별 활동
+                "page_activity": {}     # 페이지별 활동
+            }
+            
+            current_date = start_date
+            while current_date <= end_date:
+                log_file = self.get_daily_log_file("access", current_date)
+                date_str = current_date.strftime("%Y-%m-%d")
+                
+                if log_file.exists():
+                    try:
+                        with open(log_file, 'r', encoding='utf-8') as f:
+                            daily_logs = json.load(f)
+                        
+                        hourly_summary["total_entries"] += len(daily_logs)
+                        
+                        for log_entry in daily_logs:
+                            user_info = log_entry.get("user", {})
+                            username = user_info.get("username") or user_info.get("display_name")
+                            display_name = user_info.get("display_name")
+                            role = user_info.get("role")
+                            
+                            if username:
+                                hourly_summary["unique_users"].add(username)
+                            
+                            # 타임스탬프에서 시간 추출
+                            timestamp = log_entry.get("timestamp", "")
+                            if timestamp:
+                                try:
+                                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                    hour_key = dt.strftime("%Y-%m-%d %H:00")
+                                    date_hour_key = dt.strftime("%Y-%m-%d")
+                                    
+                                    # 시간별 활동 카운트
+                                    if hour_key not in hourly_summary["hourly_activity"]:
+                                        hourly_summary["hourly_activity"][hour_key] = {
+                                            "total_visits": 0,
+                                            "unique_users": set(),
+                                            "pages": {}
+                                        }
+                                    
+                                    hourly_summary["hourly_activity"][hour_key]["total_visits"] += 1
+                                    if username:
+                                        hourly_summary["hourly_activity"][hour_key]["unique_users"].add(username)
+                                    
+                                    # 페이지 정보
+                                    page_info = log_entry.get("page", {})
+                                    page_path = page_info.get("path", "unknown")
+                                    if page_path not in hourly_summary["hourly_activity"][hour_key]["pages"]:
+                                        hourly_summary["hourly_activity"][hour_key]["pages"][page_path] = 0
+                                    hourly_summary["hourly_activity"][hour_key]["pages"][page_path] += 1
+                                    
+                                    # 사용자별 활동
+                                    if username:
+                                        if username not in hourly_summary["user_activity"]:
+                                            hourly_summary["user_activity"][username] = {
+                                                "display_name": display_name,
+                                                "role": role,
+                                                "total_visits": 0,
+                                                "last_visit": "",
+                                                "pages_visited": {},
+                                                "hourly_visits": {}
+                                            }
+                                        
+                                        hourly_summary["user_activity"][username]["total_visits"] += 1
+                                        hourly_summary["user_activity"][username]["last_visit"] = timestamp
+                                        
+                                        # 사용자별 페이지 방문
+                                        if page_path not in hourly_summary["user_activity"][username]["pages_visited"]:
+                                            hourly_summary["user_activity"][username]["pages_visited"][page_path] = 0
+                                        hourly_summary["user_activity"][username]["pages_visited"][page_path] += 1
+                                        
+                                        # 사용자별 시간대별 방문
+                                        if hour_key not in hourly_summary["user_activity"][username]["hourly_visits"]:
+                                            hourly_summary["user_activity"][username]["hourly_visits"][hour_key] = 0
+                                        hourly_summary["user_activity"][username]["hourly_visits"][hour_key] += 1
+                                    
+                                    # 페이지별 활동
+                                    if page_path not in hourly_summary["page_activity"]:
+                                        hourly_summary["page_activity"][page_path] = {
+                                            "total_visits": 0,
+                                            "unique_users": set(),
+                                            "hourly_visits": {}
+                                        }
+                                    
+                                    hourly_summary["page_activity"][page_path]["total_visits"] += 1
+                                    if username:
+                                        hourly_summary["page_activity"][page_path]["unique_users"].add(username)
+                                    
+                                    if hour_key not in hourly_summary["page_activity"][page_path]["hourly_visits"]:
+                                        hourly_summary["page_activity"][page_path]["hourly_visits"][hour_key] = 0
+                                    hourly_summary["page_activity"][page_path]["hourly_visits"][hour_key] += 1
+                                    
+                                except Exception as e:
+                                    self.logger.warning(f"Error parsing timestamp {timestamp}: {str(e)}")
+                    
+                    except Exception as e:
+                        self.logger.error(f"Error reading log file {log_file}: {str(e)}")
+                
+                current_date = current_date + timedelta(days=1)
+            
+            # set을 list로 변환
+            hourly_summary["unique_users"] = list(hourly_summary["unique_users"])
+            
+            # 시간별 활동에서 unique_users를 list로 변환
+            for hour_key in hourly_summary["hourly_activity"]:
+                hourly_summary["hourly_activity"][hour_key]["unique_users"] = list(
+                    hourly_summary["hourly_activity"][hour_key]["unique_users"]
+                )
+            
+            # 페이지별 활동에서 unique_users를 list로 변환
+            for page_path in hourly_summary["page_activity"]:
+                hourly_summary["page_activity"][page_path]["unique_users"] = list(
+                    hourly_summary["page_activity"][page_path]["unique_users"]
+                )
+            
+            return hourly_summary
+            
+        except Exception as e:
+            self.logger.error(f"Error getting access log hourly summary: {str(e)}")
+            return None
+
+    def get_daily_access_summary(self, start_date=None, end_date=None):
+        """일별 접속 현황 요약"""
+        try:
+            if start_date is None:
+                start_date = datetime.now().replace(day=1)
+            if end_date is None:
+                end_date = datetime.now()
+            
+            daily_summary = {
+                "period": {
+                    "start": start_date.isoformat(),
+                    "end": end_date.isoformat()
+                },
+                "daily_stats": {}  # 일별 통계
+            }
+            
+            current_date = start_date
+            while current_date <= end_date:
+                log_file = self.get_daily_log_file("access", current_date)
+                date_str = current_date.strftime("%Y-%m-%d")
+                
+                if log_file.exists():
+                    try:
+                        with open(log_file, 'r', encoding='utf-8') as f:
+                            daily_logs = json.load(f)
+                        
+                        # 일별 통계 계산
+                        daily_users = set()
+                        daily_visits = len(daily_logs)
+                        
+                        for log_entry in daily_logs:
+                            user_info = log_entry.get("user", {})
+                            username = user_info.get("username") or user_info.get("display_name")
+                            if username:
+                                daily_users.add(username)
+                        
+                        daily_summary["daily_stats"][date_str] = {
+                            "total_visits": daily_visits,
+                            "unique_users": len(daily_users),
+                            "users": list(daily_users)
+                        }
+                    
+                    except Exception as e:
+                        self.logger.error(f"Error reading log file {log_file}: {str(e)}")
+                else:
+                    # 로그가 없는 날도 기록
+                    daily_summary["daily_stats"][date_str] = {
+                        "total_visits": 0,
+                        "unique_users": 0,
+                        "users": []
+                    }
+                
+                current_date = current_date + timedelta(days=1)
+            
+            return daily_summary
+            
+        except Exception as e:
+            self.logger.error(f"Error getting daily access summary: {str(e)}")
+            return None
+
+    def get_user_daily_activity(self, username, start_date=None, end_date=None):
+        """특정 사용자의 일별 접속 현황"""
+        try:
+            if start_date is None:
+                start_date = datetime.now().replace(day=1)
+            if end_date is None:
+                end_date = datetime.now()
+            
+            user_activity = {
+                "username": username,
+                "period": {
+                    "start": start_date.isoformat(),
+                    "end": end_date.isoformat()
+                },
+                "daily_activity": {}  # 일별 활동
+            }
+            
+            current_date = start_date
+            while current_date <= end_date:
+                log_file = self.get_daily_log_file("access", current_date)
+                date_str = current_date.strftime("%Y-%m-%d")
+                
+                if log_file.exists():
+                    try:
+                        with open(log_file, 'r', encoding='utf-8') as f:
+                            daily_logs = json.load(f)
+                        
+                        # 해당 사용자의 로그만 필터링
+                        user_logs = []
+                        for log_entry in daily_logs:
+                            user_info = log_entry.get("user", {})
+                            log_username = user_info.get("username") or user_info.get("display_name")
+                            if log_username == username:
+                                user_logs.append(log_entry)
+                        
+                        if user_logs:
+                            # 사용자의 일별 활동 계산
+                            first_visit = None
+                            last_visit = None
+                            total_visits = len(user_logs)
+                            
+                            for log_entry in user_logs:
+                                timestamp = log_entry.get("timestamp", "")
+                                if timestamp:
+                                    try:
+                                        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                        if first_visit is None or dt < first_visit:
+                                            first_visit = dt
+                                        if last_visit is None or dt > last_visit:
+                                            last_visit = dt
+                                    except:
+                                        pass
+                            
+                            # 사용 시간 계산 (분 단위)
+                            usage_minutes = 0
+                            if first_visit and last_visit:
+                                usage_minutes = int((last_visit - first_visit).total_seconds() / 60)
+                            
+                            user_activity["daily_activity"][date_str] = {
+                                "total_visits": total_visits,
+                                "first_visit": first_visit.isoformat() if first_visit else None,
+                                "last_visit": last_visit.isoformat() if last_visit else None,
+                                "usage_minutes": usage_minutes
+                            }
+                        else:
+                            # 해당 날짜에 활동이 없음
+                            user_activity["daily_activity"][date_str] = {
+                                "total_visits": 0,
+                                "first_visit": None,
+                                "last_visit": None,
+                                "usage_minutes": 0
+                            }
+                    
+                    except Exception as e:
+                        self.logger.error(f"Error reading log file {log_file}: {str(e)}")
+                else:
+                    # 로그 파일이 없는 날
+                    user_activity["daily_activity"][date_str] = {
+                        "total_visits": 0,
+                        "first_visit": None,
+                        "last_visit": None,
+                        "usage_minutes": 0
+                    }
+                
+                current_date = current_date + timedelta(days=1)
+            
+            return user_activity
+            
+        except Exception as e:
+            self.logger.error(f"Error getting user daily activity: {str(e)}")
+            return None
+
+    def get_date_user_activity(self, target_date):
+        """특정 날짜의 사용자별 접속시간 및 사용시간"""
+        try:
+            log_file = self.get_daily_log_file("access", target_date)
+            
+            if not log_file.exists():
+                return {
+                    "date": target_date.strftime("%Y-%m-%d"),
+                    "users": {}
+                }
+            
+            with open(log_file, 'r', encoding='utf-8') as f:
+                daily_logs = json.load(f)
+            
+            user_activities = {}
+            
+            for log_entry in daily_logs:
+                user_info = log_entry.get("user", {})
+                username = user_info.get("username") or user_info.get("display_name")
+                display_name = user_info.get("display_name")
+                role = user_info.get("role")
+                
+                if username:
+                    if username not in user_activities:
+                        user_activities[username] = {
+                            "display_name": display_name,
+                            "role": role,
+                            "visits": [],
+                            "first_visit": None,
+                            "last_visit": None,
+                            "usage_minutes": 0
+                        }
+                    
+                    timestamp = log_entry.get("timestamp", "")
+                    if timestamp:
+                        try:
+                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            user_activities[username]["visits"].append(dt)
+                            
+                            if user_activities[username]["first_visit"] is None or dt < user_activities[username]["first_visit"]:
+                                user_activities[username]["first_visit"] = dt
+                            if user_activities[username]["last_visit"] is None or dt > user_activities[username]["last_visit"]:
+                                user_activities[username]["last_visit"] = dt
+                        except:
+                            pass
+            
+            # 각 사용자의 사용시간 계산
+            for username, activity in user_activities.items():
+                if activity["first_visit"] and activity["last_visit"]:
+                    activity["usage_minutes"] = int((activity["last_visit"] - activity["first_visit"]).total_seconds() / 60)
+                    activity["first_visit"] = activity["first_visit"].isoformat()
+                    activity["last_visit"] = activity["last_visit"].isoformat()
+                else:
+                    activity["usage_minutes"] = 0
+                    activity["first_visit"] = None
+                    activity["last_visit"] = None
+            
+            return {
+                "date": target_date.strftime("%Y-%m-%d"),
+                "users": user_activities
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting date user activity: {str(e)}")
+            return None
+
 # 전역 로거 인스턴스
 usage_logger = UsageLogger() 

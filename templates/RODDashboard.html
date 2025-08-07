@@ -496,11 +496,25 @@
         </div>
     </div>
 
+    <!-- Unmatched Notes Popup -->
+    <div id="unmatchedNotesPopup" class="popup-overlay" style="display: none;">
+        <div class="popup-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+            <h3>⚠️ Unmatched Progress Notes</h3>
+            <p>The following progress notes could not be matched to any resident:</p>
+            <div id="unmatchedNotesList" style="text-align: left; margin: 15px 0;">
+                <!-- Unmatched notes will be populated here -->
+            </div>
+            <div class="popup-buttons">
+                <button onclick="hideUnmatchedNotesPopup()" class="btn-cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="dashboard-container">
         <!-- Dashboard Header -->
         <div class="dashboard-header">
             <div class="header-info">
-                <h1>Resident of the day</h1>
+                <h1>Resident of the Day</h1>
                 <p>Progress Report System - Administrative Overview</p>
                 <p>Selected Site: <strong>{{ site }}</strong></p>
             </div>
@@ -585,6 +599,9 @@
                         <div style="text-align: center;">
                             <div style="font-size: 1.5em; font-weight: 700; color: var(--accent-color);" id="totalNotesCount">-</div>
                             <div style="font-size: 0.9em; color: #7f8c8d;">Total Notes Found</div>
+                            <button onclick="checkUnmatchedNotes()" style="margin-top: 8px; padding: 6px 12px; background: var(--warning-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: 600;">
+                                🔍 Check Unmatched Progress Notes
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -669,26 +686,26 @@
                         site: currentSite,
                         year: year,
                         month: month,
-                        event_types: []  // 서버에서 동적으로 처리
+                        event_types: []  // Server handles dynamically
                     })
                 });
 
                 if (!rodResponse.ok) {
                     if (rodResponse.status === 401) {
-                        // 세션 만료 시 자동 연장 시도
-                        console.log('세션 만료 감지 - 자동 연장 시도');
+                        // Session expired - try auto extension
+                        console.log('Session expired detected - trying auto extension');
                         const extendResponse = await fetch('/api/extend-session', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' }
                         });
                         
                         if (extendResponse.ok) {
-                            // 연장 성공 시 다시 시도
-                            console.log('세션 연장 성공 - 다시 시도');
+                            // Extension successful - retry
+                            console.log('Session extension successful - retrying');
                             hideLoadingPopup();
                             return loadResidenceStatus();
                         } else {
-                            // 연장 실패 시 로그인 페이지로 이동
+                            // Extension failed - redirect to login page
                             hideLoadingPopup();
                             alert('Session expired. Please login again.');
                             window.location.href = '/';
@@ -703,23 +720,56 @@
                 if (!rodData.success) {
                     throw new Error(rodData.message || 'Failed to load ROD data');
                 }
+                
+                // Store data globally for later use
+                window.lastLoadedRODData = rodData;
+                
+                // Debug: Log the data structure
+                console.log('ROD Data structure:', rodData);
+                console.log('ROD Data keys:', Object.keys(rodData));
+                if (rodData.data) {
+                    console.log('ROD Data.data keys:', Object.keys(rodData.data));
+                }
 
                 // The server returns processed ROD data, so we can display it directly
                 // Create the display structure from the processed data
                 const displayData = {
-                    rodStatus: rodData.data,
+                    rodStatus: rodData.data.residence_status || rodData.data,
                     summary: {
-                        totalResidences: Object.keys(rodData.data).length,
-                        totalRnEnNotes: Object.values(rodData.data).filter(r => r.rn_en_has_note).length,
-                        totalPcaNotes: Object.values(rodData.data).filter(r => r.pca_has_note).length,
-                        totalNotesCount: Object.values(rodData.data).reduce((sum, r) => sum + r.total_count, 0),
-                        completedResidences: Object.values(rodData.data).filter(r => r.rn_en_has_note && r.pca_has_note).length,
-                        overallCompletionRate: Object.values(rodData.data).filter(r => r.rn_en_has_note && r.pca_has_note).length / Object.keys(rodData.data).length * 100
+                        totalResidences: Object.keys(rodData.data.residence_status || rodData.data).length,
+                        totalRnEnNotes: Object.values(rodData.data.residence_status || rodData.data).filter(r => r.rn_en_has_note).length,
+                        totalPcaNotes: Object.values(rodData.data.residence_status || rodData.data).filter(r => r.pca_has_note).length,
+                        totalNotesCount: Object.values(rodData.data.residence_status || rodData.data).reduce((sum, r) => sum + r.total_count, 0),
+                        completedResidences: Object.values(rodData.data.residence_status || rodData.data).filter(r => r.rn_en_has_note && r.pca_has_note).length,
+                        overallCompletionRate: Object.values(rodData.data.residence_status || rodData.data).filter(r => r.rn_en_has_note && r.pca_has_note).length / Object.keys(rodData.data.residence_status || rodData.data).length * 100
                     }
                 };
                 
                 // Display the data
                 displayResidenceStatus(displayData);
+                
+                // Check for unmatched notes and show popup
+                // Handle both possible data structures
+                let unmatchedNotes = null;
+                console.log('Checking for unmatched notes in rodData:', rodData);
+                console.log('rodData.data structure:', rodData.data);
+                
+                if (rodData.data && rodData.data.unmatched_notes) {
+                    unmatchedNotes = rodData.data.unmatched_notes;
+                    console.log('Found unmatched_notes in rodData.data:', unmatchedNotes);
+                } else if (rodData.data && rodData.data.data && rodData.data.data.unmatched_notes) {
+                    unmatchedNotes = rodData.data.data.unmatched_notes;
+                    console.log('Found unmatched_notes in rodData.data.data:', unmatchedNotes);
+                } else {
+                    console.log('No unmatched_notes found in expected locations');
+                }
+                
+                if (unmatchedNotes && unmatchedNotes.length > 0) {
+                    console.log(`Found ${unmatchedNotes.length} unmatched notes`);
+                    showUnmatchedNotesPopup(unmatchedNotes);
+                } else {
+                    console.log('No unmatched notes to display');
+                }
                 
                 // Hide loading popup
                 hideLoadingPopup();
@@ -770,6 +820,86 @@
         function retryLoadData() {
             hideRetryPopup();
             loadResidenceStatus();
+        }
+
+        // Show unmatched notes popup
+        function showUnmatchedNotesPopup(unmatchedNotes) {
+            console.log('showUnmatchedNotesPopup called with:', unmatchedNotes);
+            console.log('Number of unmatched notes:', unmatchedNotes.length);
+            
+            const popup = document.getElementById('unmatchedNotesPopup');
+            const listContainer = document.getElementById('unmatchedNotesList');
+            
+            if (!popup) {
+                console.error('unmatchedNotesPopup element not found');
+                return;
+            }
+            
+            if (!listContainer) {
+                console.error('unmatchedNotesList element not found');
+                return;
+            }
+            
+            // Clear previous content
+            listContainer.innerHTML = '';
+            
+            // Create list of unmatched notes
+            unmatchedNotes.forEach((note, index) => {
+                const noteDiv = document.createElement('div');
+                noteDiv.style.border = '1px solid #ddd';
+                noteDiv.style.padding = '10px';
+                noteDiv.style.margin = '5px 0';
+                noteDiv.style.borderRadius = '5px';
+                noteDiv.style.backgroundColor = '#f9f9f9';
+                
+                noteDiv.innerHTML = `
+                    <strong>Note ID:</strong> ${note.note_id}<br>
+                    <strong>Client ID:</strong> ${note.client_id}<br>
+                    <strong>Event Type:</strong> ${note.event_type}<br>
+                    <strong>Event Date:</strong> ${note.event_date}<br>
+                    <strong>Residence:</strong> ${note.residence_name || 'Unknown'}<br>
+                    <strong>Residence Client ID:</strong> ${note.residence_client_record_id || 'Unknown'}
+                `;
+                
+                listContainer.appendChild(noteDiv);
+            });
+            
+            console.log('Setting popup display to flex');
+            popup.style.display = 'flex';
+            console.log('Popup should now be visible');
+        }
+
+        // Hide unmatched notes popup
+        function hideUnmatchedNotesPopup() {
+            document.getElementById('unmatchedNotesPopup').style.display = 'none';
+        }
+
+        // Check unmatched notes function
+        function checkUnmatchedNotes() {
+            console.log('Checking unmatched notes...');
+            
+            // Get current data from the page
+            const currentData = window.lastLoadedRODData;
+            
+            if (!currentData) {
+                alert('No data available. Please load the status first.');
+                return;
+            }
+            
+            // Find unmatched notes from the current data
+            let unmatchedNotes = null;
+            if (currentData.unmatched_notes) {
+                unmatchedNotes = currentData.unmatched_notes;
+            } else if (currentData.data && currentData.data.unmatched_notes) {
+                unmatchedNotes = currentData.data.unmatched_notes;
+            }
+            
+            if (unmatchedNotes && unmatchedNotes.length > 0) {
+                console.log(`Found ${unmatchedNotes.length} unmatched notes`);
+                showUnmatchedNotesPopup(unmatchedNotes);
+            } else {
+                alert('No unmatched notes found. All notes are properly matched to residents.');
+            }
         }
 
 
