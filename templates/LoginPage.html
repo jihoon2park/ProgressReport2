@@ -199,7 +199,12 @@
         // API server status check function
         function checkServerStatus() {
             fetch('/api/server-status')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     updateStatusDisplay(data);
                     updateLastUpdated();
@@ -230,7 +235,20 @@
             Object.keys(statusData).forEach(site => {
                 const elementId = statusMap[site];
                 const element = document.getElementById(elementId);
+                
+                // Add null check for element
+                if (!element) {
+                    console.warn(`Status element not found: ${elementId}`);
+                    return;
+                }
+                
                 const icon = element.querySelector('.status-icon');
+                
+                // Add null check for icon
+                if (!icon) {
+                    console.warn(`Status icon not found in element: ${elementId}`);
+                    return;
+                }
                 
                 if (statusData[site]) {
                     // Online status
@@ -246,13 +264,36 @@
 
         // Display last updated time
         function updateLastUpdated() {
+            const lastUpdatedElement = document.getElementById('last-updated');
+            if (!lastUpdatedElement) {
+                console.warn('Last updated element not found');
+                return;
+            }
+            
             const now = new Date();
             const timeString = now.toLocaleTimeString();
-            document.getElementById('last-updated').textContent = `Last updated: ${timeString}`;
+            lastUpdatedElement.textContent = `Last updated: ${timeString}`;
         }
 
         // Initial status check on page load
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Login page loaded successfully');
+            
+            // Verify critical elements exist
+            const criticalElements = [
+                'status-parafield',
+                'status-nerrilda', 
+                'status-ramsay',
+                'status-westpark',
+                'status-yankalilla',
+                'last-updated'
+            ];
+            
+            const missingElements = criticalElements.filter(id => !document.getElementById(id));
+            if (missingElements.length > 0) {
+                console.warn('Missing critical elements:', missingElements);
+            }
+            
             // Initial status check
             checkServerStatus();
             
@@ -260,11 +301,20 @@
             setInterval(checkServerStatus, 60000);
         });
 
-                    // Clean up timer when page is hidden (optional)
+        // Clean up timer when page is hidden (optional)
         document.addEventListener('visibilitychange', function() {
             if (document.hidden) {
                 // Can stop checking when page is hidden,
                 // but keep running according to requirements
+            }
+        });
+        
+        // Global error handler to catch any unhandled errors
+        window.addEventListener('error', function(event) {
+            console.error('Global error caught:', event.error);
+            // Don't show alerts for external script errors
+            if (event.filename && !event.filename.includes('contentBundle.js')) {
+                console.log('Application error detected');
             }
         });
     </script>

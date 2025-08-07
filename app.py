@@ -1431,8 +1431,7 @@ def log_viewer():
     """로그 뷰어 페이지"""
     # 관리자만 접근 허용
     if current_user.role != 'admin':
-        flash('Access denied. This page is for administrators only.', 'error')
-        return redirect(url_for('progress_notes'))
+        return redirect(url_for('home'))
     
     # 접속 로그 기록
     user_info = {
@@ -1443,7 +1442,30 @@ def log_viewer():
     }
     usage_logger.log_access(user_info)
     
-    return render_template('LogViewer.html', current_user=current_user)
+    return render_template('LogViewer.html')
+
+@app.route('/log_viewer/progress_notes')
+@login_required
+def progress_note_logs_viewer():
+    """Progress Note Logs 전용 뷰어 페이지"""
+    # 관리자만 접근 허용
+    if current_user.role != 'admin':
+        return redirect(url_for('home'))
+    
+    # URL 파라미터에서 날짜 가져오기
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    # 접속 로그 기록
+    user_info = {
+        "username": current_user.username,
+        "display_name": current_user.display_name,
+        "role": current_user.role,
+        "position": current_user.position
+    }
+    usage_logger.log_access(user_info)
+    
+    return render_template('ProgressNoteLogsViewer.html', start_date=start_date, end_date=end_date)
 
 @app.route('/api/logs/summary')
 @login_required
@@ -1485,6 +1507,198 @@ def get_log_summary():
             'success': False,
             'message': f'Error: {str(e)}'
         }), 500
+
+@app.route('/api/logs/access-hourly-summary')
+@login_required
+def get_access_hourly_summary():
+    """Access log의 시간별 사용자 활동 요약 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str)
+        if end_date_str:
+            end_date = datetime.fromisoformat(end_date_str)
+        
+        hourly_summary = usage_logger.get_access_log_hourly_summary(start_date, end_date)
+        
+        if hourly_summary:
+            return jsonify({
+                'success': True,
+                'summary': hourly_summary
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get access hourly summary'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting access hourly summary: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/logs/daily-access-summary')
+@login_required
+def get_daily_access_summary():
+    """일별 접속 현황 요약"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str)
+        if end_date_str:
+            end_date = datetime.fromisoformat(end_date_str)
+        
+        daily_summary = usage_logger.get_daily_access_summary(start_date, end_date)
+        
+        if daily_summary:
+            return jsonify({
+                'success': True,
+                'summary': daily_summary
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get daily access summary'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting daily access summary: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/logs/user-daily-activity')
+@login_required
+def get_user_daily_activity():
+    """특정 사용자의 일별 접속 현황"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        username = request.args.get('username')
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        if not username:
+            return jsonify({'success': False, 'message': 'Username is required'}), 400
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str)
+        if end_date_str:
+            end_date = datetime.fromisoformat(end_date_str)
+        
+        user_activity = usage_logger.get_user_daily_activity(username, start_date, end_date)
+        
+        if user_activity:
+            return jsonify({
+                'success': True,
+                'activity': user_activity
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get user daily activity'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting user daily activity: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/logs/date-user-activity')
+@login_required
+def get_date_user_activity():
+    """특정 날짜의 사용자별 접속시간 및 사용시간"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        date_str = request.args.get('date')
+        
+        if not date_str:
+            return jsonify({'success': False, 'message': 'Date is required'}), 400
+        
+        target_date = datetime.fromisoformat(date_str)
+        date_activity = usage_logger.get_date_user_activity(target_date)
+        
+        if date_activity:
+            return jsonify({
+                'success': True,
+                'activity': date_activity
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get date user activity'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting date user activity: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/log-rod-debug', methods=['POST'])
+@login_required
+def log_rod_debug():
+    """Log ROD debug information to file instead of console"""
+    try:
+        debug_data = request.get_json()
+        if not debug_data:
+            return jsonify({'success': False, 'message': 'No debug data provided'})
+        
+        # Create logs directory if it doesn't exist
+        logs_dir = os.path.join(os.getcwd(), 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        filename = f'rod_debug_{timestamp}.json'
+        filepath = os.path.join(logs_dir, filename)
+        
+        # Add server timestamp and user info
+        debug_data['server_timestamp'] = datetime.now().isoformat()
+        debug_data['user'] = current_user.username if current_user.is_authenticated else 'Unknown'
+        
+        # Save to file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(debug_data, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"ROD debug log saved to: {filepath}")
+        return jsonify({'success': True, 'message': 'Debug log saved'})
+        
+    except Exception as e:
+        logger.error(f"Error saving ROD debug log: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 @app.route('/api/logs/details')
 @login_required
@@ -1541,39 +1755,6 @@ def get_log_details():
             'success': False,
             'message': f'Error: {str(e)}'
         }), 500
-
-@app.route('/api/log-rod-debug', methods=['POST'])
-@login_required
-def log_rod_debug():
-    """Log ROD debug information to file instead of console"""
-    try:
-        debug_data = request.get_json()
-        if not debug_data:
-            return jsonify({'success': False, 'message': 'No debug data provided'})
-        
-        # Create logs directory if it doesn't exist
-        logs_dir = os.path.join(os.getcwd(), 'logs')
-        os.makedirs(logs_dir, exist_ok=True)
-        
-        # Create filename with timestamp
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-        filename = f'rod_debug_{timestamp}.json'
-        filepath = os.path.join(logs_dir, filename)
-        
-        # Add server timestamp and user info
-        debug_data['server_timestamp'] = datetime.now().isoformat()
-        debug_data['user'] = current_user.username if current_user.is_authenticated else 'Unknown'
-        
-        # Save to file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(debug_data, f, indent=2, ensure_ascii=False)
-        
-        logger.info(f"ROD debug log saved to: {filepath}")
-        return jsonify({'success': True, 'message': 'Debug log saved'})
-        
-    except Exception as e:
-        logger.error(f"Error saving ROD debug log: {str(e)}")
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 
 # ==============================

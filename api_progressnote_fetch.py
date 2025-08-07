@@ -635,16 +635,70 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
         rn_en_notes = []  # RN/EN 노트만 따로 저장
         pca_notes = []    # PCA 노트만 따로 저장
         
-        # RN/EN과 PCA 이벤트 타입 ID를 모두 포함하여 한 번에 가져오기
-        event_type_ids = []
-        if rn_en_id:
-            event_type_ids.append(rn_en_id)
-        if pca_id:
-            event_type_ids.append(pca_id)
+        # 먼저 저장된 파일에서 데이터를 찾아보기
+        logs_dir = os.path.join(os.getcwd(), 'data')
+        timestamp_pattern = f"{year}_{month:02d}"
         
-        if event_type_ids:
-            # 모든 이벤트 타입을 한 번에 가져오기
-            client = ProgressNoteFetchClient(site)
+        # 5월 데이터 파일 찾기 (정확한 패턴 매칭)
+        rn_en_files = [f for f in os.listdir(logs_dir) if f.startswith(f'progress_notes_rn_en_{site}_{timestamp_pattern}_')]
+        pca_files = [f for f in os.listdir(logs_dir) if f.startswith(f'progress_notes_pca_{site}_{timestamp_pattern}_')]
+        
+        logger.info(f"Looking for files with pattern: {timestamp_pattern}")
+        logger.info(f"Site: {site}")
+        logger.info(f"All files in data directory: {[f for f in os.listdir(logs_dir) if 'Parafield' in f and '2025_05' in f]}")
+        logger.info(f"Found RN/EN files: {rn_en_files}")
+        logger.info(f"Found PCA files: {pca_files}")
+        
+        if rn_en_files and pca_files:
+            # 가장 최근 파일 선택
+            rn_en_files.sort(reverse=True)
+            pca_files.sort(reverse=True)
+            
+            try:
+                # RN/EN 노트 로드
+                rn_en_filepath = os.path.join(logs_dir, rn_en_files[0])
+                with open(rn_en_filepath, 'r', encoding='utf-8') as f:
+                    rn_en_notes = json.load(f)
+                logger.info(f"Loaded {len(rn_en_notes)} RN/EN notes from file: {rn_en_files[0]}")
+                
+                # PCA 노트 로드
+                pca_filepath = os.path.join(logs_dir, pca_files[0])
+                with open(pca_filepath, 'r', encoding='utf-8') as f:
+                    pca_notes = json.load(f)
+                logger.info(f"Loaded {len(pca_notes)} PCA notes from file: {pca_files[0]}")
+                
+                # 모든 노트 합치기
+                all_resident_notes = rn_en_notes + pca_notes
+                
+                # 노트를 타입별로 분류
+                for note in rn_en_notes:
+                    event_type_mapping[note.get('Id')] = "RN/EN"
+                for note in pca_notes:
+                    event_type_mapping[note.get('Id')] = "PCA"
+                
+                logger.info(f"Successfully loaded {len(all_resident_notes)} notes from saved files")
+                
+            except Exception as e:
+                logger.error(f"Failed to load notes from files: {str(e)}")
+                # 파일 로드 실패 시 API에서 가져오기
+                all_resident_notes = []
+                rn_en_notes = []
+                pca_notes = []
+        else:
+            logger.info(f"No saved files found for {site} {year}/{month}, fetching from API")
+        
+        # 저장된 파일이 없거나 로드 실패한 경우 API에서 가져오기
+        if not all_resident_notes:
+            # RN/EN과 PCA 이벤트 타입 ID를 모두 포함하여 한 번에 가져오기
+            event_type_ids = []
+            if rn_en_id:
+                event_type_ids.append(rn_en_id)
+            if pca_id:
+                event_type_ids.append(pca_id)
+            
+            if event_type_ids:
+                # 모든 이벤트 타입을 한 번에 가져오기
+                client = ProgressNoteFetchClient(site)
             
             # 날짜 범위를 조금 더 넓게 설정 (전후 1일 포함)
             extended_start_date = start_date - timedelta(days=1)
@@ -731,15 +785,12 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
         
         # 5. Residence별로 노트 매칭 및 상태 생성
         residence_status = {}
+        unmatched_notes = []  # 매칭 실패한 노트 추적
         
         # 클라이언트 데이터 구조 확인 및 처리
-        logger.info(f"Client data type: {type(client_data)}")
         if isinstance(client_data, dict):
-            logger.info(f"Client data keys: {list(client_data.keys())}")
-            # 딕셔너리인 경우 values()를 사용
             client_list = list(client_data.values()) if client_data else []
         elif isinstance(client_data, list):
-            logger.info(f"Client data length: {len(client_data)}")
             client_list = client_data
         else:
             logger.error(f"Unexpected client data type: {type(client_data)}")
@@ -747,11 +798,8 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
         
         logger.info(f"Processing {len(client_list)} clients")
         
-        # 클라이언트 데이터 구조 확인
-        if client_list:
-            logger.info(f"First client sample: {client_list[0]}")
-            logger.info(f"First client keys: {list(client_list[0].keys()) if isinstance(client_list[0], dict) else 'Not a dict'}")
-        
+        # 먼저 모든 residence의 ClientRecordId를 수집
+        residence_client_mapping = {}
         for residence in client_list:
             if isinstance(residence, dict):
                 first_name = residence.get('FirstName', '')
@@ -773,42 +821,24 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                 # Residence의 ClientRecordId 찾기 (실시간 API 데이터에서는 다른 필드명 사용)
                 residence_client_record_id = residence.get('ClientRecordId') or residence.get('Id') or residence.get('ClientId')
                 
-                # 디버깅: Barrie McAskill 케이스 특별 로깅
-                if 'Barrie' in residence_name or 'McAskill' in residence_name:
-                    logger.info(f"=== Barrie McAskill Debug ===")
-                    logger.info(f"Residence Name: {residence_name}")
-                    logger.info(f"ClientRecordId: {residence_client_record_id}")
-                    logger.info(f"All residence fields: {list(residence.keys())}")
-                    logger.info(f"Available fields: {list(residence.keys())}")
+                # Residence 이름과 ClientRecordId 매핑 저장
+                residence_client_mapping[residence_name] = residence_client_record_id
                 
                 # 모든 resident를 화면에 표시 (노트가 없어도 표시)
                 residence_notes = []
                 
                 if residence_client_record_id:
-                    # 해당 Residence의 노트 찾기
+                    # 해당 Residence의 노트 찾기 (매칭된 노트만)
                     for note in all_resident_notes:
-                        note_client_id = note.get('ClientId')  # Progress Note의 ClientId 확인
-                        
-                        # 디버깅: Barrie McAskill 케이스 특별 로깅
-                        if 'Barrie' in residence_name or 'McAskill' in residence_name:
-                            logger.info(f"Checking note ClientId: {note_client_id} vs residence ClientRecordId: {residence_client_record_id}")
+                        note_client_id = note.get('ClientId')
                         
                         # 매칭 로직: ClientRecordId로만 매칭
                         if note_client_id == residence_client_record_id:
                             residence_notes.append(note)
-                            # 디버깅: 매칭 성공 로그
-                            if 'Barrie' in residence_name or 'McAskill' in residence_name:
-                                logger.info(f"✅ MATCH FOUND for {residence_name}: Note ID {note.get('Id')} via ClientRecordId")
-                        else:
-                            # 디버깅: 매칭 실패 로그
-                            if 'Barrie' in residence_name or 'McAskill' in residence_name:
-                                logger.info(f"❌ NO MATCH for {residence_name}: Note ClientId {note_client_id} != Residence ClientRecordId {residence_client_record_id}")
                 
-                # 디버깅: Barrie McAskill 케이스 결과
-                if 'Barrie' in residence_name or 'McAskill' in residence_name:
-                    logger.info(f"Total notes found for {residence_name}: {len(residence_notes)}")
-                    for note in residence_notes:
-                        logger.info(f"  - Note ID: {note.get('Id')}, EventType: {note.get('ProgressNoteEventType', {}).get('Description', 'N/A')}")
+                # 노트가 없어도 residence_status에 추가 (모든 residence 표시)
+                
+
                 
                 # Residence별 상태 생성 (노트가 없어도 생성)
                 rn_en_has_note = False
@@ -856,6 +886,39 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                     'pca_authors': pca_authors
                 }
         
+        # 매칭되지 않은 노트 계산 (효율적인 방법)
+        matched_note_ids = set()
+        
+        logger.info(f"Total notes to process: {len(all_resident_notes)}")
+        logger.info(f"Total residences available: {len(residence_client_mapping)}")
+        
+        # 각 노트가 어떤 residence와 매칭되는지 확인
+        for note in all_resident_notes:
+            note_client_id = note.get('ClientId')
+            note_matched = False
+            
+            # 모든 residence의 ClientRecordId와 비교
+            for residence_name, residence_client_record_id in residence_client_mapping.items():
+                if residence_client_record_id and note_client_id == residence_client_record_id:
+                    matched_note_ids.add(note.get('Id'))
+                    note_matched = True
+                    break
+            
+            # 매칭되지 않은 노트 추가
+            if not note_matched:
+                unmatched_note_info = {
+                    'note_id': note.get('Id'),
+                    'client_id': note_client_id,
+                    'event_type': note.get('ProgressNoteEventType', {}).get('Description', 'Unknown'),
+                    'event_date': note.get('EventDate', 'Unknown'),
+                    'residence_name': 'Unknown',
+                    'residence_client_record_id': 'Unknown'
+                }
+                unmatched_notes.append(unmatched_note_info)
+        
+        logger.info(f"Matched notes: {len(matched_note_ids)}")
+        logger.info(f"Unmatched notes: {len(unmatched_notes)}")
+        
         # Save debug info to file
         try:
             logs_dir = os.path.join(os.getcwd(), 'logs')
@@ -869,12 +932,61 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
         except Exception as e:
             logger.error(f"Failed to save ROD processing debug log: {str(e)}")
         
-        logger.info(f"ROD processing completed for {site}: {len(residence_status)} residences")
-        logger.info(f"Residence status keys: {list(residence_status.keys())}")
+        # 매칭 실패한 노트 중복 제거
+        unique_unmatched_notes = []
+        seen_notes = set()
+        for note in unmatched_notes:
+            note_key = f"{note['note_id']}_{note['client_id']}"
+            if note_key not in seen_notes:
+                unique_unmatched_notes.append(note)
+                seen_notes.add(note_key)
+        
+        # 매칭되지 않은 노트를 JSON 파일로 저장
+        if unique_unmatched_notes:
+            try:
+                logs_dir = os.path.join(os.getcwd(), 'data')
+                os.makedirs(logs_dir, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                
+                unmatched_filename = f'unmatched_notes_{site}_{year}_{month:02d}_{timestamp}.json'
+                unmatched_filepath = os.path.join(logs_dir, unmatched_filename)
+                
+                unmatched_data = {
+                    'site': site,
+                    'year': year,
+                    'month': month,
+                    'timestamp': datetime.now().isoformat(),
+                    'total_notes': len(all_resident_notes),
+                    'matched_notes': len(matched_note_ids),
+                    'unmatched_notes_count': len(unique_unmatched_notes),
+                    'unmatched_notes': unique_unmatched_notes,
+                    'summary': {
+                        'total_residences': len(residence_client_mapping),
+                        'available_client_ids': list(residence_client_mapping.values()),
+                        'unmatched_client_ids': list(set([note['client_id'] for note in unique_unmatched_notes]))
+                    }
+                }
+                
+                with open(unmatched_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(unmatched_data, f, indent=2, ensure_ascii=False)
+                
+                logger.info(f"Saved {len(unique_unmatched_notes)} unmatched notes to: {unmatched_filename}")
+                
+            except Exception as e:
+                logger.error(f"Failed to save unmatched notes to file: {str(e)}")
+        else:
+            logger.info("No unmatched notes found")
+        
+        logger.info(f"ROD processing completed for {site}: {len(residence_status)} residences, {len(unique_unmatched_notes)} unmatched notes")
         if len(residence_status) == 0:
             logger.warning("No residences found in residence_status!")
-            logger.info(f"Client data sample: {client_list[:2] if client_list else 'No client data'}")
-        return residence_status
+        
+        # residence_status에 unmatched_notes 정보 추가
+        result = {
+            'residence_status': residence_status,
+            'unmatched_notes': unique_unmatched_notes
+        }
+        return result
         
     except Exception as e:
         logger.error(f"Error in fetch_residence_of_day_notes_with_client_data: {str(e)}")
