@@ -2,6 +2,7 @@ import json
 import os
 import requests
 from typing import Dict, Any
+import logging
 
 # 테스트용 설정
 SITE_SERVERS = {
@@ -14,6 +15,8 @@ API_HEADERS = {
     'Content-Type': 'application/json'
     # 필요한 경우 인증 헤더 등 추가
 }
+
+logger = logging.getLogger(__name__)
 
 class APIClient:
     def __init__(self, site: str):
@@ -28,8 +31,8 @@ class APIClient:
 
     def get_client_information(self) -> Dict[str, Any]:
         """
-        클라이언트 정보를 가져오고 캐시하는 함수
-        먼저 API를 호출하고, 실패하면 캐시된 데이터를 반환
+        클라이언트 정보를 가져오는 함수
+        캐시 사용 안함 - API 실패시 에러 발생
         """
         try:
             endpoint = f"{self.base_url}/api/client"
@@ -37,16 +40,14 @@ class APIClient:
             response.raise_for_status()
             client_data = response.json()
             
-            # 성공적으로 가져왔다면 캐시에 저장
+            # 성공적으로 가져왔다면 캐시에 저장 (읽기 전용 백업용)
             self._cache_client_data(client_data)
             return client_data
             
         except requests.RequestException as e:
-            # API 호출 실패시 캐시된 데이터 반환 시도
-            cached_data = self._load_cached_client_data()
-            if cached_data:
-                return cached_data
-            raise e  # 캐시된 데이터도 없다면 에러 발생
+            # API 호출 실패시 에러 발생 (캐시 사용 안함)
+            logger.error(f"API 호출 실패: {str(e)}")
+            raise e  # 캐시된 데이터 사용 안함, 에러 발생
 
     def _cache_client_data(self, data: Dict[str, Any]) -> None:
         """클라이언트 데이터를 파일에 캐시"""
@@ -77,15 +78,10 @@ def test_api_client():
         
     except requests.RequestException as e:
         print("API 호출 실패:", str(e))
-        # 캐시된 데이터 확인
-        try:
-            cached_data = client._load_cached_client_data()
-            if cached_data:
-                print("캐시된 데이터 로드 성공:", cached_data)
-            else:
-                print("캐시된 데이터 없음")
-        except Exception as cache_error:
-            print("캐시 로드 실패:", str(cache_error))
+        print("캐시 사용 안함 - 에러 발생")
+        
+    except Exception as e:
+        print("예상치 못한 오류:", str(e))
 
 if __name__ == "__main__":
     test_api_client()

@@ -452,7 +452,67 @@ async function fetchAndSaveProgressNotes(eventTypes = null) {
         }
     } catch (error) {
         console.error('Failed to fetch Progress Notes:', error);
+        
+        // 사용자에게 에러 메시지 표시
+        const errorMessage = `데이터 가져오기 실패: ${error.message}`;
+        showErrorMessage(errorMessage);
+        
+        // 에러 로그를 서버로 전송 (선택사항)
+        try {
+            await fetch('/api/log-rod-debug', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    error: 'Progress Notes fetch failed',
+                    message: error.message,
+                    site: currentSite,
+                    timestamp: new Date().toISOString()
+                })
+            });
+        } catch (logError) {
+            console.error('Failed to log error to server:', logError);
+        }
     }
+}
+
+// 에러 메시지 표시 함수
+function showErrorMessage(message) {
+    // 기존 에러 메시지 제거
+    const existingError = document.querySelector('.error-message');
+    if (existingError) {
+        existingError.remove();
+    }
+    
+    // 새 에러 메시지 생성
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ff4444;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        z-index: 1000;
+        max-width: 400px;
+        word-wrap: break-word;
+    `;
+    errorDiv.innerHTML = `
+        <strong>오류 발생</strong><br>
+        ${message}<br>
+        <small>자동으로 사라집니다</small>
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    // 10초 후 자동 제거
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.remove();
+        }
+    }, 10000);
 }
 
 // 수동 새로고침 함수
