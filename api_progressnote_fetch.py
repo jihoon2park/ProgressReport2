@@ -142,6 +142,16 @@ class ProgressNoteFetchClient:
                 return True, data
             else:
                 logger.error(f"API request failed: {response.status_code} - {response.text}")
+                # API 실패시 상세한 에러 정보 제공
+                error_details = {
+                    'status_code': response.status_code,
+                    'response_text': response.text,
+                    'api_url': self.api_url,
+                    'params': params,
+                    'site': self.site,
+                    'timestamp': datetime.now().isoformat()
+                }
+                logger.error(f"API 실패 상세 정보: {error_details}")
                 return False, None
                 
         except requests.exceptions.Timeout:

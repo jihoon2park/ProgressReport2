@@ -49,9 +49,29 @@ def get_flask_config():
     
     return config
 
+def get_cache_policy():
+    """캐시 사용 정책 설정"""
+    environment = get_environment()
+    
+    if environment == 'production':
+        return {
+            'use_cache_on_failure': False,  # 서버에서는 캐시 사용 안함
+            'cache_expiry_hours': 1,        # 캐시 만료 시간 짧게
+            'force_api_refresh': True,      # 강제 API 새로고침
+            'cleanup_data_on_login': True   # 로그인시 data 폴더 정리
+        }
+    else:
+        return {
+            'use_cache_on_failure': False,  # 로컬에서도 캐시 사용 안함 (일관성)
+            'cache_expiry_hours': 1,        # 캐시 만료 시간 짧게
+            'force_api_refresh': True,      # 강제 API 새로고침
+            'cleanup_data_on_login': True   # 로그인시 data 폴더 정리
+        }
+
 def print_current_config():
     """현재 설정을 출력 (디버깅용)"""
     config = get_flask_config()
+    cache_policy = get_cache_policy()
     environment = get_environment()
     
     print(f"\n=== 현재 환경: {environment.upper()} ===")
@@ -61,4 +81,9 @@ def print_current_config():
     print(f"PORT: {config['PORT']}")
     print(f"LOG_LEVEL: {config['LOG_LEVEL']}")
     print(f"API_TIMEOUT: {config['API_TIMEOUT']}")
+    print(f"캐시 사용 정책:")
+    print(f"  - API 실패시 캐시 사용: {cache_policy['use_cache_on_failure']}")
+    print(f"  - 캐시 만료 시간: {cache_policy['cache_expiry_hours']}시간")
+    print(f"  - 강제 API 새로고침: {cache_policy['force_api_refresh']}")
+    print(f"  - 로그인시 data 폴더 정리: {cache_policy['cleanup_data_on_login']}")
     print("=" * 50) 

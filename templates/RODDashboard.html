@@ -783,8 +783,13 @@
                     month: month,
                     year: year
                 });
+                
+                // 사용자에게 더 명확한 에러 메시지 표시
+                const errorMessage = `데이터 로드 실패: ${error.message}`;
+                showDetailedErrorMessage(errorMessage, error);
+                
                 hideLoadingPopup();
-                showRetryPopup(error.message);
+                showRetryPopup(errorMessage);
             }
         }
 
@@ -1211,6 +1216,55 @@
             alert(details);
         }
 
+        // 상세 에러 메시지 표시 함수
+        function showDetailedErrorMessage(message, error) {
+            // 기존 에러 메시지 제거
+            const existingError = document.querySelector('.detailed-error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            // 새 에러 메시지 생성
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'detailed-error-message';
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #ff4444;
+                color: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                z-index: 1000;
+                max-width: 500px;
+                word-wrap: break-word;
+                font-family: Arial, sans-serif;
+            `;
+            
+            const errorDetails = error.stack ? error.stack.split('\n').slice(0, 3).join('<br>') : 'No stack trace available';
+            
+            errorDiv.innerHTML = `
+                <strong>🚨 ROD Dashboard 오류</strong><br><br>
+                <strong>메시지:</strong> ${message}<br><br>
+                <strong>사이트:</strong> ${currentSite}<br>
+                <strong>기간:</strong> ${year}년 ${month}월<br><br>
+                <strong>상세 정보:</strong><br>
+                <small style="font-family: monospace; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 3px;">
+                    ${errorDetails}
+                </small><br><br>
+                <small>자동으로 사라집니다</small>
+            `;
+            
+            document.body.appendChild(errorDiv);
+            
+            // 15초 후 자동 제거
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 15000);
+        }
     </script>
 </body>
 </html> 

@@ -29,7 +29,7 @@ from api_carearea import APICareArea
 from api_eventtype import APIEventType
 from config import SITE_SERVERS, API_HEADERS
 from config_users import authenticate_user, get_user
-from config_env import get_flask_config, print_current_config
+from config_env import get_flask_config, print_current_config, get_cache_policy
 from models import load_user, User
 from usage_logger import usage_logger
 
@@ -604,6 +604,17 @@ def login():
                         "position": user_info.get('position', 'unknown')
                     }
                     usage_logger.log_access(success_user_info)
+                    
+                    # Data 폴더 정리 (캐시된 JSON 파일 제거)
+                    cache_policy = get_cache_policy()
+                    if cache_policy['cleanup_data_on_login']:
+                        cleanup_success = cleanup_data_folder()
+                        if cleanup_success:
+                            logger.info("Data 폴더 정리 성공")
+                        else:
+                            logger.warning("Data 폴더 정리 실패")
+                    else:
+                        logger.info("캐시 정책에 따라 Data 폴더 정리 건너뜀")
                     
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
@@ -1756,6 +1767,41 @@ def get_log_details():
             'message': f'Error: {str(e)}'
         }), 500
 
+# 로그인 성공 후 data 폴더 정리 함수 추가
+def cleanup_data_folder():
+    """로그인시 data 폴더의 JSON 파일들을 정리합니다."""
+    try:
+        data_dir = os.path.join(app.root_path, 'data')
+        if os.path.exists(data_dir):
+            # JSON 파일들만 찾기
+            json_files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
+            
+            if json_files:
+                logger.info(f"Data 폴더 정리 시작 - {len(json_files)}개 JSON 파일 삭제")
+                
+                # JSON 파일들을 직접 삭제
+                deleted_count = 0
+                for json_file in json_files:
+                    try:
+                        file_path = os.path.join(data_dir, json_file)
+                        os.remove(file_path)
+                        deleted_count += 1
+                        logger.info(f"JSON 파일 삭제: {json_file}")
+                    except Exception as e:
+                        logger.error(f"JSON 파일 삭제 실패 {json_file}: {str(e)}")
+                
+                logger.info(f"Data 폴더 정리 완료 - {deleted_count}/{len(json_files)}개 파일 삭제")
+                return True
+            else:
+                logger.info("Data 폴더에 JSON 파일이 없음")
+                return True
+        else:
+            logger.warning("Data 폴더가 존재하지 않음")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Data 폴더 정리 중 오류 발생: {str(e)}")
+        return False
 
 # ==============================
 # 앱 실행
