@@ -471,6 +471,22 @@
         .btn-retry:hover {
             background: #2980b9;
         }
+
+        .btn-agree {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-agree:hover {
+            background: #229954;
+        }
     </style>
 </head>
 <body>
@@ -506,6 +522,20 @@
             </div>
             <div class="popup-buttons">
                 <button onclick="hideUnmatchedNotesPopup()" class="btn-cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reference Information Popup -->
+    <div id="referencePopup" class="popup-overlay" style="display: none;">
+        <div class="popup-content" style="max-width: 500px; text-align: center;">
+            <h3>⚠️ Important Notice</h3>
+            <p style="font-size: 16px; line-height: 1.6; margin: 20px 0; color: #2c3e50;">
+                Caution: This information is provided strictly for reference.<br><br>
+                To ensure accuracy and prevent errors, please be advised that all final decisions should be made based on Manad Plus.
+            </p>
+            <div class="popup-buttons">
+                <button onclick="hideReferencePopup()" class="btn-agree">Agree</button>
             </div>
         </div>
     </div>
@@ -657,6 +687,9 @@
             
             // Set year dropdown to current year
             document.getElementById('yearSelect').value = currentYear;
+            
+            // Show reference popup on page load
+            showReferencePopup();
             
             // Auto-load current month status
             loadResidenceStatus();
@@ -1214,6 +1247,26 @@
             }
             
             alert(details);
+        }
+
+        // Show reference popup
+        function showReferencePopup() {
+            // Check if user has already agreed today
+            const today = new Date().toDateString();
+            const hasAgreedToday = sessionStorage.getItem('rodReferenceAgreed') === today;
+            
+            if (!hasAgreedToday) {
+                document.getElementById('referencePopup').style.display = 'flex';
+            }
+        }
+
+        // Hide reference popup
+        function hideReferencePopup() {
+            document.getElementById('referencePopup').style.display = 'none';
+            
+            // Record that user has agreed today
+            const today = new Date().toDateString();
+            sessionStorage.setItem('rodReferenceAgreed', today);
         }
 
         // 상세 에러 메시지 표시 함수
