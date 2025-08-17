@@ -565,6 +565,18 @@ def login():
                     flash(f'You are not allowed to access {site}.', 'error')
                     return redirect(url_for('home'))
 
+                # 1. Data 폴더 정리를 먼저 실행 (기존 파일들 삭제)
+                cache_policy = get_cache_policy()
+                if cache_policy['cleanup_data_on_login']:
+                    cleanup_success = cleanup_data_folder()
+                    if cleanup_success:
+                        logger.info("Data 폴더 정리 성공 - 기존 파일들 삭제됨")
+                    else:
+                        logger.warning("Data 폴더 정리 실패")
+                else:
+                    logger.info("캐시 정책에 따라 Data 폴더 정리 건너뜀")
+
+                # 2. API 호출 (새로운 데이터 가져오기)
                 # 클라이언트 정보 가져오기 (실패해도 로그인 진행)
                 client_success, client_info = fetch_client_information(site)
                 
@@ -574,13 +586,17 @@ def login():
                 # Event Type 정보 가져오기 (실패해도 로그인 진행)
                 event_type_success, event_type_info = fetch_event_type_information(site)
                 
+                # 3. 파일 저장 (새로운 JSON 파일들 생성)
                 # API 서버 연결 실패 시에도 로그인 허용
                 try:
                     if client_info:  # client_info가 있을 때만 저장
                         filename = save_client_data(username, site, client_info)
                         session['current_file'] = filename
+                        logger.info(f"클라이언트 데이터 저장 완료: {filename}")
+                    else:
+                        logger.warning("클라이언트 정보가 없어 저장하지 않음")
                     
-                    # Flask-Login을 사용한 로그인 처리
+                    # 4. Flask-Login을 사용한 로그인 처리
                     user = User(username, user_info)
                     login_user(user, remember=False)  # 브라우저 닫으면 세션 만료
                     session.permanent = False
@@ -605,17 +621,6 @@ def login():
                     }
                     usage_logger.log_access(success_user_info)
                     
-                    # Data 폴더 정리 (캐시된 JSON 파일 제거)
-                    cache_policy = get_cache_policy()
-                    if cache_policy['cleanup_data_on_login']:
-                        cleanup_success = cleanup_data_folder()
-                        if cleanup_success:
-                            logger.info("Data 폴더 정리 성공")
-                        else:
-                            logger.warning("Data 폴더 정리 실패")
-                    else:
-                        logger.info("캐시 정책에 따라 Data 폴더 정리 건너뜀")
-                    
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
                     logger.info(f"로그인 사용자명 확인: {username} -> {username_upper}")
@@ -625,10 +630,11 @@ def login():
                     else:
                         logger.info(f"로그인 성공 - 일반 사용자, progress_notes로 리다이렉트")
                         return redirect(url_for('progress_notes', site=site))
+                        
                 except Exception as e:
                     logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
                     flash('Error occurred while saving data.', 'error')
-                    
+                    return redirect(url_for('home'))
             except Exception as e:
                 logger.error(f"API 호출 중 오류 발생: {str(e)}")
                 # API 오류 시에도 로그인 허용
@@ -1769,31 +1775,52 @@ def get_log_details():
 
 # 로그인 성공 후 data 폴더 정리 함수 추가
 def cleanup_data_folder():
-    """로그인시 data 폴더의 JSON 파일들을 정리합니다."""
+    """로그인시 data 폴더의 progress note 관련 JSON 파일들을 정리합니다."""
     try:
         data_dir = os.path.join(app.root_path, 'data')
         if os.path.exists(data_dir):
-            # JSON 파일들만 찾기
-            json_files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
+            # JSON 파일들 중 progress note 관련 파일만 찾기 (client 데이터는 보존)
+            all_json_files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
             
-            if json_files:
-                logger.info(f"Data 폴더 정리 시작 - {len(json_files)}개 JSON 파일 삭제")
+            # 보존할 파일들 (client 데이터)
+            preserve_files = [
+                'Client_list.json',
+                'carearea.json', 
+                'eventtype.json'
+            ]
+            
+            # 사이트별 client 파일도 보존
+            from config import SITE_SERVERS
+            for site in SITE_SERVERS.keys():
+                site_name = site.replace(' ', '_').lower()
+                preserve_files.append(f"{site_name}_client.json")
+            
+            # 삭제할 파일들 (progress note 관련)
+            files_to_delete = []
+            for json_file in all_json_files:
+                if json_file not in preserve_files and not json_file.startswith('prepare_send'):
+                    files_to_delete.append(json_file)
+            
+            if files_to_delete:
+                logger.info(f"Data 폴더 정리 시작 - {len(files_to_delete)}개 progress note JSON 파일 삭제")
+                logger.info(f"보존할 파일들: {preserve_files}")
+                logger.info(f"삭제할 파일들: {files_to_delete}")
                 
-                # JSON 파일들을 직접 삭제
+                # progress note 관련 JSON 파일들을 직접 삭제
                 deleted_count = 0
-                for json_file in json_files:
+                for json_file in files_to_delete:
                     try:
                         file_path = os.path.join(data_dir, json_file)
                         os.remove(file_path)
                         deleted_count += 1
-                        logger.info(f"JSON 파일 삭제: {json_file}")
+                        logger.info(f"Progress note JSON 파일 삭제: {json_file}")
                     except Exception as e:
-                        logger.error(f"JSON 파일 삭제 실패 {json_file}: {str(e)}")
+                        logger.error(f"Progress note JSON 파일 삭제 실패 {json_file}: {str(e)}")
                 
-                logger.info(f"Data 폴더 정리 완료 - {deleted_count}/{len(json_files)}개 파일 삭제")
+                logger.info(f"Data 폴더 정리 완료 - {deleted_count}/{len(files_to_delete)}개 progress note 파일 삭제")
                 return True
             else:
-                logger.info("Data 폴더에 JSON 파일이 없음")
+                logger.info("삭제할 progress note JSON 파일이 없음")
                 return True
         else:
             logger.warning("Data 폴더가 존재하지 않음")
