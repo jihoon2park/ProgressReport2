@@ -1251,22 +1251,13 @@
 
         // Show reference popup
         function showReferencePopup() {
-            // Check if user has already agreed today
-            const today = new Date().toDateString();
-            const hasAgreedToday = sessionStorage.getItem('rodReferenceAgreed') === today;
-            
-            if (!hasAgreedToday) {
-                document.getElementById('referencePopup').style.display = 'flex';
-            }
+            // Always show popup on page load (every login)
+            document.getElementById('referencePopup').style.display = 'flex';
         }
 
         // Hide reference popup
         function hideReferencePopup() {
             document.getElementById('referencePopup').style.display = 'none';
-            
-            // Record that user has agreed today
-            const today = new Date().toDateString();
-            sessionStorage.setItem('rodReferenceAgreed', today);
         }
 
         // 상세 에러 메시지 표시 함수
