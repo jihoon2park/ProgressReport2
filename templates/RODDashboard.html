@@ -677,6 +677,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('ROD Dashboard initialized');
             
+            // Check if popup element exists
+            const popupElement = document.getElementById('referencePopup');
+            console.log('DOMContentLoaded - Popup element check:', popupElement);
+            
+            if (popupElement) {
+                console.log('Initial popup display style:', popupElement.style.display);
+                console.log('Initial popup computed style:', window.getComputedStyle(popupElement).display);
+            }
+            
             // Set current month and year based on today's date
             const now = new Date();
             const currentMonth = now.getMonth() + 1;
@@ -689,6 +698,7 @@
             document.getElementById('yearSelect').value = currentYear;
             
             // Show reference popup on page load
+            console.log('About to call showReferencePopup...');
             showReferencePopup();
             
             // Auto-load current month status
@@ -1251,8 +1261,23 @@
 
         // Show reference popup
         function showReferencePopup() {
-            // Always show popup on page load (every login)
-            document.getElementById('referencePopup').style.display = 'flex';
+            console.log('showReferencePopup called');
+            
+            const popupElement = document.getElementById('referencePopup');
+            if (!popupElement) {
+                console.error('Reference popup element not found!');
+                return;
+            }
+            
+            console.log('Popup element found, setting display to flex');
+            popupElement.style.display = 'flex';
+            
+            // Verify the change
+            setTimeout(() => {
+                console.log('Popup display style after change:', popupElement.style.display);
+                console.log('Popup computed style:', window.getComputedStyle(popupElement).display);
+                console.log('Popup visibility:', popupElement.style.display === 'flex');
+            }, 100);
         }
 
         // Hide reference popup
