@@ -40,9 +40,7 @@ venv.bak/
 data/
 *.json
 data/*.json
-data/**/*.json
-
-# 데이터베이스 파일 (프로덕션에서는 자동 생성)
+data/**/*.jso# 데이터베이스 파일 (프로덕션에서는 자동 생성)
 *.db
 *.sqlite
 *.sqlite3
