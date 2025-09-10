@@ -69,18 +69,59 @@ logging.basicConfig(
     level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        # 콘솔 출력
+        # 콘솔 출력 (개발 환경에서만)
         logging.StreamHandler(),
-        # 파일 출력 (최대 10MB, 5개 파일 로테이션)
+        # 파일 출력 (최대 50MB, 10개 파일 로테이션) - 운영 서버용
         logging.handlers.RotatingFileHandler(
             f'{log_dir}/app.log',
-            maxBytes=10*1024*1024,  # 10MB
-            backupCount=5,
+            maxBytes=50*1024*1024,  # 50MB
+            backupCount=10,
             encoding='utf-8'
         )
     ]
 )
 logger = logging.getLogger(__name__)
+
+# 운영 서버용 추가 로깅 설정
+def setup_production_logging():
+    """운영 서버용 로깅 설정"""
+    try:
+        # 에러 전용 로그 파일
+        error_handler = logging.handlers.RotatingFileHandler(
+            f'{log_dir}/error.log',
+            maxBytes=20*1024*1024,  # 20MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        
+        # 액세스 로그 파일
+        access_handler = logging.handlers.RotatingFileHandler(
+            f'{log_dir}/access.log',
+            maxBytes=30*1024*1024,  # 30MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+        access_handler.setLevel(logging.INFO)
+        access_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(message)s'
+        ))
+        
+        # 루트 로거에 핸들러 추가
+        root_logger = logging.getLogger()
+        root_logger.addHandler(error_handler)
+        root_logger.addHandler(access_handler)
+        
+        logger.info("운영 서버용 로깅 설정 완료")
+        
+    except Exception as e:
+        logger.error(f"로깅 설정 중 오류: {str(e)}")
+
+# 운영 서버용 로깅 설정 적용
+setup_production_logging()
 
 # 현재 설정 출력
 print_current_config()
@@ -2102,6 +2143,96 @@ def get_log_details():
             'success': False,
             'message': f'Error: {str(e)}'
         }), 500
+
+@app.route('/api/logs/app-log')
+@login_required
+def get_app_log():
+    """app.log 파일 내용 조회 (운영 서버용)"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        log_file = os.path.join(os.getcwd(), 'logs', 'app.log')
+        
+        if not os.path.exists(log_file):
+            return jsonify({'success': False, 'message': 'app.log file not found'}), 404
+        
+        # 최근 1000줄만 읽기 (성능 최적화)
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            recent_lines = lines[-1000:] if len(lines) > 1000 else lines
+        
+        return jsonify({
+            'success': True,
+            'logs': ''.join(recent_lines),
+            'total_lines': len(lines),
+            'showing_lines': len(recent_lines)
+        })
+        
+    except Exception as e:
+        logger.error(f"app.log 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/logs/error-log')
+@login_required
+def get_error_log():
+    """error.log 파일 내용 조회 (운영 서버용)"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        log_file = os.path.join(os.getcwd(), 'logs', 'error.log')
+        
+        if not os.path.exists(log_file):
+            return jsonify({'success': False, 'message': 'error.log file not found'}), 404
+        
+        # 최근 500줄만 읽기
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            recent_lines = lines[-500:] if len(lines) > 500 else lines
+        
+        return jsonify({
+            'success': True,
+            'logs': ''.join(recent_lines),
+            'total_lines': len(lines),
+            'showing_lines': len(recent_lines)
+        })
+        
+    except Exception as e:
+        logger.error(f"error.log 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/logs/access-log')
+@login_required
+def get_access_log():
+    """access.log 파일 내용 조회 (운영 서버용)"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        log_file = os.path.join(os.getcwd(), 'logs', 'access.log')
+        
+        if not os.path.exists(log_file):
+            return jsonify({'success': False, 'message': 'access.log file not found'}), 404
+        
+        # 최근 500줄만 읽기
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            recent_lines = lines[-500:] if len(lines) > 500 else lines
+        
+        return jsonify({
+            'success': True,
+            'logs': ''.join(recent_lines),
+            'total_lines': len(lines),
+            'showing_lines': len(recent_lines)
+        })
+        
+    except Exception as e:
+        logger.error(f"access.log 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/send-alarm', methods=['POST'])
 @login_required

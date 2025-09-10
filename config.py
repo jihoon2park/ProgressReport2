@@ -9,13 +9,13 @@ API_HEADERS = {
 
 # DB 기반 API 키 관리자 사용
 try:
-    from api_key_manager import get_api_headers, get_server_info
+    from api_key_manager import get_api_headers, get_server_info, get_site_servers
     USE_DB_API_KEYS = True
 except ImportError:
-    # 폴백: 기존 하드코딩된 방식 (개발/테스트용)
+    # 폴백: 기본 설정 (개발/테스트용)
     USE_DB_API_KEYS = False
     
-    # 개발용 하드코딩된 설정 (프로덕션에서는 사용하지 않음)
+    # 기본 사이트 서버 정보 (폴백용)
     SITE_SERVERS = {
         'Parafield Gardens': '192.168.1.11:8080',
         'Nerrilda': '192.168.21.12:8080',
@@ -24,19 +24,12 @@ except ImportError:
         'Yankalilla': '192.168.51.12:8080'
     }
     
-    SITE_API_KEYS = {
-        'Parafield Gardens': 'qPh+xiaSIvRCqQ5nB6gNBQl12IMLFED4C5s/xfjQ88k=',
-        'Nerrilda': 'UYlsB9uLJt8pqc+82WKzLYcIH+hxWsF3IJCemHkc77w=',
-        'Ramsay': 'DtQEnNJohGnYnzQory++De2NijWqINO+enhDdBNHYTM=',
-        'West Park': 'oWhTkk0QwiXk/TWrqDDQNHpC30/htIVqwIZf8Fc+kaw=',
-        'Yankalilla': 'RhU1zjQMJs2/BK/USVmVywy5SdimDTm28BRguF70c+I='
-    }
-    
     def get_api_headers(site):
         """사이트에 맞는 API 헤더 반환 (폴백)"""
         headers = API_HEADERS.copy()
         headers['x-api-username'] = 'ManadAPI'
-        headers['x-api-key'] = SITE_API_KEYS.get(site, SITE_API_KEYS['Parafield Gardens'])
+        # 폴백에서는 기본 키 사용
+        headers['x-api-key'] = 'default-key'
         return headers
     
     def get_server_info(site):
@@ -48,6 +41,10 @@ except ImportError:
             'server_port': port,
             'base_url': f"http://{server_info}"
         }
+    
+    def get_site_servers():
+        """사이트 서버 정보 반환 (폴백)"""
+        return SITE_SERVERS
 
 # SITE_SERVERS는 하위 호환성을 위해 유지 (DB에서 동적으로 생성)
 if USE_DB_API_KEYS:
