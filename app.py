@@ -29,7 +29,7 @@ load_dotenv()
 from api_client import APIClient
 from api_carearea import APICareArea
 from api_eventtype import APIEventType
-from config import SITE_SERVERS, API_HEADERS
+from config import SITE_SERVERS, API_HEADERS, get_available_sites
 from config_users import authenticate_user, get_user
 from config_env import get_flask_config, print_current_config, get_cache_policy
 from models import load_user, User
@@ -58,6 +58,7 @@ flask_config = get_flask_config()
 
 # 로깅 설정
 log_level = getattr(logging, flask_config['LOG_LEVEL'].upper())
+
 
 # 로그 디렉토리 생성
 log_dir = 'logs'

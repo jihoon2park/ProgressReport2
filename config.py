@@ -7,6 +7,15 @@ API_HEADERS = {
     'Accept': 'application/json'
 }
 
+# 기본 사이트 서버 정보 (폴백용)
+SITE_SERVERS = {
+    'Parafield Gardens': '192.168.1.11:8080',
+    'Nerrilda': '192.168.21.12:8080',
+    'Ramsay': '192.168.31.12:8080',
+    'West Park': '192.168.41.12:8080',
+    'Yankalilla': '192.168.51.12:8080'
+}
+
 # DB 기반 API 키 관리자 사용
 try:
     from api_key_manager import get_api_headers, get_server_info, get_site_servers
@@ -14,15 +23,6 @@ try:
 except ImportError:
     # 폴백: 기본 설정 (개발/테스트용)
     USE_DB_API_KEYS = False
-    
-    # 기본 사이트 서버 정보 (폴백용)
-    SITE_SERVERS = {
-        'Parafield Gardens': '192.168.1.11:8080',
-        'Nerrilda': '192.168.21.12:8080',
-        'Ramsay': '192.168.31.12:8080',
-        'West Park': '192.168.41.12:8080',
-        'Yankalilla': '192.168.51.12:8080'
-    }
     
     def get_api_headers(site):
         """사이트에 맞는 API 헤더 반환 (폴백)"""
@@ -45,6 +45,19 @@ except ImportError:
     def get_site_servers():
         """사이트 서버 정보 반환 (폴백)"""
         return SITE_SERVERS
+
+def get_available_sites():
+    """사용 가능한 사이트 목록을 DB 또는 폴백에서 가져오기"""
+    try:
+        if USE_DB_API_KEYS:
+            return list(get_site_servers().keys())
+        else:
+            return list(SITE_SERVERS.keys())
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"사이트 정보 조회 실패: {e}")
+        return list(SITE_SERVERS.keys())  # 폴백
 
 # SITE_SERVERS는 하위 호환성을 위해 유지 (DB에서 동적으로 생성)
 if USE_DB_API_KEYS:
