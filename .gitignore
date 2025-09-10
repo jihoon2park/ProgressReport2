@@ -42,10 +42,12 @@ data/
 data/*.json
 data/**/*.json
 
-# 데이터베이스 파일
+# 데이터베이스 파일 (프로덕션에서는 자동 생성)
 *.db
 *.sqlite
 *.sqlite3
+# 단, 스키마 파일은 포함
+!database_schema.sql
 
 # 로그 파일
 *.log

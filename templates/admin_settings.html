@@ -220,6 +220,77 @@
         .status-inactive {
             background-color: #dc3545;
         }
+
+        /* 운영 서버 로그 모달 스타일 */
+        .log-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-button:hover {
+            background-color: #f8f9fa;
+        }
+
+        .tab-button.active {
+            border-bottom-color: #007bff;
+            background-color: #f8f9fa;
+        }
+
+        .log-content {
+            height: 500px;
+            overflow: hidden;
+        }
+
+        .log-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .log-text {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            height: 450px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-text::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-text::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        .log-text::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .log-text::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
         
         .alert {
             padding: 12px;
@@ -265,7 +336,8 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-    </style>
+
+</style>
 </head>
 <body>
     <div class="admin-container">
@@ -288,7 +360,7 @@
         <div class="settings-section">
             <div class="settings-header">
                 <h3>🔑 API 키 관리</h3>
-                <p>사이트별 API 키를 안전하게 관리합니다.</p>
+                <p>사이트별 API 키를 안전하게 관리합니다. 암호화되어 DB에 저장됩니다.</p>
             </div>
             
             <div class="api-key-actions" style="margin-bottom: 20px;">
@@ -324,10 +396,52 @@
             
             <div class="form-group">
                 <label>시스템 로그</label>
-                <button class="btn btn-primary" onclick="window.open('/log-viewer', '_blank')">📊 로그 뷰어</button>
+                <button class="btn btn-primary" onclick="window.open('/log-viewer', '_blank')" style="margin: 5px;">📊 로그 뷰어</button>
+                <button class="btn btn-info" onclick="showProductionLogs()" style="margin: 5px;">🔍 운영 서버 로그</button>
             </div>
         </div>
 
+    </div>
+
+    <!-- 운영 서버 로그 모달 -->
+    <div id="productionLogsModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 90%; max-height: 80%;">
+            <div class="modal-header">
+                <h3>🔍 운영 서버 로그</h3>
+                <span class="close" onclick="closeProductionLogsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="log-tabs">
+                    <button class="tab-button active" onclick="showLogTab('app')">📋 App Log</button>
+                    <button class="tab-button" onclick="showLogTab('error')">❌ Error Log</button>
+                    <button class="tab-button" onclick="showLogTab('access')">🌐 Access Log</button>
+                </div>
+                
+                <div id="app-log-content" class="log-content">
+                    <div class="log-info">
+                        <span id="app-log-info">로딩 중...</span>
+                        <button onclick="refreshLog('app')" class="btn btn-sm btn-secondary">🔄 새로고침</button>
+                    </div>
+                    <pre id="app-log-text" class="log-text"></pre>
+                </div>
+                
+                <div id="error-log-content" class="log-content" style="display: none;">
+                    <div class="log-info">
+                        <span id="error-log-info">로딩 중...</span>
+                        <button onclick="refreshLog('error')" class="btn btn-sm btn-secondary">🔄 새로고침</button>
+                    </div>
+                    <pre id="error-log-text" class="log-text"></pre>
+                </div>
+                
+                <div id="access-log-content" class="log-content" style="display: none;">
+                    <div class="log-info">
+                        <span id="access-log-info">로딩 중...</span>
+                        <button onclick="refreshLog('access')" class="btn btn-sm btn-secondary">🔄 새로고침</button>
+                    </div>
+                    <pre id="access-log-text" class="log-text"></pre>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- API 키 추가/편집 모달 -->
@@ -606,6 +720,63 @@
         // 새로고침
         function refreshApiKeys() {
             loadApiKeys();
+        }
+
+        // 운영 서버 로그 모달 표시
+        function showProductionLogs() {
+            document.getElementById('productionLogsModal').style.display = 'block';
+            loadLog('app'); // 기본적으로 app 로그 로드
+        }
+
+        // 운영 서버 로그 모달 닫기
+        function closeProductionLogsModal() {
+            document.getElementById('productionLogsModal').style.display = 'none';
+        }
+
+        // 로그 탭 전환
+        function showLogTab(logType) {
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            // 모든 로그 콘텐츠 숨기기
+            document.querySelectorAll('.log-content').forEach(content => content.style.display = 'none');
+            
+            // 선택된 탭 활성화
+            event.target.classList.add('active');
+            // 선택된 로그 콘텐츠 표시
+            document.getElementById(logType + '-log-content').style.display = 'block';
+            
+            // 해당 로그 로드
+            loadLog(logType);
+        }
+
+        // 로그 로드
+        async function loadLog(logType) {
+            const infoElement = document.getElementById(logType + '-log-info');
+            const textElement = document.getElementById(logType + '-log-text');
+            
+            infoElement.textContent = '로딩 중...';
+            textElement.textContent = '';
+            
+            try {
+                const response = await fetch(`/api/logs/${logType}-log`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    textElement.textContent = data.logs;
+                    infoElement.textContent = `총 ${data.total_lines}줄 중 최근 ${data.showing_lines}줄 표시`;
+                } else {
+                    textElement.textContent = '로그를 불러올 수 없습니다: ' + data.message;
+                    infoElement.textContent = '오류 발생';
+                }
+            } catch (error) {
+                textElement.textContent = '로그 로드 실패: ' + error.message;
+                infoElement.textContent = '오류 발생';
+            }
+        }
+
+        // 로그 새로고침
+        function refreshLog(logType) {
+            loadLog(logType);
         }
 
         // 시스템 상태 확인

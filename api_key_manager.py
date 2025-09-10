@@ -5,39 +5,19 @@ API 키 관리자 - 데이터베이스에서 API 키를 안전하게 관리
 
 import sqlite3
 import os
-import base64
-from cryptography.fernet import Fernet
 from typing import Dict, Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
 
 class APIKeyManager:
-    """API 키 관리자 - 암호화된 저장 및 관리"""
+    """API 키 관리자 - DB에 평문으로 저장 및 관리"""
     
     def __init__(self, db_path='progress_report.db'):
         self.db_path = db_path
-        self.encryption_key = self._get_or_create_encryption_key()
-        self.cipher = Fernet(self.encryption_key)
         
         # 테이블 생성
         self._create_table()
-    
-    def _get_or_create_encryption_key(self) -> bytes:
-        """암호화 키 생성 또는 로드"""
-        key_file = 'api_key_encryption.key'
-        
-        if os.path.exists(key_file):
-            with open(key_file, 'rb') as f:
-                return f.read()
-        else:
-            # 새 키 생성
-            key = Fernet.generate_key()
-            with open(key_file, 'wb') as f:
-                f.write(key)
-            # 파일 권한 제한 (소유자만 읽기)
-            os.chmod(key_file, 0o600)
-            return key
     
     def _create_table(self):
         """API 키 테이블 생성"""
@@ -49,7 +29,7 @@ class APIKeyManager:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 site_name TEXT NOT NULL UNIQUE,
                 api_username TEXT NOT NULL,
-                api_key_encrypted TEXT NOT NULL,
+                api_key TEXT NOT NULL,
                 server_ip TEXT NOT NULL,
                 server_port INTEGER DEFAULT 8080,
                 is_active BOOLEAN DEFAULT 1,
@@ -67,16 +47,7 @@ class APIKeyManager:
         conn.commit()
         conn.close()
     
-    def _encrypt_key(self, api_key: str) -> str:
-        """API 키 암호화"""
-        encrypted_key = self.cipher.encrypt(api_key.encode())
-        return base64.b64encode(encrypted_key).decode()
-    
-    def _decrypt_key(self, encrypted_key: str) -> str:
-        """API 키 복호화"""
-        encrypted_data = base64.b64decode(encrypted_key.encode())
-        decrypted_key = self.cipher.decrypt(encrypted_data)
-        return decrypted_key.decode()
+    # 암호화 제거 - 평문으로 저장
     
     def add_api_key(self, site_name: str, api_username: str, api_key: str, 
                    server_ip: str, server_port: int = 8080, notes: str = "") -> bool:
@@ -85,13 +56,11 @@ class APIKeyManager:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            encrypted_key = self._encrypt_key(api_key)
-            
             cursor.execute('''
                 INSERT OR REPLACE INTO api_keys 
-                (site_name, api_username, api_key_encrypted, server_ip, server_port, notes, updated_at)
+                (site_name, api_username, api_key, server_ip, server_port, notes, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (site_name, api_username, encrypted_key, server_ip, server_port, notes))
+            ''', (site_name, api_username, api_key, server_ip, server_port, notes))
             
             conn.commit()
             conn.close()
@@ -110,7 +79,7 @@ class APIKeyManager:
             cursor = conn.cursor()
             
             cursor.execute('''
-                SELECT site_name, api_username, api_key_encrypted, server_ip, server_port, is_active, notes
+                SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
                 FROM api_keys 
                 WHERE site_name = ? AND is_active = 1
             ''', (site_name,))
@@ -119,11 +88,10 @@ class APIKeyManager:
             conn.close()
             
             if result:
-                decrypted_key = self._decrypt_key(result[2])
                 return {
                     'site_name': result[0],
                     'api_username': result[1],
-                    'api_key': decrypted_key,
+                    'api_key': result[2],
                     'server_ip': result[3],
                     'server_port': result[4],
                     'is_active': bool(result[5]),
@@ -143,7 +111,7 @@ class APIKeyManager:
             cursor = conn.cursor()
             
             cursor.execute('''
-                SELECT site_name, api_username, api_key_encrypted, server_ip, server_port, is_active, notes
+                SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
                 FROM api_keys 
                 WHERE is_active = 1
                 ORDER BY site_name
@@ -154,11 +122,10 @@ class APIKeyManager:
             
             api_keys = []
             for result in results:
-                decrypted_key = self._decrypt_key(result[2])
                 api_keys.append({
                     'site_name': result[0],
                     'api_username': result[1],
-                    'api_key': decrypted_key,
+                    'api_key': result[2],
                     'server_ip': result[3],
                     'server_port': result[4],
                     'is_active': bool(result[5]),
@@ -281,3 +248,13 @@ def get_server_info(site_name: str) -> Optional[Dict[str, str]]:
     """서버 정보 조회"""
     manager = get_api_key_manager()
     return manager.get_server_info(site_name)
+
+def get_site_servers() -> Dict[str, str]:
+    """모든 사이트 서버 정보 조회"""
+    manager = get_api_key_manager()
+    servers = {}
+    
+    for api_data in manager.get_all_api_keys():
+        servers[api_data['site_name']] = f"{api_data['server_ip']}:{api_data['server_port']}"
+    
+    return servers

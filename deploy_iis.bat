@@ -18,18 +18,23 @@ if not exist "C:\inetpub\wwwroot\ProgressReport\data" mkdir "C:\inetpub\wwwroot\
 
 REM 파일 복사
 echo 파일 복사 중...
-xcopy /Y /E /I "app.py" "C:\inetpub\wwwroot\ProgressReport\"
-xcopy /Y /E /I "config.py" "C:\inetpub\wwwroot\ProgressReport\"
-xcopy /Y /E /I "api_*.py" "C:\inetpub\wwwroot\ProgressReport\"
-xcopy /Y /E /I "config_*.py" "C:\inetpub\wwwroot\ProgressReport\"
+xcopy /Y /E /I "*.py" "C:\inetpub\wwwroot\ProgressReport\"
 xcopy /Y /E /I "templates" "C:\inetpub\wwwroot\ProgressReport\templates\"
 xcopy /Y /E /I "static" "C:\inetpub\wwwroot\ProgressReport\static\"
 xcopy /Y /E /I "web.config" "C:\inetpub\wwwroot\ProgressReport\"
+xcopy /Y /E /I "requirements.txt" "C:\inetpub\wwwroot\ProgressReport\"
+xcopy /Y /E /I "database_schema.sql" "C:\inetpub\wwwroot\ProgressReport\"
+xcopy /Y /E /I "production_setup.py" "C:\inetpub\wwwroot\ProgressReport\"
 
 REM Python 패키지 설치
 echo Python 패키지 설치 중...
 pip install -r requirements.txt
 pip install wfastcgi
+
+REM 프로덕션 환경 설정 (DB 초기화, API 키 마이그레이션 등)
+echo 프로덕션 환경 설정 중...
+cd "C:\inetpub\wwwroot\ProgressReport"
+python production_setup.py
 
 REM wfastcgi 활성화
 echo wfastcgi 활성화 중...
