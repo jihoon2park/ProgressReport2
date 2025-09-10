@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .header .subtitle {
+            color: #7f8c8d;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 6px;
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 1px;
+        }
+
+        .stat-label {
+            font-size: 0.7em;
+            opacity: 0.9;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+        }
+
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .devices-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .devices-table th,
+        .devices-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .devices-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .devices-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+
+
+        .refresh-btn {
+            float: right;
+            background: #95a5a6;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .refresh-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .export-btn {
+            float: right;
+            background: #27ae60;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+
+        .export-btn:hover {
+            background: #229954;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .notification-preview {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .notification-preview h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .notification-preview .preview-item {
+            margin-bottom: 8px;
+        }
+
+        .notification-preview .preview-label {
+            font-weight: 600;
+            color: #7f8c8d;
+            margin-right: 10px;
+        }
+        
+        .user-list-container {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+        
+        .user-list-header {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .user-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: white;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            transition: background-color 0.2s ease;
+            min-height: 60px;
+        }
+        
+        .user-item:last-child {
+            border-bottom: none;
+        }
+        
+        .user-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .user-item input[type="checkbox"] {
+            margin-right: 20px;
+            transform: scale(1.1);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .user-id {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+            line-height: 1.3;
+        }
+        
+        .user-details {
+            font-size: 0.95em;
+            color: #7f8c8d;
+            line-height: 1.4;
+        }
+        
+        .user-token-count {
+            font-weight: 500;
+            color: #3498db;
+            margin-right: 15px;
+        }
+        
+        .user-registration-date {
+            color: #95a5a6;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-outline-primary {
+            background: transparent;
+            border: 1px solid #3498db;
+            color: #3498db;
+        }
+        
+        .btn-outline-primary:hover {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-outline-secondary {
+            background: transparent;
+            border: 1px solid #95a5a6;
+            color: #95a5a6;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: #95a5a6;
+            color: white;
+        }
+
+        /* User Selection Container */
+        .user-selection-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .user-selection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .user-selection-header h4 {
+            margin: 0;
+            color: #495057;
+            font-size: 18px;
+        }
+
+        .user-selection-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .user-selection-table th {
+            background: #f8f9fa;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 13px;
+        }
+
+        .user-selection-table td {
+            padding: 8px;
+            border-bottom: 1px solid #f1f3f4;
+            font-size: 13px;
+        }
+
+        .user-selection-table tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .user-selection-checkbox {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .user-selection-user-id {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .user-selection-user-token-count {
+            color: #007bff;
+            font-weight: 500;
+        }
+
+        .user-selection-user-registration-date {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* Device List Inline Editing Styles */
+        .device-table .editable-cell {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .device-table .editable-cell:hover {
+            background-color: #f8f9fa;
+        }
+
+        .device-table .edit-input {
+            width: 100%;
+            padding: 4px 8px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            transition: all 0.2s;
+        }
+        
+        .device-table .edit-input:focus {
+            outline: none;
+            border-color: #0056b3;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .device-table .edit-buttons {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .device-table .edit-btn {
+            padding: 2px 8px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .device-table .edit-save-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .device-table .edit-save-btn:hover {
+            background: #218838;
+        }
+
+        .device-table .edit-cancel-btn {
+            background: #6c757d;
+            color: white;
+        }
+
+        .device-table .edit-cancel-btn:hover {
+            background: #5a6268;
+        }
+
+        .device-table .edit-edit-btn {
+            background: #007bff;
+            color: white;
+            margin-left: 5px;
+        }
+
+        .device-table .edit-edit-btn:hover {
+            background: #0056b3;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 FCM Admin Dashboard</h1>
+            <div class="subtitle">
+                Firebase Cloud Messaging Management & Monitoring
+            </div>
+            <div class="nav-buttons" style="margin-top: 15px;">
+                <button class="btn-nav" onclick="window.location.href='/progress-notes'" style="background-color: #007bff; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-right: 10px;">📝 Progress Notes</button>
+                <button class="btn-nav" onclick="window.location.href='/incident-viewer'" style="background-color: #dc3545; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-right: 10px;">🚨 Incidents</button>
+                <button class="btn-nav" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-right: 10px;">🔧 Settings</button>
+                <button class="btn-nav" onclick="window.location.href='/logout'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px;">🚪 Logout</button>
+            </div>
+        </div>
+
+        <!-- Statistics Dashboard -->
+        <div class="card full-width">
+            <h3>
+                📊 FCM Statistics Dashboard
+                <button class="refresh-btn" onclick="refreshStats()">🔄 Refresh</button>
+            </h3>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalTokens">-</div>
+                    <div class="stat-label">Total Registered Tokens</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="activeTokens">-</div>
+                    <div class="stat-label">Active Tokens</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="totalUsers">-</div>
+                    <div class="stat-label">Registered Users</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="todayTokens">-</div>
+                    <div class="stat-label">Today's Registrations</div>
+                </div>
+            </div>
+            <div id="statsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- FCM Token Management -->
+            <div class="card">
+                <h3>📱 FCM Token Management</h3>
+                <div class="form-group">
+                    <label for="fcmToken">FCM Token:</label>
+                    <input type="text" id="fcmToken" placeholder="Enter FCM registration token">
+                </div>
+                <div class="form-group">
+                    <label for="deviceInfo">Device Info:</label>
+                    <input type="text" id="deviceInfo" placeholder="Device information (optional)">
+                </div>
+                <button class="btn btn-success" onclick="registerToken()">✅ Register Token</button>
+                <button class="btn btn-danger" onclick="unregisterToken()">❌ Remove Token</button>
+                <button class="btn btn-info" onclick="getAllTokens()">📋 View All Tokens</button>
+                <div id="tokenResult" class="result" style="display: none;"></div>
+            </div>
+
+            <!-- Push Notification Sending -->
+            <div class="card">
+                <h3>📢 Push Notification Sending</h3>
+                <div class="form-group">
+                    <label for="notificationTitle">Notification Title:</label>
+                    <input type="text" id="notificationTitle" placeholder="Enter notification title">
+                </div>
+                <div class="form-group">
+                    <label for="notificationBody">Notification Content:</label>
+                    <textarea id="notificationBody" rows="3" placeholder="Enter notification content"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="notificationType">Target:</label>
+                    <select id="notificationType">
+                        <option value="all">All Registered Devices</option>
+                        <option value="test">Test Alarm (Admin Only)</option>
+                        <option value="custom">Custom Users</option>
+                        <option value="select">User Selection</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customUsersGroup" style="display: none;">
+                    <label for="customUserIds">User IDs (comma separated):</label>
+                    <input type="text" id="customUserIds" placeholder="admin,user1,user2">
+                </div>
+                <div class="form-group" id="userSelectionGroup" style="display: none;">
+                    <label>User Selection:</label>
+                    <div class="user-list-container">
+                        <div class="user-list-header">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllUsers()">Select All</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllUsers()">Deselect All</button>
+                        </div>
+                        <div class="user-list" id="userList">
+                            <!-- User list will be loaded here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-warning" onclick="sendNotification()">🚀 Send Notification</button>
+                <div id="notificationResult" class="result" style="display: none;"></div>
+                
+                <!-- Notification Preview -->
+                <div class="notification-preview" id="notificationPreview" style="display: none;">
+                    <h4>📱 Notification Preview</h4>
+                    <div class="preview-item">
+                        <span class="preview-label">Title:</span>
+                        <span id="previewTitle"></span>
+                    </div>
+                    <div class="preview-item">
+                        <span class="preview-label">Content:</span>
+                        <span id="previewBody"></span>
+                    </div>
+                    <div class="preview-item">
+                        <span class="preview-label">Target:</span>
+                        <span id="previewTarget"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Client Data Synchronization Status -->
+        <div class="card full-width">
+            <h3>
+                🔄 Client Data Synchronization
+                <button class="refresh-btn" onclick="refreshAllClientData()">🔄 Refresh All</button>
+            </h3>
+            <div id="clientSyncStatusContainer">
+                <div style="padding: 20px; text-align: center; color: #7f8c8d;">
+                    <p>Loading synchronization status...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registered Device List -->
+        <div class="card full-width">
+            <h3>
+                📱 Registered Device List
+                <button class="refresh-btn" onclick="getAllTokens()">🔄 Refresh</button>
+                <button class="export-btn" onclick="exportDeviceData()">📤 Export</button>
+            </h3>
+            <div id="devicesTableContainer">
+                <table class="devices-table" id="devicesTable" style="display: none;">
+                    <thead>
+                        <tr>
+                                                    <th>User ID</th>
+                        <th>FCM Token</th>
+                        <th>Device Info</th>
+                        <th>Registration Date</th>
+                        <th>Last Used</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="devicesTableBody">
+                    </tbody>
+                </table>
+                <div id="noDevicesMessage" style="text-align: center; padding: 40px; color: #7f8c8d;">
+                    <h3>📱 No devices registered</h3>
+                    <p>Registered FCM tokens will appear here.</p>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        // Initialize on page load
+        window.addEventListener('load', function() {
+            refreshStats();
+            getAllTokens();
+            setupNotificationPreview();
+        });
+
+        // Setup notification preview
+        function setupNotificationPreview() {
+            const titleInput = document.getElementById('notificationTitle');
+            const bodyInput = document.getElementById('notificationBody');
+            const typeSelect = document.getElementById('notificationType');
+            
+            [titleInput, bodyInput, typeSelect].forEach(element => {
+                element.addEventListener('input', updateNotificationPreview);
+                element.addEventListener('change', updateNotificationPreview);
+            });
+        }
+
+        // Update notification preview
+        function updateNotificationPreview() {
+            const title = document.getElementById('notificationTitle').value;
+            const body = document.getElementById('notificationBody').value;
+            const type = document.getElementById('notificationType').value;
+            
+            if (title || body) {
+                document.getElementById('previewTitle').textContent = title || 'No Title';
+                document.getElementById('previewBody').textContent = body || 'No Content';
+                
+                let targetText = '';
+                switch(type) {
+                    case 'all': targetText = 'All Registered Devices'; break;
+                    case 'test': targetText = 'Test Alarm (Admin Only)'; break;
+                    case 'custom': targetText = 'Custom Users'; break;
+                    case 'select': targetText = 'Selected Users'; break;
+                }
+                document.getElementById('previewTarget').textContent = targetText;
+                
+                document.getElementById('notificationPreview').style.display = 'block';
+            } else {
+                document.getElementById('notificationPreview').style.display = 'none';
+            }
+        }
+
+        // Show/hide user input fields based on target selection
+        document.getElementById('notificationType').addEventListener('change', function() {
+            const customUsersGroup = document.getElementById('customUsersGroup');
+            const userSelectionGroup = document.getElementById('userSelectionGroup');
+            
+            // Hide all groups
+            customUsersGroup.style.display = 'none';
+            userSelectionGroup.style.display = 'none';
+            
+            // Show corresponding group based on selection
+            if (this.value === 'custom') {
+                customUsersGroup.style.display = 'block';
+            } else if (this.value === 'select') {
+                userSelectionGroup.style.display = 'block';
+                loadUserList(); // Load user list
+            }
+            
+            updateNotificationPreview();
+        });
+
+        // Register FCM token
+        async function registerToken() {
+            const token = document.getElementById('fcmToken').value.trim();
+            const deviceInfo = document.getElementById('deviceInfo').value.trim();
+            
+            if (!token) {
+                showResult('tokenResult', 'Please enter FCM token.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/fcm/register-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token,
+                        device_info: deviceInfo || 'Admin Dashboard'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('tokenResult', 'Token registered successfully.', 'success');
+                    document.getElementById('fcmToken').value = '';
+                    document.getElementById('deviceInfo').value = '';
+                    refreshStats();
+                    getAllTokens();
+                } else {
+                    showResult('tokenResult', `Token registration failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Remove FCM token
+        async function unregisterToken() {
+            const token = document.getElementById('fcmToken').value.trim();
+            
+            if (!token) {
+                showResult('tokenResult', 'Please enter FCM token to remove.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/fcm/unregister-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('tokenResult', 'Token removed successfully.', 'success');
+                    document.getElementById('fcmToken').value = '';
+                    refreshStats();
+                    getAllTokens();
+                } else {
+                    showResult('tokenResult', `Token removal failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Query all FCM tokens
+        async function getAllTokens() {
+            try {
+                const response = await fetch('/api/fcm/stats');
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayDevicesTable(result.stats);
+                } else {
+                    showResult('tokenResult', `Token retrieval failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Display devices table
+        function displayDevicesTable(stats) {
+            const table = document.getElementById('devicesTable');
+            const tbody = document.getElementById('devicesTableBody');
+            const noDevicesMessage = document.getElementById('noDevicesMessage');
+            
+            if (stats.total_tokens === 0) {
+                table.style.display = 'none';
+                noDevicesMessage.style.display = 'block';
+                return;
+            }
+            
+            table.style.display = 'table';
+            noDevicesMessage.style.display = 'none';
+            tbody.innerHTML = '';
+            
+            // Combine all user tokens into one array
+            let allTokens = [];
+            if (stats.user_tokens && typeof stats.user_tokens === 'object') {
+                Object.keys(stats.user_tokens).forEach(userId => {
+                    if (Array.isArray(stats.user_tokens[userId])) {
+                        stats.user_tokens[userId].forEach(token => {
+                            allTokens.push({
+                                user_id: userId,
+                                ...token
+                            });
+                        });
+                    }
+                });
+            }
+            
+            // Sort by registration date (newest first)
+            allTokens.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            
+            allTokens.forEach(token => {
+                const row = document.createElement('tr');
+                
+                const createdDate = new Date(token.created_at).toLocaleDateString('en-US');
+                const lastUsedDate = token.last_used ? 
+                    new Date(token.last_used).toLocaleDateString('en-US') : 'No usage record';
+                
+                const statusClass = token.is_active ? 'status-active' : 'status-inactive';
+                const statusText = token.is_active ? 'Active' : 'Inactive';
+                
+                row.innerHTML = `
+                    <td class="editable-cell" data-field="user_id" data-token="${token.token}">
+                        <span class="editable-text">${token.user_id}</span>
+                        <input type="text" class="edit-input" value="${token.user_id}" style="display: none;">
+                        <div class="edit-buttons" style="display: none;">
+                            <button class="edit-btn edit-save-btn" onclick="saveTokenEdit('${token.token}', 'user_id')">Save</button>
+                            <button class="edit-btn edit-cancel-btn" onclick="cancelTokenEdit('${token.token}', 'user_id')">Cancel</button>
+                        </div>
+                    </td>
+                    <td class="editable-cell" data-field="token" data-token="${token.token}" style="font-family: monospace; font-size: 0.8em;">
+                        <span class="editable-text">${token.token.substring(0, 20)}...</span>
+                        <input type="text" class="edit-input" value="${token.token}" style="display: none;">
+                        <div class="edit-buttons" style="display: none;">
+                            <button class="edit-btn edit-save-btn" onclick="saveTokenEdit('${token.token}', 'token')">Save</button>
+                            <button class="edit-btn edit-cancel-btn" onclick="cancelTokenEdit('${token.token}', 'token')">Cancel</button>
+                        </div>
+                    </td>
+                    <td class="editable-cell" data-field="device_info" data-token="${token.token}">
+                        <span class="editable-text">${token.device_info || 'Unknown'}</span>
+                        <input type="text" class="edit-input" value="${token.device_info || 'Unknown'}" style="display: none;">
+                        <div class="edit-buttons" style="display: none;">
+                            <button class="edit-btn edit-save-btn" onclick="saveTokenEdit('${token.token}', 'device_info')">Save</button>
+                            <button class="edit-btn edit-cancel-btn" onclick="cancelTokenEdit('${token.token}', 'device_info')">Cancel</button>
+                        </div>
+                    </td>
+                    <td>${createdDate}</td>
+                    <td>${lastUsedDate}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>
+                        <button class="edit-btn edit-edit-btn" onclick="editTokenField('${token.token}', 'user_id')">✏️ Edit ID</button>
+                        <button class="edit-btn edit-edit-btn" onclick="editTokenField('${token.token}', 'device_info')">✏️ Edit Info</button>
+                        <button class="edit-btn edit-edit-btn" onclick="editTokenField('${token.token}', 'token')">✏️ Edit Token</button>
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
+                                onclick="removeToken('${token.token}')">Remove</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Edit token field
+        function editTokenField(token, field) {
+            const cell = document.querySelector(`[data-token="${token}"][data-field="${field}"]`);
+            if (!cell) return;
+            
+            const textSpan = cell.querySelector('.editable-text');
+            const input = cell.querySelector('.edit-input');
+            const buttons = cell.querySelector('.edit-buttons');
+            
+            if (textSpan && input && buttons) {
+                textSpan.style.display = 'none';
+                input.style.display = 'inline-block';
+                buttons.style.display = 'flex';
+                
+                // 토큰 필드인 경우 전체 토큰을 표시
+                if (field === 'token') {
+                    input.style.fontSize = '0.7em';
+                    input.style.width = '300px';
+                } else {
+                    input.style.fontSize = '14px';
+                    input.style.width = '100%';
+                }
+                
+                input.focus();
+                input.select();
+            }
+        }
+        
+        // Cancel token edit
+        function cancelTokenEdit(token, field) {
+            const cell = document.querySelector(`[data-token="${token}"][data-field="${field}"]`);
+            if (!cell) return;
+            
+            const textSpan = cell.querySelector('.editable-text');
+            const input = cell.querySelector('.edit-input');
+            const buttons = cell.querySelector('.edit-buttons');
+            
+            if (textSpan && input && buttons) {
+                // Reset input value to original text
+                input.value = textSpan.textContent;
+                textSpan.style.display = 'inline';
+                input.style.display = 'none';
+                buttons.style.display = 'none';
+            }
+        }
+        
+        // Save token edit
+        async function saveTokenEdit(token, field) {
+            const cell = document.querySelector(`[data-token="${token}"][data-field="${field}"]`);
+            if (!cell) return;
+            
+            const textSpan = cell.querySelector('.editable-text');
+            const input = cell.querySelector('.edit-input');
+            const buttons = cell.querySelector('.edit-buttons');
+            
+            if (!textSpan || !input || !buttons) return;
+            
+            const newValue = input.value.trim();
+            if (!newValue) {
+                alert('Value cannot be empty');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/fcm/update-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token,
+                        field: field,
+                        value: newValue
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update the display
+                    textSpan.textContent = newValue;
+                    textSpan.style.display = 'inline';
+                    input.style.display = 'none';
+                    buttons.style.display = 'none';
+                    
+                    showResult('tokenResult', 'Token updated successfully.', 'success');
+                    refreshStats();
+                } else {
+                    showResult('tokenResult', `Update failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `Error occurred: ${error.message}`, 'error');
+            }
+        }
+        
+        // Remove individual token
+        async function removeToken(token) {
+            if (!confirm('Are you sure you want to remove this token?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/fcm/unregister-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('tokenResult', 'Token updated successfully.', 'success');
+                    refreshStats();
+                    getAllTokens();
+                } else {
+                    showResult('tokenResult', `Token removal failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Send push notification
+        async function sendNotification() {
+            const title = document.getElementById('notificationTitle').value.trim();
+            const body = document.getElementById('notificationBody').value.trim();
+            const type = document.getElementById('notificationType').value;
+            
+            if (!title || !body) {
+                showResult('notificationResult', 'Please enter both notification title and content.', 'error');
+                return;
+            }
+
+            let payload = {
+                title: title,
+                body: body
+            };
+
+            if (type === 'custom') {
+                const customUserIds = document.getElementById('customUserIds').value.trim();
+                if (!customUserIds) {
+                    showResult('notificationResult', 'Please enter user IDs.', 'error');
+                    return;
+                }
+                payload.user_ids = customUserIds.split(',').map(id => id.trim());
+            } else if (type === 'select') {
+                const selectedUserIds = getSelectedUserIds();
+                if (selectedUserIds.length === 0) {
+                    showResult('notificationResult', 'Please select users to send to.', 'error');
+                    return;
+                }
+                payload.user_ids = selectedUserIds;
+            } else if (type === 'test') {
+                payload.user_ids = ['admin']; // Admin only test alarm
+            }
+
+            try {
+                const response = await fetch('/api/fcm/send-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('notificationResult', `Notification sent successfully. Devices sent to: ${result.sent_count}`, 'success');
+                    document.getElementById('notificationTitle').value = '';
+                    document.getElementById('notificationBody').value = '';
+                    document.getElementById('customUserIds').value = '';
+                    document.getElementById('notificationPreview').style.display = 'none';
+                } else {
+                    showResult('notificationResult', `Notification sending failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('notificationResult', `Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Refresh FCM statistics
+        async function refreshStats() {
+            try {
+                const response = await fetch('/api/fcm/stats');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.stats;
+                    document.getElementById('totalTokens').textContent = stats.total_tokens;
+                    document.getElementById('activeTokens').textContent = stats.active_tokens;
+                    document.getElementById('totalUsers').textContent = stats.total_users;
+                    document.getElementById('todayTokens').textContent = stats.today_tokens;
+                } else {
+                    console.error('Statistics retrieval failed:', result.message);
+                }
+            } catch (error) {
+                console.error('Statistics retrieval error:', error);
+            }
+        }
+
+                // Export device data to file
+        async function exportDeviceData() {
+            try {
+                // First try to get data from the local FCM tokens file
+                const response = await fetch('/api/fcm/export-tokens');
+                const result = await response.json();
+                
+                console.log('Export data result:', result); // Debug log
+                
+                if (result.success && result.tokens) {
+                    // Prepare data for export from local file
+                    let exportData = [];
+                    
+                    // Parse the tokens data structure
+                    if (typeof result.tokens === 'object') {
+                        Object.entries(result.tokens).forEach(([userId, userData]) => {
+                            if (Array.isArray(userData)) {
+                                userData.forEach(token => {
+                                    exportData.push({
+                                        user_id: userId,
+                                        fcm_token: token.token || 'Unknown',
+                                        device_info: token.device_info || 'Unknown',
+                                        registration_date: token.created_at || 'Unknown',
+                                        last_used: token.last_used || 'No usage record',
+                                        status: token.is_active ? 'Active' : 'Inactive'
+                                    });
+                                });
+                            }
+                        });
+                    }
+                    
+                    console.log('Processed export data:', exportData); // Debug log
+                    
+                    if (exportData.length === 0) {
+                        alert('No device data found in local FCM tokens file.');
+                        return;
+                    }
+                    
+                    // Create CSV content
+                    const headers = ['User ID', 'FCM Token', 'Device Info', 'Registration Date', 'Last Used', 'Status'];
+                    const csvContent = [
+                        headers.join(','),
+                        ...exportData.map(row => [
+                            `"${row.user_id}"`,
+                            `"${row.fcm_token}"`,
+                            `"${row.device_info}"`,
+                            `"${row.registration_date}"`,
+                            `"${row.last_used}"`,
+                            `"${row.status}"`
+                        ].join(','))
+                    ].join('\n');
+                    
+                    // Create and download file
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `fcm_devices_${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    showResult('tokenResult', `Device data exported successfully! ${exportData.length} devices exported.`, 'success');
+                } else {
+                    alert('Failed to load FCM tokens from local file. Please check if the file exists.');
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + error.message);
+            }
+        }
+
+
+
+        // Show result
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Load user list
+        async function loadUserList() {
+            try {
+                console.log('Loading user list...');
+                const response = await fetch('/api/fcm/stats');
+                const result = await response.json();
+                
+                console.log('API response:', result);
+                
+                if (result.success && result.stats && result.stats.user_tokens) {
+                    console.log('User tokens found:', result.stats.user_tokens);
+                    displayUserList(result.stats.user_tokens);
+                } else {
+                    console.log('No user tokens found in response');
+                    console.log('Result structure:', result);
+                    document.getElementById('userList').innerHTML = '<div style="padding: 20px; text-align: center; color: #7f8c8d;">No registered users found.</div>';
+                }
+            } catch (error) {
+                console.error('User list loading error:', error);
+                document.getElementById('userList').innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;">Unable to load user list: ' + error.message + '</div>';
+            }
+        }
+        
+        // Display user list
+        function displayUserList(userTokens) {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+            
+            console.log('Displaying user list with data:', userTokens);
+            
+            if (!userTokens || Object.keys(userTokens).length === 0) {
+                userList.innerHTML = '<div style="padding: 20px; text-align: center; color: #7f8c8d;">No users found in the data.</div>';
+                return;
+            }
+            
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'user-selection-table';
+            
+            // Create table header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headerRow.innerHTML = `
+                <th style="width: 50px;">Select</th>
+                <th style="width: 120px;">User ID</th>
+                <th style="width: 100px;">Tokens</th>
+                <th style="width: 150px;">Registration Date</th>
+            `;
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Create table body
+            const tbody = document.createElement('tbody');
+            let userCount = 0;
+            
+            Object.entries(userTokens).forEach(([userId, userData]) => {
+                console.log('Processing user:', userId, 'with data:', userData);
+                
+                if (Array.isArray(userData) && userData.length > 0) {
+                    // userData is an array of token objects
+                    const firstToken = userData[0];
+                    const registrationDate = firstToken.created_at ? 
+                        new Date(firstToken.created_at).toLocaleDateString('en-US') : 'N/A';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td style="text-align: center;">
+                            <input type="checkbox" id="user_${userId}" value="${userId}" class="user-selection-checkbox">
+                        </td>
+                        <td class="user-selection-user-id">${userId || 'Unknown'}</td>
+                        <td class="user-selection-user-token-count">${userData.length}</td>
+                        <td class="user-selection-user-registration-date">${registrationDate}</td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                    userCount++;
+                } else {
+                    console.log('Invalid user data format for:', userId, userData);
+                }
+            });
+            
+            if (userCount === 0) {
+                userList.innerHTML = '<div style="padding: 20px; text-align: center; color: #7f8c8d;">No valid users found in the data.</div>';
+                return;
+            }
+            
+            table.appendChild(tbody);
+            userList.appendChild(table);
+            console.log('User list displayed successfully with', userCount, 'users');
+        }
+        
+        // Select all users
+        function selectAllUsers() {
+            const checkboxes = document.querySelectorAll('.user-selection-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        }
+        
+        // Deselect all users
+        function deselectAllUsers() {
+            const checkboxes = document.querySelectorAll('.user-selection-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+        
+        // Get selected user IDs
+        function getSelectedUserIds() {
+            const checkboxes = document.querySelectorAll('.user-selection-checkbox:checked');
+            return Array.from(checkboxes).map(checkbox => checkbox.value);
+        }
+        
+        // 클라이언트 동기화 관련 함수들
+        async function loadClientSyncStatus() {
+            try {
+                const response = await fetch('/api/clients/sync-status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayClientSyncStatus(result.sync_status);
+                } else {
+                    document.getElementById('clientSyncStatusContainer').innerHTML = 
+                        '<div style="padding: 20px; color: #e74c3c;">동기화 상태를 불러올 수 없습니다.</div>';
+                }
+            } catch (error) {
+                console.error('동기화 상태 로드 오류:', error);
+                document.getElementById('clientSyncStatusContainer').innerHTML = 
+                    '<div style="padding: 20px; color: #e74c3c;">동기화 상태 로드 실패</div>';
+            }
+        }
+        
+        function displayClientSyncStatus(syncStatus) {
+            const container = document.getElementById('clientSyncStatusContainer');
+            
+            let html = '<div style="padding: 15px;"><table style="width: 100%; border-collapse: collapse;">';
+            html += '<tr style="background-color: #f8f9fa; font-weight: bold;">';
+            html += '<th style="padding: 10px; border: 1px solid #dee2e6;">Site</th>';
+            html += '<th style="padding: 10px; border: 1px solid #dee2e6;">Records</th>';
+            html += '<th style="padding: 10px; border: 1px solid #dee2e6;">Last Sync</th>';
+            html += '<th style="padding: 10px; border: 1px solid #dee2e6;">Status</th>';
+            html += '<th style="padding: 10px; border: 1px solid #dee2e6;">Actions</th>';
+            html += '</tr>';
+            
+            for (const [site, status] of Object.entries(syncStatus)) {
+                const isExpired = status.is_expired;
+                const statusColor = isExpired ? '#e74c3c' : '#27ae60';
+                const statusText = isExpired ? '만료됨' : '유효함';
+                const ageText = status.cache_age_minutes ? `${status.cache_age_minutes}분 전` : '-';
+                
+                html += '<tr>';
+                html += `<td style="padding: 10px; border: 1px solid #dee2e6;">${site}</td>`;
+                html += `<td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${status.records}</td>`;
+                html += `<td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">${ageText}</td>`;
+                html += `<td style="padding: 10px; border: 1px solid #dee2e6; text-align: center; color: ${statusColor};">${statusText}</td>`;
+                html += `<td style="padding: 10px; border: 1px solid #dee2e6; text-align: center;">`;
+                html += `<button class="btn btn-sm" onclick="refreshSiteClients('${site}')" style="background-color: #3498db; color: white; border: none; padding: 5px 10px; border-radius: 3px;">새로고침</button>`;
+                html += '</td>';
+                html += '</tr>';
+            }
+            
+            html += '</table></div>';
+            container.innerHTML = html;
+        }
+        
+        async function refreshSiteClients(site) {
+            try {
+                showNotification(`${site} 클라이언트 데이터 새로고침 중...`, 'info');
+                
+                const response = await fetch(`/api/clients/refresh/${encodeURIComponent(site)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const changes = result.changes;
+                    let message = `${site} 데이터 업데이트 완료`;
+                    
+                    if (changes.added > 0 || changes.updated > 0 || changes.removed > 0) {
+                        message += ` (신규: ${changes.added}, 업데이트: ${changes.updated}, 제거: ${changes.removed})`;
+                    }
+                    
+                    showNotification(message, 'success');
+                    
+                    // 동기화 상태 다시 로드
+                    setTimeout(() => loadClientSyncStatus(), 1000);
+                    
+                } else {
+                    showNotification(`${site} 새로고침 실패: ${result.message}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error(`${site} 새로고침 오류:`, error);
+                showNotification(`${site} 새로고침 중 오류가 발생했습니다.`, 'error');
+            }
+        }
+        
+        async function refreshAllClientData() {
+            try {
+                showNotification('모든 사이트 클라이언트 데이터 새로고침 중...', 'info');
+                
+                const response = await fetch('/api/clients/refresh-all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const summary = result.summary;
+                    let message = `전체 새로고침 완료: 신규 ${summary.added}명, 업데이트 ${summary.updated}명, 제거 ${summary.removed}명`;
+                    
+                    showNotification(message, 'success');
+                    
+                    // 동기화 상태 다시 로드
+                    setTimeout(() => loadClientSyncStatus(), 1000);
+                    
+                } else {
+                    showNotification(`전체 새로고침 실패: ${result.message}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('전체 새로고침 오류:', error);
+                showNotification('전체 새로고침 중 오류가 발생했습니다.', 'error');
+            }
+        }
+        
+        // 페이지 로드 시 동기화 상태 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            loadClientSyncStatus();
+            
+            // 5분마다 자동으로 상태 새로고침
+            setInterval(loadClientSyncStatus, 5 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>

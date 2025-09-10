@@ -17,15 +17,61 @@
             Login User: <span class="user-name">{{ current_user.display_name if current_user else 'Unknown' }}</span>
         </div>
     </div>
+    
+    <style>
+        /* Refresh Button Style */
+        .btn-refresh {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            min-width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-refresh:hover {
+            background-color: #2980b9;
+            transform: scale(1.05);
+        }
+
+        .btn-refresh:active {
+            transform: scale(0.95);
+        }
+
+        .btn-refresh.loading {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
         <header class="app-header">
             <span>Progress Notes</span>
-            <div class="header-buttons" id="headerButtons">
-                <button class="btn-view-notes" onclick="window.location.href='/progress-notes'">View Notes</button>
-                <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
+                    <div class="header-buttons" id="headerButtons">
+            <button class="btn-view-notes" onclick="window.location.href='/progress-notes'">View Notes</button>
+            <!-- Debug information added -->
+            <div style="color: white; font-size: 12px; margin: 0 10px;">
+                User: {{ current_user.username if current_user else 'None' }} | 
+                Role: {{ current_user.role if current_user else 'None' }} | 
+                Is Admin: {{ current_user.is_admin() if current_user else 'False' }}
             </div>
+
+            <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
+        </div>
             <div class="window-controls">
                 <span>_</span><span>&#9723;</span><span>X</span>
             </div>
@@ -35,14 +81,22 @@
                 <div class="sidebar-section client-selection">
                     <div class="form-group">
                         <label for="client">Client:</label>
-                        <select id="client" class="form-control">
-                            <option value="">(none)</option>
-                            {% if clients %}
-                                {% for client in clients %}
-                                    <option value="{{ client.id }}">{{ client.name }} (ID: {{ client.id }})</option>
-                                {% endfor %}
-                            {% endif %}
-                        </select>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <select id="client" class="form-control" style="flex: 1;">
+                                <option value="">(none)</option>
+                                {% if clients %}
+                                    {% for client in clients %}
+                                        <option value="{{ client.id }}">{{ client.name }} (ID: {{ client.id }})</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                            <button id="refreshClientsBtn" class="btn-refresh" onclick="refreshClientList()" title="Refresh Client List">
+                                🔄
+                            </button>
+                        </div>
+                        <div id="clientSyncStatus" style="font-size: 11px; color: #666; margin-top: 5px; display: none;">
+                            Last Update: <span id="lastSyncTime">-</span>
+                        </div>
                     </div>
                     <!-- Service selection window - commented out
                     <div class="form-group">
@@ -67,6 +121,28 @@
 {#                        <li>Life Story</li>#}
 {#                    </ul>#}
                 </div>
+                
+                <!-- Policy & FCM Management Section -->
+                {% if current_user and current_user.role in ['admin', 'site_admin'] %}
+                <div class="sidebar-section policy-management">
+                    <h4 style="margin: 0 0 10px 0; color: #333; font-size: 14px;">🚨 Policy Management</h4>
+                    <button class="btn-admin-fcm-sidebar" onclick="window.location.href='/policy-management'">
+                        Policy & Recipients
+                    </button>
+                </div>
+                <div class="sidebar-section fcm-management">
+                    <h4 style="margin: 0 0 10px 0; color: #333; font-size: 14px;">🔥 FCM Management</h4>
+                    <button class="btn-admin-fcm-sidebar" onclick="window.location.href='/fcm-admin-dashboard'">
+                        FCM Dashboard
+                    </button>
+                </div>
+                <div class="sidebar-section admin-settings">
+                    <h4 style="margin: 0 0 10px 0; color: #333; font-size: 14px;">⚙️ Admin Settings</h4>
+                    <button class="btn-admin-settings-sidebar" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; width: 100%; margin-bottom: 5px;">
+                        🔧 System Settings
+                    </button>
+                </div>
+                {% endif %}
             </aside>
             <main class="content-area">
                 <div class="tabs">
@@ -182,5 +258,103 @@
     <!-- Load JavaScript files (at end of body) -->
     <script src="{{ url_for('static', filename='js/progressNoteDB.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    
+    <script>
+        // Client list refresh function
+        async function refreshClientList() {
+            const refreshBtn = document.getElementById('refreshClientsBtn');
+            const statusDiv = document.getElementById('clientSyncStatus');
+            const lastSyncSpan = document.getElementById('lastSyncTime');
+            const clientSelect = document.getElementById('client');
+            
+            // Get current site information
+            const siteNameElement = document.querySelector('.site-name');
+            const currentSite = siteNameElement ? siteNameElement.textContent.trim() : 'Parafield Gardens';
+            
+            try {
+                // Show loading state
+                refreshBtn.classList.add('loading');
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '⏳';
+                
+                statusDiv.style.display = 'block';
+                lastSyncSpan.textContent = 'Updating...';
+                
+                // API call
+                const response = await fetch(`/api/clients/refresh/${encodeURIComponent(currentSite)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update client list with page refresh on success
+                    const changes = result.changes;
+                    let message = `Client data update completed`;
+                    
+                    if (changes.added > 0 || changes.updated > 0 || changes.removed > 0) {
+                        message += `\\nNew: ${changes.added}, Updated: ${changes.updated}, Removed: ${changes.removed}`;
+                    }
+                    
+                    alert(message);
+                    
+                    // Reflect latest data with page refresh
+                    window.location.reload();
+                    
+                } else {
+                    alert(`Refresh failed: ${result.message}`);
+                    lastSyncSpan.textContent = 'Failed';
+                }
+                
+            } catch (error) {
+                console.error('Client refresh error:', error);
+                alert(`An error occurred during refresh: ${error.message}`);
+                lastSyncSpan.textContent = 'Error';
+            } finally {
+                // Release loading state
+                refreshBtn.classList.remove('loading');
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '🔄';
+            }
+        }
+        
+        // Check synchronization status on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/api/clients/sync-status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const siteNameElement = document.querySelector('.site-name');
+                    const currentSite = siteNameElement ? siteNameElement.textContent.trim() : 'Parafield Gardens';
+                    
+                    const siteStatus = result.sync_status[currentSite];
+                    if (siteStatus) {
+                        const statusDiv = document.getElementById('clientSyncStatus');
+                        const lastSyncSpan = document.getElementById('lastSyncTime');
+                        
+                        if (siteStatus.last_sync) {
+                            const syncTime = new Date(siteStatus.last_sync);
+                            const ageMinutes = siteStatus.cache_age_minutes || 0;
+                            
+                            lastSyncSpan.textContent = `${ageMinutes} minutes ago`;
+                            statusDiv.style.display = 'block';
+                            
+                            // Show warning if cache is expired
+                            if (siteStatus.is_expired) {
+                                statusDiv.style.color = '#e74c3c';
+                                lastSyncSpan.textContent += ' (Expired)';
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Sync status check error:', error);
+            }
+        });
+    </script>
 </body>
 </html>

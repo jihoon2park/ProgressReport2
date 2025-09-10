@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Policy & Alarm Management - Progress Report System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --light-bg: #ecf0f1;
+            --dark-text: #2c3e50;
+            --border-color: #bdc3c7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--dark-text);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-info h1 {
+            font-size: 2.5em;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header-info p {
+            font-size: 1.2em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+
+        .user-role {
+            color: #7f8c8d;
+        }
+
+        .btn-back {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+
+        .btn-back:hover {
+            background: #2980b9;
+        }
+
+        .management-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alarm-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 5px solid var(--secondary-color);
+        }
+
+        .alarm-section h4 {
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .alarm-modal-btn {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        .alarm-modal-btn:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .alarm-modal-btn.confirm {
+            background: var(--secondary-color);
+        }
+
+        .alarm-modal-btn.confirm:hover {
+            background: #2980b9;
+        }
+
+        .alarm-modal-btn.danger {
+            background: var(--accent-color);
+        }
+
+        .alarm-modal-btn.danger:hover {
+            background: #c0392b;
+        }
+
+        .template-item, .recipient-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .template-info, .recipient-info {
+            flex: 1;
+        }
+
+        .template-name, .recipient-name {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .template-description, .recipient-details {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        .template-actions, .recipient-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-edit, .btn-delete {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn-edit {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #e67e22;
+        }
+
+        .btn-delete {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+        }
+
+        .escalation-status {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .status-value {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #d5f4e6;
+            color: var(--success-color);
+        }
+
+        .status-inactive {
+            background: #fadbd8;
+            color: var(--accent-color);
+        }
+
+        .status-pending {
+            background: #fef9e7;
+            color: var(--warning-color);
+        }
+
+        .result-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+        }
+
+        .result-success {
+            background: #d5f4e6;
+            color: var(--success-color);
+            border: 1px solid #a9dfbf;
+        }
+
+        .result-error {
+            background: #fadbd8;
+            color: var(--accent-color);
+            border: 1px solid #f1948a;
+        }
+
+        .result-info {
+            background: #d6eaf8;
+            color: var(--secondary-color);
+            border: 1px solid #aed6f1;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--secondary-color);
+            font-size: 1.2em;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-info">
+                <h1>⚙️ Policy & Alarm Management</h1>
+                <p>Progress Report System - Advanced Alarm & Policy Configuration</p>
+            </div>
+            <div class="user-info">
+                <div class="user-name">{{ current_user.display_name }}</div>
+                <div class="user-role">{{ current_user.role }} - {{ current_user.position }}</div>
+                <button class="btn-back" onclick="window.location.href='/fcm-admin-dashboard'">← Back to FCM Dashboard</button>
+                <button class="btn-back" onclick="window.location.href='/escalation-policy-management'" style="margin-left: 10px; background-color: #e74c3c;">⚡ Escalation Policies</button>
+            </div>
+        </div>
+
+        <!-- Alarm Template Management -->
+        <div class="management-section">
+            <div class="section-title">
+                📋 Alarm Templates
+                <button class="alarm-modal-btn confirm" onclick="showCreateTemplateModal()">
+                    ➕ Create New Template
+                </button>
+            </div>
+            <div id="alarmTemplatesContent">
+                <div class="loading">Loading alarm templates...</div>
+            </div>
+        </div>
+
+        <!-- Recipient Management -->
+        <div class="management-section">
+            <div class="section-title">
+                👥 Recipients
+                <button class="alarm-modal-btn confirm" onclick="showAddRecipientModal()">
+                    ➕ Add New Recipient
+                </button>
+            </div>
+            <div id="alarmRecipientsContent">
+                <div class="loading">Loading recipients...</div>
+            </div>
+        </div>
+
+        <!-- Escalation Status -->
+        <div class="management-section">
+            <div class="section-title">🚨 Escalation Status</div>
+            <div id="escalationStatusContent">
+                <div class="loading">Loading escalation status...</div>
+            </div>
+        </div>
+
+        <!-- Result Messages -->
+        <div id="resultMessage" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let alarmTemplates = [];
+        let alarmRecipients = [];
+        let escalationStatus = {};
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Policy & Alarm Management initialized');
+            loadAlarmTemplates();
+            loadAlarmRecipients();
+            loadEscalationStatus();
+        });
+
+        // Load alarm templates
+        async function loadAlarmTemplates() {
+            try {
+                const response = await fetch('/api/alarm-templates', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alarmTemplates = data.templates || [];
+                    displayAlarmTemplates();
+                } else {
+                    throw new Error(data.message || 'Failed to load templates');
+                }
+            } catch (error) {
+                console.error('Error loading alarm templates:', error);
+                document.getElementById('alarmTemplatesContent').innerHTML = 
+                    '<div class="result-error">Error loading alarm templates: ' + error.message + '</div>';
+            }
+        }
+
+        // Display alarm templates
+        function displayAlarmTemplates() {
+            const container = document.getElementById('alarmTemplatesContent');
+            
+            if (alarmTemplates.length === 0) {
+                container.innerHTML = '<div class="no-data">No alarm templates found.</div>';
+                return;
+            }
+
+            let html = '';
+            alarmTemplates.forEach(template => {
+                html += `
+                    <div class="template-item">
+                        <div class="template-info">
+                            <div class="template-name">${template.name}</div>
+                            <div class="template-description">${template.description || 'No description'}</div>
+                        </div>
+                        <div class="template-actions">
+                            <button class="btn-edit" onclick="editTemplate('${template.id}')">Edit</button>
+                            <button class="btn-delete" onclick="deleteTemplate('${template.id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Load alarm recipients
+        async function loadAlarmRecipients() {
+            try {
+                const response = await fetch('/api/alarm-recipients', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alarmRecipients = data.recipients || [];
+                    displayAlarmRecipients();
+                } else {
+                    throw new Error(data.message || 'Failed to load recipients');
+                }
+            } catch (error) {
+                console.error('Error loading alarm recipients:', error);
+                document.getElementById('alarmRecipientsContent').innerHTML = 
+                    '<div class="result-error">Error loading recipients: ' + error.message + '</div>';
+            }
+        }
+
+        // Display alarm recipients
+        function displayAlarmRecipients() {
+            const container = document.getElementById('alarmRecipientsContent');
+            
+            if (alarmRecipients.length === 0) {
+                container.innerHTML = '<div class="no-data">No recipients found.</div>';
+                return;
+            }
+
+            let html = '';
+            alarmRecipients.forEach(recipient => {
+                html += `
+                    <div class="recipient-item">
+                        <div class="recipient-info">
+                            <div class="recipient-name">${recipient.name} (${recipient.role})</div>
+                            <div class="recipient-details">${recipient.email} | ${recipient.phone} | ${recipient.team}</div>
+                        </div>
+                        <div class="recipient-actions">
+                            <button class="btn-edit" onclick="editRecipient('${recipient.user_id}')">Edit</button>
+                            <button class="btn-delete" onclick="deleteRecipient('${recipient.user_id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Load escalation status
+        async function loadEscalationStatus() {
+            try {
+                const response = await fetch('/api/alarm-escalation-status', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    escalationStatus = data.status || {};
+                    displayEscalationStatus();
+                } else {
+                    throw new Error(data.message || 'Failed to load escalation status');
+                }
+            } catch (error) {
+                console.error('Error loading escalation status:', error);
+                document.getElementById('escalationStatusContent').innerHTML = 
+                    '<div class="result-error">Error loading escalation status: ' + error.message + '</div>';
+            }
+        }
+
+        // Display escalation status
+        function displayEscalationStatus() {
+            const container = document.getElementById('escalationStatusContent');
+            
+            const statusItems = [
+                { label: 'Primary Escalation', key: 'primary', default: 'Active' },
+                { label: 'Secondary Escalation', key: 'secondary', default: 'Inactive' },
+                { label: 'Emergency Escalation', key: 'emergency', default: 'Active' },
+                { label: 'Auto-Response', key: 'auto_response', default: 'Active' }
+            ];
+
+            let html = '<div class="escalation-status">';
+            statusItems.forEach(item => {
+                const status = escalationStatus[item.key] || item.default;
+                const statusClass = status === 'Active' ? 'status-active' : 
+                                  status === 'Inactive' ? 'status-inactive' : 'status-pending';
+                
+                html += `
+                    <div class="status-item">
+                        <span class="status-label">${item.label}</span>
+                        <span class="status-value ${statusClass}">${status}</span>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        // Show result message
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('resultMessage');
+            resultDiv.className = `result-message result-${type}`;
+            resultDiv.textContent = message;
+            resultDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Template management functions
+        function showCreateTemplateModal() {
+            // Implementation for creating template modal
+            showResult('Create template modal - to be implemented', 'info');
+        }
+
+        function editTemplate(templateId) {
+            showResult(`Edit template ${templateId} - to be implemented`, 'info');
+        }
+
+        function deleteTemplate(templateId) {
+            if (confirm('Are you sure you want to delete this template?')) {
+                showResult(`Delete template ${templateId} - to be implemented`, 'info');
+            }
+        }
+
+        // Recipient management functions
+        function showAddRecipientModal() {
+            // Implementation for adding recipient modal
+            showResult('Add recipient modal - to be implemented', 'info');
+        }
+
+        function editRecipient(userId) {
+            showResult(`Edit recipient ${userId} - to be implemented`, 'info');
+        }
+
+        function deleteRecipient(userId) {
+            if (confirm('Are you sure you want to delete this recipient?')) {
+                showResult(`Delete recipient ${userId} - to be implemented`, 'info');
+            }
+        }
+    </script>
+</body>
+</html>

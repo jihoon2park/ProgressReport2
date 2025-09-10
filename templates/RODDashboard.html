@@ -827,8 +827,8 @@
                     year: year
                 });
                 
-                // 사용자에게 더 명확한 에러 메시지 표시
-                const errorMessage = `데이터 로드 실패: ${error.message}`;
+                        // Display clearer error message to user
+        const errorMessage = `Data load failed: ${error.message}`;
                 showDetailedErrorMessage(errorMessage, error);
                 
                 hideLoadingPopup();
@@ -1285,15 +1285,15 @@
             document.getElementById('referencePopup').style.display = 'none';
         }
 
-        // 상세 에러 메시지 표시 함수
+        // Function to display detailed error message
         function showDetailedErrorMessage(message, error) {
-            // 기존 에러 메시지 제거
+            // Remove existing error message
             const existingError = document.querySelector('.detailed-error-message');
             if (existingError) {
                 existingError.remove();
             }
             
-            // 새 에러 메시지 생성
+            // Create new error message
             const errorDiv = document.createElement('div');
             errorDiv.className = 'detailed-error-message';
             errorDiv.style.cssText = `
@@ -1314,20 +1314,20 @@
             const errorDetails = error.stack ? error.stack.split('\n').slice(0, 3).join('<br>') : 'No stack trace available';
             
             errorDiv.innerHTML = `
-                <strong>🚨 ROD Dashboard 오류</strong><br><br>
-                <strong>메시지:</strong> ${message}<br><br>
-                <strong>사이트:</strong> ${currentSite}<br>
-                <strong>기간:</strong> ${year}년 ${month}월<br><br>
-                <strong>상세 정보:</strong><br>
+                <strong>🚨 ROD Dashboard Error</strong><br><br>
+                <strong>Message:</strong> ${message}<br><br>
+                <strong>Site:</strong> ${currentSite}<br>
+                <strong>Period:</strong> ${year}/${month}<br><br>
+                <strong>Details:</strong><br>
                 <small style="font-family: monospace; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 3px;">
                     ${errorDetails}
                 </small><br><br>
-                <small>자동으로 사라집니다</small>
+                <small>Will disappear automatically</small>
             `;
             
             document.body.appendChild(errorDiv);
             
-            // 15초 후 자동 제거
+            // Auto-remove after 15 seconds
             setTimeout(() => {
                 if (errorDiv.parentNode) {
                     errorDiv.remove();

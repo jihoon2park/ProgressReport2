@@ -1,5 +1,6 @@
 from flask_login import UserMixin
 from config_users import get_user
+from datetime import datetime
 
 class User(UserMixin):
     """Flask-Login을 위한 User 클래스"""
@@ -18,6 +19,7 @@ class User(UserMixin):
         """Flask-Login에서 요구하는 사용자 ID 반환"""
         return self.username
         
+    @property
     def is_authenticated(self):
         """인증된 사용자인지 확인"""
         return True
@@ -49,6 +51,57 @@ class User(UserMixin):
     def is_physiotherapist(self):
         """물리치료사인지 확인"""
         return self.role == 'physiotherapist'
+        
+    def is_site_admin(self):
+        """사이트 관리자인지 확인"""
+        return self.role == 'site_admin'
+
+class FCMToken:
+    """FCM 토큰 관리 모델"""
+    
+    def __init__(self, user_id: str, token: str, device_info: str = None, created_at: datetime = None):
+        self.user_id = user_id
+        self.token = token
+        self.device_info = device_info or "Unknown Device"
+        self.created_at = created_at or datetime.now()
+        self.last_used = datetime.now()
+        self.is_active = True
+    
+    def to_dict(self):
+        """딕셔너리 형태로 변환"""
+        return {
+            'user_id': self.user_id,
+            'token': self.token,
+            'device_info': self.device_info,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_used': self.last_used.isoformat() if self.last_used else None,
+            'is_active': self.is_active
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict):
+        """딕셔너리에서 객체 생성"""
+        created_at = None
+        last_used = None
+        
+        if data.get('created_at'):
+            try:
+                created_at = datetime.fromisoformat(data['created_at'])
+            except:
+                created_at = datetime.now()
+        
+        if data.get('last_used'):
+            try:
+                last_used = datetime.fromisoformat(data['last_used'])
+            except:
+                last_used = datetime.now()
+        
+        return cls(
+            user_id=data['user_id'],
+            token=data['token'],
+            device_info=data.get('device_info', 'Unknown Device'),
+            created_at=created_at
+        )
 
 def load_user(user_id):
     """Flask-Login의 user_loader 콜백 함수"""

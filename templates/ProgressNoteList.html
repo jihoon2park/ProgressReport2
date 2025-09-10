@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f7f9fa; }
-        .container { display: flex; height: 100vh; }
+        .container { display: flex; height: 100vh; position: relative; }
         .left-panel { flex: 2; padding: 24px 16px 16px 24px; background: #fff; border-right: 1px solid #e0e0e0; overflow-y: auto; overflow-x: visible; }
         .right-panel { flex: 1; padding: 24px 24px 16px 24px; background: #f9fbfd; }
         
@@ -44,9 +44,10 @@
         }
         .header-buttons {
             display: flex;
-            gap: 20px;
+            gap: 15px;
             justify-content: flex-end;
             margin: 0;
+            flex-wrap: wrap;
         }
         .btn-addnew { background: #28a745; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
         .btn-addnew:hover { background: #218838; }
@@ -57,7 +58,164 @@
         .btn-admin { background: #6f42c1; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
         .btn-admin:hover { background: #5a32a3; }
         
-        /* site-info-line 오버라이드 */
+        .btn-incident { background: #e74c3c; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
+        .btn-incident:hover { background: #c0392b; }
+        
+        .btn-admin-fcm { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3); }
+        .btn-admin-fcm:hover { background: linear-gradient(135deg, #c0392b, #a93226); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); }
+        
+        /* Log Viewer Button - Bottom Fixed */
+        .log-viewer-footer {
+            text-align: right;
+            padding: 20px;
+            margin-top: 30px;
+            border-top: 1px solid #e9ecef;
+        }
+        .btn-log-viewer { 
+            background: linear-gradient(135deg, #6c757d, #495057); 
+            color: #fff; 
+            border: none; 
+            border-radius: 6px; 
+            padding: 10px 20px; 
+            font-size: 1em; 
+            font-weight: 500; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3); 
+        }
+        .btn-log-viewer:hover { 
+            background: linear-gradient(135deg, #495057, #343a40); 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4); 
+        }
+        
+        /* 페이지네이션 스타일 */
+        .pagination-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .pagination-info {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-pagination {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-pagination:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        .btn-pagination:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .page-numbers {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .page-number {
+            background: #fff;
+            color: #007bff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .page-number:hover {
+            background: #e9ecef;
+        }
+        
+        .page-number.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .pagination-settings {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+        }
+        
+        .pagination-settings select {
+            padding: 4px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .btn-refresh-cache {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-refresh-cache:hover {
+            background: #218838;
+        }
+        
+        .cache-status {
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        .cache-status.cached {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .cache-status.api-fresh {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .cache-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* site-info-line override */
         .site-info-line {
             display: flex !important;
             align-items: center !important;
@@ -66,7 +224,7 @@
             flex-wrap: nowrap !important;
         }
         
-        /* 필터 스타일 */
+        /* Filter styles */
         .filter-header {
             display: flex;
             align-items: center;
@@ -185,7 +343,7 @@
         .note-detail h3 { margin-top: 0; font-size: 1.1em; color: #1976d2; }
         .note-detail pre { background: #f7f7f7; padding: 10px; border-radius: 4px; font-size: 0.97em; }
         
-        /* 팝업 스타일 */
+        /* Popup styles */
         .popup-overlay {
             position: fixed;
             top: 0;
@@ -286,8 +444,12 @@
     <div class="header-buttons">
         <button class="btn-addnew" onclick="openProgressNotePopup()">Add New</button>
         <button id="refreshBtn" class="btn-refresh" onclick="refreshData()">Refresh</button>
-        {% if current_user.role == 'admin' %}
-        <button class="btn-admin" onclick="window.location.href='/log-viewer'">Log Viewer</button>
+        {% if current_user.role in ['admin', 'site_admin'] %}
+        <button class="btn-incident" onclick="window.location.href='/incident-viewer?site={{ site }}'">🚨 Incident Viewer</button>
+        {% endif %}
+        {% if current_user.role in ['admin', 'site_admin'] %}
+        <button class="btn-admin-fcm" onclick="window.location.href='/fcm-admin-dashboard'">🔥 FCM Admin</button>
+        <button class="btn-admin-settings" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🔧 Settings</button>
         {% endif %}
         <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
     </div>
@@ -311,6 +473,39 @@
             <!-- Data rendered by JS -->
             </tbody>
         </table>
+        
+        <!-- Cache Refresh Button -->
+        <div style="text-align: center; margin: 20px 0;">
+            <button id="refreshCacheBtnTop" class="btn-refresh-cache" onclick="refreshCache()" title="Refresh Cache" style="font-size: 16px; padding: 10px 20px;">
+                🔄 Refresh Cache (Fetch from API)
+            </button>
+        </div>
+        
+        <!-- Pagination UI -->
+        <div id="paginationContainer" class="pagination-container" style="display: block;">
+            <div class="pagination-info">
+                <span id="paginationInfo">Page Information</span>
+            </div>
+            <div class="pagination-controls">
+                <button id="prevPageBtn" class="btn-pagination" onclick="changePage(-1)">← Previous</button>
+                <div id="pageNumbers" class="page-numbers"></div>
+                <button id="nextPageBtn" class="btn-pagination" onclick="changePage(1)">Next →</button>
+            </div>
+            <div class="pagination-settings">
+                <label for="perPageSelect">Items per page:</label>
+                <select id="perPageSelect" onchange="changePerPage()">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                </select>
+                <button id="refreshCacheBtn" class="btn-refresh-cache" onclick="refreshCache()" title="Refresh Cache">🔄</button>
+            </div>
+        </div>
+        
+        <!-- Cache Status Display -->
+        <div id="cacheStatus" class="cache-status" style="display: none;">
+            <span id="cacheStatusText">Cache Status</span>
+        </div>
     </div>
     <div class="right-panel">
         <div class="note-detail" id="noteDetail">
@@ -320,7 +515,7 @@
     </div>
 </div>
 
-<!-- Progress Note 팝업 -->
+        <!-- Progress Note Popup -->
 <div id="progressNotePopup" class="popup-overlay" style="display: none;">
     <div class="popup-content">
         <div class="popup-header">
@@ -328,7 +523,7 @@
             <button class="popup-close" onclick="closeProgressNotePopup()">&times;</button>
         </div>
         <div class="popup-body">
-            <iframe id="progressNoteFrame" src="/index" width="100%" height="600px" frameborder="0"></iframe>
+            <iframe id="progressNoteFrame" width="100%" height="600px" frameborder="0"></iframe>
         </div>
     </div>
 </div>
@@ -338,26 +533,31 @@
     window.currentSite = '{{ site }}';
     console.log('Site from server:', window.currentSite);
     
-    // 팝업 열기 함수
+            // Function to open popup
     function openProgressNotePopup() {
         const popup = document.getElementById('progressNotePopup');
         const frame = document.getElementById('progressNoteFrame');
         
-        // iframe의 src를 현재 사이트 정보와 함께 설정
+        // Set iframe src with current site information
         frame.src = `/index?site=${encodeURIComponent(window.currentSite)}`;
         
         popup.style.display = 'flex';
-        document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
     }
     
-    // 팝업 닫기 함수
+            // Function to close popup
     function closeProgressNotePopup() {
         const popup = document.getElementById('progressNotePopup');
+        const frame = document.getElementById('progressNoteFrame');
+        
+        // Clear iframe src when closing popup to prevent unnecessary requests
+        frame.src = '';
+        
         popup.style.display = 'none';
-        document.body.style.overflow = 'auto'; // 배경 스크롤 복원
+        document.body.style.overflow = 'auto'; // Restore background scrolling
     }
     
-    // ESC 키로 팝업 닫기
+            // Close popup with ESC key
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             const popup = document.getElementById('progressNotePopup');
@@ -367,7 +567,7 @@
         }
     });
     
-    // 팝업 외부 클릭으로 닫기
+            // Close popup by clicking outside
     document.addEventListener('click', function(event) {
         const popup = document.getElementById('progressNotePopup');
         if (event.target === popup) {
@@ -375,33 +575,34 @@
         }
     });
     
-    // iframe으로부터 메시지 수신
+            // Receive messages from iframe
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'PROGRESS_NOTE_SAVED') {
             if (event.data.action === 'close_and_refresh') {
                 closeProgressNotePopup();
-                // 데이터 새로고침
+                // Data refresh
                 setTimeout(() => {
                     refreshData();
                 }, 500);
             } else if (event.data.action === 'refresh_only') {
-                // 데이터만 새로고침
+                // Data only refresh
                 setTimeout(() => {
                     refreshData();
                 }, 500);
             } else if (event.data.action === 'close_only') {
-                // 팝업만 닫기
+                // Close popup only
                 closeProgressNotePopup();
             }
         }
     });
     
-    window.allNotes = []; // 모든 노트 데이터 저장
+    window.allNotes = []; // Store all notes data
     
 
 </script>
 <script src="/static/js/progressNoteDB.js"></script>
 <script src="/static/js/progressNoteList.js"></script>
-<script src="/static/js/script.js"></script>
+
+
 </body>
 </html> 

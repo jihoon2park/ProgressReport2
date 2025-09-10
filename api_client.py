@@ -41,6 +41,10 @@ class APIClient:
 
 
 
+def get_api_client(site):
+    """API 클라이언트 인스턴스를 반환하는 함수"""
+    return APIClient(site)
+
 def fetch_client_information(site):
     """클라이언트 정보를 가져오고 처리하는 함수"""
     logger.info(f"클라이언트 정보 요청 시작 - 사이트: {site}")

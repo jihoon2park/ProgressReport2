@@ -5,7 +5,7 @@
 // Current site setting (received from server or URL parameter or default value)
 const currentSite = window.currentSite || new URLSearchParams(window.location.search).get('site') || 'Ramsay';
 
-// 전역 클라이언트 매핑 객체
+// Global client mapping object
 let clientMap = {};
 
 // Performance monitoring variables
@@ -18,14 +18,14 @@ let performanceMetrics = {
 
 // Performance monitoring function
 function logPerformance(message, data = {}) {
-    // 성능 개선을 위해 로깅 제한
+    // Limit logging for performance improvement
     const isImportant = message.includes('error') || 
                        message.includes('failed') || 
                        message.includes('completed') ||
                        message.includes('initialization');
     
     if (!isImportant) {
-        return; // 중요하지 않은 로그는 출력하지 않음
+        return; // Do not output unimportant logs
     }
     
     const timestamp = Date.now();
@@ -80,7 +80,7 @@ function disableRefreshButton() {
         refreshBtn.style.opacity = '0.6';
         refreshBtn.style.cursor = 'not-allowed';
         
-        // 10초 후 자동으로 다시 활성화
+        // Automatically reactivate after 10 seconds
         setTimeout(() => {
             enableRefreshButton();
         }, 10000);
@@ -305,7 +305,31 @@ async function renderNotesTable() {
     
     tbody.appendChild(fragment);
     
-
+    // 페이지네이션 UI 강제 표시 (일반 목록 보기에서도)
+    if (notes.length > 0) {
+        console.log('강제로 페이지네이션 UI 표시 중...');
+        
+        // 서버에서 받은 페이지네이션 정보 사용 (우선순위)
+        let paginationData;
+        if (window.serverPagination) {
+            console.log('서버 페이지네이션 정보 사용:', window.serverPagination);
+            paginationData = window.serverPagination;
+        } else {
+            // 서버 페이지네이션 정보가 없으면 전체 노트 수 사용
+            const totalCount = window.allNotes ? window.allNotes.length : notes.length;
+            console.log('전체 노트 수 사용:', totalCount, '현재 표시된 노트 수:', notes.length);
+            
+            paginationData = {
+                page: 1,
+                per_page: 50,
+                total_count: totalCount,
+                total_pages: Math.ceil(totalCount / 50)
+            };
+        }
+        
+        console.log('최종 페이지네이션 데이터:', paginationData);
+        updatePaginationUI(paginationData);
+    }
     
     // Auto-select first visible row
     if (notes.length > 0) {
@@ -329,6 +353,39 @@ function selectNote(idx, notes) {
     // Show detail content
     const note = notes[idx];
     document.getElementById('noteDetailContent').innerHTML = formatNoteDetail(note);
+}
+
+// Update progress notes table with new data
+function updateProgressNotesTable(notes) {
+    console.log('Updating table with', notes.length, 'notes');
+    
+    const tbody = document.querySelector('#notesTable tbody');
+    tbody.innerHTML = '';
+    
+    // Batch DOM operations for better performance
+    const fragment = document.createDocumentFragment();
+    
+    notes.forEach((note, idx) => {
+        const rowData = mapNoteToRow(note);
+        const tr = document.createElement('tr');
+        tr.dataset.idx = idx;
+        Object.values(rowData).forEach(val => {
+            const td = document.createElement('td');
+            td.textContent = val;
+            tr.appendChild(td);
+        });
+        tr.addEventListener('click', () => selectNote(idx, notes));
+        fragment.appendChild(tr);
+    });
+    
+    tbody.appendChild(fragment);
+    
+    // Auto-select first visible row
+    if (notes.length > 0) {
+        selectNote(0, notes);
+    }
+    
+    console.log('Table updated successfully');
 }
 
 // Execute on page load
@@ -417,7 +474,7 @@ async function fetchAndSaveProgressNotes(eventTypes = null) {
             console.log('Fetching all progress notes (no event type filtering)');
         }
         
-        const response = await fetch('/api/fetch-progress-notes', {
+        const response = await fetch('/api/fetch-progress-notes-cached', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -433,6 +490,12 @@ async function fetchAndSaveProgressNotes(eventTypes = null) {
         
         if (result.success) {
             console.log(`Successfully fetched ${result.count} Progress Notes from server`);
+            
+            // 서버에서 받은 페이지네이션 정보를 전역 변수에 저장
+            if (result.pagination) {
+                window.serverPagination = result.pagination;
+                console.log('서버 페이지네이션 정보 저장:', result.pagination);
+            }
             
             // Save to IndexedDB
             if (result.data && result.data.length > 0) {
@@ -698,6 +761,265 @@ window.performanceMonitor = {
         };
     }
 };
+
+// 페이지네이션 관련 전역 변수
+let currentPage = 1;
+let totalPages = 1;
+let totalCount = 0;
+let perPage = 50;
+let currentPaginationData = null;
+
+// 페이지네이션 기능
+function updatePaginationUI(paginationData) {
+    console.log('updatePaginationUI called with:', paginationData);
+    currentPaginationData = paginationData;
+    currentPage = paginationData.page;
+    totalPages = paginationData.total_pages;
+    totalCount = paginationData.total_count;
+    
+    const container = document.getElementById('paginationContainer');
+    const info = document.getElementById('paginationInfo');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const pageNumbers = document.getElementById('pageNumbers');
+    
+    console.log('Pagination elements found:', {
+        container: !!container,
+        info: !!info,
+        prevBtn: !!prevBtn,
+        nextBtn: !!nextBtn,
+        pageNumbers: !!pageNumbers
+    });
+    
+    if (!container || !info || !prevBtn || !nextBtn || !pageNumbers) {
+        console.error('페이지네이션 UI 요소를 찾을 수 없습니다.');
+        return;
+    }
+    
+    // Update page information
+    const startItem = (currentPage - 1) * perPage + 1;
+    const endItem = Math.min(currentPage * perPage, totalCount);
+    info.textContent = `Showing ${startItem}-${endItem} of ${totalCount} items (Page ${currentPage}/${totalPages})`;
+    
+    // Update Previous/Next button states
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+    
+    // Generate page numbers (forced display version)
+    console.log('Creating page numbers...', { currentPage, totalPages });
+    pageNumbers.innerHTML = '';
+    
+    // Show maximum 10 page numbers
+    const maxVisiblePages = Math.min(10, totalPages);
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Adjust start page
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    console.log('Page range:', { startPage, endPage, totalPages });
+    
+    // Create page number buttons
+    for (let i = startPage; i <= endPage; i++) {
+        console.log(`Creating page button for page ${i}`);
+        const pageBtn = document.createElement('button');
+        pageBtn.className = `page-number ${i === currentPage ? 'active' : ''}`;
+        pageBtn.textContent = i;
+        pageBtn.onclick = () => {
+            console.log(`Page ${i} clicked`);
+            goToPage(i);
+        };
+        pageNumbers.appendChild(pageBtn);
+    }
+    
+    console.log('Page numbers created:', pageNumbers.children.length, 'buttons');
+    
+    // Force page numbers to be visible with styles
+    pageNumbers.style.display = 'flex';
+    pageNumbers.style.gap = '5px';
+    pageNumbers.style.justifyContent = 'center';
+    pageNumbers.style.alignItems = 'center';
+    
+    // Show container
+    console.log('Showing pagination container');
+    container.style.display = 'block';
+    
+    // Debug: Output pagination information
+    console.log('Pagination UI updated:', {
+        currentPage,
+        totalPages,
+        totalCount,
+        perPage,
+        startItem: (currentPage - 1) * perPage + 1,
+        endItem: Math.min(currentPage * perPage, totalCount)
+    });
+}
+
+function changePage(direction) {
+    console.log(`changePage called: direction=${direction}, currentPage=${currentPage}, totalPages=${totalPages}`);
+    const newPage = currentPage + direction;
+    if (newPage >= 1 && newPage <= totalPages) {
+        console.log(`Going to page: ${newPage}`);
+        goToPage(newPage);
+    } else {
+        console.log(`Invalid page: ${newPage} (must be between 1 and ${totalPages})`);
+    }
+}
+
+function goToPage(page) {
+    console.log(`goToPage called: page=${page}, currentPage=${currentPage}, totalPages=${totalPages}`);
+    if (page < 1 || page > totalPages) {
+        console.log(`Invalid page: ${page} (must be between 1 and ${totalPages})`);
+        return;
+    }
+    
+    if (page === currentPage) {
+        console.log(`Same page: ${page} - no action needed`);
+        return;
+    }
+    
+    console.log(`Changing to page: ${page}`);
+    currentPage = page;
+    loadProgressNotes();
+}
+
+function changePerPage() {
+    const select = document.getElementById('perPageSelect');
+    perPage = parseInt(select.value);
+    currentPage = 1; // Reset to first page
+    loadProgressNotes();
+}
+
+function refreshCache() {
+    const btn = document.getElementById('refreshCacheBtn');
+    const btnTop = document.getElementById('refreshCacheBtnTop');
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '🔄 Refreshing...';
+    }
+    if (btnTop) {
+        btnTop.disabled = true;
+        btnTop.textContent = '🔄 Refreshing...';
+    }
+    
+    // Load data with forced refresh
+    loadProgressNotes(true);
+    
+    setTimeout(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🔄';
+        }
+        if (btnTop) {
+            btnTop.disabled = false;
+            btnTop.textContent = '🔄 Refresh Cache (Fetch from API)';
+        }
+    }, 2000);
+}
+
+function updateCacheStatus(cacheInfo) {
+    const statusDiv = document.getElementById('cacheStatus');
+    const statusText = document.getElementById('cacheStatusText');
+    
+    if (!statusDiv || !statusText) {
+        return;
+    }
+    
+    let statusClass = 'cached';
+    let statusMessage = 'Loaded from cache';
+    
+    if (cacheInfo.status === 'api-fresh') {
+        statusClass = 'api-fresh';
+        statusMessage = 'Freshly loaded from API';
+    } else if (cacheInfo.status === 'error') {
+        statusClass = 'error';
+        statusMessage = 'Error occurred during loading';
+    } else if (cacheInfo.status === 'cached') {
+        const ageHours = cacheInfo.cache_age_hours || 0;
+        if (ageHours < 1) {
+            statusMessage = `Loaded from cache (${Math.round(ageHours * 60)} minutes ago)`;
+        } else {
+            statusMessage = `Loaded from cache (${Math.round(ageHours)} hours ago)`;
+        }
+    }
+    
+    statusText.textContent = statusMessage;
+    statusDiv.className = `cache-status ${statusClass}`;
+    statusDiv.style.display = 'block';
+}
+
+// 기존 loadProgressNotes 함수 수정
+async function loadProgressNotes(forceRefresh = false) {
+    try {
+        performanceMonitor.startMeasure('loadProgressNotes');
+        
+        const requestBody = {
+            site: currentSite,
+            days: 7,
+            page: currentPage,
+            per_page: perPage,
+            force_refresh: forceRefresh
+        };
+        
+        console.log(`Loading progress notes - Page: ${currentPage}, Per Page: ${perPage}, Force Refresh: ${forceRefresh}`);
+        
+        const response = await fetch('/api/fetch-progress-notes-cached', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('API Response:', result);
+        
+        if (result.success) {
+            // 데이터 표시
+            updateProgressNotesTable(result.data);
+            
+            // 페이지네이션 UI 업데이트
+            console.log('Pagination data:', result.pagination);
+            if (result.pagination) {
+                console.log('Updating pagination UI...', result.pagination);
+                updatePaginationUI(result.pagination);
+            } else {
+                console.log('No pagination data received - creating default pagination');
+                // API에서 페이지네이션 데이터가 없으면 기본값으로 생성
+                const defaultPagination = {
+                    page: currentPage,
+                    per_page: perPage,
+                    total_count: result.data ? result.data.length : 0,
+                    total_pages: Math.ceil((result.data ? result.data.length : 0) / perPage)
+                };
+                console.log('Using default pagination:', defaultPagination);
+                updatePaginationUI(defaultPagination);
+            }
+            
+            // 캐시 상태 표시
+            if (result.cache_info) {
+                updateCacheStatus(result.cache_info);
+            }
+            
+            console.log(`Progress notes loaded successfully - ${result.count} items (Page ${currentPage}/${result.pagination?.total_pages || 1})`);
+        } else {
+            throw new Error(result.message || 'Failed to load progress notes');
+        }
+        
+    } catch (error) {
+        console.error('Error loading progress notes:', error);
+        showError(`Failed to load progress notes: ${error.message}`);
+    } finally {
+        performanceMonitor.endMeasure('loadProgressNotes');
+    }
+}
 
 // 페이지 로드 시 디버깅 도구 안내
 console.log('Performance debugging tools available:');
