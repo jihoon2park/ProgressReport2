@@ -117,9 +117,17 @@ USERS_DB = {
         "location": ["Yankalilla"]
     },
     "ROD": {
-        "password_hash": hash_password("rod123!"),
+        "password_hash": hash_password("rod1234!"),
         "first_name": "ROD",
         "last_name": "User",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["All"]
+    },
+        "ROD_NR": {
+        "password_hash": hash_password("rodnr1234!"),
+        "first_name": "ROD",
+        "last_name": "Nerrilda",
         "role": "admin",
         "position": "Admin",
         "location": ["All"]
