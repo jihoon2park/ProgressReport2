@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Test Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result.info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+                    <h1>🔥 Firebase Cloud Messaging (FCM) Test</h1>
+        
+        <!-- FCM Token Registration/Removal -->
+        <div class="section">
+            <h3>📱 FCM Token Management</h3>
+            <div class="form-group">
+                <label for="fcmToken">FCM Token:</label>
+                <input type="text" id="fcmToken" placeholder="Enter FCM registration token" style="font-family: monospace;">
+            </div>
+            <div class="form-group">
+                <label for="deviceInfo">Device Info:</label>
+                <input type="text" id="deviceInfo" placeholder="e.g., Samsung Galaxy S21, iPhone 13" value="Web Browser">
+            </div>
+            <button onclick="registerToken()" class="btn-success">Register Token</button>
+            <button onclick="unregisterToken()" class="btn-danger">Remove Token</button>
+            <button onclick="getMyTokens()" class="btn-success">View My Tokens</button>
+            <div id="tokenResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Push Notification Sending -->
+        <div class="section">
+            <h3>📢 Push Notification Sending</h3>
+            <div class="form-group">
+                <label for="notificationTitle">Notification Title:</label>
+                <input type="text" id="notificationTitle" placeholder="Enter notification title" value="Test Notification">
+            </div>
+            <div class="form-group">
+                <label for="notificationBody">Notification Content:</label>
+                <textarea id="notificationBody" placeholder="Enter notification content">This is an FCM test notification.</textarea>
+            </div>
+            <div class="form-group">
+                <label for="notificationType">Target:</label>
+                <select id="notificationType">
+                    <option value="all">All Users</option>
+                    <option value="specific">Specific Users</option>
+                    <option value="topic">Send by Topic</option>
+                </select>
+            </div>
+            <div class="form-group" id="specificUsersGroup" style="display: none;">
+                <label for="specificUsers">User IDs (comma separated):</label>
+                <input type="text" id="specificUsers" placeholder="e.g., user1, user2, user3">
+            </div>
+            <div class="form-group" id="topicGroup" style="display: none;">
+                <label for="topicName">Topic Name:</label>
+                <input type="text" id="topicName" placeholder="e.g., news, alerts, updates">
+            </div>
+            <div class="form-group">
+                <label for="customData">Additional Data (JSON):</label>
+                <textarea id="customData" placeholder='{"key": "value", "type": "test"}'>{}</textarea>
+            </div>
+            <button onclick="sendNotification()" class="btn-success">Send Notification</button>
+            <div id="notificationResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- FCM Statistics -->
+        <div class="section">
+            <h3>📊 FCM Statistics</h3>
+            <button onclick="getFCMStats()" class="btn-success">View Statistics</button>
+            <div id="statsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Token Cleanup -->
+        <div class="section">
+            <h3>🧹 Token Cleanup</h3>
+            <div class="form-group">
+                <label for="cleanupDays">Cleanup threshold (days):</label>
+                <input type="number" id="cleanupDays" value="30" min="1" max="365">
+            </div>
+            <button onclick="cleanupTokens()" class="btn-danger">Cleanup Inactive Tokens</button>
+            <div id="cleanupResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Update UI when target changes
+        document.getElementById('notificationType').addEventListener('change', function() {
+            const specificUsersGroup = document.getElementById('specificUsersGroup');
+            const topicGroup = document.getElementById('topicGroup');
+            
+            specificUsersGroup.style.display = 'none';
+            topicGroup.style.display = 'none';
+            
+            if (this.value === 'specific') {
+                specificUsersGroup.style.display = 'block';
+            } else if (this.value === 'topic') {
+                topicGroup.style.display = 'block';
+            }
+        });
+
+        // FCM Token Registration
+        async function registerToken() {
+            const token = document.getElementById('fcmToken').value.trim();
+            const deviceInfo = document.getElementById('deviceInfo').value.trim();
+            
+            if (!token) {
+                showResult('tokenResult', 'Please enter FCM token.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/fcm/register-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token,
+                        device_info: deviceInfo || 'Unknown Device'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('tokenResult', `✅ ${result.message}\n\nToken: ${token}\nDevice: ${deviceInfo}`, 'success');
+                } else {
+                    showResult('tokenResult', `❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `❌ Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // FCM Token Removal
+        async function unregisterToken() {
+            const token = document.getElementById('fcmToken').value.trim();
+            
+            if (!token) {
+                showResult('tokenResult', 'Please enter FCM token.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/fcm/unregister-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('tokenResult', `✅ ${result.message}`, 'success');
+                    document.getElementById('fcmToken').value = '';
+                } else {
+                    showResult('tokenResult', `❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `❌ 오류 발생: ${error.message}`, 'error');
+            }
+        }
+
+        // Get my FCM tokens
+        async function getMyTokens() {
+            try {
+                const response = await fetch('/api/fcm/tokens');
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.tokens && result.tokens.length > 0) {
+                        let tokensHtml = '📱 Registered FCM Tokens:\n\n';
+                        result.tokens.forEach((token, index) => {
+                            tokensHtml += `Token ${index + 1}:\n`;
+                            tokensHtml += `  - Token: ${token.token}\n`;
+                            tokensHtml += `  - Device: ${token.device_info}\n`;
+                            tokensHtml += `  - Registration Date: ${token.created_at}\n`;
+                            tokensHtml += `  - Last Used: ${token.last_used}\n`;
+                            tokensHtml += `  - Status: ${token.is_active ? 'Active' : 'Inactive'}\n\n`;
+                        });
+                        showResult('tokenResult', tokensHtml, 'success');
+                    } else {
+                        showResult('tokenResult', '📱 No registered FCM tokens.', 'info');
+                    }
+                } else {
+                    showResult('tokenResult', `❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('tokenResult', `❌ Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Send push notification
+        async function sendNotification() {
+            const title = document.getElementById('notificationTitle').value.trim();
+            const body = document.getElementById('notificationBody').value.trim();
+            const notificationType = document.getElementById('notificationType').value;
+            
+            if (!title || !body) {
+                showResult('notificationResult', 'Please enter both title and content.', 'error');
+                return;
+            }
+            
+            let customData = {};
+            try {
+                customData = JSON.parse(document.getElementById('customData').value);
+            } catch (e) {
+                showResult('notificationResult', 'Additional data JSON format is invalid.', 'error');
+                return;
+            }
+            
+            const requestData = {
+                title: title,
+                body: body,
+                data: customData
+            };
+            
+            if (notificationType === 'specific') {
+                const users = document.getElementById('specificUsers').value.trim();
+                if (!users) {
+                    showResult('notificationResult', 'Please enter user IDs.', 'error');
+                    return;
+                }
+                requestData.user_ids = users.split(',').map(id => id.trim());
+            } else if (notificationType === 'topic') {
+                const topic = document.getElementById('topicName').value.trim();
+                if (!topic) {
+                    showResult('notificationResult', 'Please enter topic name.', 'error');
+                    return;
+                }
+                requestData.topic = topic;
+            }
+            
+            try {
+                const response = await fetch('/api/fcm/send-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = `✅ ${result.message}\n\n`;
+                    if (result.result) {
+                        message += `Result: ${JSON.stringify(result.result, null, 2)}`;
+                    }
+                    showResult('notificationResult', message, 'success');
+                } else {
+                    showResult('notificationResult', `❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('notificationResult', `❌ Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Get FCM statistics
+        async function getFCMStats() {
+            try {
+                const response = await fetch('/api/fcm/stats');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.stats;
+                    let statsHtml = '📊 FCM Token Statistics:\n\n';
+                    statsHtml += `Total Users: ${stats.total_users}\n`;
+                    statsHtml += `Total Tokens: ${stats.total_tokens}\n`;
+                    statsHtml += `Active Tokens: ${stats.active_tokens}\n`;
+                    statsHtml += `Inactive Tokens: ${stats.inactive_tokens}`;
+                    
+                    showResult('statsResult', statsHtml, 'success');
+                } else {
+                    showResult('statsResult', `❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('statsResult', `❌ Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Cleanup inactive tokens
+        async function cleanupTokens() {
+            const days = document.getElementById('cleanupDays').value;
+            
+            try {
+                const response = await fetch('/api/fcm/cleanup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        days_threshold: parseInt(days)
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('cleanupResult', `✅ ${result.message}`, 'success');
+                } else {
+                    showResult('cleanupResult', `❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('cleanupResult', `❌ Error occurred: ${error.message}`, 'error');
+            }
+        }
+
+        // Show result
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+            
+            // Auto-scroll
+            element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Get current user tokens on page load
+        window.addEventListener('load', function() {
+            getMyTokens();
+        });
+    </script>
+</body>
+</html>

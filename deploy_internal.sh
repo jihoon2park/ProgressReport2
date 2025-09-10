@@ -56,6 +56,22 @@ sudo python3 -m venv $APP_PATH/venv
 sudo $APP_PATH/venv/bin/pip install --upgrade pip
 sudo $APP_PATH/venv/bin/pip install -r $APP_PATH/requirements.txt
 
+# 데이터베이스 초기화 (첫 배포 시에만)
+echo "🗄️ 데이터베이스 초기화..."
+cd $APP_PATH
+if [ ! -f "progress_report.db" ]; then
+    echo "데이터베이스가 존재하지 않음. 초기화 실행..."
+    sudo -u www-data $APP_PATH/venv/bin/python init_database.py
+    if [ $? -eq 0 ]; then
+        echo "✅ 데이터베이스 초기화 완료"
+    else
+        echo "❌ 데이터베이스 초기화 실패 - 간단한 초기화 시도"
+        sudo -u www-data $APP_PATH/venv/bin/python init_database_simple.py
+    fi
+else
+    echo "✅ 기존 데이터베이스 발견 - 초기화 건너뜀"
+fi
+
 # Systemd 서비스 생성 (내부 서버용)
 echo "🔧 Systemd 서비스 설정..."
 sudo tee /etc/systemd/system/$APP_NAME.service > /dev/null <<EOF
@@ -104,6 +120,16 @@ echo "🔒 파일 권한 설정..."
 sudo chown -R www-data:www-data $APP_PATH
 sudo chmod -R 755 $APP_PATH
 sudo chmod 600 $APP_PATH/.env
+
+# SQLite 데이터베이스 파일 권한 설정
+if [ -f "$APP_PATH/progress_report.db" ]; then
+    sudo chown www-data:www-data $APP_PATH/progress_report.db
+    sudo chmod 664 $APP_PATH/progress_report.db
+    echo "✅ SQLite 데이터베이스 권한 설정 완료"
+fi
+
+# 데이터베이스 디렉토리 쓰기 권한 확인 (SQLite WAL 파일용)
+sudo chmod 775 $APP_PATH
 
 # 방화벽 설정 (내부 네트워크용)
 echo "🔥 방화벽 설정..."

@@ -20,6 +20,14 @@ USERS_DB = {
         "position": "System Administrator",
         "location": ["All"]
     },
+    "PG_admin": {
+        "password_hash": hash_password("password"),
+        "first_name": "PG",
+        "last_name": "Admin",
+        "role": "site_admin",
+        "position": "Site Administrator",
+        "location": ["Parafield Gardens"]
+    },
     "PaulVaska": {
         "password_hash": hash_password("Paul123!"),
         "first_name": "Paul",
