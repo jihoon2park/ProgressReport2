@@ -120,8 +120,8 @@ class PolicyScheduler:
                 DELETE FROM task_execution_logs 
                 WHERE performed_at < ? 
                   AND task_id IN (
-                      SELECT task_id FROM scheduled_tasks 
-                      WHERE status = 'completed' AND completed_at < ?
+                      SELECT task_name FROM scheduled_tasks 
+                      WHERE is_active = 0 AND last_run < ?
                   )
             ''', (cutoff_date, cutoff_date))
             

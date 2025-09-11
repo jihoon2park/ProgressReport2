@@ -78,11 +78,21 @@ class APIKeyManager:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            cursor.execute('''
-                SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
-                FROM api_keys 
-                WHERE site_name = ? AND is_active = 1
-            ''', (site_name,))
+            # 먼저 api_key 컬럼이 있는지 확인
+            cursor.execute("PRAGMA table_info(api_keys)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'api_key' in columns:
+                # 새로운 스키마 (평문 API 키)
+                cursor.execute('''
+                    SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
+                    FROM api_keys 
+                    WHERE site_name = ? AND is_active = 1
+                ''', (site_name,))
+            else:
+                # 기존 스키마 (암호화된 API 키) - 폴백 사용
+                logger.warning(f"api_key 컬럼이 없음, 폴백 사용: {site_name}")
+                return None
             
             result = cursor.fetchone()
             conn.close()
@@ -110,12 +120,23 @@ class APIKeyManager:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            cursor.execute('''
-                SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
-                FROM api_keys 
-                WHERE is_active = 1
-                ORDER BY site_name
-            ''')
+            # 먼저 api_key 컬럼이 있는지 확인
+            cursor.execute("PRAGMA table_info(api_keys)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'api_key' in columns:
+                # 새로운 스키마 (평문 API 키)
+                cursor.execute('''
+                    SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
+                    FROM api_keys 
+                    WHERE is_active = 1
+                    ORDER BY site_name
+                ''')
+            else:
+                # 기존 스키마 (암호화된 API 키) - 빈 결과 반환
+                logger.warning("api_key 컬럼이 없음, 빈 결과 반환")
+                conn.close()
+                return []
             
             results = cursor.fetchall()
             conn.close()

@@ -30,6 +30,81 @@ from api_client import APIClient
 from api_carearea import APICareArea
 from api_eventtype import APIEventType
 from config import SITE_SERVERS, API_HEADERS, get_available_sites
+import logging
+import os
+import sys
+from datetime import datetime
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
+
+# SITE_SERVERS 안전성 체크 및 폴백 처리
+def get_safe_site_servers():
+    """안전한 사이트 서버 정보 반환 (폴백 포함)"""
+    try:
+        # config에서 SITE_SERVERS 가져오기
+        if SITE_SERVERS and len(SITE_SERVERS) > 0:
+            logger.info(f"SITE_SERVERS 로드 성공: {list(SITE_SERVERS.keys())}")
+            return SITE_SERVERS
+        else:
+            logger.warning("SITE_SERVERS가 비어있음, 폴백 사용")
+            return get_fallback_site_servers()
+    except Exception as e:
+        logger.error(f"SITE_SERVERS 로드 실패: {e}, 폴백 사용")
+        return get_fallback_site_servers()
+
+# IIS 환경 감지 및 설정
+def is_iis_environment():
+    """IIS 환경인지 확인"""
+    return 'IIS' in os.environ.get('SERVER_SOFTWARE', '') or 'IIS' in os.environ.get('HTTP_HOST', '')
+
+def get_application_path():
+    """애플리케이션 경로 반환 (IIS 환경 고려)"""
+    if is_iis_environment():
+        # IIS 환경에서는 현재 작업 디렉토리 사용
+        return os.getcwd()
+    else:
+        # 개발 환경에서는 스크립트 디렉토리 사용
+        return os.path.dirname(os.path.abspath(__file__))
+
+# 전역 변수로 안전한 사이트 서버 정보 캐시
+_cached_site_servers = None
+
+def get_cached_site_servers():
+    """캐시된 안전한 사이트 서버 정보 반환"""
+    global _cached_site_servers
+    if _cached_site_servers is None:
+        _cached_site_servers = get_safe_site_servers()
+    return _cached_site_servers
+
+def get_fallback_site_servers():
+    """폴백 사이트 서버 정보"""
+    return {
+        'Parafield Gardens': '192.168.1.11:8080',
+        'Nerrilda': '192.168.21.12:8080',
+        'Ramsay': '192.168.31.12:8080',
+        'West Park': '192.168.41.12:8080',
+        'Yankalilla': '192.168.51.12:8080'
+    }
+
+def debug_site_servers():
+    """사이트 서버 정보 디버깅"""
+    try:
+        logger.info("=== 사이트 서버 정보 디버깅 시작 ===")
+        logger.info(f"USE_DB_API_KEYS: {getattr(config, 'USE_DB_API_KEYS', 'Not defined')}")
+        logger.info(f"SITE_SERVERS 타입: {type(SITE_SERVERS)}")
+        logger.info(f"SITE_SERVERS 내용: {SITE_SERVERS}")
+        logger.info(f"SITE_SERVERS 길이: {len(SITE_SERVERS) if SITE_SERVERS else 0}")
+        
+        # 안전한 사이트 서버 정보 확인
+        safe_servers = get_safe_site_servers()
+        logger.info(f"안전한 사이트 서버: {safe_servers}")
+        
+        logger.info("=== 사이트 서버 정보 디버깅 완료 ===")
+        return safe_servers
+    except Exception as e:
+        logger.error(f"사이트 서버 디버깅 중 오류: {e}")
+        return get_fallback_site_servers()
 from config_users import authenticate_user, get_user
 from config_env import get_flask_config, print_current_config, get_cache_policy
 from models import load_user, User
@@ -541,10 +616,144 @@ def check_api_server_health(server_ip):
 @app.route('/api/server-status')
 def get_server_status():
     """모든 사이트의 API 서버 상태를 반환"""
-    status = {}
-    for site, server_ip in SITE_SERVERS.items():
-        status[site] = check_api_server_health(server_ip)
-    return jsonify(status)
+    try:
+        # 안전한 사이트 서버 정보 사용
+        safe_site_servers = get_safe_site_servers()
+        status = {}
+        
+        for site, server_ip in safe_site_servers.items():
+            try:
+                status[site] = check_api_server_health(server_ip)
+                logger.debug(f"서버 상태 체크 완료 - {site}: {status[site]}")
+            except Exception as e:
+                logger.error(f"서버 상태 체크 실패 - {site}: {e}")
+                status[site] = False
+        
+        logger.info(f"서버 상태 API 응답: {status}")
+        return jsonify(status)
+    except Exception as e:
+        logger.error(f"서버 상태 API 오류: {e}")
+        # 오류 시 빈 상태 반환
+        return jsonify({})
+
+@app.route('/api/debug/site-servers')
+def debug_site_servers_api():
+    """사이트 서버 정보 디버깅 API (IIS 문제 진단용)"""
+    try:
+        debug_info = {
+            'timestamp': datetime.now().isoformat(),
+            'environment': 'IIS' if is_iis_environment() else 'Development',
+            'config_loaded': False,
+            'site_servers': {},
+            'fallback_used': False,
+            'errors': [],
+            'iis_info': {
+                'server_software': os.environ.get('SERVER_SOFTWARE', 'Not set'),
+                'http_host': os.environ.get('HTTP_HOST', 'Not set'),
+                'application_path': get_application_path(),
+                'current_directory': os.getcwd(),
+                'python_path': sys.executable
+            }
+        }
+        
+        # config 모듈 상태 확인
+        try:
+            import config
+            debug_info['config_loaded'] = True
+            debug_info['use_db_api_keys'] = getattr(config, 'USE_DB_API_KEYS', 'Not defined')
+            debug_info['site_servers'] = getattr(config, 'SITE_SERVERS', {})
+        except Exception as e:
+            debug_info['errors'].append(f"Config 로드 실패: {str(e)}")
+        
+        # 안전한 사이트 서버 정보 확인
+        try:
+            safe_servers = get_safe_site_servers()
+            debug_info['safe_site_servers'] = safe_servers
+            debug_info['fallback_used'] = safe_servers == get_fallback_site_servers()
+        except Exception as e:
+            debug_info['errors'].append(f"안전한 사이트 서버 로드 실패: {str(e)}")
+            debug_info['safe_site_servers'] = get_fallback_site_servers()
+            debug_info['fallback_used'] = True
+        
+        # API 키 매니저 상태 확인
+        try:
+            from api_key_manager import get_api_key_manager
+            manager = get_api_key_manager()
+            api_keys = manager.get_all_api_keys()
+            debug_info['api_keys_count'] = len(api_keys)
+            debug_info['api_keys'] = [{'site': key['site_name'], 'server': f"{key['server_ip']}:{key['server_port']}"} for key in api_keys]
+        except Exception as e:
+            debug_info['errors'].append(f"API 키 매니저 확인 실패: {str(e)}")
+            debug_info['api_keys_count'] = 0
+        
+        return jsonify(debug_info)
+    except Exception as e:
+        return jsonify({
+            'error': f"디버깅 API 오류: {str(e)}",
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/logs')
+def get_logs():
+    """로그 파일 목록 및 내용 조회 API"""
+    try:
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            return jsonify({'error': '로그 디렉토리가 없습니다'}), 404
+        
+        # 로그 파일 목록
+        log_files = []
+        for filename in os.listdir(log_dir):
+            if filename.endswith('.log'):
+                filepath = os.path.join(log_dir, filename)
+                stat = os.stat(filepath)
+                log_files.append({
+                    'name': filename,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+        
+        return jsonify({
+            'log_files': sorted(log_files, key=lambda x: x['modified'], reverse=True),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': f"로그 조회 실패: {str(e)}"}), 500
+
+@app.route('/api/logs/<filename>')
+def get_log_content(filename):
+    """특정 로그 파일 내용 조회"""
+    try:
+        # 보안: 파일명에 경로 조작 방지
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({'error': '잘못된 파일명'}), 400
+        
+        filepath = os.path.join("logs", filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': '파일을 찾을 수 없습니다'}), 404
+        
+        # 마지막 N줄 읽기
+        lines = request.args.get('lines', 100, type=int)
+        lines = min(lines, 1000)  # 최대 1000줄로 제한
+        
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            all_lines = f.readlines()
+            content_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+        
+        return jsonify({
+            'filename': filename,
+            'lines': len(content_lines),
+            'total_lines': len(all_lines),
+            'content': [line.rstrip() for line in content_lines],
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': f"로그 내용 조회 실패: {str(e)}"}), 500
+
+@app.route('/logs')
+def logs_page():
+    """로그 뷰어 페이지"""
+    return render_template('LogViewer.html')
 
 @app.route('/api/health')
 def health_check():
@@ -606,7 +815,8 @@ def home():
         
         # allowed_sites가 비어있으면 기본값으로 설정
         if not allowed_sites:
-            allowed_sites = list(SITE_SERVERS.keys())
+            safe_site_servers = get_safe_site_servers()
+            allowed_sites = list(safe_site_servers.keys())
             session['allowed_sites'] = allowed_sites
             logger.warning(f"홈 페이지에서 allowed_sites가 비어있음, 기본 사이트 목록으로 설정: {allowed_sites}")
         
@@ -626,12 +836,24 @@ def home():
         logger.info(f"일반 사용자 - progress_notes로 리다이렉트 (site={site}, allowed_sites={allowed_sites})")
         return redirect(url_for('progress_notes', site=site))
     
-    return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
+    # 폴백 로그인 페이지
+    safe_site_servers = get_safe_site_servers()
+    return render_template('LoginPage.html', sites=safe_site_servers.keys())
 
 @app.route('/login', methods=['GET'])
 def login_page():
     """로그인 페이지"""
-    return render_template('LoginPage.html', sites=SITE_SERVERS.keys())
+    try:
+        # 안전한 사이트 서버 정보 사용
+        safe_site_servers = get_safe_site_servers()
+        sites = list(safe_site_servers.keys())
+        logger.info(f"로그인 페이지 렌더링 - 사이트 목록: {sites}")
+        return render_template('LoginPage.html', sites=sites)
+    except Exception as e:
+        logger.error(f"로그인 페이지 렌더링 실패: {e}")
+        # 최종 폴백
+        fallback_sites = list(get_fallback_site_servers().keys())
+        return render_template('LoginPage.html', sites=fallback_sites)
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -671,11 +893,13 @@ def login():
                 
                 # ADMIN 사용자는 항상 모든 사이트 접근 허용
                 if user_role == 'ADMIN':
-                    allowed_sites = list(SITE_SERVERS.keys())
+                    safe_site_servers = get_safe_site_servers()
+                    allowed_sites = list(safe_site_servers.keys())
                     logger.info(f"ADMIN 사용자 - 모든 사이트 허용: {allowed_sites}")
                 # location이 All이거나 2개 이상이면 모든 사이트 허용
                 elif (isinstance(user_location, list) and (len(user_location) > 1 or (len(user_location) == 1 and user_location[0].lower() == 'all'))) or (isinstance(user_location, str) and user_location.lower() == 'all'):
-                    allowed_sites = list(SITE_SERVERS.keys())
+                    safe_site_servers = get_safe_site_servers()
+                    allowed_sites = list(safe_site_servers.keys())
                     logger.info(f"모든 사이트 허용: {allowed_sites}")
                 else:
                     # location이 1개면 해당 사이트만 허용
@@ -951,10 +1175,11 @@ def rod_dashboard():
     
     # 모든 사이트 정보 가져오기
     sites_info = []
-    for site_name in SITE_SERVERS.keys():
+    safe_site_servers = get_safe_site_servers()
+    for site_name in safe_site_servers.keys():
         sites_info.append({
             'name': site_name,
-            'server': SITE_SERVERS[site_name],
+            'server': safe_site_servers[site_name],
             'is_selected': site_name == site
         })
     
@@ -966,38 +1191,49 @@ def rod_dashboard():
 @app.route('/progress-notes')
 @login_required
 def progress_notes():
-    allowed_sites = session.get('allowed_sites', [])
-    site = request.args.get('site', session.get('site', 'Ramsay'))
-    logger.info(f"progress_notes: allowed_sites={allowed_sites} (타입: {type(allowed_sites)}), site={site}")
-    logger.info(f"progress_notes 세션 전체 내용: {dict(session)}")
-    logger.info(f"progress_notes request.args: {dict(request.args)}")
+    try:
+        allowed_sites = session.get('allowed_sites', [])
+        site = request.args.get('site', session.get('site', 'Ramsay'))
+        logger.info(f"progress_notes: allowed_sites={allowed_sites} (타입: {type(allowed_sites)}), site={site}")
+        logger.info(f"progress_notes 세션 전체 내용: {dict(session)}")
+        logger.info(f"progress_notes request.args: {dict(request.args)}")
+        
+        # allowed_sites가 비어있으면 기본 사이트 목록에서 선택
+        if not allowed_sites:
+            safe_site_servers = get_safe_site_servers()
+            allowed_sites = list(safe_site_servers.keys())
+            # 세션에 다시 저장
+            session['allowed_sites'] = allowed_sites
+            logger.warning(f"allowed_sites가 비어있음, 기본 사이트 목록으로 설정: {allowed_sites}")
+        
+        # location이 1개면 무조건 그 사이트로 강제
+        if isinstance(allowed_sites, list) and len(allowed_sites) == 1:
+            forced_site = allowed_sites[0]
+            if site != forced_site:
+                logger.info(f"단일 사이트 강제 리다이렉트: {site} -> {forced_site}")
+                return redirect(url_for('progress_notes', site=forced_site))
+            site = forced_site
+        
+        # 접속 로그 기록
+        try:
+            user_info = {
+                "username": current_user.username,
+                "display_name": current_user.display_name,
+                "role": current_user.role,
+                "position": current_user.position
+            }
+            usage_logger.log_access(user_info)
+        except Exception as e:
+            logger.error(f"접속 로그 기록 실패: {e}")
+        
+        logger.info(f"progress_notes 최종 렌더링 - site: {site}, allowed_sites: {allowed_sites}")
+        return render_template('ProgressNoteList.html', site=site)
     
-    # allowed_sites가 비어있으면 기본 사이트 목록에서 선택
-    if not allowed_sites:
-        allowed_sites = list(SITE_SERVERS.keys())
-        # 세션에 다시 저장
-        session['allowed_sites'] = allowed_sites
-        logger.warning(f"allowed_sites가 비어있음, 기본 사이트 목록으로 설정: {allowed_sites}")
-    
-    # location이 1개면 무조건 그 사이트로 강제
-    if isinstance(allowed_sites, list) and len(allowed_sites) == 1:
-        forced_site = allowed_sites[0]
-        if site != forced_site:
-            logger.info(f"단일 사이트 강제 리다이렉트: {site} -> {forced_site}")
-            return redirect(url_for('progress_notes', site=forced_site))
-        site = forced_site
-    
-    # 접속 로그 기록
-    user_info = {
-        "username": current_user.username,
-        "display_name": current_user.display_name,
-        "role": current_user.role,
-        "position": current_user.position
-    }
-    usage_logger.log_access(user_info)
-    
-    logger.info(f"progress_notes 최종 렌더링 - site: {site}, allowed_sites: {allowed_sites}")
-    return render_template('ProgressNoteList.html', site=site)
+    except Exception as e:
+        logger.error(f"progress_notes 오류: {e}")
+        # 오류 발생 시 로그인 페이지로 리다이렉트
+        flash('페이지 로드 중 오류가 발생했습니다. 다시 로그인해주세요.', 'error')
+        return redirect(url_for('login_page'))
 
 @app.route('/save_progress_note', methods=['POST'])
 @login_required
@@ -1496,11 +1732,12 @@ def fetch_progress_notes():
         logger.info(f"Request data: {data}")
         
         # 사이트 서버 설정 확인
-        if site not in SITE_SERVERS:
-            logger.error(f"Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}")
+        safe_site_servers = get_safe_site_servers()
+        if site not in safe_site_servers:
+            logger.error(f"Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}")
             return jsonify({
                 'success': False, 
-                'message': f'Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}'
+                'message': f'Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}'
             }), 400
         
         # 캐시 매니저 사용
@@ -1718,12 +1955,13 @@ def incident_viewer():
         return redirect(url_for('home'))
     
     # 사이트 파라미터 가져오기 (등록된 사이트 중 첫 번째를 기본값으로)
-    default_site = list(SITE_SERVERS.keys())[0] if SITE_SERVERS else 'Parafield Gardens'
+    safe_site_servers = get_safe_site_servers()
+    default_site = list(safe_site_servers.keys())[0] if safe_site_servers else 'Parafield Gardens'
     site = request.args.get('site', default_site)
     
     # 사이트 목록 생성
     sites = []
-    for site_name, server_info in SITE_SERVERS.items():
+    for site_name, server_info in safe_site_servers.items():
         sites.append({
             'name': site_name,
             'server': server_info,
@@ -1847,13 +2085,14 @@ def fetch_incidents():
         logger.info(f"Fetching incidents for {site} from {start_date} to {end_date}")
         
         # 사이트 서버 설정 확인
-        if site not in SITE_SERVERS:
+        safe_site_servers = get_safe_site_servers()
+        if site not in safe_site_servers:
             return jsonify({
                 'success': False, 
-                'message': f'Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}'
+                'message': f'Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}'
             }), 400
         
-        server_ip = SITE_SERVERS[site]
+        server_ip = safe_site_servers[site]
         logger.info(f"Target server for {site}: {server_ip}")
         
         try:
@@ -2607,7 +2846,8 @@ def cleanup_data_folder():
             ]
             
             # 사이트별 client 파일도 보존
-            for site in SITE_SERVERS.keys():
+            safe_site_servers = get_safe_site_servers()
+            for site in safe_site_servers.keys():
                 site_name = site.replace(' ', '_').lower()
                 preserve_files.append(f"{site_name}_client.json")
             

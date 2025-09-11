@@ -87,16 +87,27 @@ class ProgressNotesCacheManager:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 마지막 동기화 시간 확인
+            # 실제 캐시 데이터 확인
             cursor.execute('''
-                SELECT last_sync_time, sync_status, total_notes
+                SELECT COUNT(*) as count, MAX(created_at) as last_created
+                FROM progress_notes_cache 
+                WHERE site_name = ? AND expires_at > ?
+            ''', (site, datetime.now().isoformat()))
+            
+            cache_info = cursor.fetchone()
+            cache_count = cache_info[0] if cache_info else 0
+            last_created = cache_info[1] if cache_info and cache_info[1] else None
+            
+            # 동기화 상태도 확인
+            cursor.execute('''
+                SELECT last_sync, sync_status, records_count
                 FROM progress_notes_sync 
-                WHERE site = ?
+                WHERE site_name = ?
             ''', (site,))
             
             sync_info = cursor.fetchone()
             
-            if not sync_info:
+            if cache_count == 0:
                 return {
                     'is_fresh': False,
                     'last_sync': None,
@@ -104,14 +115,18 @@ class ProgressNotesCacheManager:
                     'status': 'no_cache'
                 }
             
-            last_sync = datetime.fromisoformat(sync_info['last_sync_time']) if sync_info['last_sync_time'] else None
-            cache_age_hours = (datetime.now() - last_sync).total_seconds() / 3600 if last_sync else float('inf')
+            # 캐시 나이 계산
+            if last_created:
+                last_created_dt = datetime.fromisoformat(last_created)
+                cache_age_hours = (datetime.now() - last_created_dt).total_seconds() / 3600
+            else:
+                cache_age_hours = float('inf')
             
             return {
                 'is_fresh': cache_age_hours < self.cache_duration_hours,
-                'last_sync': sync_info['last_sync_time'],
-                'total_notes': sync_info['total_notes'],
-                'status': sync_info['sync_status'],
+                'last_sync': sync_info[0] if sync_info else last_created,
+                'total_notes': cache_count,
+                'status': sync_info[1] if sync_info else 'cached',
                 'cache_age_hours': cache_age_hours
             }
             
@@ -136,31 +151,70 @@ class ProgressNotesCacheManager:
             # 날짜 범위 계산
             cutoff_date = datetime.now() - timedelta(days=days)
             
-            # 전체 개수 조회 (api_created_at이 NULL인 경우도 포함)
+            # 캐시에서 데이터 조회 (모든 노트가 하나의 JSON으로 저장됨)
             cursor.execute('''
-                SELECT COUNT(*) as total
+                SELECT data
                 FROM progress_notes_cache 
-                WHERE site = ? AND is_active = 1 
-                AND (api_created_at >= ? OR api_created_at IS NULL)
-            ''', (site, cutoff_date.isoformat()))
+                WHERE site_name = ? AND expires_at > ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            ''', (site, datetime.now().isoformat()))
             
-            total_count = cursor.fetchone()['total']
+            cache_row = cursor.fetchone()
+            if not cache_row:
+                return {
+                    'notes': [],
+                    'total_count': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'total_pages': 0,
+                    'cache_status': 'no_cache',
+                    'last_sync': None
+                }
             
-            # 페이지네이션으로 데이터 조회 (api_created_at이 NULL인 경우도 포함)
+            # JSON 데이터 파싱
+            try:
+                all_notes = json.loads(cache_row[0])
+                if not isinstance(all_notes, list):
+                    all_notes = []
+            except json.JSONDecodeError as e:
+                logger.error(f"캐시 데이터 JSON 파싱 실패: {e}")
+                return {
+                    'notes': [],
+                    'total_count': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'total_pages': 0,
+                    'cache_status': 'error',
+                    'last_sync': None
+                }
+            
+            # 날짜 필터링 (days 파라미터 적용)
+            if days > 0:
+                cutoff_date = datetime.now() - timedelta(days=days)
+                filtered_notes = []
+                for note in all_notes:
+                    # 노트의 생성일 확인 (다양한 필드명 지원)
+                    note_date = None
+                    for date_field in ['createdAt', 'CreatedAt', 'created_at', 'date']:
+                        if date_field in note and note[date_field]:
+                            try:
+                                if isinstance(note[date_field], str):
+                                    note_date = datetime.fromisoformat(note[date_field].replace('Z', '+00:00'))
+                                else:
+                                    note_date = note[date_field]
+                                break
+                            except:
+                                continue
+                    
+                    if note_date is None or note_date >= cutoff_date:
+                        filtered_notes.append(note)
+                all_notes = filtered_notes
+            
+            # 페이지네이션 적용
+            total_count = len(all_notes)
             offset = (page - 1) * per_page
-            cursor.execute('''
-                SELECT note_data, api_created_at, api_updated_at
-                FROM progress_notes_cache 
-                WHERE site = ? AND is_active = 1 
-                AND (api_created_at >= ? OR api_created_at IS NULL)
-                ORDER BY COALESCE(api_created_at, created_at) DESC
-                LIMIT ? OFFSET ?
-            ''', (site, cutoff_date.isoformat(), per_page, offset))
-            
-            notes = []
-            for row in cursor.fetchall():
-                note_data = json.loads(row['note_data'])
-                notes.append(note_data)
+            notes = all_notes[offset:offset + per_page]
             
             total_pages = (total_count + per_page - 1) // per_page
             
@@ -229,49 +283,37 @@ class ProgressNotesCacheManager:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 기존 데이터 비활성화
-            cursor.execute('''
-                UPDATE progress_notes_cache 
-                SET is_active = 0, updated_at = ?
-                WHERE site = ?
-            ''', (datetime.now().isoformat(), site))
+            # 기존 데이터 삭제
+            cursor.execute('DELETE FROM progress_notes_cache WHERE site_name = ?', (site,))
             
             # 새 데이터 삽입
             new_notes_count = 0
-            for note in notes:
-                try:
-                    note_id = note.get('id') or note.get('Id')
-                    if not note_id:
-                        continue
-                    
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO progress_notes_cache 
-                        (site, note_id, note_data, api_created_at, api_updated_at, is_active)
-                        VALUES (?, ?, ?, ?, ?, 1)
-                    ''', (
-                        site,
-                        note_id,
-                        json.dumps(note),
-                        note.get('createdAt') or note.get('CreatedAt'),
-                        note.get('updatedAt') or note.get('UpdatedAt'),
-                    ))
-                    new_notes_count += 1
-                    
-                except Exception as e:
-                    logger.warning(f"노트 캐시 저장 실패 (ID: {note_id}): {e}")
-                    continue
+            cache_key = f"progress_notes_{site}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            expires_at = datetime.now() + timedelta(hours=self.cache_duration_hours)
+            
+            # 모든 노트를 하나의 JSON으로 저장
+            cursor.execute('''
+                INSERT INTO progress_notes_cache 
+                (site_name, cache_key, data, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                site,
+                cache_key,
+                json.dumps(notes),
+                datetime.now().isoformat(),
+                expires_at.isoformat()
+            ))
+            new_notes_count = len(notes)
             
             # 동기화 상태 업데이트
             cursor.execute('''
                 INSERT OR REPLACE INTO progress_notes_sync 
-                (site, last_sync_time, total_notes, new_notes_count, sync_status, updated_at)
-                VALUES (?, ?, ?, ?, 'success', ?)
+                (site_name, last_sync, records_count, sync_status)
+                VALUES (?, ?, ?, 'success')
             ''', (
                 site,
                 datetime.now().isoformat(),
-                len(notes),
-                new_notes_count,
-                datetime.now().isoformat()
+                len(notes)
             ))
             
             conn.commit()
