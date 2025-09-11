@@ -36,6 +36,10 @@ echo 프로덕션 환경 설정 중...
 cd "C:\inetpub\wwwroot\ProgressReport"
 python production_setup.py
 
+REM DB 스키마 수정 (운영 서버와 개발 서버 동기화)
+echo DB 스키마 수정 중...
+python fix_prod_schema.py
+
 REM wfastcgi 활성화
 echo wfastcgi 활성화 중...
 wfastcgi-enable
