@@ -341,9 +341,32 @@ def fetch_care_area_information(site):
     return True, None  # DB에서 조회하므로 API 호출 불필요
 
 def fetch_event_type_information(site):
-    """Event Type 정보를 가져오고 처리 (비활성화 - DB 사용)"""
-    logger.info(f"Event Type 정보 조회 건너뜀 - DB에서 조회됨 (사이트: {site})")
-    return True, None  # DB에서 조회하므로 API 호출 불필요
+    """Event Type 정보를 가져오고 처리 (ROD 대시보드용 활성화)"""
+    try:
+        from api_eventtype import APIEventType
+        logger.info(f"Event Type 정보 조회 시작 - 사이트: {site}")
+        
+        api_eventtype = APIEventType(site)
+        event_type_data = api_eventtype.get_event_type_information()
+        
+        if event_type_data:
+            # Event Type 데이터가 리스트 형태로 직접 반환됨
+            if isinstance(event_type_data, list):
+                logger.info(f"Event Type 정보 조회 성공 - 사이트: {site}, {len(event_type_data)}개")
+                return True, event_type_data
+            elif isinstance(event_type_data, dict) and 'data' in event_type_data:
+                logger.info(f"Event Type 정보 조회 성공 - 사이트: {site}, {len(event_type_data['data'])}개")
+                return True, event_type_data['data']
+            else:
+                logger.warning(f"Event Type 데이터 구조 예상과 다름 - 사이트: {site}, 타입: {type(event_type_data)}")
+                return False, None
+        else:
+            logger.warning(f"Event Type 정보 조회 실패 - 사이트: {site}")
+            return False, None
+            
+    except Exception as e:
+        logger.error(f"Event Type 정보 조회 중 오류 - 사이트: {site}, 오류: {e}")
+        return False, None
 
 def save_json_file(filepath, data):
     """JSON 데이터를 파일로 저장"""
@@ -1764,17 +1787,48 @@ def fetch_progress_notes():
                 'message': f'Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}'
             }), 400
         
-        # 캐시 매니저 사용
-        from progress_notes_cache_manager import cache_manager
+        # JSON 캐시 매니저 사용
+        from progress_notes_json_cache import json_cache
+        from api_progressnote_fetch import fetch_progress_notes_for_site
         
-        if force_refresh:
-            # 강제 새로고침: 캐시 무시하고 API에서 직접 조회
-            logger.info(f"강제 새로고침 모드 - API에서 직접 조회: {site}")
-            result = cache_manager._get_notes_from_api_and_cache(site, page, per_page, days)
+        # ROD 대시보드: 무조건 API에서 새로 받아오기 (캐시 무시)
+        logger.info(f"ROD 대시보드 모드 - 무조건 API에서 새로 조회: {site}")
+        success, notes = fetch_progress_notes_for_site(site, days)
+        
+        if not success or not notes:
+            result = {
+                'success': False,
+                'notes': [],
+                'page': page,
+                'per_page': per_page,
+                'total_count': 0,
+                'total_pages': 0,
+                'cache_status': 'no_data',
+                'last_sync': None,
+                'cache_age_hours': 0
+            }
         else:
-            # 하이브리드 캐싱 사용
-            logger.info(f"하이브리드 캐싱 모드 - 사이트: {site}")
-            result = cache_manager.get_cached_notes(site, page, per_page, days, use_hybrid=True)
+            # JSON 캐시에 저장 (다른 페이지에서 사용할 수 있도록)
+            json_cache.update_cache(site, notes)
+            
+            # 페이지네이션 적용
+            total_count = len(notes)
+            total_pages = (total_count + per_page - 1) // per_page
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_notes = notes[start_idx:end_idx]
+            
+            result = {
+                'success': True,
+                'notes': paginated_notes,
+                'page': page,
+                'per_page': per_page,
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'cache_status': 'fresh_api_data',
+                'last_sync': datetime.now().isoformat(),
+                'cache_age_hours': 0
+            }
         
         # 응답 데이터 구성
         response_data = {
@@ -1796,77 +1850,40 @@ def fetch_progress_notes():
             'fetched_at': datetime.now().isoformat()
         }
         
-        logger.info(f"프로그레스 노트 가져오기 성공 - {site}: {result['total_count']}개 (페이지 {page}/{result['total_pages']})")
-        return jsonify(response_data)
-        
-        try:
-            # ROD 대시보드 요청인지 확인 (year, month가 제공되고 event_types가 None이거나 빈 배열인 경우)
-            if year is not None and month is not None and (not event_types or len(event_types) == 0):
-                logger.info(f"ROD Dashboard request detected for {site} - {year}/{month}")
-                from api_progressnote_fetch import fetch_residence_of_day_notes_with_client_data
-                
-                # 실시간 클라이언트 데이터와 함께 ROD 로직 사용
-                residence_status = fetch_residence_of_day_notes_with_client_data(site, year, month)
-                
-                if residence_status:
-                    logger.info(f"ROD data fetched successfully for {site}: {len(residence_status)} residences")
-                    return jsonify({
-                        'success': True,
-                        'message': f'Successfully fetched ROD data for {len(residence_status)} residences',
-                        'data': residence_status,
-                        'site': site,
-                        'count': len(residence_status),
-                        'fetched_at': datetime.now().isoformat()
-                    })
-                else:
-                    logger.warning(f"No ROD data found for {site}")
-                    return jsonify({
-                        'success': True,
-                        'message': 'No ROD data found',
-                        'data': {},
-                        'site': site,
-                        'count': 0,
-                        'fetched_at': datetime.now().isoformat()
-                    })
-            else:
-                # 일반적인 프로그레스 노트 요청
-                from api_progressnote_fetch import fetch_progress_notes_for_site
-                logger.info(f"Calling fetch_progress_notes_for_site for {site} with event_types: {event_types}")
-                success, progress_notes = fetch_progress_notes_for_site(site, days, event_types, year, month)
+        # ROD 대시보드 요청인지 확인 (year, month가 제공되고 event_types가 None이거나 빈 배열인 경우)
+        if year is not None and month is not None and (not event_types or len(event_types) == 0):
+            logger.info(f"ROD Dashboard request detected for {site} - {year}/{month}")
+            from api_progressnote_fetch import fetch_residence_of_day_notes_with_client_data
             
-            if success:
-                logger.info(f"프로그레스 노트 가져오기 성공 - {site}: {len(progress_notes) if progress_notes else 0}개")
-                
+            # 실시간 클라이언트 데이터와 함께 ROD 로직 사용
+            residence_status = fetch_residence_of_day_notes_with_client_data(site, year, month)
+            
+            if residence_status and 'residence_status' in residence_status:
+                residence_data = residence_status['residence_status']
+                logger.info(f"ROD data fetched successfully for {site}: {len(residence_data)} residences")
                 return jsonify({
                     'success': True,
-                    'message': f'Successfully fetched {len(progress_notes) if progress_notes else 0} progress notes',
-                    'data': progress_notes,
+                    'message': f'Successfully fetched ROD data for {len(residence_data)} residences',
+                    'data': residence_data,
                     'site': site,
-                    'count': len(progress_notes) if progress_notes else 0,
+                    'count': len(residence_data),
                     'fetched_at': datetime.now().isoformat()
                 })
             else:
-                logger.error(f"프로그레스 노트 가져오기 실패 - {site}")
+                logger.warning(f"No ROD data found for {site}")
                 return jsonify({
-                    'success': False,
-                    'message': 'Failed to fetch progress notes from server'
-                }), 500
-                
-        except ImportError as e:
-            logger.error(f"API 모듈 import 오류: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Progress note fetch module not available'
-            }), 500
-        except Exception as e:
-            logger.error(f"fetch_progress_notes_for_site 호출 중 오류: {str(e)}")
-            logger.error(f"Error type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return jsonify({
-                'success': False,
-                'message': f'Error in fetch_progress_notes_for_site: {str(e)}'
-            }), 500
+                    'success': True,
+                    'message': 'No ROD data found',
+                    'data': {},
+                    'site': site,
+                    'count': 0,
+                    'fetched_at': datetime.now().isoformat()
+                })
+        else:
+            # 일반 Progress Notes 요청
+            logger.info(f"Regular Progress Notes request for {site}")
+            logger.info(f"프로그레스 노트 가져오기 성공 - {site}: {result['total_count']}개 (페이지 {page}/{result['total_pages']})")
+            return jsonify(response_data)
             
     except Exception as e:
         logger.error(f"프로그레스 노트 가져오기 중 오류: {str(e)}")
