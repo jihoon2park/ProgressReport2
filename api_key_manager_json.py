@@ -57,7 +57,7 @@ class APIKeyManagerJSON:
                 return api_key
         return None
     
-    def add_api_key(self, site_name: str, api_key: str, server_url: str) -> bool:
+    def add_api_key(self, site_name: str, api_username: str, api_key: str, server_ip: str, server_port: int = 8080, notes: str = '') -> bool:
         """API 키 추가"""
         api_keys = self._load_api_keys()
         
@@ -72,10 +72,13 @@ class APIKeyManagerJSON:
         new_api_key = {
             'id': new_id,
             'site_name': site_name,
+            'api_username': api_username,
             'api_key': api_key,
-            'server_url': server_url,
-            'server_ip': server_url.split('://')[1].split(':')[0],
-            'server_port': server_url.split(':')[-1],
+            'server_ip': server_ip,
+            'server_port': server_port,
+            'server_url': f"http://{server_ip}:{server_port}",
+            'notes': notes,
+            'is_active': True,
             'created_at': '2025-09-11T12:00:00',
             'updated_at': '2025-09-11T12:00:00'
         }
@@ -83,19 +86,36 @@ class APIKeyManagerJSON:
         api_keys.append(new_api_key)
         return self._save_api_keys(api_keys)
     
-    def update_api_key(self, site_name: str, api_key: str, server_url: str) -> bool:
+    def update_api_key(self, site_name: str, **kwargs) -> bool:
         """API 키 업데이트"""
         api_keys = self._load_api_keys()
         
         for i, existing_key in enumerate(api_keys):
             if existing_key.get('site_name') == site_name:
-                api_keys[i].update({
-                    'api_key': api_key,
-                    'server_url': server_url,
-                    'server_ip': server_url.split('://')[1].split(':')[0],
-                    'server_port': server_url.split(':')[-1],
-                    'updated_at': '2025-09-11T12:00:00'
-                })
+                # 업데이트할 필드들만 변경
+                update_data = {}
+                if 'api_username' in kwargs:
+                    update_data['api_username'] = kwargs['api_username']
+                if 'api_key' in kwargs:
+                    update_data['api_key'] = kwargs['api_key']
+                if 'server_ip' in kwargs:
+                    update_data['server_ip'] = kwargs['server_ip']
+                if 'server_port' in kwargs:
+                    update_data['server_port'] = kwargs['server_port']
+                if 'notes' in kwargs:
+                    update_data['notes'] = kwargs['notes']
+                if 'is_active' in kwargs:
+                    update_data['is_active'] = kwargs['is_active']
+                
+                # server_url 업데이트
+                if 'server_ip' in update_data or 'server_port' in update_data:
+                    server_ip = update_data.get('server_ip', existing_key.get('server_ip'))
+                    server_port = update_data.get('server_port', existing_key.get('server_port'))
+                    update_data['server_url'] = f"http://{server_ip}:{server_port}"
+                
+                update_data['updated_at'] = '2025-09-11T12:00:00'
+                
+                api_keys[i].update(update_data)
                 return self._save_api_keys(api_keys)
         
         logger.warning(f"API 키를 찾을 수 없습니다: {site_name}")
@@ -112,6 +132,10 @@ class APIKeyManagerJSON:
         
         logger.warning(f"API 키를 찾을 수 없습니다: {site_name}")
         return False
+    
+    def deactivate_api_key(self, site_name: str) -> bool:
+        """API 키 비활성화 (삭제 대신 비활성화)"""
+        return self.update_api_key(site_name, is_active=False)
     
     def get_api_headers(self, site_name: str) -> Dict[str, str]:
         """사이트에 맞는 API 헤더 반환"""

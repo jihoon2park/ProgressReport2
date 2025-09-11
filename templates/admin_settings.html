@@ -360,11 +360,10 @@
         <div class="settings-section">
             <div class="settings-header">
                 <h3>🔑 API 키 관리</h3>
-                <p>사이트별 API 키를 안전하게 관리합니다. 암호화되어 DB에 저장됩니다.</p>
+                <p>기본 5개 사이트의 API 키를 관리합니다. 편집과 테스트만 가능합니다.</p>
             </div>
             
             <div class="api-key-actions" style="margin-bottom: 20px;">
-                <button class="btn btn-success" onclick="openAddModal()">➕ 새 API 키 추가</button>
                 <button class="btn btn-primary" onclick="refreshApiKeys()">🔄 새로고침</button>
                 <button class="btn btn-warning" onclick="testAllConnections()">🧪 모든 연결 테스트</button>
             </div>
@@ -444,18 +443,18 @@
         </div>
     </div>
 
-    <!-- API 키 추가/편집 모달 -->
+    <!-- API 키 편집 모달 -->
     <div id="apiKeyModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">API 키 추가</h3>
+                <h3 id="modalTitle">API 키 편집</h3>
                 <span class="close" onclick="closeModal()">&times;</span>
             </div>
             
             <form id="apiKeyForm">
                 <div class="form-group">
                     <label for="siteName">사이트 이름 *</label>
-                    <input type="text" id="siteName" name="siteName" required>
+                    <input type="text" id="siteName" name="siteName" readonly>
                 </div>
                 
                 <div class="form-group">
@@ -540,22 +539,11 @@
                     <div class="api-key-actions">
                         <button class="btn btn-primary btn-sm" onclick="editApiKey('${apiKey.site_name}')">✏️ 편집</button>
                         <button class="btn btn-warning btn-sm" onclick="testConnection('${apiKey.site_name}')">🧪 테스트</button>
-                        <button class="btn btn-danger btn-sm" onclick="toggleApiKey('${apiKey.site_name}', ${!apiKey.is_active})">
-                            ${apiKey.is_active ? '⏸️ 비활성화' : '▶️ 활성화'}
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteApiKey('${apiKey.site_name}')">🗑️ 삭제</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        // 새 API 키 추가 모달 열기
-        function openAddModal() {
-            currentEditingSite = null;
-            document.getElementById('modalTitle').textContent = 'API 키 추가';
-            document.getElementById('apiKeyForm').reset();
-            document.getElementById('apiKeyModal').style.display = 'block';
-        }
 
         // API 키 편집 모달 열기
         async function editApiKey(siteName) {
@@ -622,57 +610,6 @@
             }
         });
 
-        // API 키 활성화/비활성화
-        async function toggleApiKey(siteName, isActive) {
-            if (!confirm(`${isActive ? '활성화' : '비활성화'}하시겠습니까?`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/admin/api-keys/${siteName}/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ is_active: isActive })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert(data.message, 'success');
-                    loadApiKeys();
-                } else {
-                    showAlert('상태 변경에 실패했습니다: ' + data.message, 'danger');
-                }
-            } catch (error) {
-                showAlert('상태 변경에 실패했습니다: ' + error.message, 'danger');
-            }
-        }
-
-        // API 키 삭제
-        async function deleteApiKey(siteName) {
-            if (!confirm(`정말로 "${siteName}"의 API 키를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/admin/api-keys/${siteName}`, {
-                    method: 'DELETE'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert(data.message, 'success');
-                    loadApiKeys();
-                } else {
-                    showAlert('삭제에 실패했습니다: ' + data.message, 'danger');
-                }
-            } catch (error) {
-                showAlert('삭제에 실패했습니다: ' + error.message, 'danger');
-            }
-        }
 
         // 연결 테스트
         async function testConnection(siteName) {

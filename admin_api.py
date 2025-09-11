@@ -13,7 +13,7 @@ from datetime import datetime
 
 # API 키 관리자 import
 try:
-    from api_key_manager import get_api_key_manager
+    from api_key_manager_json import APIKeyManagerJSON
     API_KEY_MANAGER_AVAILABLE = True
 except ImportError:
     API_KEY_MANAGER_AVAILABLE = False
@@ -48,7 +48,7 @@ def get_api_keys():
                 'message': 'API 키 관리자가 사용할 수 없습니다.'
             }), 500
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         api_keys = manager.get_all_api_keys()
         
         # 보안을 위해 API 키는 일부만 표시
@@ -80,7 +80,7 @@ def get_api_key(site_name):
                 'message': 'API 키 관리자가 사용할 수 없습니다.'
             }), 500
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         api_key = manager.get_api_key(site_name)
         
         if not api_key:
@@ -124,7 +124,7 @@ def add_api_key():
                     'message': f'필수 필드가 누락되었습니다: {field}'
                 }), 400
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         
         success = manager.add_api_key(
             site_name=data['siteName'],
@@ -167,7 +167,7 @@ def update_api_key(site_name):
             }), 500
         
         data = request.get_json()
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         
         # 업데이트할 필드들
         update_data = {}
@@ -215,7 +215,7 @@ def delete_api_key(site_name):
                 'message': 'API 키 관리자가 사용할 수 없습니다.'
             }), 500
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         success = manager.deactivate_api_key(site_name)
         
         if success:
@@ -252,7 +252,7 @@ def toggle_api_key(site_name):
         data = request.get_json()
         is_active = data.get('is_active', True)
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         success = manager.update_api_key(site_name, is_active=is_active)
         
         if success:
@@ -287,7 +287,7 @@ def test_api_connection(site_name):
                 'message': 'API 키 관리자가 사용할 수 없습니다.'
             }), 500
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         api_data = manager.get_api_key(site_name)
         
         if not api_data:
@@ -337,7 +337,7 @@ def test_all_api_connections():
                 'message': 'API 키 관리자가 사용할 수 없습니다.'
             }), 500
         
-        manager = get_api_key_manager()
+        manager = APIKeyManagerJSON()
         api_keys = manager.get_all_api_keys()
         
         results = []
@@ -406,7 +406,7 @@ def get_system_status():
         encryption_status = {'available': False}
         try:
             if API_KEY_MANAGER_AVAILABLE:
-                manager = get_api_key_manager()
+                manager = APIKeyManagerJSON()
                 # 암호화 키 파일 존재 확인
                 encryption_status['available'] = os.path.exists('api_key_encryption.key')
             else:
