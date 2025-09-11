@@ -159,91 +159,22 @@ class TaskManager:
     
     def send_scheduled_notifications(self) -> Dict[str, Any]:
         """
-        스케줄된 알림 전송
-        2단계: 알림 발송 (서버 → 모바일 앱)
+        스케줄된 알림 전송 (JSON 기반으로 변경 예정)
+        현재는 DB가 제거되어 비활성화됨
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 현재 시간에 실행해야 할 작업 조회
-            current_time = datetime.now()
-            cursor.execute('''
-                SELECT task_id, incident_id, client_name, task_type, task_description,
-                       assigned_role, site, deep_link, priority
-                FROM scheduled_tasks 
-                WHERE status = 'pending' 
-                  AND scheduled_time <= ? 
-                  AND notification_sent = 0
-                ORDER BY priority DESC, scheduled_time ASC
-                LIMIT 50
-            ''', (current_time,))
-            
-            pending_tasks = cursor.fetchall()
-            sent_count = 0
-            failed_count = 0
-            
-            for task in pending_tasks:
-                task_id, incident_id, client_name, task_type, task_description, \
-                assigned_role, site, deep_link, priority = task
-                
-                # FCM 메시지 구성
-                title = f"📋 Task Assignment - {client_name}"
-                body = f"{task_description}. Please complete on PC and confirm in app."
-                
-                # 딥링크 데이터
-                fcm_data = {
-                    'type': 'task_notification',
-                    'deep_link': deep_link,
-                    'task_id': task_id,
-                    'incident_id': incident_id,
-                    'task_type': task_type,
-                    'priority': priority,
-                    'client_name': client_name,
-                    'site': site
-                }
-                
-                # 해당 역할의 사용자들에게 전송
-                success = self._send_fcm_to_role(assigned_role, site, title, body, fcm_data)
-                
-                if success:
-                    # 알림 전송 완료 상태 업데이트
-                    cursor.execute('''
-                        UPDATE scheduled_tasks 
-                        SET notification_sent = 1, 
-                            notification_count = notification_count + 1,
-                            last_notification_time = CURRENT_TIMESTAMP,
-                            status = 'in_progress'
-                        WHERE task_id = ?
-                    ''', (task_id,))
-                    
-                    # 알림 전송 로그
-                    self._log_task_action(task_id, 'notified', 'system', {
-                        'fcm_data': fcm_data,
-                        'assigned_role': assigned_role
-                    })
-                    
-                    sent_count += 1
-                    logger.info(f"작업 알림 전송 완료: {task_id} -> {assigned_role}")
-                else:
-                    failed_count += 1
-                    logger.error(f"작업 알림 전송 실패: {task_id}")
-            
-            conn.commit()
-            
+            # TODO: JSON 기반 스케줄된 알림 시스템으로 변경 예정
+            logger.info("스케줄된 알림 전송 - JSON 기반으로 변경 예정 (현재 비활성화)")
             return {
-                'success': True,
-                'sent_count': sent_count,
-                'failed_count': failed_count,
-                'total_processed': len(pending_tasks)
+                'success': True, 
+                'message': 'JSON 기반으로 변경 예정 (현재 비활성화)',
+                'sent_count': 0,
+                'failed_count': 0
             }
             
         except Exception as e:
             logger.error(f"스케줄된 알림 전송 실패: {e}")
             return {'success': False, 'message': str(e)}
-        finally:
-            if conn:
-                conn.close()
     
     def complete_task(self, task_id: str, completed_by: str, notes: str = None) -> Dict[str, Any]:
         """

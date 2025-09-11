@@ -1,4 +1,6 @@
 # config.py
+
+
 # 기존 하드코딩된 설정을 DB 기반으로 변경
 
 # 기본 API 인증 헤더 (공통 부분)
@@ -16,19 +18,19 @@ SITE_SERVERS = {
     'Yankalilla': '192.168.51.12:8080'
 }
 
-# DB 기반 API 키 관리자 사용
+# JSON 기반 API 키 관리자 사용
 try:
-    from api_key_manager import get_api_headers, get_server_info, get_site_servers
+    from api_key_manager_json import get_api_headers, get_server_info, get_site_servers
     USE_DB_API_KEYS = True
-    print("DB 기반 API 키 관리자 로드 성공")
+    print("JSON 기반 API 키 관리자 로드 성공")
 except ImportError as e:
     # 폴백: 기본 설정 (개발/테스트용)
     USE_DB_API_KEYS = False
-    print(f"DB 기반 API 키 관리자 로드 실패, 폴백 사용: {e}")
+    print(f"JSON 기반 API 키 관리자 로드 실패, 폴백 사용: {e}")
 except Exception as e:
     # 기타 오류도 폴백으로 처리
     USE_DB_API_KEYS = False
-    print(f"DB 기반 API 키 관리자 로드 중 오류, 폴백 사용: {e}")
+    print(f"JSON 기반 API 키 관리자 로드 중 오류, 폴백 사용: {e}")
     
     def get_api_headers(site):
         """사이트에 맞는 API 헤더 반환 (폴백)"""
@@ -70,17 +72,17 @@ if USE_DB_API_KEYS:
     def get_site_servers():
         """DB에서 사이트 서버 정보 조회"""
         try:
-            from api_key_manager import get_api_key_manager
+            from api_key_manager_json import get_api_key_manager
             manager = get_api_key_manager()
             servers = {}
             
             for api_data in manager.get_all_api_keys():
                 servers[api_data['site_name']] = f"{api_data['server_ip']}:{api_data['server_port']}"
             
-            print(f"DB에서 사이트 서버 정보 로드 성공: {list(servers.keys())}")
+            print(f"JSON에서 사이트 서버 정보 로드 성공: {list(servers.keys())}")
             return servers
         except Exception as e:
-            print(f"DB에서 사이트 서버 정보 로드 실패, 폴백 사용: {e}")
+            print(f"JSON에서 사이트 서버 정보 로드 실패, 폴백 사용: {e}")
             return SITE_SERVERS  # 기본값 반환
     
     try:

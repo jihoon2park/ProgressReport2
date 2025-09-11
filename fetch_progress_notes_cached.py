@@ -14,6 +14,62 @@ logger = logging.getLogger(__name__)
 # Blueprint 생성
 progress_notes_cached_bp = Blueprint('progress_notes_cached', __name__)
 
+def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int):
+    """API에서 Progress Notes 조회 후 JSON 캐시에 저장"""
+    try:
+        from progress_notes_json_cache import json_cache
+        from api_progressnote_fetch import fetch_progress_notes_for_site
+        success, notes = fetch_progress_notes_for_site(site, days)
+        
+        if not success or not notes:
+            return {
+                'success': False,
+                'notes': [],
+                'page': page,
+                'per_page': per_page,
+                'total_count': 0,
+                'total_pages': 0,
+                'cache_status': 'no_data',
+                'last_sync': None,
+                'cache_age_hours': 0
+            }
+        
+        # JSON 캐시에 저장
+        json_cache.update_cache(site, notes)
+        
+        # 페이지네이션 적용
+        total_count = len(notes)
+        total_pages = (total_count + per_page - 1) // per_page
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_notes = notes[start_idx:end_idx]
+        
+        return {
+            'success': True,
+            'notes': paginated_notes,
+            'page': page,
+            'per_page': per_page,
+            'total_count': total_count,
+            'total_pages': total_pages,
+            'cache_status': 'updated',
+            'last_sync': datetime.now().isoformat(),
+            'cache_age_hours': 0
+        }
+        
+    except Exception as e:
+        logger.error(f"API에서 데이터 조회 실패: {e}")
+        return {
+            'success': False,
+            'notes': [],
+            'page': page,
+            'per_page': per_page,
+            'total_count': 0,
+            'total_pages': 0,
+            'cache_status': 'error',
+            'last_sync': None,
+            'cache_age_hours': 0
+        }
+
 @progress_notes_cached_bp.route('/api/fetch-progress-notes-cached', methods=['POST'])
 @login_required
 def fetch_progress_notes_cached():
@@ -45,17 +101,35 @@ def fetch_progress_notes_cached():
                 'message': f'Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}'
             }), 400
         
-        # 캐시 매니저 사용
-        from progress_notes_cache_manager import cache_manager
+        # JSON 캐시 매니저 사용
+        from progress_notes_json_cache import json_cache
         
         if force_refresh:
             # 강제 새로고침: 캐시 무시하고 API에서 직접 조회
             logger.info(f"강제 새로고침 모드 - API에서 직접 조회: {site}")
-            result = cache_manager._get_notes_from_api_and_cache(site, page, per_page, days)
+            result = _get_notes_from_api_and_cache(site, page, per_page, days)
         else:
-            # 하이브리드 캐싱 사용
-            logger.info(f"하이브리드 캐싱 모드 - 사이트: {site}")
-            result = cache_manager.get_cached_notes(site, page, per_page, days, use_hybrid=True)
+                # JSON 캐시 사용
+                logger.info(f"JSON 캐시 모드 - 사이트: {site}")
+                result = json_cache.get_cached_notes(site, page, per_page)
+                
+                # 캐시가 없거나 만료된 경우 API에서 조회
+                if not result['success'] or not json_cache.is_cache_valid(site):
+                    logger.info(f"캐시 없음/만료 - API에서 조회: {site}")
+                    result = _get_notes_from_api_and_cache(site, page, per_page, days)
+                else:
+                    # 캐시 데이터를 API 형식으로 변환
+                    result = {
+                        'success': True,
+                        'notes': result.get('data', []),
+                        'page': result.get('pagination', {}).get('current_page', page),
+                        'per_page': result.get('pagination', {}).get('per_page', per_page),
+                        'total_count': result.get('pagination', {}).get('total_count', 0),
+                        'total_pages': result.get('pagination', {}).get('total_pages', 0),
+                        'cache_status': 'cached',
+                        'last_sync': result.get('last_sync'),
+                        'cache_age_hours': result.get('cache_age_hours', 0)
+                    }
         
         # 응답 데이터 구성
         response_data = {
@@ -99,11 +173,11 @@ def clear_progress_notes_cache():
         data = request.get_json()
         site = data.get('site')
         
-        from progress_notes_cache_manager import cache_manager
+        from progress_notes_json_cache import json_cache
         
         if site:
             # 특정 사이트 캐시만 초기화
-            cache_manager._clear_site_cache(site)
+            json_cache.clear_cache(site)
             logger.info(f"Progress Notes 캐시 초기화 완료 - 사이트: {site}")
             return jsonify({
                 'success': True,
@@ -111,7 +185,7 @@ def clear_progress_notes_cache():
             })
         else:
             # 전체 캐시 초기화
-            cache_manager.cleanup_old_cache(days=0)
+            json_cache.clear_cache()
             logger.info("전체 Progress Notes 캐시 초기화 완료")
             return jsonify({
                 'success': True,

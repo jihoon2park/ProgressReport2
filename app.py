@@ -930,13 +930,37 @@ def login():
 
                 # 2. DB에서 데이터 조회 (JSON 파일 생성 제거)
                 # 매일 새벽 3시에 DB 업데이트되므로 로그인 시 API 호출 불필요
-                logger.info(f"로그인 시 DB에서 데이터 조회 - 사이트: {site}")
+                logger.info(f"로그인 시 사이트별 데이터 자동 수집 - 사이트: {site}")
                 
-                # 3. 세션 설정 (JSON 파일 대신 DB 사용)
+                # 3. 사이트별 데이터 자동 수집
                 try:
-                    # DB에서 클라이언트 데이터 조회 (필요시)
-                    # session['current_file'] = f"data/{site.replace(' ', '_').lower()}_client.json"  # 제거
-                    logger.info(f"DB 기반 데이터 조회 완료 - 사이트: {site}")
+                    # 3-1. 클라이언트 데이터 수집 (매번)
+                    from api_client import fetch_client_information
+                    client_success, client_info = fetch_client_information(site)
+                    if client_success:
+                        logger.info(f"클라이언트 데이터 수집 성공 - {site}: {len(client_info)}명")
+                    else:
+                        logger.warning(f"클라이언트 데이터 수집 실패 - {site}")
+                    
+                    # 3-2. Progress Notes 데이터 수집 (매번)
+                    from progress_notes_json_cache import json_cache
+                    from api_progressnote_fetch import fetch_progress_notes_for_site
+                    progress_success, progress_notes = fetch_progress_notes_for_site(site, 7)
+                    if progress_success and progress_notes:
+                        json_cache.update_cache(site, progress_notes)
+                        logger.info(f"Progress Notes 데이터 수집 성공 - {site}: {len(progress_notes)}개")
+                    else:
+                        logger.warning(f"Progress Notes 데이터 수집 실패 - {site}")
+                    
+                    # 3-3. 일일 데이터 수집 (최초 접속시에만)
+                    from daily_data_manager import daily_data_manager
+                    daily_results = daily_data_manager.collect_daily_data_if_needed(site)
+                    if daily_results['care_area']:
+                        logger.info(f"Care Area 데이터 수집 완료 - {site}")
+                    if daily_results['event_type']:
+                        logger.info(f"Event Type 데이터 수집 완료 - {site}")
+                    
+                    logger.info(f"사이트별 데이터 수집 완료 - 사이트: {site}")
                     
                     # 4. Flask-Login을 사용한 로그인 처리
                     user = User(username, user_info)
