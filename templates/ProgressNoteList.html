@@ -61,8 +61,6 @@
         .btn-incident { background: #e74c3c; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
         .btn-incident:hover { background: #c0392b; }
         
-        .btn-admin-fcm { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3); }
-        .btn-admin-fcm:hover { background: linear-gradient(135deg, #c0392b, #a93226); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); }
         
         /* Log Viewer Button - Bottom Fixed */
         .log-viewer-footer {
@@ -448,7 +446,6 @@
         <button class="btn-incident" onclick="window.location.href='/incident-viewer?site={{ site }}'">🚨 Incident Viewer</button>
         {% endif %}
         {% if current_user.role in ['admin', 'site_admin'] %}
-        <button class="btn-admin-fcm" onclick="window.location.href='/fcm-admin-dashboard'">🔥 FCM Admin</button>
         <button class="btn-admin-settings" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🔧 Settings</button>
         {% endif %}
         <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
@@ -463,10 +460,8 @@
                 <th>Client</th>
                 <th>Date</th>
                 <th>Time</th>
-                <th>Late entry</th>
                 <th>Event type</th>
                 <th>Care area(s)</th>
-                <th>Created by</th>
             </tr>
             </thead>
             <tbody>
@@ -474,12 +469,6 @@
             </tbody>
         </table>
         
-        <!-- Cache Refresh Button -->
-        <div style="text-align: center; margin: 20px 0;">
-            <button id="refreshCacheBtnTop" class="btn-refresh-cache" onclick="refreshCache()" title="Refresh Cache" style="font-size: 16px; padding: 10px 20px;">
-                🔄 Refresh Cache (Fetch from API)
-            </button>
-        </div>
         
         <!-- Pagination UI -->
         <div id="paginationContainer" class="pagination-container" style="display: block;">
@@ -498,7 +487,6 @@
                     <option value="50" selected>50</option>
                     <option value="100">100</option>
                 </select>
-                <button id="refreshCacheBtn" class="btn-refresh-cache" onclick="refreshCache()" title="Refresh Cache">🔄</button>
             </div>
         </div>
         

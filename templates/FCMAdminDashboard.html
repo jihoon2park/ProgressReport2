@@ -944,7 +944,7 @@
                         <button class="edit-btn edit-edit-btn" onclick="editTokenField('${token.token}', 'device_info')">✏️ Edit Info</button>
                         <button class="edit-btn edit-edit-btn" onclick="editTokenField('${token.token}', 'token')">✏️ Edit Token</button>
                         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
-                                onclick="removeToken('${token.token}')">Remove</button>
+                                onclick="removeToken('${token.user_id}', '${token.token}')">Remove</button>
                     </td>
                 `;
                 
@@ -1048,7 +1048,7 @@
         }
         
         // Remove individual token
-        async function removeToken(token) {
+        async function removeToken(userId, token) {
             if (!confirm('Are you sure you want to remove this token?')) {
                 return;
             }
@@ -1060,6 +1060,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
+                        user_id: userId,
                         token: token
                     })
                 });

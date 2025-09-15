@@ -855,8 +855,6 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                 pca_has_note = False
                 rn_en_count = 0
                 pca_count = 0
-                rn_en_authors = []
-                pca_authors = []
                 
                 for note in residence_notes:
                     note_id = note.get('Id')
@@ -865,23 +863,9 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                     if event_type_name == "RN/EN":
                         rn_en_has_note = True
                         rn_en_count += 1
-                        
-                        # 작성자 정보 추가
-                        created_by = note.get('CreatedByUser')
-                        if created_by:
-                            author_name = f"{created_by.get('FirstName', '')} {created_by.get('LastName', '')}".strip()
-                            if author_name:
-                                rn_en_authors.append(author_name)
                     elif event_type_name == "PCA":
                         pca_has_note = True
                         pca_count += 1
-                        
-                        # 작성자 정보 추가
-                        created_by = note.get('CreatedByUser')
-                        if created_by:
-                            author_name = f"{created_by.get('FirstName', '')} {created_by.get('LastName', '')}".strip()
-                            if author_name:
-                                pca_authors.append(author_name)
                 
                 residence_status[residence_name] = {
                     'residence_name': residence_name,
@@ -891,9 +875,7 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                     'pca_has_note': pca_has_note,
                     'rn_en_count': rn_en_count,
                     'pca_count': pca_count,
-                    'total_count': rn_en_count + pca_count,
-                    'rn_en_authors': rn_en_authors,
-                    'pca_authors': pca_authors
+                    'total_count': rn_en_count + pca_count
                 }
         
         # 매칭되지 않은 노트 계산 (효율적인 방법)

@@ -117,7 +117,7 @@ from dataclasses import asdict
 
 # FCM 서비스 임포트
 from fcm_service import get_fcm_service
-from fcm_token_manager_sqlite import get_fcm_token_manager_sqlite as get_fcm_token_manager
+from fcm_token_manager import get_fcm_token_manager
 
 # Task Manager 임포트
 from task_manager import get_task_manager
@@ -3212,6 +3212,79 @@ def export_fcm_tokens():
         return jsonify({
             'success': False,
             'message': f'토큰 내보내기 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+@app.route('/api/active-users', methods=['GET'])
+def get_active_users():
+    """현재 로그인된 사용자들을 사이트별로 반환하는 API"""
+    try:
+        token_manager = get_fcm_token_manager()
+        stats = token_manager.get_token_stats()
+        
+        # 사이트별로 사용자 그룹화
+        site_users = {
+            'Parafield Gardens': [],
+            'Nerrilda': [],
+            'Ramsay': [],
+            'Yankalilla': []
+        }
+        
+        # 사용자별 토큰 정보 처리
+        for user_id, user_tokens in stats.get('user_tokens', {}).items():
+            active_tokens = [token for token in user_tokens if token.get('is_active', True)]
+            
+            if active_tokens:
+                # 가장 최근에 사용된 토큰 정보 사용
+                latest_token = max(active_tokens, key=lambda x: x.get('last_used', ''))
+                
+                # 사용자 정보 구성
+                user_info = {
+                    'user_id': user_id,
+                    'device_info': latest_token.get('device_info', 'Unknown Device'),
+                    'last_used': latest_token.get('last_used', ''),
+                    'created_at': latest_token.get('created_at', ''),
+                    'token_count': len(active_tokens)
+                }
+                
+                # 사이트별로 분류 (사용자 ID나 디바이스 정보 기반으로 추정)
+                # 실제로는 사용자 테이블에서 사이트 정보를 가져와야 하지만, 
+                # 현재는 간단히 사용자 ID 패턴으로 분류
+                if 'pg' in user_id.lower() or 'parafield' in user_id.lower():
+                    site_users['Parafield Gardens'].append(user_info)
+                elif 'nerrilda' in user_id.lower():
+                    site_users['Nerrilda'].append(user_info)
+                elif 'ramsay' in user_id.lower():
+                    site_users['Ramsay'].append(user_info)
+                elif 'yankalilla' in user_id.lower():
+                    site_users['Yankalilla'].append(user_info)
+                else:
+                    # 기본적으로 Parafield Gardens에 배치
+                    site_users['Parafield Gardens'].append(user_info)
+        
+        # 각 사이트별 통계 계산
+        site_stats = {}
+        total_active_devices = 0
+        for site, users in site_users.items():
+            site_devices = sum(user['token_count'] for user in users)
+            site_stats[site] = {
+                'users': users,
+                'total_users': len(users),
+                'total_devices': site_devices
+            }
+            total_active_devices += site_devices
+        
+        return jsonify({
+            'success': True,
+            'site_users': site_stats,
+            'total_active_users': sum(len(users) for users in site_users.values()),
+            'total_active_devices': total_active_devices
+        })
+        
+    except Exception as e:
+        logger.error(f"활성 사용자 조회 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'활성 사용자 조회 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 @app.route('/api/fcm/cleanup', methods=['POST'])

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check if we're in popup mode (iframe)
     if (window.parent !== window) {
+        
         // Hide header buttons in popup mode
         const headerButtons = document.getElementById('headerButtons');
         if (headerButtons) {
