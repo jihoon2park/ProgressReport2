@@ -197,9 +197,18 @@ class FCMService:
             )
             logger.info(f"알림 객체 생성 완료: {notification}")
             
+            # data 매개변수 검증 및 변환
+            if data is None:
+                message_data = {}
+            elif isinstance(data, dict):
+                message_data = data
+            else:
+                logger.warning(f"data 매개변수가 dict가 아닙니다: {type(data)}, 빈 dict로 변환합니다")
+                message_data = {}
+            
             message = messaging.MulticastMessage(
                 notification=notification,
-                data=data or {},
+                data=message_data,
                 tokens=tokens
             )
             logger.info(f"멀티캐스트 메시지 객체 생성 완료: {message}")

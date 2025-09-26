@@ -614,7 +614,7 @@
             }
         }
 
-        // 정책 목록 로드
+        // Load policy list
         async function loadPolicies() {
             try {
                 const response = await fetch('/api/escalation-policies');
@@ -631,7 +631,7 @@
             }
         }
 
-        // 정책 목록 표시
+        // Display policy list
         function displayPolicies(policies) {
             const container = document.getElementById('policyList');
             
@@ -708,7 +708,7 @@
             loadEscalationTimeline(defaultSteps);
         }
 
-        // 에스컬레이션 타임라인 로드
+        // Load escalation timeline
         function loadEscalationTimeline(steps) {
             const container = document.getElementById('escalationTimeline');
             container.innerHTML = '';
@@ -723,7 +723,7 @@
             });
         }
 
-        // 타임라인 단계 추가
+        // Add timeline step
         function addTimelineStep(stepData = null, stepNumber = null) {
             const container = document.getElementById('escalationTimeline');
             const currentSteps = container.querySelectorAll('.timeline-step').length;
@@ -732,7 +732,7 @@
             const data = stepData || {
                 delay_minutes: 15,
                 repeat_count: 1,
-                message_template: '알림 메시지를 입력하세요'
+                message_template: 'Please enter notification message'
             };
 
             const stepHtml = `
@@ -740,26 +740,26 @@
                     <div class="step-badge">${step}</div>
                     <div class="step-content">
                         <div class="step-timing">
-                            단계 ${step}: ${data.delay_minutes === 0 ? '즉시' : data.delay_minutes + '분 후'} ${data.repeat_count}회 반복
+                            Step ${step}: ${data.delay_minutes === 0 ? 'Immediately' : data.delay_minutes + ' minutes after'} ${data.repeat_count} times repeat
                         </div>
                         <div class="step-edit-controls">
                             <div>
-                                <label style="font-size: 0.9em;">지연시간 (분)</label>
+                                <label style="font-size: 0.9em;">Delay Time (minutes)</label>
                                 <input type="number" class="form-control" name="delay-${step}" value="${data.delay_minutes}" min="0" max="1440" onchange="updateStepDisplay(${step})">
                             </div>
                             <div>
-                                <label style="font-size: 0.9em;">반복횟수</label>
+                                <label style="font-size: 0.9em;">Repeat Count</label>
                                 <input type="number" class="form-control" name="repeat-${step}" value="${data.repeat_count}" min="1" max="10" onchange="updateStepDisplay(${step})">
                             </div>
                             <div>
                                 <button type="button" class="btn btn-danger" onclick="removeTimelineStep(${step})" style="margin-top: 20px; padding: 8px 12px;">
-                                    ❌ 제거
+                                    ❌ Remove
                                 </button>
                             </div>
                         </div>
                         <div class="form-group" style="margin-top: 15px;">
-                            <label style="font-size: 0.9em;">알람 메시지</label>
-                            <textarea class="form-control" name="message-${step}" rows="2" placeholder="이 단계에서 보낼 알림 메시지">${data.message_template || ''}</textarea>
+                            <label style="font-size: 0.9em;">Alarm Message</label>
+                            <textarea class="form-control" name="message-${step}" rows="2" placeholder="Notification message to send at this step">${data.message_template || ''}</textarea>
                         </div>
                     </div>
                 </div>
@@ -768,18 +768,18 @@
             container.insertAdjacentHTML('beforeend', stepHtml);
         }
 
-        // 타임라인 단계 표시 업데이트
+        // Update timeline step display
         function updateStepDisplay(stepNumber) {
             const stepElement = document.getElementById(`timeline-step-${stepNumber}`);
             const delay = parseInt(stepElement.querySelector(`[name="delay-${stepNumber}"]`).value) || 0;
             const repeat = parseInt(stepElement.querySelector(`[name="repeat-${stepNumber}"]`).value) || 1;
             
             const timingElement = stepElement.querySelector('.step-timing');
-            const delayText = delay === 0 ? '즉시' : delay + '분 후';
-            timingElement.textContent = `단계 ${stepNumber}: ${delayText} ${repeat}회 반복`;
+            const delayText = delay === 0 ? 'Immediately' : delay + ' minutes after';
+            timingElement.textContent = `Step ${stepNumber}: ${delayText} ${repeat} times repeat`;
         }
 
-        // 타임라인 단계 제거
+        // Remove timeline step
         function removeTimelineStep(stepNumber) {
             const stepElement = document.getElementById(`timeline-step-${stepNumber}`);
             if (stepElement) {
@@ -788,7 +788,7 @@
             }
         }
 
-        // 타임라인 단계 번호 재정렬
+        // Renumber timeline steps
         function renumberTimelineSteps() {
             const steps = document.querySelectorAll('.timeline-step');
             steps.forEach((step, index) => {
@@ -796,14 +796,14 @@
                 const oldId = step.id;
                 const stepId = oldId.split('-').pop();
                 
-                // ID 업데이트
+                // Update ID
                 step.id = `timeline-step-${newNumber}`;
                 
-                // 단계 번호 업데이트
+                // Update step number
                 const badge = step.querySelector('.step-badge');
                 badge.textContent = newNumber;
                 
-                // 입력 필드 이름 업데이트
+                // Update input field names
                 const delayInput = step.querySelector('[name^="delay-"]');
                 const repeatInput = step.querySelector('[name^="repeat-"]');
                 const messageInput = step.querySelector('[name^="message-"]');
@@ -814,12 +814,12 @@
                 if (messageInput) messageInput.name = `message-${newNumber}`;
                 if (removeBtn) removeBtn.setAttribute('onclick', `removeTimelineStep(${newNumber})`);
                 
-                // 표시 텍스트 업데이트
+                // Update display text
                 updateStepDisplay(newNumber);
             });
         }
 
-        // FCM 디바이스 목록 로드
+        // Load FCM device list
         async function loadFCMDevices() {
             try {
                 const response = await fetch('/api/fcm/export-tokens');
@@ -837,7 +837,7 @@
             }
         }
 
-        // FCM 디바이스 목록 표시
+        // Display FCM device list
         function displayFCMDevices(devices) {
             const container = document.getElementById('fcmDeviceList');
             
@@ -870,7 +870,7 @@
             container.innerHTML = html;
         }
 
-        // 디바이스 선택/해제
+        // Toggle device selection
         function toggleDeviceSelection(deviceId) {
             if (selectedDevices.has(deviceId)) {
                 selectedDevices.delete(deviceId);
@@ -879,15 +879,15 @@
             }
             
             updateSelectedRecipientsDisplay();
-            displayFCMDevices(fcmDevices); // 선택 상태 반영
+            displayFCMDevices(fcmDevices); // Reflect selection state
         }
 
-        // 선택된 수신자 표시 업데이트
+        // Update selected recipients display
         function updateSelectedRecipientsDisplay() {
             const container = document.getElementById('selectedRecipients');
             
             if (selectedDevices.size === 0) {
-                container.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">왼쪽에서 디바이스를 선택하여 수신자로 등록하세요</div>';
+                container.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">Select devices from the left to register as recipients</div>';
                 return;
             }
 
@@ -907,21 +907,21 @@
             container.innerHTML = html;
         }
 
-        // 새 정책 생성
+        // Create new policy
         function createNewPolicy() {
             currentPolicyId = null;
             document.getElementById('policyForm').reset();
             
-            // 모든 정책 항목의 선택 해제
+            // Deselect all policy items
             document.querySelectorAll('.policy-item').forEach(item => {
                 item.classList.remove('selected');
             });
             
             createDefaultEscalationTimeline();
-            showNotification('새 정책을 생성합니다. 정보를 입력하세요.', 'info');
+            showNotification('Creating new policy. Please enter information.', 'info');
         }
 
-        // 정책 저장
+        // Save policy
         async function savePolicyChanges() {
             try {
                 const formData = collectPolicyFormData();
@@ -944,19 +944,19 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showNotification('정책이 성공적으로 저장되었습니다.', 'success');
-                    loadPolicies(); // 목록 새로고침
+                    showNotification('Policy saved successfully.', 'success');
+                    loadPolicies(); // Refresh list
                 } else {
-                    showNotification(`정책 저장 실패: ${result.message}`, 'error');
+                    showNotification(`Policy save failed: ${result.message}`, 'error');
                 }
 
             } catch (error) {
-                console.error('정책 저장 오류:', error);
-                showNotification('정책 저장 중 오류가 발생했습니다.', 'error');
+                console.error('Policy save error:', error);
+                showNotification('An error occurred while saving the policy.', 'error');
             }
         }
 
-        // 정책 폼 데이터 수집
+        // Collect policy form data
         function collectPolicyFormData() {
             const steps = [];
             const stepElements = document.querySelectorAll('.timeline-step');
@@ -971,7 +971,7 @@
                     step_number: stepNum,
                     delay_minutes: delay,
                     repeat_count: repeat,
-                    recipients: Array.from(selectedDevices), // 선택된 FCM 디바이스들
+                    recipients: Array.from(selectedDevices), // Selected FCM devices
                     message_template: message
                 });
             });
@@ -986,30 +986,30 @@
             };
         }
 
-        // 폼 데이터 검증
+        // Validate form data
         function validatePolicyFormData(formData) {
             if (!formData.policy_name.trim()) {
-                showNotification('정책 이름을 입력하세요.', 'error');
+                showNotification('Please enter a policy name.', 'error');
                 return false;
             }
 
             if (formData.steps.length === 0) {
-                showNotification('최소 1개의 에스컬레이션 단계가 필요합니다.', 'error');
+                showNotification('At least 1 escalation step is required.', 'error');
                 return false;
             }
 
             if (selectedDevices.size === 0) {
-                showNotification('Recipients 탭에서 수신자 디바이스를 선택하세요.', 'error');
+                showNotification('Please select recipient devices in the Recipients tab.', 'error');
                 return false;
             }
 
             return true;
         }
 
-        // 수신자 그룹 저장
+        // Save recipient group
         async function saveRecipientGroup() {
             if (selectedDevices.size === 0) {
-                showNotification('저장할 디바이스를 선택하세요.', 'error');
+                showNotification('Please select devices to save.', 'error');
                 return;
             }
 
@@ -1031,21 +1031,21 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showNotification(`${groupName} 그룹에 ${deviceList.length}개 디바이스가 저장되었습니다.`, 'success');
+                    showNotification(`${deviceList.length} devices saved to ${groupName} group.`, 'success');
                 } else {
-                    showNotification(`그룹 저장 실패: ${result.message}`, 'error');
+                    showNotification(`Group save failed: ${result.message}`, 'error');
                 }
 
             } catch (error) {
-                console.error('그룹 저장 오류:', error);
-                showNotification('그룹 저장 중 오류가 발생했습니다.', 'error');
+                console.error('Group save error:', error);
+                showNotification('An error occurred while saving the group.', 'error');
             }
         }
 
-        // 그룹 알림 테스트
+        // Test group notification
         async function testGroupNotification() {
             if (selectedDevices.size === 0) {
-                showNotification('테스트할 디바이스를 선택하세요.', 'error');
+                showNotification('Please select devices to test.', 'error');
                 return;
             }
 
@@ -1057,31 +1057,31 @@
                     },
                     body: JSON.stringify({
                         devices: Array.from(selectedDevices),
-                        message: '테스트 알림입니다.'
+                        message: 'This is a test notification.'
                     })
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    showNotification(`${selectedDevices.size}개 디바이스에 테스트 알림을 전송했습니다.`, 'success');
+                    showNotification(`Test notification sent to ${selectedDevices.size} devices.`, 'success');
                 } else {
-                    showNotification(`테스트 알림 실패: ${result.message}`, 'error');
+                    showNotification(`Test notification failed: ${result.message}`, 'error');
                 }
 
             } catch (error) {
-                console.error('테스트 알림 오류:', error);
-                showNotification('테스트 알림 중 오류가 발생했습니다.', 'error');
+                console.error('Test notification error:', error);
+                showNotification('An error occurred during test notification.', 'error');
             }
         }
 
-        // FCM 디바이스 새로고침
+        // Refresh FCM devices
         function refreshFCMDevices() {
             showNotification('Refreshing FCM device list...', 'info');
             loadFCMDevices();
         }
 
-        // 정책 테스트
+        // Test policy
         async function testPolicyExecution() {
             const formData = collectPolicyFormData();
             
@@ -1101,31 +1101,31 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showNotification(`정책 테스트 완료: ${selectedDevices.size}개 디바이스에 총 ${result.total_notifications}개 알림 전송 예정`, 'success');
+                    showNotification(`Policy test completed: ${result.total_notifications} notifications scheduled to be sent to ${selectedDevices.size} devices`, 'success');
                 } else {
-                    showNotification(`정책 테스트 실패: ${result.message}`, 'error');
+                    showNotification(`Policy test failed: ${result.message}`, 'error');
                 }
 
             } catch (error) {
-                console.error('정책 테스트 오류:', error);
-                showNotification('정책 테스트 중 오류가 발생했습니다.', 'error');
+                console.error('Policy test error:', error);
+                showNotification('An error occurred during policy test.', 'error');
             }
         }
 
-        // 정책 삭제 확인
+        // Confirm policy deletion
         function deletePolicyConfirm() {
             if (!currentPolicyId) {
-                showNotification('삭제할 정책을 선택하세요.', 'error');
+                showNotification('Please select a policy to delete.', 'error');
                 return;
             }
 
             const policyName = document.getElementById('policyName').value;
-            if (confirm(`정말로 "${policyName}" 정책을 삭제하시겠습니까?`)) {
+            if (confirm(`Are you sure you want to delete the "${policyName}" policy?`)) {
                 deletePolicy();
             }
         }
 
-        // 정책 삭제
+        // Delete policy
         async function deletePolicy() {
             try {
                 const response = await fetch(`/api/escalation-policies/${currentPolicyId}`, {
@@ -1135,20 +1135,20 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showNotification('정책이 성공적으로 삭제되었습니다.', 'success');
-                    loadPolicies(); // 목록 새로고침
-                    createNewPolicy(); // 편집기 초기화
+                    showNotification('Policy deleted successfully.', 'success');
+                    loadPolicies(); // Refresh list
+                    createNewPolicy(); // Initialize editor
                 } else {
-                    showNotification(`정책 삭제 실패: ${result.message}`, 'error');
+                    showNotification(`Policy deletion failed: ${result.message}`, 'error');
                 }
 
             } catch (error) {
-                console.error('정책 삭제 오류:', error);
-                showNotification('정책 삭제 중 오류가 발생했습니다.', 'error');
+                console.error('Policy deletion error:', error);
+                showNotification('An error occurred while deleting the policy.', 'error');
             }
         }
 
-        // 알림 표시
+        // Show notification
         function showNotification(message, type) {
             const notification = document.getElementById('notification');
             notification.textContent = message;

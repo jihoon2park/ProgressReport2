@@ -210,10 +210,8 @@ function mapNoteToRow(note) {
         client: clientName,
         date: note.EventDate ? note.EventDate.split('T')[0] : '',
         time: note.EventDate ? (note.EventDate.split('T')[1] || '').slice(0,5) : '',
-        lateEntry: note.IsLateEntry ? '✔' : '',
         eventType: note.ProgressNoteEventType?.Description || '',
-        careAreas: (note.CareAreas || []).map(ca => ca.Description).join(', '),
-        createdBy: note.CreatedByName || note.CreatedBy || (note.CreatedByUser?.UserName || '')
+        careAreas: (note.CareAreas || []).map(ca => ca.Description).join(', ')
     };
 }
 
@@ -237,8 +235,6 @@ function formatNoteDetail(note) {
         <b>Date:</b> ${note.EventDate ? note.EventDate.replace('T', ' ').slice(0, 16) : ''}<br>
         <b>Client:</b> ${note.ClientId || ''}<br>
         <b>Care area(s):</b> ${(note.CareAreas || []).map(ca => ca.Description).join(', ')}<br>
-        <b>Created by:</b> ${note.CreatedByName || note.CreatedBy || (note.CreatedByUser?.UserName || '')}<br>
-        <b>Late entry:</b> ${note.IsLateEntry ? 'Yes' : 'No'}<br>
         <hr>
         <b>Notes:</b><br>
         <div style="background:#f7f7f7; padding:10px; border-radius:4px; font-size:0.97em; max-height:400px; overflow-y:auto;">
@@ -892,33 +888,6 @@ function changePerPage() {
     loadProgressNotes();
 }
 
-function refreshCache() {
-    const btn = document.getElementById('refreshCacheBtn');
-    const btnTop = document.getElementById('refreshCacheBtnTop');
-    
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = '🔄 Refreshing...';
-    }
-    if (btnTop) {
-        btnTop.disabled = true;
-        btnTop.textContent = '🔄 Refreshing...';
-    }
-    
-    // Load data with forced refresh
-    loadProgressNotes(true);
-    
-    setTimeout(() => {
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = '🔄';
-        }
-        if (btnTop) {
-            btnTop.disabled = false;
-            btnTop.textContent = '🔄 Refresh Cache (Fetch from API)';
-        }
-    }, 2000);
-}
 
 function updateCacheStatus(cacheInfo) {
     const statusDiv = document.getElementById('cacheStatus');
