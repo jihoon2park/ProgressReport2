@@ -146,7 +146,7 @@ USERS_DB = {
         "last_name": "Parafield Gardens",
         "role": "admin",
         "position": "Admin",
-        "location": ["Parafield Gardens"]
+        "location": ["Ramsay", "Nerrilda", "Parafield Gardens"]
     },
     "WPROD": {
         "password_hash": hash_password("wppassword"),
@@ -162,7 +162,7 @@ USERS_DB = {
         "last_name": "Ramsay",
         "role": "admin",
         "position": "Admin",
-        "location": ["Ramsay"]
+        "location": ["Ramsay", "Nerrilda"]
     },
     "NROD": {
         "password_hash": hash_password("nrpassword"),

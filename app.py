@@ -913,13 +913,17 @@ def home():
             logger.info(f"YKROD 사용자 감지 - Yankalilla ROD 대시보드로 리다이렉트")
             return redirect(url_for('rod_dashboard', site='Yankalilla'))
         elif username_upper == 'PGROD':
-            logger.info(f"PGROD 사용자 감지 - Parafield Gardens ROD 대시보드로 리다이렉트")
+            logger.info(f"PGROD 사용자 감지 - 다중 사이트 접근 가능, Parafield Gardens로 기본 리다이렉트")
+            session['site'] = 'Parafield Gardens'
+            session['allowed_sites'] = ['Ramsay', 'Nerrilda', 'Parafield Gardens']
             return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
         elif username_upper == 'WPROD':
             logger.info(f"WPROD 사용자 감지 - West Park ROD 대시보드로 리다이렉트")
             return redirect(url_for('rod_dashboard', site='West Park'))
         elif username_upper == 'RSROD':
-            logger.info(f"RSROD 사용자 감지 - Ramsay ROD 대시보드로 리다이렉트")
+            logger.info(f"RSROD 사용자 감지 - 다중 사이트 접근 가능, Ramsay로 기본 리다이렉트")
+            session['site'] = 'Ramsay'
+            session['allowed_sites'] = ['Ramsay', 'Nerrilda']
             return redirect(url_for('rod_dashboard', site='Ramsay'))
         elif username_upper == 'NROD':
             logger.info(f"NROD 사용자 감지 - Nerrilda ROD 대시보드로 리다이렉트")
@@ -1107,9 +1111,9 @@ def login():
                         session['allowed_sites'] = ['Yankalilla']
                         return redirect(url_for('rod_dashboard', site='Yankalilla'))
                     elif username_upper == 'PGROD':
-                        logger.info(f"로그인 성공 - PGROD 사용자 감지, Parafield Gardens ROD 대시보드로 리다이렉트")
+                        logger.info(f"로그인 성공 - PGROD 사용자 감지, 다중 사이트 접근 가능, Parafield Gardens ROD 대시보드로 리다이렉트")
                         session['site'] = 'Parafield Gardens'
-                        session['allowed_sites'] = ['Parafield Gardens']
+                        session['allowed_sites'] = ['Ramsay', 'Nerrilda', 'Parafield Gardens']
                         return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
                     elif username_upper == 'WPROD':
                         logger.info(f"로그인 성공 - WPROD 사용자 감지, West Park ROD 대시보드로 리다이렉트")
@@ -1117,9 +1121,9 @@ def login():
                         session['allowed_sites'] = ['West Park']
                         return redirect(url_for('rod_dashboard', site='West Park'))
                     elif username_upper == 'RSROD':
-                        logger.info(f"로그인 성공 - RSROD 사용자 감지, Ramsay ROD 대시보드로 리다이렉트")
+                        logger.info(f"로그인 성공 - RSROD 사용자 감지, 다중 사이트 접근 가능, Ramsay ROD 대시보드로 리다이렉트")
                         session['site'] = 'Ramsay'
-                        session['allowed_sites'] = ['Ramsay']
+                        session['allowed_sites'] = ['Ramsay', 'Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Ramsay'))
                     elif username_upper == 'NROD':
                         logger.info(f"로그인 성공 - NROD 사용자 감지, Nerrilda ROD 대시보드로 리다이렉트")
@@ -1179,9 +1183,9 @@ def login():
                         session['allowed_sites'] = ['Yankalilla']
                         return redirect(url_for('rod_dashboard', site='Yankalilla'))
                     elif username_upper == 'PGROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - PGROD 사용자 감지, Parafield Gardens ROD 대시보드로 리다이렉트")
+                        logger.info(f"로그인 성공 (API 오류 있음) - PGROD 사용자 감지, 다중 사이트 접근 가능, Parafield Gardens ROD 대시보드로 리다이렉트")
                         session['site'] = 'Parafield Gardens'
-                        session['allowed_sites'] = ['Parafield Gardens']
+                        session['allowed_sites'] = ['Ramsay', 'Nerrilda', 'Parafield Gardens']
                         return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
                     elif username_upper == 'WPROD':
                         logger.info(f"로그인 성공 (API 오류 있음) - WPROD 사용자 감지, West Park ROD 대시보드로 리다이렉트")
@@ -1189,9 +1193,9 @@ def login():
                         session['allowed_sites'] = ['West Park']
                         return redirect(url_for('rod_dashboard', site='West Park'))
                     elif username_upper == 'RSROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - RSROD 사용자 감지, Ramsay ROD 대시보드로 리다이렉트")
+                        logger.info(f"로그인 성공 (API 오류 있음) - RSROD 사용자 감지, 다중 사이트 접근 가능, Ramsay ROD 대시보드로 리다이렉트")
                         session['site'] = 'Ramsay'
-                        session['allowed_sites'] = ['Ramsay']
+                        session['allowed_sites'] = ['Ramsay', 'Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Ramsay'))
                     elif username_upper == 'NROD':
                         logger.info(f"로그인 성공 (API 오류 있음) - NROD 사용자 감지, Nerrilda ROD 대시보드로 리다이렉트")
@@ -1350,8 +1354,8 @@ def rod_dashboard():
     safe_site_servers = get_safe_site_servers()
     
     # 사이트 전용 ROD 사용자인 경우 자신의 사이트만 표시
-    if username_upper in ['YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
-        # allowed_sites에서 첫 번째 사이트만 사용 (이미 1개로 제한됨)
+    if username_upper in ['YKROD', 'WPROD', 'NROD']:
+        # 단일 사이트 전용 사용자
         allowed_sites = session.get('allowed_sites', [])
         if allowed_sites:
             site_name = allowed_sites[0]
@@ -1360,6 +1364,16 @@ def rod_dashboard():
                 'server': safe_site_servers.get(site_name, 'Unknown'),
                 'is_selected': True
             })
+    elif username_upper in ['PGROD', 'RSROD']:
+        # 다중 사이트 접근 가능 사용자
+        allowed_sites = session.get('allowed_sites', [])
+        for site_name in allowed_sites:
+            if site_name in safe_site_servers:
+                sites_info.append({
+                    'name': site_name,
+                    'server': safe_site_servers[site_name],
+                    'is_selected': site_name == site
+                })
     else:
         # 일반 ROD 사용자는 모든 사이트 표시
         for site_name in safe_site_servers.keys():
