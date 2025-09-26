@@ -71,22 +71,19 @@ class ProgressNoteFetchClient:
             # API 파라미터 설정
             params = {}
             
-            # 날짜 형식 변환
-            start_date_str = start_date.strftime('%Y-%m-%d')
-            end_date_str = end_date.strftime('%Y-%m-%d')
+            # 날짜 형식 변환 (POSTMAN과 동일한 형식 사용)
+            start_date_str = start_date.strftime('%Y-%m-%dT00:00:00Z')
+            end_date_str = end_date.strftime('%Y-%m-%dT23:59:59Z')
             
             # 이벤트 타입 필터링
             if progress_note_event_type_id is not None:
                 params['progressNoteEventTypeId'] = progress_note_event_type_id
             
-            # 날짜 필터 적용 - inclusive 범위 사용 (gte: >=, lte: <=)
-            params['date'] = [f'gte:{start_date_str}', f'lte:{end_date_str}']
+            # 날짜 필터 적용 - POSTMAN과 동일한 형식 사용 (gt: >, lt: <)
+            params['date'] = [f'gt:{start_date_str}', f'lt:{end_date_str}']
             
-            # Limit 파라미터 (이벤트 타입 필터링이 있을 때는 제한 없음, 그렇지 않으면 기본값 사용)
-            if progress_note_event_type_id is not None:
-                # 이벤트 타입으로 필터링할 때는 limit 제거 (성능 최적화)
-                pass  # Verbose logging removed
-            elif limit is not None:
+            # Limit 파라미터 설정
+            if limit is not None:
                 params['limit'] = limit
             
             # API 요청
@@ -344,11 +341,13 @@ class ProgressNoteFetchClient:
         """
         try:
             logger.info(f"Finding Resident of the day event types for site: {self.site}")
-            from app import fetch_event_type_information
-            success, event_types = fetch_event_type_information(self.site)
             
-            if not success or not event_types:
-                logger.error(f"Failed to fetch event types for site {self.site}")
+            # 사이트별 JSON 파일에서 이벤트 타입 로드
+            from api_eventtype import get_site_event_types
+            event_types = get_site_event_types(self.site)
+            
+            if not event_types:
+                logger.error(f"Failed to load event types from JSON for site {self.site}")
                 return []
             
             logger.info(f"Searching through {len(event_types)} event types for 'Resident of the day'")
@@ -381,12 +380,13 @@ class ProgressNoteFetchClient:
         """
         try:
             logger.info(f"Finding event type ID for '{event_type_name}' in site: {self.site}")
-            # 이벤트 타입 목록 가져오기
-            from app import fetch_event_type_information
-            success, event_types = fetch_event_type_information(self.site)
             
-            if not success or not event_types:
-                logger.error(f"Failed to fetch event types for site {self.site}")
+            # 사이트별 JSON 파일에서 이벤트 타입 로드
+            from api_eventtype import get_site_event_types
+            event_types = get_site_event_types(self.site)
+            
+            if not event_types:
+                logger.error(f"Failed to load event types from JSON for site {self.site}")
                 return None
             
             logger.info(f"Found {len(event_types)} event types for site {self.site}")
@@ -512,7 +512,7 @@ def test_progress_note_fetch():
 
 def fetch_event_types_for_site(site: str) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
     """
-    특정 사이트의 이벤트 타입 목록을 가져옵니다.
+    특정 사이트의 이벤트 타입 목록을 가져옵니다. (사이트별 JSON 파일 사용)
     
     Args:
         site (str): 사이트 이름
@@ -521,23 +521,68 @@ def fetch_event_types_for_site(site: str) -> tuple[bool, Optional[List[Dict[str,
         (성공 여부, 이벤트 타입 리스트 또는 None)
     """
     try:
-        from app import fetch_event_type_information
-        success, event_types = fetch_event_type_information(site)
-        return success, event_types
+        from api_eventtype import get_site_event_types
+        event_types = get_site_event_types(site)
+        
+        if event_types:
+            logger.info(f"Successfully loaded {len(event_types)} event types for site {site}")
+            return True, event_types
+        else:
+            logger.warning(f"No event types found for site {site}")
+            return False, None
+            
     except Exception as e:
         logger.error(f"Error fetching event types for site {site}: {str(e)}")
         return False, None
 
-def find_resident_of_day_event_types(event_types: List[Dict[str, Any]]) -> tuple[Optional[int], Optional[int]]:
+# 사이트별 Resident of the day 이벤트 타입 ID (하드코딩)
+SITE_EVENT_TYPE_IDS = {
+    'Parafield Gardens': {'rn_en': 30, 'pca': 121},
+    'Nerrilda': {'rn_en': 30, 'pca': 85},
+    'Ramsay': {'rn_en': 82, 'pca': 30},
+    'West Park': {'rn_en': 30, 'pca': 100},
+    'Yankalilla': {'rn_en': 30, 'pca': 63}
+}
+
+def find_resident_of_day_event_types(event_types: List[Dict[str, Any]] = None, site: str = None) -> tuple[Optional[int], Optional[int]]:
     """
-    이벤트 타입 목록에서 Resident of the day 관련 이벤트 타입 ID를 찾습니다.
+    사이트별 Resident of the day 이벤트 타입 ID를 반환합니다.
     
     Args:
-        event_types: 이벤트 타입 목록
+        event_types: 이벤트 타입 목록 (사용하지 않음, 호환성을 위해 유지)
+        site: 사이트명 (사용하지 않음, 호환성을 위해 유지)
     
     Returns:
         (RN/EN 이벤트 타입 ID, PCA 이벤트 타입 ID)
     """
+    # 현재 사이트의 이벤트 타입 ID 반환 (하드코딩된 값 사용)
+    # 사이트는 ProgressNoteFetchClient의 self.site에서 가져옴
+    return None, None  # 이 함수는 더 이상 사용되지 않음
+
+def get_site_event_type_ids(site: str) -> tuple[Optional[int], Optional[int]]:
+    """
+    특정 사이트의 Resident of the day 이벤트 타입 ID를 반환합니다.
+    
+    Args:
+        site: 사이트명
+    
+    Returns:
+        (RN/EN 이벤트 타입 ID, PCA 이벤트 타입 ID)
+    """
+    site_ids = SITE_EVENT_TYPE_IDS.get(site)
+    if site_ids:
+        rn_en_id = site_ids.get('rn_en')
+        pca_id = site_ids.get('pca')
+        logger.info(f"Using hardcoded event type IDs for {site}: RN/EN={rn_en_id}, PCA={pca_id}")
+        return rn_en_id, pca_id
+    else:
+        logger.error(f"No event type IDs found for site: {site}")
+        return None, None
+
+# 기존 API에서 이벤트 타입을 가져오는 로직 (주석 처리)
+"""
+def find_resident_of_day_event_types_from_api(event_types: List[Dict[str, Any]]) -> tuple[Optional[int], Optional[int]]:
+    # 이벤트 타입 목록에서 Resident of the day 관련 이벤트 타입 ID를 찾습니다.
     rn_en_id = None
     pca_id = None
     
@@ -546,7 +591,11 @@ def find_resident_of_day_event_types(event_types: List[Dict[str, Any]]) -> tuple
         event_id = event_type.get('Id')
         
         if 'resident of the day' in description:
-            if 'pca' in description:
+            # lifestyle은 제외
+            if 'lifestyle' in description:
+                logger.info(f"Skipping lifestyle event type: ID {event_id} - {event_type.get('Description')}")
+                continue
+            elif 'pca' in description:
                 pca_id = event_id
                 logger.info(f"Found PCA Resident of the day event type: ID {event_id} - {event_type.get('Description')}")
             elif any(keyword in description for keyword in ['rn', 'en', 'nurse']):
@@ -554,6 +603,7 @@ def find_resident_of_day_event_types(event_types: List[Dict[str, Any]]) -> tuple
                 logger.info(f"Found RN/EN Resident of the day event type: ID {event_id} - {event_type.get('Description')}")
     
     return rn_en_id, pca_id
+"""
 
 def fetch_residence_of_day_notes_with_client_data(site, year, month):
     """
@@ -619,18 +669,20 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
             'end_date': end_date.isoformat()
         })
         
-        # 3. 사이트별 Resident of the day 관련 EventType ID들 동적 찾기
-        event_success, event_types = fetch_event_types_for_site(site)
-        if not event_success or not event_types:
-            logger.error(f"Failed to fetch event types for {site}")
-            return {}
+        # 3. 사이트별 Resident of the day 관련 EventType ID들 가져오기 (하드코딩)
+        rn_en_id, pca_id = get_site_event_type_ids(site)
         
-        rn_en_id, pca_id = find_resident_of_day_event_types(event_types)
+        # 기존 API에서 이벤트 타입을 가져오는 로직 (주석 처리)
+        # event_success, event_types = fetch_event_types_for_site(site)
+        # if not event_success or not event_types:
+        #     logger.error(f"Failed to fetch event types for {site}")
+        #     return {}
+        # rn_en_id, pca_id = find_resident_of_day_event_types(event_types)
         
         debug_info['steps'].append({
             'step': 'event_type_fetch',
-            'success': event_success,
-            'event_types_count': len(event_types) if event_types else 0,
+            'success': True,  # 하드코딩된 값 사용
+            'event_types_count': 0,  # API에서 가져오지 않음
             'rn_en_id': rn_en_id,
             'pca_id': pca_id
         })
@@ -699,7 +751,7 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
         
         # 저장된 파일이 없거나 로드 실패한 경우 API에서 가져오기
         if not all_resident_notes:
-            # RN/EN과 PCA 이벤트 타입 ID를 모두 포함하여 한 번에 가져오기
+            # RN/EN, PCA 이벤트 타입 ID를 포함하여 한 번에 가져오기
             event_type_ids = []
             if rn_en_id:
                 event_type_ids.append(rn_en_id)
@@ -734,7 +786,13 @@ def fetch_residence_of_day_notes_with_client_data(site, year, month):
                     all_resident_notes.extend(notes)
                     
                     # 노트를 타입별로 분류
-                    event_type_name = "RN/EN" if event_type_id == rn_en_id else "PCA"
+                    if event_type_id == rn_en_id:
+                        event_type_name = "RN/EN"
+                    elif event_type_id == pca_id:
+                        event_type_name = "PCA"
+                    else:
+                        event_type_name = "Unknown"
+                    
                     for note in notes:
                         event_type_mapping[note.get('Id')] = event_type_name
                     

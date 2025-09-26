@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from flask import request, session
 import logging
 from pathlib import Path
@@ -51,7 +51,9 @@ class UsageLogger:
     def log_access(self, user_info=None, page_info=None):
         """접속 로그 기록"""
         try:
-            now = datetime.now()
+            # 호주 동부 표준시 (AEST, UTC+10) 사용
+            aest = timezone(timedelta(hours=10))
+            now = datetime.now(aest)
             log_file = self.get_daily_log_file("access", now)
             
             # 접속 정보 수집
@@ -105,7 +107,9 @@ class UsageLogger:
     def log_progress_note(self, note_data, user_info=None, success=True, error_message=None):
         """Progress Note 로그 기록"""
         try:
-            now = datetime.now()
+            # 호주 동부 표준시 (AEST, UTC+10) 사용
+            aest = timezone(timedelta(hours=10))
+            now = datetime.now(aest)
             log_file = self.get_daily_log_file("progress_notes", now)
             
             # Progress Note 정보 수집
@@ -168,7 +172,9 @@ class UsageLogger:
     def log_api_call(self, api_endpoint, request_data=None, response_data=None, user_info=None, success=True, error_message=None):
         """API 호출 로그 기록"""
         try:
-            now = datetime.now()
+            # 호주 동부 표준시 (AEST, UTC+10) 사용
+            aest = timezone(timedelta(hours=10))
+            now = datetime.now(aest)
             log_file = self.get_daily_log_file("api_calls", now)
             
             # API 호출 정보 수집

@@ -101,6 +101,10 @@
         <div class="header">
             <h1>🔍 IIS 서버 로그 뷰어</h1>
             <p>실시간 로그 모니터링 및 디버깅 도구</p>
+            <div style="margin-top: 10px;">
+                <a href="/usage-log-viewer" style="color: #3498db; text-decoration: none; font-weight: bold; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 4px; margin-right: 10px;">📊 사용자 활동 로그 분석</a>
+                <a href="/log-viewer" style="color: #e74c3c; text-decoration: none; font-weight: bold; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 4px;">⚙️ 시스템 로그 뷰어</a>
+            </div>
         </div>
         
         <button class="refresh-btn" onclick="refreshLogs()">🔄 새로고침</button>
@@ -140,12 +144,37 @@
                 return;
             }
             
-            container.innerHTML = logFiles.map(file => `
-                <div class="log-file" onclick="loadLog('${file.name}')">
-                    <h3>${file.name}</h3>
-                    <p>크기: ${Math.round(file.size/1024)}KB | 수정: ${new Date(file.modified).toLocaleString()}</p>
-                </div>
-            `).join('');
+            // 파일 타입별로 그룹화
+            const systemLogs = logFiles.filter(file => file.type === 'system');
+            const usageLogs = logFiles.filter(file => file.type === 'usage');
+            
+            let html = '';
+            
+            // Usage 로그 섹션
+            if (usageLogs.length > 0) {
+                html += '<h2 style="color: #2c3e50; margin: 20px 0 10px 0; border-bottom: 2px solid #3498db; padding-bottom: 5px;">📊 사용자 활동 로그 (Usage Logs)</h2>';
+                html += usageLogs.map(file => `
+                    <div class="log-file" onclick="loadLog('${file.name}')" style="border-left: 4px solid #3498db;">
+                        <h3>${file.name}</h3>
+                        <p>크기: ${Math.round(file.size/1024)}KB | 수정: ${new Date(file.modified).toLocaleString()}</p>
+                        <small style="color: #3498db;">사용자 로그인/로그아웃 및 활동 기록</small>
+                    </div>
+                `).join('');
+            }
+            
+            // 시스템 로그 섹션
+            if (systemLogs.length > 0) {
+                html += '<h2 style="color: #2c3e50; margin: 20px 0 10px 0; border-bottom: 2px solid #e74c3c; padding-bottom: 5px;">⚙️ 시스템 로그 (System Logs)</h2>';
+                html += systemLogs.map(file => `
+                    <div class="log-file" onclick="loadLog('${file.name}')" style="border-left: 4px solid #e74c3c;">
+                        <h3>${file.name}</h3>
+                        <p>크기: ${Math.round(file.size/1024)}KB | 수정: ${new Date(file.modified).toLocaleString()}</p>
+                        <small style="color: #e74c3c;">시스템 및 애플리케이션 로그</small>
+                    </div>
+                `).join('');
+            }
+            
+            container.innerHTML = html;
         }
         
         async function loadLog(filename) {
@@ -159,8 +188,17 @@
                     return;
                 }
                 
-                document.getElementById('logContent').innerHTML = data.content.join('\n');
-                document.getElementById('logContent').style.display = 'block';
+                const logContent = document.getElementById('logContent');
+                
+                if (data.type === 'json') {
+                    // JSON 파일인 경우 구문 강조 적용
+                    logContent.innerHTML = `<pre style="color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.4; white-space: pre-wrap;">${data.content.join('\n')}</pre>`;
+                } else {
+                    // 일반 텍스트 파일인 경우
+                    logContent.innerHTML = data.content.join('\n');
+                }
+                
+                logContent.style.display = 'block';
                 showStatus('success', `${filename} 로드 완료 (${data.lines}/${data.total_lines} 줄)`);
             } catch (error) {
                 showStatus('error', '네트워크 오류: ' + error.message);

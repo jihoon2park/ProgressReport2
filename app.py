@@ -19,11 +19,17 @@ import logging.handlers
 import json
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 # .env 파일에서 환경변수 로딩
 load_dotenv()
+
+# 호주 동부 표준시 (AEST, UTC+10) 헬퍼 함수
+def get_australian_time():
+    """호주 동부 표준시 반환"""
+    aest = timezone(timedelta(hours=10))
+    return datetime.now(aest)
 
 # 내부 모듈 임포트
 from api_client import APIClient
@@ -440,7 +446,7 @@ def create_progress_note_json(form_data):
             logger.info(f"EventDate 설정: {progress_note['EventDate']}")
         else:
             # EventDate가 없으면 현재 시간 사용
-            progress_note["EventDate"] = datetime.now().isoformat()
+            progress_note["EventDate"] = get_australian_time().isoformat()
             logger.info(f"EventDate 기본값 설정: {progress_note['EventDate']}")
             
         # ProgressNoteEventType (필수)
@@ -664,7 +670,7 @@ def debug_site_servers_api():
     """사이트 서버 정보 디버깅 API (IIS 문제 진단용)"""
     try:
         debug_info = {
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': get_australian_time().isoformat(),
             'environment': 'IIS' if is_iis_environment() else 'Development',
             'config_loaded': False,
             'site_servers': {},
@@ -713,63 +719,117 @@ def debug_site_servers_api():
     except Exception as e:
         return jsonify({
             'error': f"디버깅 API 오류: {str(e)}",
-            'timestamp': datetime.now().isoformat()
+            'timestamp': get_australian_time().isoformat()
         }), 500
 
 @app.route('/api/logs')
 def get_logs():
     """로그 파일 목록 및 내용 조회 API"""
     try:
-        log_dir = "logs"
-        if not os.path.exists(log_dir):
-            return jsonify({'error': '로그 디렉토리가 없습니다'}), 404
-        
-        # 로그 파일 목록
         log_files = []
-        for filename in os.listdir(log_dir):
-            if filename.endswith('.log'):
-                filepath = os.path.join(log_dir, filename)
-                stat = os.stat(filepath)
-                log_files.append({
-                    'name': filename,
-                    'size': stat.st_size,
-                    'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
-                })
+        
+        # 1. 일반 로그 파일 (logs 디렉토리) - 의미없는 로그 파일 제외
+        log_dir = "logs"
+        excluded_files = ['test.log', 'app.log', 'usage_system.log']
+        
+        if os.path.exists(log_dir):
+            for filename in os.listdir(log_dir):
+                if filename.endswith('.log') and filename not in excluded_files:
+                    filepath = os.path.join(log_dir, filename)
+                    stat = os.stat(filepath)
+                    log_files.append({
+                        'name': filename,
+                        'type': 'system',
+                        'size': stat.st_size,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        'path': filepath
+                    })
+        
+        # 2. Usage 로그 파일 (UsageLog 디렉토리)
+        usage_log_dir = "UsageLog"
+        if os.path.exists(usage_log_dir):
+            for root, dirs, files in os.walk(usage_log_dir):
+                for filename in files:
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(root, filename)
+                        stat = os.stat(filepath)
+                        # 상대 경로로 표시 (Windows 경로 구분자를 슬래시로 통일)
+                        rel_path = os.path.relpath(filepath, usage_log_dir).replace('\\', '/')
+                        log_files.append({
+                            'name': f"UsageLog/{rel_path}",
+                            'type': 'usage',
+                            'size': stat.st_size,
+                            'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            'path': filepath
+                        })
         
         return jsonify({
             'log_files': sorted(log_files, key=lambda x: x['modified'], reverse=True),
-            'timestamp': datetime.now().isoformat()
+            'timestamp': get_australian_time().isoformat()
         })
     except Exception as e:
         return jsonify({'error': f"로그 조회 실패: {str(e)}"}), 500
 
-@app.route('/api/logs/<filename>')
+@app.route('/api/logs/<path:filename>')
 def get_log_content(filename):
     """특정 로그 파일 내용 조회"""
     try:
         # 보안: 파일명에 경로 조작 방지
-        if '..' in filename or '/' in filename or '\\' in filename:
+        if '..' in filename or filename.startswith('/') or filename.startswith('\\'):
             return jsonify({'error': '잘못된 파일명'}), 400
         
-        filepath = os.path.join("logs", filename)
+        # UsageLog 파일인지 확인
+        if filename.startswith('UsageLog/'):
+            # Windows 경로 구분자를 실제 경로로 변환
+            filepath = filename.replace('/', os.sep)
+        else:
+            filepath = os.path.join("logs", filename)
+        
         if not os.path.exists(filepath):
             return jsonify({'error': '파일을 찾을 수 없습니다'}), 404
         
-        # 마지막 N줄 읽기
-        lines = request.args.get('lines', 100, type=int)
-        lines = min(lines, 1000)  # 최대 1000줄로 제한
-        
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            all_lines = f.readlines()
-            content_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
-        
-        return jsonify({
-            'filename': filename,
-            'lines': len(content_lines),
-            'total_lines': len(all_lines),
-            'content': [line.rstrip() for line in content_lines],
-            'timestamp': datetime.now().isoformat()
-        })
+        # JSON 파일인지 확인
+        if filename.endswith('.json'):
+            # JSON 파일인 경우 파싱하여 보기 좋게 표시
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # JSON을 보기 좋게 포맷팅
+            formatted_json = json.dumps(data, indent=2, ensure_ascii=False)
+            content_lines = formatted_json.split('\n')
+            
+            # 마지막 N줄 읽기
+            lines = request.args.get('lines', 100, type=int)
+            lines = min(lines, 1000)  # 최대 1000줄로 제한
+            
+            if len(content_lines) > lines:
+                content_lines = content_lines[-lines:]
+            
+            return jsonify({
+                'filename': filename,
+                'type': 'json',
+                'lines': len(content_lines),
+                'total_lines': len(formatted_json.split('\n')),
+                'content': content_lines,
+                'timestamp': get_australian_time().isoformat()
+            })
+        else:
+            # 일반 로그 파일인 경우
+            lines = request.args.get('lines', 100, type=int)
+            lines = min(lines, 1000)  # 최대 1000줄로 제한
+            
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                all_lines = f.readlines()
+                content_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            
+            return jsonify({
+                'filename': filename,
+                'type': 'text',
+                'lines': len(content_lines),
+                'total_lines': len(all_lines),
+                'content': [line.rstrip() for line in content_lines],
+                'timestamp': get_australian_time().isoformat()
+            })
     except Exception as e:
         return jsonify({'error': f"로그 내용 조회 실패: {str(e)}"}), 500
 
@@ -800,7 +860,7 @@ def health_check():
         return jsonify({
             'success': True,
             'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': get_australian_time().isoformat(),
             'services': {
                 'database': True,
                 'fcm': fcm_status,
@@ -815,7 +875,7 @@ def health_check():
         return jsonify({
             'success': False,
             'status': 'unhealthy',
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': get_australian_time().isoformat(),
             'error': str(e)
         }), 500
 
@@ -849,6 +909,21 @@ def home():
         if username_upper == 'ROD':
             logger.info(f"ROD 사용자 감지 - rod_dashboard로 리다이렉트")
             return redirect(url_for('rod_dashboard'))
+        elif username_upper == 'YKROD':
+            logger.info(f"YKROD 사용자 감지 - Yankalilla ROD 대시보드로 리다이렉트")
+            return redirect(url_for('rod_dashboard', site='Yankalilla'))
+        elif username_upper == 'PGROD':
+            logger.info(f"PGROD 사용자 감지 - Parafield Gardens ROD 대시보드로 리다이렉트")
+            return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
+        elif username_upper == 'WPROD':
+            logger.info(f"WPROD 사용자 감지 - West Park ROD 대시보드로 리다이렉트")
+            return redirect(url_for('rod_dashboard', site='West Park'))
+        elif username_upper == 'RSROD':
+            logger.info(f"RSROD 사용자 감지 - Ramsay ROD 대시보드로 리다이렉트")
+            return redirect(url_for('rod_dashboard', site='Ramsay'))
+        elif username_upper == 'NROD':
+            logger.info(f"NROD 사용자 감지 - Nerrilda ROD 대시보드로 리다이렉트")
+            return redirect(url_for('rod_dashboard', site='Nerrilda'))
         
         # PG_admin 사용자인 경우 incident_viewer로 이동
         if current_user.role == 'site_admin':
@@ -998,7 +1073,7 @@ def login():
                     set_session_permanent(user_role)
                     
                     # 세션 생성 시간 기록
-                    session['_created'] = datetime.now().isoformat()
+                    session['_created'] = get_australian_time().isoformat()
                     session['user_role'] = user_role  # 사용자 역할을 세션에 저장
                     
                     # 세션에 추가 정보 저장
@@ -1026,6 +1101,31 @@ def login():
                     if username_upper == 'ROD':
                         logger.info(f"로그인 성공 - ROD 사용자 감지, rod_dashboard로 리다이렉트")
                         return redirect(url_for('rod_dashboard', site=site))
+                    elif username_upper == 'YKROD':
+                        logger.info(f"로그인 성공 - YKROD 사용자 감지, Yankalilla ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Yankalilla'
+                        session['allowed_sites'] = ['Yankalilla']
+                        return redirect(url_for('rod_dashboard', site='Yankalilla'))
+                    elif username_upper == 'PGROD':
+                        logger.info(f"로그인 성공 - PGROD 사용자 감지, Parafield Gardens ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Parafield Gardens'
+                        session['allowed_sites'] = ['Parafield Gardens']
+                        return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
+                    elif username_upper == 'WPROD':
+                        logger.info(f"로그인 성공 - WPROD 사용자 감지, West Park ROD 대시보드로 리다이렉트")
+                        session['site'] = 'West Park'
+                        session['allowed_sites'] = ['West Park']
+                        return redirect(url_for('rod_dashboard', site='West Park'))
+                    elif username_upper == 'RSROD':
+                        logger.info(f"로그인 성공 - RSROD 사용자 감지, Ramsay ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Ramsay'
+                        session['allowed_sites'] = ['Ramsay']
+                        return redirect(url_for('rod_dashboard', site='Ramsay'))
+                    elif username_upper == 'NROD':
+                        logger.info(f"로그인 성공 - NROD 사용자 감지, Nerrilda ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Nerrilda'
+                        session['allowed_sites'] = ['Nerrilda']
+                        return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
                         logger.info(f"로그인 성공 - PG_admin 사용자 감지, incident_viewer로 리다이렉트")
                         return redirect(url_for('incident_viewer', site=site))
@@ -1054,7 +1154,7 @@ def login():
                     set_session_permanent(user_role)
                     
                     # 세션 생성 시간 기록
-                    session['_created'] = datetime.now().isoformat()
+                    session['_created'] = get_australian_time().isoformat()
                     session['user_role'] = user_role  # 사용자 역할을 세션에 저장
                     
                     # 세션에 추가 정보 저장
@@ -1073,6 +1173,31 @@ def login():
                     if username_upper == 'ROD':
                         logger.info(f"로그인 성공 (API 오류 있음) - ROD 사용자 감지, rod_dashboard로 리다이렉트")
                         return redirect(url_for('rod_dashboard', site=site))
+                    elif username_upper == 'YKROD':
+                        logger.info(f"로그인 성공 (API 오류 있음) - YKROD 사용자 감지, Yankalilla ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Yankalilla'
+                        session['allowed_sites'] = ['Yankalilla']
+                        return redirect(url_for('rod_dashboard', site='Yankalilla'))
+                    elif username_upper == 'PGROD':
+                        logger.info(f"로그인 성공 (API 오류 있음) - PGROD 사용자 감지, Parafield Gardens ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Parafield Gardens'
+                        session['allowed_sites'] = ['Parafield Gardens']
+                        return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
+                    elif username_upper == 'WPROD':
+                        logger.info(f"로그인 성공 (API 오류 있음) - WPROD 사용자 감지, West Park ROD 대시보드로 리다이렉트")
+                        session['site'] = 'West Park'
+                        session['allowed_sites'] = ['West Park']
+                        return redirect(url_for('rod_dashboard', site='West Park'))
+                    elif username_upper == 'RSROD':
+                        logger.info(f"로그인 성공 (API 오류 있음) - RSROD 사용자 감지, Ramsay ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Ramsay'
+                        session['allowed_sites'] = ['Ramsay']
+                        return redirect(url_for('rod_dashboard', site='Ramsay'))
+                    elif username_upper == 'NROD':
+                        logger.info(f"로그인 성공 (API 오류 있음) - NROD 사용자 감지, Nerrilda ROD 대시보드로 리다이렉트")
+                        session['site'] = 'Nerrilda'
+                        session['allowed_sites'] = ['Nerrilda']
+                        return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
                         logger.info(f"로그인 성공 (API 오류 있음) - PG_admin 사용자 감지, incident_viewer로 리다이렉트")
                         return redirect(url_for('incident_viewer', site=site))
@@ -1204,7 +1329,7 @@ def rod_dashboard():
     # ROD 사용자가 아닌 경우 접근 제한 (대소문자 구분 안함)
     username_upper = current_user.username.upper()
     logger.info(f"ROD 대시보드 접근 시도 - 사용자명 확인: {current_user.username} -> {username_upper}")
-    if username_upper != 'ROD':
+    if username_upper not in ['ROD', 'YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
         flash('Access denied. This dashboard is for ROD users only.', 'error')
         return redirect(url_for('progress_notes'))
     
@@ -1220,15 +1345,29 @@ def rod_dashboard():
     }
     usage_logger.log_access(user_info)
     
-    # 모든 사이트 정보 가져오기
+    # 사이트 정보 가져오기 (사이트 전용 ROD 사용자는 자신의 사이트만)
     sites_info = []
     safe_site_servers = get_safe_site_servers()
-    for site_name in safe_site_servers.keys():
-        sites_info.append({
-            'name': site_name,
-            'server': safe_site_servers[site_name],
-            'is_selected': site_name == site
-        })
+    
+    # 사이트 전용 ROD 사용자인 경우 자신의 사이트만 표시
+    if username_upper in ['YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
+        # allowed_sites에서 첫 번째 사이트만 사용 (이미 1개로 제한됨)
+        allowed_sites = session.get('allowed_sites', [])
+        if allowed_sites:
+            site_name = allowed_sites[0]
+            sites_info.append({
+                'name': site_name,
+                'server': safe_site_servers.get(site_name, 'Unknown'),
+                'is_selected': True
+            })
+    else:
+        # 일반 ROD 사용자는 모든 사이트 표시
+        for site_name in safe_site_servers.keys():
+            sites_info.append({
+                'name': site_name,
+                'server': safe_site_servers[site_name],
+                'is_selected': site_name == site
+            })
     
     return render_template('RODDashboard.html', 
                          site=site, 
@@ -1419,8 +1558,8 @@ def get_rod_residence_status():
     """Resident of the day 현황을 가져옵니다."""
     try:
         site = request.args.get('site', 'Parafield Gardens')
-        year = int(request.args.get('year', datetime.now().year))
-        month = int(request.args.get('month', datetime.now().month))
+        year = int(request.args.get('year', get_australian_time().year))
+        month = int(request.args.get('month', get_australian_time().month))
         
         logger.info(f"Fetching Resident of the day status for {site} - {year}/{month}")
         
@@ -1580,7 +1719,7 @@ def get_rod_stats():
     """ROD 전용 통계 정보 반환"""
     try:
         # ROD 사용자만 접근 가능
-        if current_user.username.upper() != 'ROD':
+        if current_user.username.upper() not in ['ROD', 'YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
         data = request.get_json()
@@ -1603,7 +1742,7 @@ def get_rod_stats():
                 stats['totalNotes'] = len(progress_notes)
                 
                 # 오늘 날짜의 노트 수 계산
-                today = datetime.now().date()
+                today = get_australian_time().date()
                 today_notes = [note for note in progress_notes 
                              if note.get('EventDate') and 
                              datetime.fromisoformat(note['EventDate'].replace('Z', '+00:00')).date() == today]
@@ -1625,7 +1764,7 @@ def get_rod_stats():
             'success': True,
             'stats': stats,
             'site': site,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': get_australian_time().isoformat()
         })
         
     except Exception as e:
@@ -1711,13 +1850,13 @@ def get_session_status():
     try:
         # 모든 사용자에게 동일한 세션 타임아웃 적용
         session_lifetime = timedelta(minutes=10)
-        session_created = session.get('_created', datetime.now())
+        session_created = session.get('_created', get_australian_time())
         
         if isinstance(session_created, str):
             session_created = datetime.fromisoformat(session_created)
         
         session_expires = session_created + session_lifetime
-        now = datetime.now()
+        now = get_australian_time()
         
         # 남은 시간 계산 (초 단위)
         remaining_seconds = (session_expires - now).total_seconds()
@@ -1739,7 +1878,7 @@ def extend_session():
     """세션 연장"""
     try:
         # 모든 사용자에게 동일한 세션 연장 적용
-        session['_created'] = datetime.now().isoformat()
+        session['_created'] = get_australian_time().isoformat()
         
         # Flask-Login 세션 갱신 (재귀 방지를 위해 직접 세션 갱신)
         session.permanent = True
@@ -1826,7 +1965,7 @@ def fetch_progress_notes():
                 'total_count': total_count,
                 'total_pages': total_pages,
                 'cache_status': 'fresh_api_data',
-                'last_sync': datetime.now().isoformat(),
+                'last_sync': get_australian_time().isoformat(),
                 'cache_age_hours': 0
             }
         
@@ -1847,7 +1986,7 @@ def fetch_progress_notes():
             },
             'site': site,
             'count': result['total_count'],
-            'fetched_at': datetime.now().isoformat()
+            'fetched_at': get_australian_time().isoformat()
         }
         
         # ROD 대시보드 요청인지 확인 (year, month가 제공되고 event_types가 None이거나 빈 배열인 경우)
@@ -1867,7 +2006,7 @@ def fetch_progress_notes():
                     'data': residence_data,
                     'site': site,
                     'count': len(residence_data),
-                    'fetched_at': datetime.now().isoformat()
+                    'fetched_at': get_australian_time().isoformat()
                 })
             else:
                 logger.warning(f"No ROD data found for {site}")
@@ -1877,7 +2016,7 @@ def fetch_progress_notes():
                     'data': {},
                     'site': site,
                     'count': 0,
-                    'fetched_at': datetime.now().isoformat()
+                    'fetched_at': get_australian_time().isoformat()
                 })
         else:
             # 일반 Progress Notes 요청
@@ -1923,7 +2062,7 @@ def fetch_progress_notes_incremental():
                     'data': progress_notes,
                     'site': site,
                     'count': len(progress_notes) if progress_notes else 0,
-                    'fetched_at': datetime.now().isoformat()
+                    'fetched_at': get_australian_time().isoformat()
                 })
             else:
                 logger.error(f"증분 업데이트 실패 (단순화됨) - {site}")
@@ -2042,6 +2181,25 @@ def log_viewer():
     
     return render_template('LogViewer.html')
 
+@app.route('/usage-log-viewer')
+@login_required
+def usage_log_viewer():
+    """사용자 활동 로그 전용 뷰어 페이지"""
+    # 관리자만 접근 허용
+    if current_user.role != 'admin':
+        return redirect(url_for('home'))
+    
+    # 접속 로그 기록
+    user_info = {
+        "username": current_user.username,
+        "display_name": current_user.display_name,
+        "role": current_user.role,
+        "position": current_user.position
+    }
+    usage_logger.log_access(user_info)
+    
+    return render_template('UsageLogViewer.html')
+
 @app.route('/log_viewer/progress_notes')
 @login_required
 def progress_note_logs_viewer():
@@ -2150,7 +2308,7 @@ def fetch_incidents():
                     'data': incidents_data,
                     'site': site,
                     'count': len(incidents_data.get('incidents', [])),
-                    'fetched_at': datetime.now().isoformat()
+                    'fetched_at': get_australian_time().isoformat()
                 })
             else:
                 logger.warning(f"No incidents found for {site}")
@@ -2160,7 +2318,7 @@ def fetch_incidents():
                     'data': {'incidents': [], 'clients': []},
                     'site': site,
                     'count': 0,
-                    'fetched_at': datetime.now().isoformat()
+                    'fetched_at': get_australian_time().isoformat()
                 })
                 
         except Exception as e:
@@ -2350,12 +2508,12 @@ def log_rod_debug():
         os.makedirs(logs_dir, exist_ok=True)
         
         # Create filename with timestamp
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        timestamp = get_australian_time().strftime('%Y-%m-%d_%H%M%S')
         filename = f'rod_debug_{timestamp}.json'
         filepath = os.path.join(logs_dir, filename)
         
         # Add server timestamp and user info
-        debug_data['server_timestamp'] = datetime.now().isoformat()
+        debug_data['server_timestamp'] = get_australian_time().isoformat()
         debug_data['user'] = current_user.username if current_user.is_authenticated else 'Unknown'
         
         # Save to file
@@ -2513,6 +2671,291 @@ def get_access_log():
         
     except Exception as e:
         logger.error(f"access.log 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usage-logs')
+@login_required
+def get_usage_logs():
+    """사용자 활동 로그 분석 데이터 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        # 날짜 범위 파라미터
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # UsageLog 디렉토리에서 로그 파일들 수집
+        usage_log_dir = "UsageLog"
+        if not os.path.exists(usage_log_dir):
+            return jsonify({'success': True, 'logs': [], 'summary': {}})
+        
+        all_logs = []
+        login_sessions = {}  # 사용자별 로그인 세션 추적
+        
+        # 모든 JSON 로그 파일 읽기
+        for root, dirs, files in os.walk(usage_log_dir):
+            for filename in files:
+                if filename.endswith('.json'):
+                    filepath = os.path.join(root, filename)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            logs = json.load(f)
+                            
+                        # 날짜 필터링
+                        if start_date or end_date:
+                            filtered_logs = []
+                            for log in logs:
+                                log_date = log.get('timestamp', '').split('T')[0]
+                                if start_date and log_date < start_date:
+                                    continue
+                                if end_date and log_date > end_date:
+                                    continue
+                                filtered_logs.append(log)
+                            logs = filtered_logs
+                        
+                        all_logs.extend(logs)
+                    except Exception as e:
+                        logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                        continue
+        
+        # 시간순 정렬
+        all_logs.sort(key=lambda x: x.get('timestamp', ''))
+        
+        # 로그인/로그아웃 세션 분석
+        for log in all_logs:
+            username = log.get('user', {}).get('username', 'Unknown')
+            timestamp = log.get('timestamp', '')
+            page = log.get('page', {}).get('path', '')
+            
+            if username not in login_sessions:
+                login_sessions[username] = []
+            
+            # 로그인 감지 (홈 페이지나 로그인 페이지 접근)
+            if page in ['/', '/login'] or 'login' in page.lower():
+                login_sessions[username].append({
+                    'type': 'login',
+                    'timestamp': timestamp,
+                    'page': page
+                })
+            
+            # 로그아웃 감지
+            if page == '/logout':
+                login_sessions[username].append({
+                    'type': 'logout',
+                    'timestamp': timestamp,
+                    'page': page
+                })
+        
+        # 요약 통계
+        summary = {
+            'total_logs': len(all_logs),
+            'unique_users': len(set(log.get('user', {}).get('username', 'Unknown') for log in all_logs)),
+            'date_range': {
+                'start': all_logs[0].get('timestamp', '').split('T')[0] if all_logs else None,
+                'end': all_logs[-1].get('timestamp', '').split('T')[0] if all_logs else None
+            },
+            'login_sessions': login_sessions
+        }
+        
+        return jsonify({
+            'success': True,
+            'logs': all_logs[-1000:],  # 최근 1000개만 반환
+            'summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"사용자 활동 로그 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usage-logs/months')
+@login_required
+def get_usage_log_months():
+    """사용 가능한 월 목록 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        usage_log_dir = "UsageLog"
+        months = set()
+        
+        if os.path.exists(usage_log_dir):
+            for root, dirs, files in os.walk(usage_log_dir):
+                for filename in files:
+                    if filename.endswith('.json'):
+                        # 파일명에서 월 정보 추출 (예: access_2025-09-26.json)
+                        if 'access_' in filename:
+                            try:
+                                date_part = filename.replace('access_', '').replace('.json', '')
+                                year_month = '-'.join(date_part.split('-')[:2])  # YYYY-MM
+                                months.add(year_month)
+                            except:
+                                continue
+        
+        return jsonify({
+            'success': True,
+            'months': sorted(list(months), reverse=True)
+        })
+        
+    except Exception as e:
+        logger.error(f"월 목록 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usage-logs/month/<month>')
+@login_required
+def get_usage_logs_by_month(month):
+    """특정 월의 사용자 활동 로그 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        usage_log_dir = "UsageLog"
+        all_logs = []
+        days = set()
+        
+        if os.path.exists(usage_log_dir):
+            for root, dirs, files in os.walk(usage_log_dir):
+                for filename in files:
+                    if filename.endswith('.json') and month in filename:
+                        filepath = os.path.join(root, filename)
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                logs = json.load(f)
+                            
+                            for log in logs:
+                                timestamp = log.get('timestamp', '')
+                                if timestamp:
+                                    log_date = timestamp.split('T')[0]
+                                    if log_date.startswith(month):
+                                        all_logs.append(log)
+                                        day = log_date.split('-')[2]  # 일자 추출
+                                        days.add(day)
+                        except Exception as e:
+                            logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                            continue
+        
+        # 시간순 정렬
+        all_logs.sort(key=lambda x: x.get('timestamp', ''))
+        
+        # 통계 계산
+        unique_users = len(set(log.get('user', {}).get('username', 'Unknown') for log in all_logs))
+        active_days = len(days)
+        avg_daily_access = len(all_logs) / active_days if active_days > 0 else 0
+        
+        stats = {
+            'totalAccess': len(all_logs),
+            'uniqueUsers': unique_users,
+            'activeDays': active_days,
+            'avgDailyAccess': avg_daily_access
+        }
+        
+        return jsonify({
+            'success': True,
+            'logs': all_logs,
+            'stats': stats,
+            'days': sorted(list(days), reverse=True)
+        })
+        
+    except Exception as e:
+        logger.error(f"월별 로그 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usage-logs/all')
+@login_required
+def get_all_usage_logs():
+    """전체 사용자 활동 로그 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        usage_log_dir = "UsageLog"
+        all_logs = []
+        
+        if os.path.exists(usage_log_dir):
+            for root, dirs, files in os.walk(usage_log_dir):
+                for filename in files:
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(root, filename)
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                logs = json.load(f)
+                                all_logs.extend(logs)
+                        except Exception as e:
+                            logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                            continue
+        
+        # 시간순 정렬
+        all_logs.sort(key=lambda x: x.get('timestamp', ''))
+        
+        # 통계 계산
+        unique_users = len(set(log.get('user', {}).get('username', 'Unknown') for log in all_logs))
+        
+        stats = {
+            'totalAccess': len(all_logs),
+            'uniqueUsers': unique_users,
+            'activeDays': 0,
+            'avgDailyAccess': 0
+        }
+        
+        return jsonify({
+            'success': True,
+            'logs': all_logs[-2000:],  # 최근 2000개만 반환
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"전체 로그 조회 실패: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usage-logs/monthly-stats')
+@login_required
+def get_monthly_usage_stats():
+    """월별 통계 반환"""
+    try:
+        # 관리자만 접근 허용
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        usage_log_dir = "UsageLog"
+        monthly_stats = {}
+        
+        if os.path.exists(usage_log_dir):
+            for root, dirs, files in os.walk(usage_log_dir):
+                for filename in files:
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(root, filename)
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                logs = json.load(f)
+                            
+                            for log in logs:
+                                timestamp = log.get('timestamp', '')
+                                if timestamp:
+                                    log_date = timestamp.split('T')[0]
+                                    year_month = '-'.join(log_date.split('-')[:2])
+                                    
+                                    if year_month not in monthly_stats:
+                                        monthly_stats[year_month] = 0
+                                    monthly_stats[year_month] += 1
+                        except Exception as e:
+                            logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                            continue
+        
+        # 월별 통계를 리스트로 변환
+        monthly_list = [{'month': month, 'totalAccess': count} for month, count in monthly_stats.items()]
+        monthly_list.sort(key=lambda x: x['month'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'monthlyStats': monthly_list
+        })
+        
+    except Exception as e:
+        logger.error(f"월별 통계 조회 실패: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/send-alarm', methods=['POST'])
@@ -3777,7 +4220,7 @@ def update_escalation_policy_unified(policy_id):
                 data['description'],
                 data['event_type'],
                 data['priority'],
-                datetime.now().isoformat(),
+                get_australian_time().isoformat(),
                 policy_id
             ))
             
@@ -3834,7 +4277,7 @@ def delete_escalation_policy_unified(policy_id):
                 UPDATE escalation_policies 
                 SET is_active = 0, updated_at = ?
                 WHERE id = ?
-            ''', (datetime.now().isoformat(), policy_id))
+            ''', (get_australian_time().isoformat(), policy_id))
             
             # 관련 단계도 비활성화
             cursor.execute('''

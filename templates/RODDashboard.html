@@ -641,9 +641,19 @@
                     <table id="residenceTable" style="width: 100%; border-collapse: collapse; display: none;">
                                         <thead>
                     <tr style="background: var(--light-bg);">
-                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Residence Name</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); cursor: pointer; user-select: none; transition: background-color 0.2s;" 
+                            onclick="sortTable('name')" 
+                            onmouseover="this.style.backgroundColor='#e9ecef'" 
+                            onmouseout="this.style.backgroundColor='var(--light-bg)'">
+                            Residence Name <span id="sort-name" style="font-size: 16px; font-weight: bold; margin-left: 8px;"><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▲</span><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▼</span></span>
+                        </th>
                         <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Preferred Name</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Wing</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); cursor: pointer; user-select: none; transition: background-color 0.2s;" 
+                            onclick="sortTable('wing')" 
+                            onmouseover="this.style.backgroundColor='#e9ecef'" 
+                            onmouseout="this.style.backgroundColor='var(--light-bg)'">
+                            Wing <span id="sort-wing" style="font-size: 16px; font-weight: bold; margin-left: 8px;"><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▲</span><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▼</span></span>
+                        </th>
                         <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color);">ROD by RN/EN</th>
                         <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color);">ROD by PCA</th>
                         <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color);">Count</th>
@@ -1008,74 +1018,9 @@
             document.getElementById('totalNotesCount').textContent = summary.totalNotesCount || 0;
             document.getElementById('summaryStats').style.display = 'block';
             
-            // Populate table
-            const tbody = document.getElementById('residenceTableBody');
-            tbody.innerHTML = '';
-            
-            if (Object.keys(rodStatus).length === 0) {
-                console.warn('No residence data to display');
-                const row = document.createElement('tr');
-                const cell = document.createElement('td');
-                cell.colSpan = 6;
-                cell.style.textAlign = 'center';
-                cell.style.padding = '20px';
-                cell.style.color = '#7f8c8d';
-                cell.textContent = 'No residence data available';
-                row.appendChild(cell);
-                tbody.appendChild(row);
-            } else {
-                Object.values(rodStatus).forEach(residence => {
-                const row = document.createElement('tr');
-                row.style.borderBottom = '1px solid var(--border-color)';
-
-                const residenceCell = document.createElement('td');
-                residenceCell.style.padding = '12px';
-                residenceCell.style.fontWeight = '600';
-                residenceCell.textContent = residence.residence_name || '-';
-
-                const preferredCell = document.createElement('td');
-                preferredCell.style.padding = '12px';
-                preferredCell.textContent = residence.preferred_name || '-';
-
-                const wingCell = document.createElement('td');
-                wingCell.style.padding = '12px';
-                wingCell.textContent = residence.wing_name || '-';
-
-                const rnEnCell = document.createElement('td');
-                rnEnCell.style.padding = '12px';
-                rnEnCell.style.textAlign = 'center';
-                if (residence.rn_en_has_note) {
-                    rnEnCell.innerHTML = '<span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">✅</span>';
-                } else {
-                    rnEnCell.innerHTML = '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">❌</span>';
-                }
-
-                const pcaCell = document.createElement('td');
-                pcaCell.style.padding = '12px';
-                pcaCell.style.textAlign = 'center';
-                if (residence.pca_has_note) {
-                    pcaCell.innerHTML = '<span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">✅</span>';
-                } else {
-                    pcaCell.innerHTML = '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">❌</span>';
-                }
-
-                const countCell = document.createElement('td');
-                countCell.style.padding = '12px';
-                countCell.style.textAlign = 'center';
-                countCell.style.fontWeight = '600';
-                const totalCount = (residence.rn_en_count || 0) + (residence.pca_count || 0);
-                countCell.textContent = totalCount > 0 ? totalCount : '-';
-
-                row.appendChild(residenceCell);
-                row.appendChild(preferredCell);
-                row.appendChild(wingCell);
-                row.appendChild(rnEnCell);
-                row.appendChild(pcaCell);
-                row.appendChild(countCell);
-
-                tbody.appendChild(row);
-            });
-            }
+            // Store data for sorting and populate table
+            residenceData = Object.values(rodStatus);
+            renderTable(residenceData);
             
             document.getElementById('residenceTable').style.display = 'table';
         }
@@ -1333,6 +1278,148 @@
                     errorDiv.remove();
                 }
             }, 15000);
+        }
+
+        // Table sorting functionality
+        let currentSort = { column: null, direction: 'asc' };
+        let residenceData = []; // Store the original data for sorting
+
+        function sortTable(column) {
+            const tbody = document.getElementById('residenceTableBody');
+            if (!tbody || residenceData.length === 0) return;
+
+            // Determine sort direction
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+
+            // Sort the data
+            const sortedData = [...residenceData].sort((a, b) => {
+                let aValue, bValue;
+                
+                if (column === 'name') {
+                    aValue = a.residence_name || '';
+                    bValue = b.residence_name || '';
+                } else if (column === 'wing') {
+                    aValue = a.wing_name || '';
+                    bValue = b.wing_name || '';
+                }
+                
+                // Handle empty values
+                if (!aValue && !bValue) return 0;
+                if (!aValue) return 1;
+                if (!bValue) return -1;
+                
+                // Compare values
+                const comparison = aValue.localeCompare(bValue, 'en', { numeric: true });
+                return currentSort.direction === 'asc' ? comparison : -comparison;
+            });
+
+            // Update sort indicators
+            updateSortIndicators(column);
+
+            // Re-render the table
+            renderTable(sortedData);
+        }
+
+        function updateSortIndicators(activeColumn) {
+            // Reset all indicators to show both arrows with gray background
+            document.getElementById('sort-name').innerHTML = '<span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▲</span><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▼</span>';
+            document.getElementById('sort-wing').innerHTML = '<span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▲</span><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▼</span>';
+            
+            // Set active indicator with highlighted colors
+            if (activeColumn === 'name') {
+                if (currentSort.direction === 'asc') {
+                    document.getElementById('sort-name').innerHTML = '<span style="color: white; background: #e74c3c; padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-weight: bold;">▲</span><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▼</span>';
+                } else {
+                    document.getElementById('sort-name').innerHTML = '<span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▲</span><span style="color: white; background: #e74c3c; padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-weight: bold;">▼</span>';
+                }
+            } else if (activeColumn === 'wing') {
+                if (currentSort.direction === 'asc') {
+                    document.getElementById('sort-wing').innerHTML = '<span style="color: white; background: #3498db; padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-weight: bold;">▲</span><span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▼</span>';
+                } else {
+                    document.getElementById('sort-wing').innerHTML = '<span style="color: #bdc3c7; background: #ecf0f1; padding: 2px 4px; border-radius: 3px; margin: 0 1px;">▲</span><span style="color: white; background: #3498db; padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-weight: bold;">▼</span>';
+                }
+            }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('residenceTableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 6;
+                cell.style.textAlign = 'center';
+                cell.style.padding = '20px';
+                cell.style.color = '#7f8c8d';
+                cell.textContent = 'No residence data available';
+                row.appendChild(cell);
+                tbody.appendChild(row);
+            } else {
+                data.forEach(residence => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid var(--border-color)';
+
+                    // Residence Name
+                    const residenceCell = document.createElement('td');
+                    residenceCell.style.padding = '12px';
+                    residenceCell.style.fontWeight = '600';
+                    residenceCell.textContent = residence.residence_name || '-';
+                    row.appendChild(residenceCell);
+
+                    // Preferred Name
+                    const preferredCell = document.createElement('td');
+                    preferredCell.style.padding = '12px';
+                    preferredCell.textContent = residence.preferred_name || '-';
+                    row.appendChild(preferredCell);
+
+                    // Wing
+                    const wingCell = document.createElement('td');
+                    wingCell.style.padding = '12px';
+                    wingCell.textContent = residence.wing_name || '-';
+                    row.appendChild(wingCell);
+
+                    // ROD by RN/EN
+                    const rnEnCell = document.createElement('td');
+                    rnEnCell.style.padding = '12px';
+                    rnEnCell.style.textAlign = 'center';
+                    if (residence.rn_en_has_note) {
+                        rnEnCell.innerHTML = '<span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">✅</span>';
+                        rnEnCell.title = `Count: ${residence.rn_en_count || 0}`;
+                    } else {
+                        rnEnCell.innerHTML = '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">❌</span>';
+                    }
+                    row.appendChild(rnEnCell);
+
+                    // ROD by PCA
+                    const pcaCell = document.createElement('td');
+                    pcaCell.style.padding = '12px';
+                    pcaCell.style.textAlign = 'center';
+                    if (residence.pca_has_note) {
+                        pcaCell.innerHTML = '<span style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">✅</span>';
+                        pcaCell.title = `Count: ${residence.pca_count || 0}`;
+                    } else {
+                        pcaCell.innerHTML = '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">❌</span>';
+                    }
+                    row.appendChild(pcaCell);
+
+                    // Total Count
+                    const countCell = document.createElement('td');
+                    countCell.style.padding = '12px';
+                    countCell.style.textAlign = 'center';
+                    countCell.style.fontWeight = '600';
+                    const totalCount = (residence.rn_en_count || 0) + (residence.pca_count || 0);
+                    countCell.textContent = totalCount > 0 ? totalCount : '-';
+                    row.appendChild(countCell);
+
+                    tbody.appendChild(row);
+                });
+            }
         }
     </script>
 </body>

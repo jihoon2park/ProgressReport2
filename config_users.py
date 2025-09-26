@@ -131,6 +131,46 @@ USERS_DB = {
         "role": "admin",
         "position": "Admin",
         "location": ["All"]
+    },
+    "YKROD": {
+        "password_hash": hash_password("ykpassword"),
+        "first_name": "ROD",
+        "last_name": "Yankalilla",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["Yankalilla"]
+    },
+    "PGROD": {
+        "password_hash": hash_password("pgpassword"),
+        "first_name": "ROD",
+        "last_name": "Parafield Gardens",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["Parafield Gardens"]
+    },
+    "WPROD": {
+        "password_hash": hash_password("wppassword"),
+        "first_name": "ROD",
+        "last_name": "West Park",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["West Park"]
+    },
+    "RSROD": {
+        "password_hash": hash_password("rspassword"),
+        "first_name": "ROD",
+        "last_name": "Ramsay",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["Ramsay"]
+    },
+    "NROD": {
+        "password_hash": hash_password("nrpassword"),
+        "first_name": "ROD",
+        "last_name": "Nerrilda",
+        "role": "admin",
+        "position": "Admin",
+        "location": ["Nerrilda"]
     }
 }
 

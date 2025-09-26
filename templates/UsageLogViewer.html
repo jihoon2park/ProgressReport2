@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Log 뷰어 - 달력</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+            transform: translateY(-1px);
+        }
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        .btn-info:hover {
+            background: #138496;
+            transform: translateY(-1px);
+        }
+        .month-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .month-selector select {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .calendar-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .calendar-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .nav-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .nav-btn:hover {
+            background: #5a6268;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .calendar-day-header {
+            background: #495057;
+            color: white;
+            padding: 15px 5px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .calendar-day {
+            background: white;
+            min-height: 100px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid #e9ecef;
+        }
+        .calendar-day:hover {
+            background: #f8f9fa;
+            transform: scale(1.02);
+        }
+        .calendar-day.other-month {
+            background: #f8f9fa;
+            color: #adb5bd;
+        }
+        .calendar-day.today {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+        }
+        .calendar-day.selected {
+            background: #e8f5e8;
+            border: 2px solid #28a745;
+        }
+        .day-number {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .day-stats {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .user-count {
+            background: #007bff;
+            color: white;
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .user-count.high {
+            background: #dc3545;
+        }
+        .user-count.medium {
+            background: #ffc107;
+            color: #212529;
+        }
+        .user-count.low {
+            background: #28a745;
+        }
+        .day-details {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 2000;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+            pointer-events: auto;
+        }
+        .day-details.show {
+            display: block;
+        }
+        .day-details-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1999;
+            display: none;
+            pointer-events: auto;
+        }
+        .day-details-overlay.show {
+            display: block;
+        }
+        .day-details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .day-details-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+        }
+        .day-details-close {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .day-details-close:hover {
+            background: #c82333;
+        }
+        .user-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .user-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+            font-size: 13px;
+        }
+        .user-item:last-child {
+            border-bottom: none;
+        }
+        .user-name {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+        .user-time {
+            color: #6c757d;
+            font-size: 11px;
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .stat-card .number {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 사용자 접속 통계</h1>
+            <p>달력 형태로 일별 접속 현황을 확인하세요</p>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="loadCurrentMonth()">🔄 현재 월</button>
+            <button class="btn btn-success" onclick="loadAllStats()">📈 전체 통계</button>
+            <button class="btn btn-info" onclick="exportData()">💾 데이터 내보내기</button>
+            
+            <div class="month-selector">
+                <label for="monthSelect">월 선택:</label>
+                <select id="monthSelect" onchange="loadSelectedMonth()">
+                    <option value="">월을 선택하세요</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="content">
+            <!-- 통계 요약 -->
+            <div id="statsSection" class="stats-summary" style="display: none;">
+                <div class="stat-card">
+                    <h3>총 접속 수</h3>
+                    <div class="number" id="totalAccess">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>고유 사용자</h3>
+                    <div class="number" id="uniqueUsers">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>활성 일수</h3>
+                    <div class="number" id="activeDays">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>평균 일일 접속</h3>
+                    <div class="number" id="avgDailyAccess">0</div>
+                </div>
+            </div>
+            
+            <!-- 달력 -->
+            <div id="calendarSection" class="calendar-container" style="display: none;">
+                <div class="calendar-header">
+                    <div class="calendar-title" id="calendarTitle">2025년 9월</div>
+                    <div class="calendar-nav">
+                        <button class="nav-btn" onclick="previousMonth()">◀ 이전</button>
+                        <button class="nav-btn" onclick="nextMonth()">다음 ▶</button>
+                    </div>
+                </div>
+                <div id="calendarGrid" class="calendar-grid">
+                    <!-- 달력이 여기에 동적으로 생성됩니다 -->
+                </div>
+            </div>
+            
+            <!-- 로딩 상태 -->
+            <div id="loadingSection" class="loading">
+                <div class="spinner"></div>
+                <p>데이터를 불러오는 중...</p>
+            </div>
+            
+            <!-- 데이터 없음 -->
+            <div id="noDataSection" class="no-data" style="display: none;">
+                <h3>📭 데이터가 없습니다</h3>
+                <p>선택한 기간에 접속 데이터가 없습니다.</p>
+            </div>
+        </div>
+        
+        <!-- 날짜 상세 팝업 오버레이 -->
+        <div id="dayDetailsOverlay" class="day-details-overlay" onclick="closeDayDetails(); event.stopPropagation()"></div>
+        
+        <!-- 날짜 상세 팝업 -->
+        <div id="dayDetailsPopup" class="day-details">
+            <div class="day-details-header">
+                <h4 class="day-details-title" id="popupTitle">날짜</h4>
+                <button class="day-details-close" onclick="closeDayDetails(); event.stopPropagation()">✕ 닫기</button>
+            </div>
+            <div class="user-list" id="popupUserList">
+                <!-- 사용자 목록이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+        let monthlyData = {};
+        let selectedDate = null;
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMonthList();
+            loadCurrentMonth();
+            
+            // ESC 키로 팝업 닫기
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeDayDetails();
+                }
+            });
+        });
+
+        // 월 목록 로드
+        async function loadMonthList() {
+            try {
+                const response = await fetch('/api/usage-logs/months');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const monthSelect = document.getElementById('monthSelect');
+                    monthSelect.innerHTML = '<option value="">월을 선택하세요</option>';
+                    
+                    data.months.forEach(month => {
+                        const option = document.createElement('option');
+                        option.value = month;
+                        option.textContent = month;
+                        monthSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('월 목록 로드 실패:', error);
+            }
+        }
+
+        // 현재 월 로드
+        async function loadCurrentMonth() {
+            const now = new Date();
+            currentYear = now.getFullYear();
+            currentMonth = now.getMonth();
+            await loadMonthData();
+        }
+
+        // 선택된 월 로드
+        async function loadSelectedMonth() {
+            const monthSelect = document.getElementById('monthSelect');
+            const selectedMonth = monthSelect.value;
+            
+            if (selectedMonth) {
+                const [year, month] = selectedMonth.split('-');
+                currentYear = parseInt(year);
+                currentMonth = parseInt(month) - 1; // JavaScript month는 0부터 시작
+                await loadMonthData();
+            }
+        }
+
+        // 전체 통계 로드
+        async function loadAllStats() {
+            try {
+                showLoading(true);
+                showStatus('loading', '전체 통계를 불러오는 중...');
+                
+                const response = await fetch('/api/usage-logs/all');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayStats(data.stats);
+                    showStatus('success', '전체 통계 로드 완료');
+                } else {
+                    showStatus('error', '통계 로드 실패: ' + data.message);
+                }
+            } catch (error) {
+                showStatus('error', '네트워크 오류: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 월별 데이터 로드
+        async function loadMonthData() {
+            try {
+                showLoading(true);
+                showStatus('loading', '월별 데이터를 불러오는 중...');
+                
+                const month = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const response = await fetch(`/api/usage-logs/month/${month}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    monthlyData = data.logs;
+                    displayStats(data.stats);
+                    generateCalendar();
+                    showStatus('success', `${month} 데이터 로드 완료`);
+                } else {
+                    showStatus('error', '데이터 로드 실패: ' + data.message);
+                    showNoData();
+                }
+            } catch (error) {
+                showStatus('error', '네트워크 오류: ' + error.message);
+                showNoData();
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 통계 표시
+        function displayStats(stats) {
+            document.getElementById('totalAccess').textContent = stats.totalAccess || 0;
+            document.getElementById('uniqueUsers').textContent = stats.uniqueUsers || 0;
+            document.getElementById('activeDays').textContent = stats.activeDays || 0;
+            document.getElementById('avgDailyAccess').textContent = Math.round(stats.avgDailyAccess || 0);
+            
+            document.getElementById('statsSection').style.display = 'grid';
+            document.getElementById('calendarSection').style.display = 'block';
+        }
+
+        // 달력 생성
+        function generateCalendar() {
+            const calendarTitle = document.getElementById('calendarTitle');
+            const calendarGrid = document.getElementById('calendarGrid');
+            
+            calendarTitle.textContent = `${currentYear}년 ${currentMonth + 1}월`;
+            
+            // 달력 헤더
+            const dayHeaders = ['일', '월', '화', '수', '목', '금', '토'];
+            let calendarHTML = '';
+            
+            dayHeaders.forEach(day => {
+                calendarHTML += `<div class="calendar-day-header">${day}</div>`;
+            });
+            
+            // 달력 날짜들
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            const today = new Date();
+            const isCurrentMonth = today.getFullYear() === currentYear && today.getMonth() === currentMonth;
+            
+            for (let i = 0; i < 42; i++) {
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + i);
+                
+                const isCurrentMonthDay = date.getMonth() === currentMonth;
+                const isToday = isCurrentMonthDay && isCurrentMonth && date.getDate() === today.getDate();
+                
+                const dayData = getDayData(date);
+                const userCount = dayData.users.length;
+                
+                let userCountClass = 'low';
+                if (userCount > 10) userCountClass = 'high';
+                else if (userCount > 5) userCountClass = 'medium';
+                
+                calendarHTML += `
+                    <div class="calendar-day ${!isCurrentMonthDay ? 'other-month' : ''} ${isToday ? 'today' : ''}" 
+                         onclick="selectDate('${date.toISOString().split('T')[0]}', event)">
+                        <div class="day-number">${date.getDate()}</div>
+                        ${isCurrentMonthDay && userCount > 0 ? `
+                            <div class="user-count ${userCountClass}">${userCount}명</div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            calendarGrid.innerHTML = calendarHTML;
+        }
+
+        // 애들레이드 시간으로 변환하는 함수
+        function convertToAdelaideTime(timestamp) {
+            let logDateTime;
+            
+            if (timestamp.includes('+')) {
+                // 시간대 정보가 있는 경우
+                logDateTime = new Date(timestamp);
+            } else {
+                // 시간대 정보가 없는 경우 - 서버가 호주 동부 시간(UTC+10)으로 저장했다고 가정
+                logDateTime = new Date(timestamp);
+            }
+            
+            // 애들레이드는 UTC+9:30 (ACST) 또는 UTC+10:30 (ACDT)
+            // 간단히 UTC+9:30으로 계산 (일광절약시간 고려하지 않음)
+            const adelaideTime = new Date(logDateTime.getTime() - (30 * 60 * 1000)); // 30분 빼기
+            
+            return {
+                date: adelaideTime.toISOString().split('T')[0],
+                time: adelaideTime.toISOString().split('T')[1].substring(0, 5)
+            };
+        }
+
+        // 특정 날짜의 데이터 가져오기
+        function getDayData(date) {
+            const dateStr = date.toISOString().split('T')[0];
+            const dayLogs = monthlyData.filter(log => {
+                const adelaideTime = convertToAdelaideTime(log.timestamp);
+                return adelaideTime.date === dateStr;
+            });
+            
+            const users = {};
+            dayLogs.forEach(log => {
+                const username = log.user?.username || 'Unknown';
+                const adelaideTime = convertToAdelaideTime(log.timestamp);
+                
+                if (!users[username]) {
+                    users[username] = {
+                        username: username,
+                        displayName: log.user?.display_name || username,
+                        firstAccess: adelaideTime.time,
+                        lastAccess: adelaideTime.time,
+                        count: 0
+                    };
+                }
+                users[username].count++;
+                users[username].lastAccess = adelaideTime.time;
+            });
+            
+            return {
+                users: Object.values(users),
+                totalAccess: dayLogs.length
+            };
+        }
+
+        // 날짜 선택
+        function selectDate(dateStr, event) {
+            // 이벤트 전파 방지
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            
+            // 이전 선택 해제
+            if (selectedDate) {
+                const prevElement = document.querySelector(`[onclick="selectDate('${selectedDate}')"]`);
+                if (prevElement) {
+                    prevElement.classList.remove('selected');
+                }
+            }
+            
+            // 새 선택
+            selectedDate = dateStr;
+            const element = document.querySelector(`[onclick="selectDate('${dateStr}')"]`);
+            if (element) {
+                element.classList.add('selected');
+            }
+            
+            // 해당 날짜의 데이터 가져오기
+            const date = new Date(dateStr);
+            const dayData = getDayData(date);
+            
+            // 팝업 내용 업데이트
+            const popupTitle = document.getElementById('popupTitle');
+            const popupUserList = document.getElementById('popupUserList');
+            const overlay = document.getElementById('dayDetailsOverlay');
+            const popup = document.getElementById('dayDetailsPopup');
+            
+            if (popupTitle && popupUserList && overlay && popup) {
+                // 제목 설정
+                popupTitle.textContent = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+                
+                // 사용자 목록 생성
+                if (dayData.users.length > 0) {
+                    popupUserList.innerHTML = dayData.users.map(user => `
+                        <div class="user-item">
+                            <div class="user-name">${user.displayName || user.username}</div>
+                            <div class="user-time">${user.firstAccess} - ${user.lastAccess} (${user.count}회)</div>
+                        </div>
+                    `).join('');
+                } else {
+                    popupUserList.innerHTML = '<div class="user-item">이 날짜에는 접속 기록이 없습니다.</div>';
+                }
+                
+                // 팝업 표시
+                popup.classList.add('show');
+                overlay.classList.add('show');
+                
+                // body 스크롤 방지
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        // 팝업 닫기
+        function closeDayDetails() {
+            const overlay = document.getElementById('dayDetailsOverlay');
+            const popup = document.getElementById('dayDetailsPopup');
+            
+            if (overlay) overlay.classList.remove('show');
+            if (popup) popup.classList.remove('show');
+            
+            // body 스크롤 복원
+            document.body.style.overflow = '';
+            
+            // 선택 해제
+            if (selectedDate) {
+                const element = document.querySelector(`[onclick="selectDate('${selectedDate}')"]`);
+                if (element) {
+                    element.classList.remove('selected');
+                }
+                selectedDate = null;
+            }
+        }
+
+        // 이전 달
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            loadMonthData();
+        }
+
+        // 다음 달
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            loadMonthData();
+        }
+
+        // 데이터 내보내기
+        function exportData() {
+            const data = {
+                year: currentYear,
+                month: currentMonth + 1,
+                logs: monthlyData
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `usage_logs_${currentYear}_${String(currentMonth + 1).padStart(2, '0')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 상태 표시
+        function showStatus(type, message) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            status.style.display = 'block';
+            
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // 로딩 표시
+        function showLoading(show) {
+            document.getElementById('loadingSection').style.display = show ? 'block' : 'none';
+            document.getElementById('calendarSection').style.display = show ? 'none' : 'block';
+            document.getElementById('statsSection').style.display = show ? 'none' : 'grid';
+        }
+
+        // 데이터 없음 표시
+        function showNoData() {
+            document.getElementById('noDataSection').style.display = 'block';
+            document.getElementById('calendarSection').style.display = 'none';
+            document.getElementById('statsSection').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
