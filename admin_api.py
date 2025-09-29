@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from functools import wraps
 import logging
 import os
-import sqlite3
+# import sqlite3  # JSON 전용 시스템으로 변경되어 제거됨
 from datetime import datetime
 
 # API 키 관리자 import
@@ -391,14 +391,17 @@ def test_all_api_connections():
 def get_system_status():
     """시스템 상태 조회"""
     try:
-        # 데이터베이스 연결 상태 확인
-        db_status = {'connected': False}
+        # 데이터베이스 연결 상태 확인 - JSON 전용 시스템으로 변경됨
+        db_status = {'connected': True, 'type': 'JSON'}
         try:
-            conn = sqlite3.connect('progress_report.db')
-            cursor = conn.cursor()
-            cursor.execute('SELECT 1')
-            conn.close()
-            db_status['connected'] = True
+            # JSON 파일 기반 시스템이므로 항상 연결됨으로 간주
+            data_dir = 'data'
+            if os.path.exists(data_dir):
+                db_status['connected'] = True
+                db_status['type'] = 'JSON Files'
+            else:
+                db_status['connected'] = False
+                db_status['error'] = 'Data directory not found'
         except Exception as e:
             db_status['error'] = str(e)
         

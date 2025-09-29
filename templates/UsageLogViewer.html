@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usage Log 뷰어 - 달력</title>
+    <title>Usage Log Viewer - Calendar</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -354,19 +354,19 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 사용자 접속 통계</h1>
-            <p>달력 형태로 일별 접속 현황을 확인하세요</p>
+            <h1>📊 User Access Statistics</h1>
+            <p>View daily access status in calendar format</p>
         </div>
         
         <div class="controls">
-            <button class="btn btn-primary" onclick="loadCurrentMonth()">🔄 현재 월</button>
-            <button class="btn btn-success" onclick="loadAllStats()">📈 전체 통계</button>
-            <button class="btn btn-info" onclick="exportData()">💾 데이터 내보내기</button>
+            <button class="btn btn-primary" onclick="loadCurrentMonth()">🔄 Current Month</button>
+            <button class="btn btn-success" onclick="loadAllStats()">📈 All Statistics</button>
+            <button class="btn btn-info" onclick="exportData()">💾 Export Data</button>
             
             <div class="month-selector">
-                <label for="monthSelect">월 선택:</label>
+                <label for="monthSelect">Select Month:</label>
                 <select id="monthSelect" onchange="loadSelectedMonth()">
-                    <option value="">월을 선택하세요</option>
+                    <option value="">Select a month</option>
                 </select>
             </div>
         </div>
@@ -377,34 +377,34 @@
             <!-- 통계 요약 -->
             <div id="statsSection" class="stats-summary" style="display: none;">
                 <div class="stat-card">
-                    <h3>총 접속 수</h3>
+                    <h3>Total Access</h3>
                     <div class="number" id="totalAccess">0</div>
                 </div>
                 <div class="stat-card">
-                    <h3>고유 사용자</h3>
+                    <h3>Unique Users</h3>
                     <div class="number" id="uniqueUsers">0</div>
                 </div>
                 <div class="stat-card">
-                    <h3>활성 일수</h3>
+                    <h3>Active Days</h3>
                     <div class="number" id="activeDays">0</div>
                 </div>
                 <div class="stat-card">
-                    <h3>평균 일일 접속</h3>
+                    <h3>Avg Daily Access</h3>
                     <div class="number" id="avgDailyAccess">0</div>
                 </div>
             </div>
             
-            <!-- 달력 -->
+            <!-- Calendar -->
             <div id="calendarSection" class="calendar-container" style="display: none;">
                 <div class="calendar-header">
-                    <div class="calendar-title" id="calendarTitle">2025년 9월</div>
+                    <div class="calendar-title" id="calendarTitle">September 2025</div>
                     <div class="calendar-nav">
                         <button class="nav-btn" onclick="previousMonth()">◀ 이전</button>
                         <button class="nav-btn" onclick="nextMonth()">다음 ▶</button>
                     </div>
                 </div>
                 <div id="calendarGrid" class="calendar-grid">
-                    <!-- 달력이 여기에 동적으로 생성됩니다 -->
+                    <!-- Calendar will be dynamically generated here -->
                 </div>
             </div>
             
@@ -416,22 +416,22 @@
             
             <!-- 데이터 없음 -->
             <div id="noDataSection" class="no-data" style="display: none;">
-                <h3>📭 데이터가 없습니다</h3>
-                <p>선택한 기간에 접속 데이터가 없습니다.</p>
+                <h3>📭 No Data Available</h3>
+                <p>There is no access data for the selected period.</p>
             </div>
         </div>
         
-        <!-- 날짜 상세 팝업 오버레이 -->
+        <!-- Date Details Popup Overlay -->
         <div id="dayDetailsOverlay" class="day-details-overlay" onclick="closeDayDetails(); event.stopPropagation()"></div>
         
-        <!-- 날짜 상세 팝업 -->
+        <!-- Date Details Popup -->
         <div id="dayDetailsPopup" class="day-details">
             <div class="day-details-header">
-                <h4 class="day-details-title" id="popupTitle">날짜</h4>
-                <button class="day-details-close" onclick="closeDayDetails(); event.stopPropagation()">✕ 닫기</button>
+                <h4 class="day-details-title" id="popupTitle">Date</h4>
+                <button class="day-details-close" onclick="closeDayDetails(); event.stopPropagation()">✕ Close</button>
             </div>
             <div class="user-list" id="popupUserList">
-                <!-- 사용자 목록이 여기에 동적으로 추가됩니다 -->
+                <!-- User list will be dynamically added here -->
             </div>
         </div>
     </div>
@@ -447,7 +447,7 @@
             loadMonthList();
             loadCurrentMonth();
             
-            // ESC 키로 팝업 닫기
+            // Close popup with ESC key
             document.addEventListener('keydown', function(event) {
                 if (event.key === 'Escape') {
                     closeDayDetails();
@@ -455,7 +455,7 @@
             });
         });
 
-        // 월 목록 로드
+        // Load month list
         async function loadMonthList() {
             try {
                 const response = await fetch('/api/usage-logs/months');
@@ -463,7 +463,7 @@
                 
                 if (data.success) {
                     const monthSelect = document.getElementById('monthSelect');
-                    monthSelect.innerHTML = '<option value="">월을 선택하세요</option>';
+                    monthSelect.innerHTML = '<option value="">Select a month</option>';
                     
                     data.months.forEach(month => {
                         const option = document.createElement('option');
@@ -473,11 +473,11 @@
                     });
                 }
             } catch (error) {
-                console.error('월 목록 로드 실패:', error);
+                console.error('Failed to load month list:', error);
             }
         }
 
-        // 현재 월 로드
+        // Load current month
         async function loadCurrentMonth() {
             const now = new Date();
             currentYear = now.getFullYear();
@@ -485,7 +485,7 @@
             await loadMonthData();
         }
 
-        // 선택된 월 로드
+        // Load selected month
         async function loadSelectedMonth() {
             const monthSelect = document.getElementById('monthSelect');
             const selectedMonth = monthSelect.value;
@@ -498,18 +498,18 @@
             }
         }
 
-        // 전체 통계 로드
+        // Load all statistics
         async function loadAllStats() {
             try {
                 showLoading(true);
-                showStatus('loading', '전체 통계를 불러오는 중...');
+                showStatus('loading', 'Loading all statistics...');
                 
                 const response = await fetch('/api/usage-logs/all');
                 const data = await response.json();
                 
                 if (data.success) {
                     displayStats(data.stats);
-                    showStatus('success', '전체 통계 로드 완료');
+                    showStatus('success', 'All statistics loaded successfully');
                 } else {
                     showStatus('error', '통계 로드 실패: ' + data.message);
                 }
@@ -520,11 +520,11 @@
             }
         }
 
-        // 월별 데이터 로드
+        // Load monthly data
         async function loadMonthData() {
             try {
                 showLoading(true);
-                showStatus('loading', '월별 데이터를 불러오는 중...');
+                showStatus('loading', 'Loading monthly data...');
                 
                 const month = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const response = await fetch(`/api/usage-logs/month/${month}`);
@@ -558,22 +558,23 @@
             document.getElementById('calendarSection').style.display = 'block';
         }
 
-        // 달력 생성
+        // Generate calendar
         function generateCalendar() {
             const calendarTitle = document.getElementById('calendarTitle');
             const calendarGrid = document.getElementById('calendarGrid');
             
-            calendarTitle.textContent = `${currentYear}년 ${currentMonth + 1}월`;
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            calendarTitle.textContent = `${monthNames[currentMonth]} ${currentYear}`;
             
-            // 달력 헤더
-            const dayHeaders = ['일', '월', '화', '수', '목', '금', '토'];
+            // Calendar header
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             let calendarHTML = '';
             
             dayHeaders.forEach(day => {
                 calendarHTML += `<div class="calendar-day-header">${day}</div>`;
             });
             
-            // 달력 날짜들
+            // Calendar dates
             const firstDay = new Date(currentYear, currentMonth, 1);
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
             const startDate = new Date(firstDay);
@@ -596,12 +597,18 @@
                 if (userCount > 10) userCountClass = 'high';
                 else if (userCount > 5) userCountClass = 'medium';
                 
+                // Generate local date string (without UTC conversion)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const localDateStr = `${year}-${month}-${day}`;
+                
                 calendarHTML += `
                     <div class="calendar-day ${!isCurrentMonthDay ? 'other-month' : ''} ${isToday ? 'today' : ''}" 
-                         onclick="selectDate('${date.toISOString().split('T')[0]}', event)">
+                         onclick="selectDate('${localDateStr}', event)">
                         <div class="day-number">${date.getDate()}</div>
                         ${isCurrentMonthDay && userCount > 0 ? `
-                            <div class="user-count ${userCountClass}">${userCount}명</div>
+                            <div class="user-count ${userCountClass}">${userCount} users</div>
                         ` : ''}
                     </div>
                 `;
@@ -610,31 +617,46 @@
             calendarGrid.innerHTML = calendarHTML;
         }
 
-        // 애들레이드 시간으로 변환하는 함수
+        // Function to convert to Adelaide time
         function convertToAdelaideTime(timestamp) {
-            let logDateTime;
-            
-            if (timestamp.includes('+')) {
-                // 시간대 정보가 있는 경우
-                logDateTime = new Date(timestamp);
-            } else {
-                // 시간대 정보가 없는 경우 - 서버가 호주 동부 시간(UTC+10)으로 저장했다고 가정
-                logDateTime = new Date(timestamp);
+            // Server already stores in Adelaide timezone
+            // Extract date and time directly from ISO format string
+            const parts = timestamp.split('T');
+            if (parts.length === 2) {
+                const datePart = parts[0];
+                const timePart = parts[1];
+                
+                // 시간 부분에서 시간대 정보나 초 단위 제거
+                let cleanTime;
+                if (timePart.includes('+') || timePart.includes('-')) {
+                    // 시간대 정보가 있는 경우 (예: "14:30:45.123+09:30")
+                    cleanTime = timePart.split('+')[0].split('-')[0].substring(0, 5);
+                } else {
+                    // 시간대 정보가 없는 경우 (예: "14:30:45.123")
+                    cleanTime = timePart.substring(0, 5);
+                }
+                
+                return {
+                    date: datePart,
+                    time: cleanTime
+                };
             }
             
-            // 애들레이드는 UTC+9:30 (ACST) 또는 UTC+10:30 (ACDT)
-            // 간단히 UTC+9:30으로 계산 (일광절약시간 고려하지 않음)
-            const adelaideTime = new Date(logDateTime.getTime() - (30 * 60 * 1000)); // 30분 빼기
-            
+            // 기본값 반환
             return {
-                date: adelaideTime.toISOString().split('T')[0],
-                time: adelaideTime.toISOString().split('T')[1].substring(0, 5)
+                date: new Date().toISOString().split('T')[0],
+                time: new Date().toISOString().split('T')[1].substring(0, 5)
             };
         }
 
-        // 특정 날짜의 데이터 가져오기
+        // Get data for specific date
         function getDayData(date) {
-            const dateStr = date.toISOString().split('T')[0];
+            // Generate local date string (without UTC conversion)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            
             const dayLogs = monthlyData.filter(log => {
                 const adelaideTime = convertToAdelaideTime(log.timestamp);
                 return adelaideTime.date === dateStr;
@@ -653,9 +675,17 @@
                         lastAccess: adelaideTime.time,
                         count: 0
                     };
+                } else {
+                    // Compare first access time (update to earlier time)
+                    if (adelaideTime.time < users[username].firstAccess) {
+                        users[username].firstAccess = adelaideTime.time;
+                    }
+                    // Compare last access time (update to later time)
+                    if (adelaideTime.time > users[username].lastAccess) {
+                        users[username].lastAccess = adelaideTime.time;
+                    }
                 }
                 users[username].count++;
-                users[username].lastAccess = adelaideTime.time;
             });
             
             return {
@@ -664,15 +694,15 @@
             };
         }
 
-        // 날짜 선택
+        // Date selection
         function selectDate(dateStr, event) {
-            // 이벤트 전파 방지
+            // Prevent event propagation
             if (event) {
                 event.stopPropagation();
                 event.preventDefault();
             }
             
-            // 이전 선택 해제
+            // Deselect previous selection
             if (selectedDate) {
                 const prevElement = document.querySelector(`[onclick="selectDate('${selectedDate}')"]`);
                 if (prevElement) {
@@ -680,28 +710,30 @@
                 }
             }
             
-            // 새 선택
+            // New selection
             selectedDate = dateStr;
             const element = document.querySelector(`[onclick="selectDate('${dateStr}')"]`);
             if (element) {
                 element.classList.add('selected');
             }
             
-            // 해당 날짜의 데이터 가져오기
-            const date = new Date(dateStr);
+            // Get data for the date (local date processing)
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const date = new Date(year, month - 1, day); // 로컬 날짜 객체 생성
             const dayData = getDayData(date);
             
-            // 팝업 내용 업데이트
+            // Update popup content
             const popupTitle = document.getElementById('popupTitle');
             const popupUserList = document.getElementById('popupUserList');
             const overlay = document.getElementById('dayDetailsOverlay');
             const popup = document.getElementById('dayDetailsPopup');
             
             if (popupTitle && popupUserList && overlay && popup) {
-                // 제목 설정
-                popupTitle.textContent = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+                // Set title
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                popupTitle.textContent = `${monthNames[month-1]} ${day}, ${year}`;
                 
-                // 사용자 목록 생성
+                // Generate user list
                 if (dayData.users.length > 0) {
                     popupUserList.innerHTML = dayData.users.map(user => `
                         <div class="user-item">
@@ -710,19 +742,19 @@
                         </div>
                     `).join('');
                 } else {
-                    popupUserList.innerHTML = '<div class="user-item">이 날짜에는 접속 기록이 없습니다.</div>';
+                    popupUserList.innerHTML = '<div class="user-item">No access records for this date.</div>';
                 }
                 
-                // 팝업 표시
+                // Show popup
                 popup.classList.add('show');
                 overlay.classList.add('show');
                 
-                // body 스크롤 방지
+                // Prevent body scrolling
                 document.body.style.overflow = 'hidden';
             }
         }
 
-        // 팝업 닫기
+        // Close popup
         function closeDayDetails() {
             const overlay = document.getElementById('dayDetailsOverlay');
             const popup = document.getElementById('dayDetailsPopup');
@@ -730,10 +762,10 @@
             if (overlay) overlay.classList.remove('show');
             if (popup) popup.classList.remove('show');
             
-            // body 스크롤 복원
+            // Restore body scrolling
             document.body.style.overflow = '';
             
-            // 선택 해제
+            // Deselect
             if (selectedDate) {
                 const element = document.querySelector(`[onclick="selectDate('${selectedDate}')"]`);
                 if (element) {

@@ -26,6 +26,32 @@ class UsageLogger:
         )
         self.logger = logging.getLogger(__name__)
     
+    def get_adelaide_timezone(self):
+        """애들레이드 시간대 반환 (DST 고려)"""
+        from datetime import datetime, timezone, timedelta
+        
+        # 현재 UTC 시간
+        utc_now = datetime.now(timezone.utc)
+        year = utc_now.year
+        
+        # 일광절약시간 시작: 10월 첫째 일요일 2:00 AM
+        dst_start = datetime(year, 10, 1, 2, 0, 0, tzinfo=timezone.utc)
+        while dst_start.weekday() != 6:  # 일요일 찾기
+            dst_start = dst_start + timedelta(days=1)
+        
+        # 일광절약시간 종료: 4월 첫째 일요일 2:00 AM
+        dst_end = datetime(year, 4, 1, 2, 0, 0, tzinfo=timezone.utc)
+        while dst_end.weekday() != 6:  # 일요일 찾기
+            dst_end = dst_end + timedelta(days=1)
+        
+        # DST 기간 확인 (10월 ~ 다음해 3월)
+        if utc_now >= dst_start or utc_now < dst_end:
+            # ACDT: UTC+10:30 (일광절약시간)
+            return timezone(timedelta(hours=10, minutes=30))
+        else:
+            # ACST: UTC+9:30 (표준시)
+            return timezone(timedelta(hours=9, minutes=30))
+    
     def get_monthly_dir(self, target_date=None):
         """월별 디렉토리 경로 반환"""
         if target_date is None:
@@ -51,9 +77,9 @@ class UsageLogger:
     def log_access(self, user_info=None, page_info=None):
         """접속 로그 기록"""
         try:
-            # 호주 동부 표준시 (AEST, UTC+10) 사용
-            aest = timezone(timedelta(hours=10))
-            now = datetime.now(aest)
+            # 애들레이드 시간대 사용 (ACST: UTC+9:30, ACDT: UTC+10:30)
+            adelaide_tz = self.get_adelaide_timezone()
+            now = datetime.now(adelaide_tz)
             log_file = self.get_daily_log_file("access", now)
             
             # 접속 정보 수집
@@ -107,9 +133,9 @@ class UsageLogger:
     def log_progress_note(self, note_data, user_info=None, success=True, error_message=None):
         """Progress Note 로그 기록"""
         try:
-            # 호주 동부 표준시 (AEST, UTC+10) 사용
-            aest = timezone(timedelta(hours=10))
-            now = datetime.now(aest)
+            # 애들레이드 시간대 사용 (ACST: UTC+9:30, ACDT: UTC+10:30)
+            adelaide_tz = self.get_adelaide_timezone()
+            now = datetime.now(adelaide_tz)
             log_file = self.get_daily_log_file("progress_notes", now)
             
             # Progress Note 정보 수집
@@ -172,9 +198,9 @@ class UsageLogger:
     def log_api_call(self, api_endpoint, request_data=None, response_data=None, user_info=None, success=True, error_message=None):
         """API 호출 로그 기록"""
         try:
-            # 호주 동부 표준시 (AEST, UTC+10) 사용
-            aest = timezone(timedelta(hours=10))
-            now = datetime.now(aest)
+            # 애들레이드 시간대 사용 (ACST: UTC+9:30, ACDT: UTC+10:30)
+            adelaide_tz = self.get_adelaide_timezone()
+            now = datetime.now(adelaide_tz)
             log_file = self.get_daily_log_file("api_calls", now)
             
             # API 호출 정보 수집

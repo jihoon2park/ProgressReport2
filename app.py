@@ -97,7 +97,7 @@ def debug_site_servers():
     """사이트 서버 정보 디버깅"""
     try:
         logger.info("=== 사이트 서버 정보 디버깅 시작 ===")
-        logger.info(f"USE_DB_API_KEYS: {getattr(config, 'USE_DB_API_KEYS', 'Not defined')}")
+        logger.info(f"USE_DB_API_KEYS: {getattr(app.config, 'USE_DB_API_KEYS', 'Not defined')}")
         logger.info(f"SITE_SERVERS 타입: {type(SITE_SERVERS)}")
         logger.info(f"SITE_SERVERS 내용: {SITE_SERVERS}")
         logger.info(f"SITE_SERVERS 길이: {len(SITE_SERVERS) if SITE_SERVERS else 0}")
@@ -125,11 +125,11 @@ from dataclasses import asdict
 from fcm_service import get_fcm_service
 from fcm_token_manager import get_fcm_token_manager
 
-# Task Manager 임포트
-from task_manager import get_task_manager
+# Task Manager 임포트 - JSON 전용 시스템으로 변경되어 비활성화
+# from task_manager import get_task_manager
 
-# Policy Scheduler 임포트
-from policy_scheduler import start_policy_scheduler
+# Policy Scheduler 임포트 - JSON 전용 시스템으로 변경되어 비활성화
+# from policy_scheduler import start_policy_scheduler
 
 # Admin API 임포트
 from admin_api import admin_api
@@ -267,22 +267,24 @@ if not os.path.exists('data'):
     os.makedirs('data')
     logger.info("data 디렉토리 생성됨")
 
-# Policy Scheduler 시작 (백그라운드)
-try:
-    start_policy_scheduler()
-    logger.info("✅ Policy Scheduler 시작됨")
-except Exception as e:
-    logger.warning(f"⚠️ Policy Scheduler 시작 실패: {e}")
-    logger.info("앱은 정상 실행되지만 자동 알림 기능은 비활성화됩니다.")
+# Policy Scheduler 시작 (백그라운드) - JSON 전용 시스템으로 변경되어 비활성화
+# try:
+#     start_policy_scheduler()
+#     logger.info("✅ Policy Scheduler 시작됨")
+# except Exception as e:
+#     logger.warning(f"⚠️ Policy Scheduler 시작 실패: {e}")
+logger.info("ℹ️ Policy Scheduler는 JSON 전용 시스템으로 인해 비활성화됨")
+logger.info("앱은 정상 실행되지만 자동 알림 기능은 비활성화됩니다.")
 
-# Unified Data Sync Manager 시작 (백그라운드)
-try:
-    from unified_data_sync_manager import init_unified_sync
-    init_unified_sync()
-    logger.info("✅ Unified Data Sync Manager 시작됨")
-except Exception as e:
-    logger.warning(f"⚠️ Unified Data Sync Manager 시작 실패: {e}")
-    logger.info("앱은 정상 실행되지만 통합 데이터 동기화 기능은 비활성화됩니다.")
+# Unified Data Sync Manager 시작 (백그라운드) - JSON 전용 시스템으로 변경되어 비활성화
+# try:
+#     from unified_data_sync_manager import init_unified_sync
+#     init_unified_sync()
+#     logger.info("✅ Unified Data Sync Manager 시작됨")
+# except Exception as e:
+#     logger.warning(f"⚠️ Unified Data Sync Manager 시작 실패: {e}")
+logger.info("ℹ️ Unified Data Sync Manager는 JSON 전용 시스템으로 인해 비활성화됨")
+logger.info("앱은 정상 실행되지만 통합 데이터 동기화 기능은 비활성화됩니다.")
 
 # ==============================
 # 인증 관련 기능 (Flask-Login 사용)
@@ -853,9 +855,9 @@ def health_check():
         fcm_service = get_fcm_service()
         fcm_status = fcm_service is not None
         
-        # Task Manager 상태 확인
-        task_manager = get_task_manager()
-        task_manager_status = task_manager is not None
+        # Task Manager 상태 확인 - JSON 전용 시스템으로 변경되어 비활성화
+        # task_manager = get_task_manager()
+        task_manager_status = False  # 비활성화됨
         
         return jsonify({
             'success': True,
@@ -891,7 +893,7 @@ def home():
         
         # 세션에서 allowed_sites와 site 정보 확인
         allowed_sites = session.get('allowed_sites', [])
-        site = session.get('site', 'Ramsay')
+        site = session.get('site', 'Parafield Gardens')
         
         logger.info(f"홈 페이지 세션 정보 - allowed_sites: {allowed_sites} (타입: {type(allowed_sites)}), site: {site}")
         logger.info(f"홈 페이지 세션 전체 내용: {dict(session)}")
@@ -1323,7 +1325,7 @@ def clear_database():
 @login_required
 def index():
     """Progress Note 입력 페이지"""
-    site = request.args.get('site', session.get('site', 'Ramsay'))
+    site = request.args.get('site', session.get('site', 'Parafield Gardens'))
     return render_template('index.html', selected_site=site, current_user=current_user)
 
 @app.route('/rod-dashboard')
@@ -1393,7 +1395,7 @@ def rod_dashboard():
 def progress_notes():
     try:
         allowed_sites = session.get('allowed_sites', [])
-        site = request.args.get('site', session.get('site', 'Ramsay'))
+        site = request.args.get('site', session.get('site', 'Parafield Gardens'))
         logger.info(f"progress_notes: allowed_sites={allowed_sites} (타입: {type(allowed_sites)}), site={site}")
         logger.info(f"progress_notes 세션 전체 내용: {dict(session)}")
         logger.info(f"progress_notes request.args: {dict(request.args)}")
@@ -4540,7 +4542,15 @@ def get_workflow_status():
         if not incident_id:
             return jsonify({'success': False, 'message': 'incident_id required'}), 400
         
-        return get_incident_workflow_status(incident_id)
+        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # return get_incident_workflow_status(incident_id)
+        
+        # 임시 응답 (기능 비활성화)
+        return jsonify({
+            'success': False,
+            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.',
+            'workflow_status': 'unavailable'
+        })
         
     except Exception as e:
         logger.error(f"워크플로우 상태 조회 오류: {str(e)}")
@@ -4738,17 +4748,24 @@ def create_task_workflow():
         
         logger.info(f"워크플로우 생성 요청: incident_id={data['incident_id']}, created_by={created_by}")
         
-        task_manager = get_task_manager()
-        result = task_manager.create_incident_workflow(
-            incident_id=data['incident_id'],
-            policy_id=data['policy_id'],
-            client_name=data['client_name'],
-            client_id=data['client_id'],
-            site=data['site'],
-            event_type=data['event_type'],
-            risk_rating=data['risk_rating'],
-            created_by=created_by
-        )
+        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # task_manager = get_task_manager()
+        # result = task_manager.create_incident_workflow(
+        #     incident_id=data['incident_id'],
+        #     policy_id=data['policy_id'],
+        #     client_name=data['client_name'],
+        #     client_id=data['client_id'],
+        #     site=data['site'],
+        #     event_type=data['event_type'],
+        #     risk_rating=data['risk_rating'],
+        #     created_by=created_by
+        # )
+        
+        # 임시 응답 (기능 비활성화)
+        result = {
+            'success': False,
+            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.'
+        }
         
         if result['success']:
             return jsonify(result)
@@ -4769,12 +4786,19 @@ def complete_task_api(task_id):
         
         logger.info(f"작업 완료 요청: task_id={task_id}, completed_by={completed_by}")
         
-        task_manager = get_task_manager()
-        result = task_manager.complete_task(
-            task_id=task_id,
-            completed_by=completed_by,
-            notes=notes
-        )
+        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # task_manager = get_task_manager()
+        # result = task_manager.complete_task(
+        #     task_id=task_id,
+        #     completed_by=completed_by,
+        #     notes=notes
+        # )
+        
+        # 임시 응답 (기능 비활성화)
+        result = {
+            'success': False,
+            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.'
+        }
         
         if result['success']:
             return jsonify(result)
@@ -4803,8 +4827,12 @@ def get_my_tasks():
         
         logger.info(f"사용자 작업 조회: user_role={user_role}, assigned_role={assigned_role}, site={site}, status={status}")
         
-        task_manager = get_task_manager()
-        tasks = task_manager.get_user_tasks(assigned_role, site, status)
+        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # task_manager = get_task_manager()
+        # tasks = task_manager.get_user_tasks(assigned_role, site, status)
+        
+        # 임시 응답 (기능 비활성화)
+        tasks = []
         
         return jsonify({
             'success': True,
@@ -4898,8 +4926,17 @@ def send_task_notifications():
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
-        task_manager = get_task_manager()
-        result = task_manager.send_scheduled_notifications()
+        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # task_manager = get_task_manager()
+        # result = task_manager.send_scheduled_notifications()
+        
+        # 임시 응답 (기능 비활성화)
+        result = {
+            'success': False,
+            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.',
+            'sent_count': 0,
+            'failed_count': 0
+        }
         
         return jsonify(result)
         

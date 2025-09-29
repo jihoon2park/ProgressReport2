@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -344,7 +344,7 @@
         <!-- 헤더 -->
         <div class="settings-header">
             <h2>🔧 Admin Settings</h2>
-            <p>API 키 및 시스템 설정을 관리합니다. (Admin 전용)</p>
+            <p>Manage API keys and system settings. (Admin only)</p>
             <div class="nav-buttons" style="margin-top: 15px;">
                 <button class="btn-nav" onclick="window.location.href='/progress-notes'" style="background-color: #007bff; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-right: 10px;">📝 Progress Notes</button>
                 <button class="btn-nav" onclick="window.location.href='/incident-viewer'" style="background-color: #dc3545; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-right: 10px;">🚨 Incidents</button>
@@ -353,60 +353,60 @@
             </div>
         </div>
 
-        <!-- 알림 메시지 -->
+        <!-- Alert Messages -->
         <div id="alert-container"></div>
 
-        <!-- API 키 관리 섹션 -->
+        <!-- API Key Management Section -->
         <div class="settings-section">
             <div class="settings-header">
-                <h3>🔑 API 키 관리</h3>
-                <p>기본 5개 사이트의 API 키를 관리합니다. 편집과 테스트만 가능합니다.</p>
+                <h3>🔑 API Key Management</h3>
+                <p>Manage API keys for the 5 default sites. Only editing and testing are available.</p>
             </div>
             
             <div class="api-key-actions" style="margin-bottom: 20px;">
-                <button class="btn btn-primary" onclick="refreshApiKeys()">🔄 새로고침</button>
-                <button class="btn btn-warning" onclick="testAllConnections()">🧪 모든 연결 테스트</button>
+                <button class="btn btn-primary" onclick="refreshApiKeys()">🔄 Refresh</button>
+                <button class="btn btn-warning" onclick="testAllConnections()">🧪 Test All Connections</button>
             </div>
             
             <div id="api-keys-container" class="api-key-grid">
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p>API 키 정보를 불러오는 중...</p>
+                    <p>Loading API key information...</p>
                 </div>
             </div>
         </div>
 
-        <!-- 시스템 설정 섹션 -->
+        <!-- System Settings Section -->
         <div class="settings-section">
             <div class="settings-header">
-                <h3>⚙️ 시스템 설정</h3>
-                <p>시스템 전반의 설정을 관리합니다.</p>
+                <h3>⚙️ System Settings</h3>
+                <p>Manage system-wide settings.</p>
             </div>
             
             <div class="form-group">
-                <label>데이터베이스 상태</label>
-                <div id="db-status">확인 중...</div>
+                <label>Database Status</label>
+                <div id="db-status">Checking...</div>
             </div>
             
             <div class="form-group">
-                <label>암호화 키 상태</label>
-                <div id="encryption-status">확인 중...</div>
+                <label>Encryption Key Status</label>
+                <div id="encryption-status">Checking...</div>
             </div>
             
             <div class="form-group">
-                <label>시스템 로그</label>
-                <button class="btn btn-primary" onclick="window.open('/usage-log-viewer', '_blank')" style="margin: 5px;">📊 로그 뷰어</button>
-                <button class="btn btn-info" onclick="showProductionLogs()" style="margin: 5px;">🔍 운영 서버 로그</button>
+                <label>System Logs</label>
+                <button class="btn btn-primary" onclick="window.open('/usage-log-viewer', '_blank')" style="margin: 5px;">📊 Log Viewer</button>
+                <button class="btn btn-info" onclick="showProductionLogs()" style="margin: 5px;">🔍 Production Server Logs</button>
             </div>
         </div>
 
     </div>
 
-    <!-- 운영 서버 로그 모달 -->
+    <!-- Production Server Logs Modal -->
     <div id="productionLogsModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 90%; max-height: 80%;">
             <div class="modal-header">
-                <h3>🔍 운영 서버 로그</h3>
+                <h3>🔍 Production Server Logs</h3>
                 <span class="close" onclick="closeProductionLogsModal()">&times;</span>
             </div>
             <div class="modal-body">
@@ -418,24 +418,24 @@
                 
                 <div id="app-log-content" class="log-content">
                     <div class="log-info">
-                        <span id="app-log-info">로딩 중...</span>
-                        <button onclick="refreshLog('app')" class="btn btn-sm btn-secondary">🔄 새로고침</button>
+                        <span id="app-log-info">Loading...</span>
+                        <button onclick="refreshLog('app')" class="btn btn-sm btn-secondary">🔄 Refresh</button>
                     </div>
                     <pre id="app-log-text" class="log-text"></pre>
                 </div>
                 
                 <div id="error-log-content" class="log-content" style="display: none;">
                     <div class="log-info">
-                        <span id="error-log-info">로딩 중...</span>
-                        <button onclick="refreshLog('error')" class="btn btn-sm btn-secondary">🔄 새로고침</button>
+                        <span id="error-log-info">Loading...</span>
+                        <button onclick="refreshLog('error')" class="btn btn-sm btn-secondary">🔄 Refresh</button>
                     </div>
                     <pre id="error-log-text" class="log-text"></pre>
                 </div>
                 
                 <div id="access-log-content" class="log-content" style="display: none;">
                     <div class="log-info">
-                        <span id="access-log-info">로딩 중...</span>
-                        <button onclick="refreshLog('access')" class="btn btn-sm btn-secondary">🔄 새로고침</button>
+                        <span id="access-log-info">Loading...</span>
+                        <button onclick="refreshLog('access')" class="btn btn-sm btn-secondary">🔄 Refresh</button>
                     </div>
                     <pre id="access-log-text" class="log-text"></pre>
                 </div>
@@ -443,48 +443,48 @@
         </div>
     </div>
 
-    <!-- API 키 편집 모달 -->
+    <!-- API Key Edit Modal -->
     <div id="apiKeyModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">API 키 편집</h3>
+                <h3 id="modalTitle">Edit API Key</h3>
                 <span class="close" onclick="closeModal()">&times;</span>
             </div>
             
             <form id="apiKeyForm">
                 <div class="form-group">
-                    <label for="siteName">사이트 이름 *</label>
+                    <label for="siteName">Site Name *</label>
                     <input type="text" id="siteName" name="siteName" readonly>
                 </div>
                 
                 <div class="form-group">
-                    <label for="apiUsername">API 사용자명 *</label>
+                    <label for="apiUsername">API Username *</label>
                     <input type="text" id="apiUsername" name="apiUsername" value="ManadAPI" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="apiKey">API 키 *</label>
+                    <label for="apiKey">API Key *</label>
                     <input type="password" id="apiKey" name="apiKey" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="serverIp">서버 IP *</label>
+                    <label for="serverIp">Server IP *</label>
                     <input type="text" id="serverIp" name="serverIp" placeholder="192.168.1.11" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="serverPort">서버 포트</label>
+                    <label for="serverPort">Server Port</label>
                     <input type="number" id="serverPort" name="serverPort" value="8080" min="1" max="65535">
                 </div>
                 
                 <div class="form-group">
-                    <label for="notes">메모</label>
-                    <input type="text" id="notes" name="notes" placeholder="선택사항">
+                    <label for="notes">Notes</label>
+                    <input type="text" id="notes" name="notes" placeholder="Optional">
                 </div>
                 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">취소</button>
-                    <button type="submit" class="btn btn-primary">저장</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
         </div>
@@ -508,10 +508,10 @@
                 if (data.success) {
                     displayApiKeys(data.api_keys);
                 } else {
-                    showAlert('API 키를 불러오는데 실패했습니다: ' + data.message, 'danger');
+                    showAlert('Failed to load API keys: ' + data.message, 'danger');
                 }
             } catch (error) {
-                showAlert('API 키를 불러오는데 실패했습니다: ' + error.message, 'danger');
+                showAlert('Failed to load API keys: ' + error.message, 'danger');
             }
         }
 
@@ -520,7 +520,7 @@
             const container = document.getElementById('api-keys-container');
             
             if (apiKeys.length === 0) {
-                container.innerHTML = '<p>등록된 API 키가 없습니다.</p>';
+                container.innerHTML = '<p>No registered API keys.</p>';
                 return;
             }
             
@@ -537,8 +537,8 @@
                         ${apiKey.api_key.substring(0, 20)}...
                     </div>
                     <div class="api-key-actions">
-                        <button class="btn btn-primary btn-sm" onclick="editApiKey('${apiKey.site_name}')">✏️ 편집</button>
-                        <button class="btn btn-warning btn-sm" onclick="testConnection('${apiKey.site_name}')">🧪 테스트</button>
+                        <button class="btn btn-primary btn-sm" onclick="editApiKey('${apiKey.site_name}')">✏️ Edit</button>
+                        <button class="btn btn-warning btn-sm" onclick="testConnection('${apiKey.site_name}')">🧪 Test</button>
                     </div>
                 </div>
             `).join('');
@@ -553,7 +553,7 @@
                 
                 if (data.success) {
                     currentEditingSite = siteName;
-                    document.getElementById('modalTitle').textContent = 'API 키 편집';
+                    document.getElementById('modalTitle').textContent = 'Edit API Key';
                     document.getElementById('siteName').value = data.api_key.site_name;
                     document.getElementById('apiUsername').value = data.api_key.api_username;
                     document.getElementById('apiKey').value = data.api_key.api_key;
@@ -562,10 +562,10 @@
                     document.getElementById('notes').value = data.api_key.notes || '';
                     document.getElementById('apiKeyModal').style.display = 'block';
                 } else {
-                    showAlert('API 키 정보를 불러오는데 실패했습니다: ' + data.message, 'danger');
+                    showAlert('Failed to load API key information: ' + data.message, 'danger');
                 }
             } catch (error) {
-                showAlert('API 키 정보를 불러오는데 실패했습니다: ' + error.message, 'danger');
+                showAlert('Failed to load API key information: ' + error.message, 'danger');
             }
         }
 
@@ -603,10 +603,10 @@
                     closeModal();
                     loadApiKeys();
                 } else {
-                    showAlert('저장에 실패했습니다: ' + data.message, 'danger');
+                    showAlert('Failed to save: ' + data.message, 'danger');
                 }
             } catch (error) {
-                showAlert('저장에 실패했습니다: ' + error.message, 'danger');
+                showAlert('Failed to save: ' + error.message, 'danger');
             }
         });
 
@@ -614,7 +614,7 @@
         // 연결 테스트
         async function testConnection(siteName) {
             try {
-                showAlert(`${siteName} 연결을 테스트하는 중...`, 'info');
+                showAlert(`Testing ${siteName} connection...`, 'info');
                 
                 const response = await fetch(`/api/admin/api-keys/${siteName}/test`, {
                     method: 'POST'
@@ -623,19 +623,19 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showAlert(`${siteName} 연결 테스트 성공: ${data.message}`, 'success');
+                    showAlert(`${siteName} connection test successful: ${data.message}`, 'success');
                 } else {
-                    showAlert(`${siteName} 연결 테스트 실패: ${data.message}`, 'danger');
+                    showAlert(`${siteName} connection test failed: ${data.message}`, 'danger');
                 }
             } catch (error) {
-                showAlert(`${siteName} 연결 테스트 실패: ${error.message}`, 'danger');
+                showAlert(`${siteName} connection test failed: ${error.message}`, 'danger');
             }
         }
 
         // 모든 연결 테스트
         async function testAllConnections() {
             try {
-                showAlert('모든 API 연결을 테스트하는 중...', 'info');
+                showAlert('Testing all API connections...', 'info');
                 
                 const response = await fetch('/api/admin/api-keys/test-all', {
                     method: 'POST'
@@ -644,13 +644,13 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showAlert(`테스트 완료: ${data.message}`, 'success');
+                    showAlert(`Test completed: ${data.message}`, 'success');
                     loadApiKeys();
                 } else {
-                    showAlert('테스트 실패: ' + data.message, 'danger');
+                    showAlert('Test failed: ' + data.message, 'danger');
                 }
             } catch (error) {
-                showAlert('테스트 실패: ' + error.message, 'danger');
+                showAlert('Test failed: ' + error.message, 'danger');
             }
         }
 
@@ -691,7 +691,7 @@
             const infoElement = document.getElementById(logType + '-log-info');
             const textElement = document.getElementById(logType + '-log-text');
             
-            infoElement.textContent = '로딩 중...';
+            infoElement.textContent = 'Loading...';
             textElement.textContent = '';
             
             try {
@@ -700,14 +700,14 @@
                 
                 if (data.success) {
                     textElement.textContent = data.logs;
-                    infoElement.textContent = `총 ${data.total_lines}줄 중 최근 ${data.showing_lines}줄 표시`;
+                    infoElement.textContent = `Showing recent ${data.showing_lines} lines of ${data.total_lines} total lines`;
                 } else {
-                    textElement.textContent = '로그를 불러올 수 없습니다: ' + data.message;
-                    infoElement.textContent = '오류 발생';
+                    textElement.textContent = 'Unable to load logs: ' + data.message;
+                    infoElement.textContent = 'Error occurred';
                 }
             } catch (error) {
-                textElement.textContent = '로그 로드 실패: ' + error.message;
-                infoElement.textContent = '오류 발생';
+                textElement.textContent = 'Log load failed: ' + error.message;
+                infoElement.textContent = 'Error occurred';
             }
         }
 
@@ -725,14 +725,14 @@
                 if (data.success) {
                     document.getElementById('db-status').innerHTML = 
                         `<span class="status-indicator ${data.db_status.connected ? 'status-active' : 'status-inactive'}"></span>
-                         ${data.db_status.connected ? '연결됨' : '연결 실패'}`;
+                         ${data.db_status.connected ? 'Connected' : 'Connection Failed'}`;
                     
                     document.getElementById('encryption-status').innerHTML = 
                         `<span class="status-indicator ${data.encryption_status.available ? 'status-active' : 'status-inactive'}"></span>
-                         ${data.encryption_status.available ? '사용 가능' : '사용 불가'}`;
+                         ${data.encryption_status.available ? 'Available' : 'Unavailable'}`;
                 }
             } catch (error) {
-                console.error('시스템 상태 확인 실패:', error);
+                console.error('System status check failed:', error);
             }
         }
 
