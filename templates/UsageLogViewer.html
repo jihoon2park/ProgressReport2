@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Usage Log Viewer - Calendar</title>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -88,6 +90,15 @@
             border: 1px solid #ced4da;
             border-radius: 4px;
             font-size: 14px;
+        }
+        .export-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .export-group select {
+            min-width: 150px;
         }
         .content {
             padding: 30px;
@@ -361,7 +372,14 @@
         <div class="controls">
             <button class="btn btn-primary" onclick="loadCurrentMonth()">🔄 Current Month</button>
             <button class="btn btn-success" onclick="loadAllStats()">📈 All Statistics</button>
-            <button class="btn btn-info" onclick="exportData()">💾 Export Data</button>
+            <div class="export-group" style="display: flex; gap: 10px; align-items: center;">
+                <select id="exportFormat" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;">
+                    <option value="excel">📊 Excel (.xlsx)</option>
+                    <option value="csv">📋 CSV (.csv)</option>
+                    <option value="json">🔧 JSON (.json)</option>
+                </select>
+                <button class="btn btn-info" onclick="exportData()">💾 Export Data</button>
+            </div>
             
             <div class="month-selector">
                 <label for="monthSelect">Select Month:</label>
@@ -795,19 +813,159 @@
             loadMonthData();
         }
 
-        // 데이터 내보내기
+        // Export data in selected format
         function exportData() {
-            const data = {
-                year: currentYear,
-                month: currentMonth + 1,
-                logs: monthlyData
-            };
+            const format = document.getElementById('exportFormat').value;
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                               'July', 'August', 'September', 'October', 'November', 'December'];
+            const fileName = `usage_logs_${monthNames[currentMonth]}_${currentYear}`;
             
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            if (!monthlyData || monthlyData.length === 0) {
+                alert('No data to export. Please load data first.');
+                return;
+            }
+            
+            switch (format) {
+                case 'excel':
+                    exportToExcel(fileName);
+                    break;
+                case 'csv':
+                    exportToCSV(fileName);
+                    break;
+                case 'json':
+                    exportToJSON(fileName);
+                    break;
+                default:
+                    exportToExcel(fileName);
+            }
+        }
+        
+        // Export to Excel format
+        function exportToExcel(fileName) {
+            try {
+                // Prepare data for Excel
+                const excelData = monthlyData.map(log => {
+                    const adelaideTime = convertToAdelaideTime(log.timestamp);
+                    return {
+                        'Date': adelaideTime.date,
+                        'Time': adelaideTime.time,
+                        'Username': log.user?.username || 'Unknown',
+                        'Display Name': log.user?.display_name || 'Unknown',
+                        'Role': log.user?.role || 'Unknown',
+                        'Position': log.user?.position || 'Unknown',
+                        'Page URL': log.page?.url || 'Unknown',
+                        'Page Path': log.page?.path || 'Unknown',
+                        'Method': log.page?.method || 'Unknown',
+                        'IP Address': log.client?.ip || 'Unknown',
+                        'User Agent': log.client?.user_agent || 'Unknown',
+                        'Session ID': log.session?.session_id || 'Unknown'
+                    };
+                });
+                
+                // Create workbook and worksheet
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                
+                // Auto-size columns
+                const colWidths = [];
+                Object.keys(excelData[0] || {}).forEach((key, i) => {
+                    const maxLength = Math.max(
+                        key.length,
+                        ...excelData.map(row => String(row[key] || '').length)
+                    );
+                    colWidths[i] = { wch: Math.min(maxLength + 2, 50) };
+                });
+                ws['!cols'] = colWidths;
+                
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, 'Usage Logs');
+                
+                // Save file
+                XLSX.writeFile(wb, `${fileName}.xlsx`);
+                
+                showStatus('success', `Excel file exported successfully: ${fileName}.xlsx`);
+            } catch (error) {
+                console.error('Excel export error:', error);
+                showStatus('error', 'Failed to export Excel file: ' + error.message);
+            }
+        }
+        
+        // Export to CSV format
+        function exportToCSV(fileName) {
+            try {
+                // Prepare CSV headers
+                const headers = [
+                    'Date', 'Time', 'Username', 'Display Name', 'Role', 'Position',
+                    'Page URL', 'Page Path', 'Method', 'IP Address', 'User Agent', 'Session ID'
+                ];
+                
+                // Prepare CSV data
+                const csvData = monthlyData.map(log => {
+                    const adelaideTime = convertToAdelaideTime(log.timestamp);
+                    return [
+                        adelaideTime.date,
+                        adelaideTime.time,
+                        log.user?.username || 'Unknown',
+                        log.user?.display_name || 'Unknown',
+                        log.user?.role || 'Unknown',
+                        log.user?.position || 'Unknown',
+                        log.page?.url || 'Unknown',
+                        log.page?.path || 'Unknown',
+                        log.page?.method || 'Unknown',
+                        log.client?.ip || 'Unknown',
+                        (log.client?.user_agent || 'Unknown').replace(/"/g, '""'), // Escape quotes
+                        log.session?.session_id || 'Unknown'
+                    ];
+                });
+                
+                // Create CSV content
+                const csvContent = [
+                    headers.join(','),
+                    ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+                ].join('\n');
+                
+                // Download CSV
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                downloadFile(blob, `${fileName}.csv`);
+                
+                showStatus('success', `CSV file exported successfully: ${fileName}.csv`);
+            } catch (error) {
+                console.error('CSV export error:', error);
+                showStatus('error', 'Failed to export CSV file: ' + error.message);
+            }
+        }
+        
+        // Export to JSON format (original functionality)
+        function exportToJSON(fileName) {
+            try {
+                const data = {
+                    exportDate: new Date().toISOString(),
+                    period: {
+                        year: currentYear,
+                        month: currentMonth + 1,
+                        monthName: ['January', 'February', 'March', 'April', 'May', 'June', 
+                                   'July', 'August', 'September', 'October', 'November', 'December'][currentMonth]
+                    },
+                    totalRecords: monthlyData.length,
+                    logs: monthlyData
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                downloadFile(blob, `${fileName}.json`);
+                
+                showStatus('success', `JSON file exported successfully: ${fileName}.json`);
+            } catch (error) {
+                console.error('JSON export error:', error);
+                showStatus('error', 'Failed to export JSON file: ' + error.message);
+            }
+        }
+        
+        // Helper function to download file
+        function downloadFile(blob, filename) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `usage_logs_${currentYear}_${String(currentMonth + 1).padStart(2, '0')}.json`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
