@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_code }} - Admin Management System{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="error-content">
+        <div class="error-icon">
+            {% if error_code == 404 %}
+                🔍
+            {% elif error_code == 403 %}
+                🚫
+            {% elif error_code == 500 %}
+                ⚠️
+            {% else %}
+                ❌
+            {% endif %}
+        </div>
+        
+        <h1>Error {{ error_code }}</h1>
+        <p class="error-message">{{ error_message }}</p>
+        
+        <div class="error-actions">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">🏠 Back to Dashboard</a>
+            <a href="javascript:history.back()" class="btn btn-secondary">⬅️ Go Back</a>
+        </div>
+        
+        {% if error_code == 403 %}
+        <div class="error-help">
+            <p>If you believe you should have access to this resource, please contact your administrator.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.error-content {
+    text-align: center;
+    max-width: 500px;
+}
+
+.error-icon {
+    font-size: 5em;
+    margin-bottom: 20px;
+}
+
+.error-content h1 {
+    color: #2c3e50;
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.error-message {
+    color: #7f8c8d;
+    font-size: 1.2em;
+    margin-bottom: 30px;
+}
+
+.error-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.error-help {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.error-help p {
+    color: #5a6c7d;
+    margin: 0;
+}
+</style>
+{% endblock %}

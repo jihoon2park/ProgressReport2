@@ -510,7 +510,7 @@ class UnifiedDataSyncManager:
                 time.sleep(60)  # 1분마다 스케줄 확인
         
         # 백그라운드 스레드로 실행
-        sync_thread = threading.Thread(target=run_scheduler, daemon=True)
+        sync_thread = threading.Thread(target=run_scheduler, daemon=False)
         sync_thread.start()
         
         logger.info("🌅 매일 새벽 3시 통합 데이터 동기화 스케줄러 시작됨")

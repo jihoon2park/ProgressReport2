@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CIMS - Mobile Task Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .mobile-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .user-role {
+            background: rgba(255,255,255,0.2);
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+
+        .btn-scanner {
+            background: var(--info-color);
+            color: white;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-scanner:hover {
+            transform: scale(1.1);
+        }
+
+        .btn-back-dashboard {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 0.6rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .btn-back-dashboard:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: scale(1.1);
+        }
+
+        /* Task Summary */
+        .task-summary {
+            background: white;
+            margin: 1rem;
+            border-radius: 15px;
+            padding: 1rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .summary-item {
+            padding: 0.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .summary-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .summary-overdue {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            color: var(--danger-color);
+        }
+
+        .summary-due-today {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            color: var(--warning-color);
+        }
+
+        .summary-routine {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: var(--info-color);
+        }
+
+        .summary-number {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .summary-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-top: 0.3rem;
+        }
+
+        /* Search and Filter */
+        .search-section {
+            background: white;
+            margin: 1rem;
+            border-radius: 15px;
+            padding: 1rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: var(--secondary-color);
+        }
+
+        /* Task List */
+        .task-list {
+            margin: 1rem;
+        }
+
+        .task-item {
+            background: white;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .task-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+        }
+
+        .task-item.overdue {
+            border-left: 5px solid var(--danger-color);
+            background: linear-gradient(90deg, #fff5f5, white);
+        }
+
+        .task-item.urgent {
+            border-left: 5px solid var(--warning-color);
+            background: linear-gradient(90deg, #fffbf0, white);
+        }
+
+        .task-item.routine {
+            border-left: 5px solid var(--info-color);
+        }
+
+        .task-header {
+            padding: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .task-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .task-resident {
+            color: #6c757d;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .incident-badge {
+            background: #e9ecef;
+            color: #495057;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+        }
+
+        .task-body {
+            padding: 1rem;
+        }
+
+        .task-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 0.3rem;
+        }
+
+        .meta-value {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .countdown-timer {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .timer-overdue {
+            color: var(--danger-color);
+            animation: pulse 2s infinite;
+        }
+
+        .timer-urgent {
+            color: var(--warning-color);
+        }
+
+        .timer-normal {
+            color: var(--success-color);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .urgency-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .urgency-overdue {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .urgency-high {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .urgency-medium {
+            background: var(--info-color);
+            color: white;
+        }
+
+        .urgency-low {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .task-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .btn-start-note {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .btn-start-note:hover {
+            background: #219a52;
+            transform: translateY(-1px);
+        }
+
+        .btn-view-policy {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .btn-view-policy:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            padding: 0.5rem 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            text-align: center;
+        }
+
+        .nav-item {
+            padding: 0.5rem;
+            color: #6c757d;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: var(--secondary-color);
+        }
+
+        .nav-item:hover {
+            color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        .nav-icon {
+            font-size: 1.2rem;
+            display: block;
+            margin-bottom: 0.2rem;
+        }
+
+        .nav-label {
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        /* Emergency Alert */
+        .emergency-alert {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--danger-color);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 2000;
+            text-align: center;
+            max-width: 90%;
+            display: none;
+        }
+
+        .emergency-alert.show {
+            display: block;
+            animation: emergencyPulse 1s infinite;
+        }
+
+        @keyframes emergencyPulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Offline Indicator */
+        .offline-indicator {
+            position: fixed;
+            top: 70px;
+            left: 1rem;
+            right: 1rem;
+            background: #6c757d;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+            z-index: 1500;
+            display: none;
+        }
+
+        .offline-indicator.show {
+            display: block;
+        }
+
+        /* Loading States */
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 360px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .task-meta {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+        }
+
+        /* Pull to refresh */
+        .pull-to-refresh {
+            text-align: center;
+            padding: 1rem;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        /* Site Selection */
+        .site-selection {
+            margin: 1rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .site-tabs {
+            display: flex;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .site-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .site-tab {
+            flex: 1;
+            min-width: 120px;
+            padding: 0.8rem 0.5rem;
+            border: none;
+            background: #f8f9fa;
+            color: #6c757d;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .site-tab.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .site-tab:hover {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        /* Schedule Container */
+        .schedule-container {
+            margin: 1rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .schedule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .schedule-header h5 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .schedule-table-container {
+            overflow-x: auto;
+            max-height: 400px;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .schedule-table th {
+            background: #f8f9fa;
+            color: var(--primary-color);
+            padding: 0.8rem 0.5rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .schedule-table td {
+            padding: 0.8rem 0.5rem;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+        .schedule-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .time-cell {
+            font-weight: bold;
+            color: var(--primary-color);
+            min-width: 80px;
+        }
+
+        .resident-cell {
+            font-weight: 500;
+            min-width: 100px;
+        }
+
+        .room-cell {
+            color: #6c757d;
+            font-size: 0.8rem;
+            min-width: 60px;
+        }
+
+        .task-cell {
+            min-width: 120px;
+        }
+
+        .status-badge {
+            padding: 0.3rem 0.6rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-align: center;
+            min-width: 70px;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-due-soon {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-overdue {
+            background: #f5c6cb;
+            color: #721c24;
+            animation: pulse 2s infinite;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .action-btn {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 80px;
+        }
+
+        .action-btn.complete {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .action-btn.complete:hover {
+            background: #218838;
+        }
+
+        .action-btn.completed {
+            background: #6c757d;
+            color: white;
+            cursor: not-allowed;
+        }
+
+        .countdown-timer {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .timer-overdue {
+            color: var(--danger-color);
+            animation: pulse 2s infinite;
+        }
+
+        .timer-urgent {
+            color: var(--warning-color);
+        }
+
+        .timer-normal {
+            color: var(--success-color);
+        }
+
+        /* Status Indicators */
+        .status-indicator {
+            text-align: center;
+        }
+
+        .status-completed-indicator {
+            color: var(--success-color);
+            font-weight: 500;
+            font-size: 0.8rem;
+        }
+
+        .status-completed-indicator i {
+            margin-right: 0.3rem;
+        }
+
+        .status-pending-indicator {
+            color: var(--warning-color);
+            font-weight: 500;
+            font-size: 0.8rem;
+        }
+
+        .status-pending-indicator i {
+            margin-right: 0.3rem;
+        }
+
+        .status-validating-indicator {
+            color: #ffc107;
+            font-weight: 500;
+            font-size: 0.8rem;
+        }
+
+        .status-validating-indicator i {
+            margin-right: 0.3rem;
+        }
+
+        /* Overdue blinking animation */
+        .status-overdue {
+            color: #dc3545 !important;
+            animation: blink-overdue 1s infinite;
+            font-weight: 600;
+        }
+
+        .status-overdue-indicator {
+            color: #dc3545 !important;
+            animation: blink-overdue 1s infinite;
+            font-weight: 600;
+        }
+
+        .status-overdue-indicator i {
+            margin-right: 0.3rem;
+        }
+
+        @keyframes blink-overdue {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        /* Overdue task row styling */
+        .overdue-task-row {
+            background-color: rgba(220, 53, 69, 0.1) !important;
+            border-left: 4px solid #dc3545 !important;
+            animation: blink-overdue 2s infinite;
+        }
+
+        .overdue-task-row .time-cell,
+        .overdue-task-row .resident-cell,
+        .overdue-task-row .room-cell,
+        .overdue-task-row .task-cell {
+            color: #dc3545 !important;
+            font-weight: 600;
+        }
+
+        /* Haptic feedback simulation */
+        .haptic-feedback {
+            animation: haptic 0.1s;
+        }
+
+        @keyframes haptic {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Emergency Alert -->
+    <div class="emergency-alert" id="emergencyAlert">
+        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+        <h4>긴급 인시던트 발생!</h4>
+        <p id="emergencyMessage">새로운 고위험 인시던트가 보고되었습니다.</p>
+        <button class="btn btn-light mt-2" onclick="acknowledgeEmergency()">확인</button>
+    </div>
+
+    <!-- Offline Indicator -->
+    <div class="offline-indicator" id="offlineIndicator">
+        <i class="fas fa-wifi-slash me-2"></i>
+        오프라인 모드 - 데이터가 동기화되지 않을 수 있습니다
+    </div>
+
+    <!-- Header -->
+    <div class="mobile-header">
+        <div class="user-info">
+            <div>
+                <div class="user-name">{{ current_user.display_name if current_user else 'User' }}</div>
+                <div class="user-role">{{ current_user.role.title() if current_user else 'Staff' }}</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button class="btn-back-dashboard" onclick="goToIntegratedDashboard()" title="Integrated Dashboard">
+                    <i class="fas fa-home"></i>
+                </button>
+                <div>
+                    <i class="fas fa-bell" id="notificationBell"></i>
+                    <span class="badge bg-danger" id="notificationCount" style="display: none;">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="quick-actions">
+            <button class="btn-scanner" onclick="scanQRCode()" title="QR 스캔">
+                <i class="fas fa-qrcode"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Task Summary -->
+    <div class="task-summary">
+        <div class="summary-grid">
+            <div class="summary-item summary-overdue" onclick="filterTasks('overdue')">
+                <span class="summary-number" id="overdueCount">0</span>
+                <div class="summary-label">Overdue Tasks</div>
+            </div>
+            <div class="summary-item summary-due-today" onclick="filterTasks('due_today')">
+                <span class="summary-number" id="dueTodayCount">0</span>
+                <div class="summary-label">Due Today</div>
+            </div>
+            <div class="summary-item summary-routine" onclick="filterTasks('routine')">
+                <span class="summary-number" id="routineCount">0</span>
+                <div class="summary-label">Routine Tasks</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Site Selection -->
+    <div class="site-selection">
+        <div class="site-tabs">
+            <button class="site-tab active" data-site="Parafield Gardens" onclick="selectSite('Parafield Gardens')">
+                Parafield Gardens
+            </button>
+            <button class="site-tab" data-site="Nerrilda" onclick="selectSite('Nerrilda')">
+                Nerrilda
+            </button>
+            <button class="site-tab" data-site="Ramsay" onclick="selectSite('Ramsay')">
+                Ramsay
+            </button>
+            <button class="site-tab" data-site="West Park" onclick="selectSite('West Park')">
+                West Park
+            </button>
+            <button class="site-tab" data-site="Yankalilla" onclick="selectSite('Yankalilla')">
+                Yankalilla
+            </button>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <input type="text" class="search-input" id="searchInput" placeholder="Search resident name or task...">
+    </div>
+
+    <!-- Pull to Refresh -->
+    <div class="pull-to-refresh" id="pullToRefresh" style="display: none;">
+        <i class="fas fa-arrow-down"></i>
+        Pull down to refresh
+    </div>
+
+    <!-- Schedule Table -->
+    <div class="schedule-container" id="scheduleContainer">
+        <div class="schedule-header">
+            <h5><i class="fas fa-calendar-alt me-2"></i>Visit Schedule - <span id="currentSiteName">Parafield Gardens</span></h5>
+            <div class="schedule-controls">
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshSchedule()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+        
+        <div class="schedule-table-container">
+            <table class="schedule-table" id="scheduleTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Resident</th>
+                        <th>Room</th>
+                        <th>Task</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleTableBody">
+                    <!-- Schedule items will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Task List -->
+    <div class="task-list" id="taskList">
+        <!-- Tasks will be loaded here -->
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <div class="nav-grid">
+            <div class="nav-item active" onclick="showSection('tasks')">
+                <i class="fas fa-tasks nav-icon"></i>
+                <div class="nav-label">Tasks</div>
+            </div>
+            <div class="nav-item" onclick="showSection('schedule')">
+                <i class="fas fa-calendar nav-icon"></i>
+                <div class="nav-label">Schedule</div>
+            </div>
+            <div class="nav-item" onclick="showSection('residents')">
+                <i class="fas fa-users nav-icon"></i>
+                <div class="nav-label">Residents</div>
+            </div>
+            <div class="nav-item" onclick="showSection('handoff')">
+                <i class="fas fa-exchange-alt nav-icon"></i>
+                <div class="nav-label">Handoff</div>
+            </div>
+            <div class="nav-item" onclick="showSection('logbook')">
+                <i class="fas fa-book nav-icon"></i>
+                <div class="nav-label">Logbook</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Global variables
+        let allTasks = [];
+        let filteredTasks = [];
+        let currentFilter = 'all';
+        let isOnline = navigator.onLine;
+        let lastSync = new Date();
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            checkOnlineStatus();
+        });
+
+        // Initialize application
+        function initializeApp() {
+            // Reset loading states
+            isLoading = false;
+            isLoadingTasks = false;
+            isInitialLoad = true;
+            
+            loadTasks();
+            updateTaskSummary();
+            setupPullToRefresh();
+            loadSiteSchedule(currentSite); // Load initial schedule
+            
+            // Mark initial load as complete after a short delay
+            setTimeout(() => {
+                isInitialLoad = false;
+            }, 1000);
+            
+            // Check for emergency alerts
+            setTimeout(checkEmergencyAlerts, 2000);
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Search functionality
+            document.getElementById('searchInput').addEventListener('input', function(e) {
+                searchTasks(e.target.value);
+            });
+
+            // Online/offline status
+            window.addEventListener('online', function() {
+                isOnline = true;
+                document.getElementById('offlineIndicator').classList.remove('show');
+                syncOfflineData();
+            });
+
+            window.addEventListener('offline', function() {
+                isOnline = false;
+                document.getElementById('offlineIndicator').classList.add('show');
+            });
+
+            // Prevent zoom on double tap
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', function(event) {
+                const now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    event.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+        }
+
+        // Load tasks from API
+        async function loadTasks() {
+            // Prevent multiple simultaneous loads
+            if (isLoadingTasks) {
+                console.log('Tasks loading already in progress, skipping...');
+                return;
+            }
+            
+            try {
+                isLoadingTasks = true;
+                showLoadingSkeleton();
+                
+                // Try cached API first, fallback to original API
+                let response = await fetch('/api/cache/user-tasks/{{ current_user.id }}');
+                let useCache = response.ok;
+                
+                if (!response.ok) {
+                    console.log('Cache API failed, falling back to original API');
+                    response = await fetch('/api/v1/tasks/me');
+                    useCache = false;
+                }
+                
+                const data = await response.json();
+                const tasks = data.tasks || data; // Handle both cached and original response formats
+                
+                console.log('Tasks loaded:', useCache ? '(cached)' : '(live)', tasks.length, 'tasks');
+                
+                allTasks = tasks;
+                filteredTasks = [...allTasks];
+                
+                renderTasks();
+                updateTaskSummary();
+                hideLoadingSkeleton();
+                
+                lastSync = new Date();
+                
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                hideLoadingSkeleton(); // Hide loading skeleton on error
+                if (!isOnline) {
+                    loadOfflineTasks();
+                } else {
+                    showError('Failed to load tasks');
+                }
+            } finally {
+                isLoadingTasks = false;
+            }
+        }
+
+        // Render tasks
+        function renderTasks() {
+            const taskList = document.getElementById('taskList');
+            
+            if (filteredTasks.length === 0) {
+                taskList.innerHTML = `
+                    <div style="text-align: center; padding: 3rem 1rem; color: #6c757d;">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <h4>All caught up!</h4>
+                        <p>No tasks match your current filter.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort tasks by urgency and due date
+            const sortedTasks = filteredTasks.sort((a, b) => {
+                const urgencyOrder = { 'Overdue': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+                if (urgencyOrder[a.urgency] !== urgencyOrder[b.urgency]) {
+                    return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+                }
+                return new Date(a.due_date) - new Date(b.due_date);
+            });
+
+            taskList.innerHTML = sortedTasks.map(task => createTaskHTML(task)).join('');
+            
+            // Add bottom padding for navigation
+            taskList.style.paddingBottom = '100px';
+        }
+
+        // Create task HTML
+        function createTaskHTML(task) {
+            const urgencyClass = task.urgency.toLowerCase();
+            const timeRemaining = getTimeRemaining(task.due_date);
+            const timerClass = getTimerClass(timeRemaining);
+            
+            return `
+                <div class="task-item ${urgencyClass}" data-task-id="${task.task_id}">
+                    <div class="task-header">
+                        <div class="task-title">${task.description}</div>
+                        <div class="task-resident">
+                            <i class="fas fa-user"></i>
+                            ${task.resident_name}
+                            <span class="incident-badge">${task.incident_id}</span>
+                        </div>
+                    </div>
+                    <div class="task-body">
+                        <div class="task-meta">
+                            <div class="meta-item">
+                                <div class="meta-label">Due Time</div>
+                                <div class="meta-value countdown-timer ${timerClass}">
+                                    ${formatDueTime(task.due_date)}
+                                </div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Urgency</div>
+                                <div class="meta-value">
+                                    <span class="urgency-badge urgency-${urgencyClass}">
+                                        ${task.urgency}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="task-actions">
+                            <button class="btn-start-note" onclick="startNote('${task.task_id}')">
+                                <i class="fas fa-edit me-2"></i>START NOTE
+                            </button>
+                            <button class="btn-view-policy" onclick="viewPolicy('${task.task_id}')">
+                                <i class="fas fa-book me-2"></i>VIEW POLICY
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update task summary
+        function updateTaskSummary() {
+            const overdue = allTasks.filter(task => task.urgency === 'Overdue').length;
+            const dueToday = allTasks.filter(task => {
+                const dueDate = new Date(task.due_date);
+                const today = new Date();
+                return dueDate.toDateString() === today.toDateString() && task.urgency !== 'Overdue';
+            }).length;
+            const routine = allTasks.filter(task => task.urgency === 'Low').length;
+
+            document.getElementById('overdueCount').textContent = overdue;
+            document.getElementById('dueTodayCount').textContent = dueToday;
+            document.getElementById('routineCount').textContent = routine;
+
+            // Update notification count
+            const totalUrgent = overdue + dueToday;
+            const notificationCount = document.getElementById('notificationCount');
+            if (totalUrgent > 0) {
+                notificationCount.textContent = totalUrgent;
+                notificationCount.style.display = 'inline';
+            } else {
+                notificationCount.style.display = 'none';
+            }
+        }
+
+        // Filter tasks
+        function filterTasks(filter) {
+            currentFilter = filter;
+            
+            // Add haptic feedback
+            document.body.classList.add('haptic-feedback');
+            setTimeout(() => document.body.classList.remove('haptic-feedback'), 100);
+
+            switch (filter) {
+                case 'overdue':
+                    filteredTasks = allTasks.filter(task => task.urgency === 'Overdue');
+                    break;
+                case 'due_today':
+                    filteredTasks = allTasks.filter(task => {
+                        const dueDate = new Date(task.due_date);
+                        const today = new Date();
+                        return dueDate.toDateString() === today.toDateString() && task.urgency !== 'Overdue';
+                    });
+                    break;
+                case 'routine':
+                    filteredTasks = allTasks.filter(task => task.urgency === 'Low');
+                    break;
+                default:
+                    filteredTasks = [...allTasks];
+            }
+
+            renderTasks();
+        }
+
+        // Search tasks
+        function searchTasks(query) {
+            if (!query.trim()) {
+                filteredTasks = [...allTasks];
+            } else {
+                const searchTerm = query.toLowerCase();
+                filteredTasks = allTasks.filter(task => 
+                    task.resident_name.toLowerCase().includes(searchTerm) ||
+                    task.description.toLowerCase().includes(searchTerm) ||
+                    task.incident_id.toLowerCase().includes(searchTerm)
+                );
+            }
+            renderTasks();
+        }
+
+
+        // Scan QR code
+        function scanQRCode() {
+            // Add haptic feedback
+            document.body.classList.add('haptic-feedback');
+            setTimeout(() => document.body.classList.remove('haptic-feedback'), 100);
+            
+            if ('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {
+                // Open QR scanner
+                alert('QR Scanner would open here');
+            } else {
+                alert('Camera not available on this device');
+            }
+        }
+
+        // Start note (now redirects to confirmation page)
+        function startNote(taskId) {
+            // Add haptic feedback
+            document.body.classList.add('haptic-feedback');
+            setTimeout(() => document.body.classList.remove('haptic-feedback'), 100);
+            
+            // Navigate to task completion confirmation page
+            window.location.href = `/task_confirmation?task_id=${taskId}`;
+        }
+
+        // View policy
+        function viewPolicy(taskId) {
+            // Add haptic feedback
+            document.body.classList.add('haptic-feedback');
+            setTimeout(() => document.body.classList.remove('haptic-feedback'), 100);
+            
+            // Show policy details
+            alert(`Policy details for task ${taskId} would be shown here`);
+        }
+
+        // Go to integrated dashboard
+        function goToIntegratedDashboard() {
+            // Add haptic feedback
+            document.body.classList.add('haptic-feedback');
+            setTimeout(() => document.body.classList.remove('haptic-feedback'), 100);
+            
+            // Navigate to integrated dashboard
+            window.location.href = '/integrated_dashboard';
+        }
+
+        // Show section
+        function showSection(section) {
+            // Debounce rapid clicks (prevent multiple calls within 500ms)
+            const now = Date.now();
+            if (now - lastClickTime < 500) {
+                return;
+            }
+            lastClickTime = now;
+
+            // Update navigation active state
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+
+            // Add haptic feedback
+            document.body.classList.add('haptic-feedback');
+            setTimeout(() => document.body.classList.remove('haptic-feedback'), 100);
+
+            // Handle section navigation
+            switch (section) {
+                case 'tasks':
+                    // Already on tasks page
+                    break;
+                case 'schedule':
+                    alert('Schedule view would be shown here');
+                    break;
+                case 'residents':
+                    alert('Residents directory would be shown here');
+                    break;
+                case 'handoff':
+                    alert('Task handoff interface would be shown here');
+                    break;
+                case 'logbook':
+                    alert('Completed tasks logbook would be shown here');
+                    break;
+            }
+        }
+
+        // Check emergency alerts
+        function checkEmergencyAlerts() {
+            // Simulate emergency alert (remove in production)
+            // showEmergencyAlert('High severity fall reported in Room 305');
+        }
+
+        // Show emergency alert
+        function showEmergencyAlert(message) {
+            document.getElementById('emergencyMessage').textContent = message;
+            document.getElementById('emergencyAlert').classList.add('show');
+            
+            // Vibrate if supported
+            if ('vibrate' in navigator) {
+                navigator.vibrate([200, 100, 200]);
+            }
+        }
+
+        // Acknowledge emergency
+        function acknowledgeEmergency() {
+            document.getElementById('emergencyAlert').classList.remove('show');
+        }
+
+        // Setup pull to refresh
+        function setupPullToRefresh() {
+            let startY = 0;
+            let currentY = 0;
+            let pullDistance = 0;
+            let isPulling = false;
+
+            document.addEventListener('touchstart', function(e) {
+                if (window.scrollY === 0) {
+                    startY = e.touches[0].clientY;
+                    isPulling = true;
+                }
+            });
+
+            document.addEventListener('touchmove', function(e) {
+                if (isPulling && window.scrollY === 0) {
+                    currentY = e.touches[0].clientY;
+                    pullDistance = currentY - startY;
+                    
+                    if (pullDistance > 0) {
+                        e.preventDefault();
+                        const pullToRefresh = document.getElementById('pullToRefresh');
+                        
+                        if (pullDistance > 100) {
+                            pullToRefresh.innerHTML = '<i class="fas fa-sync-alt"></i> Release to refresh';
+                            pullToRefresh.style.display = 'block';
+                        } else if (pullDistance > 50) {
+                            pullToRefresh.innerHTML = '<i class="fas fa-arrow-down"></i> Pull down to refresh';
+                            pullToRefresh.style.display = 'block';
+                        }
+                    }
+                }
+            });
+
+            document.addEventListener('touchend', function(e) {
+                if (isPulling) {
+                    if (pullDistance > 100) {
+                        refreshTasks();
+                    }
+                    
+                    document.getElementById('pullToRefresh').style.display = 'none';
+                    isPulling = false;
+                    pullDistance = 0;
+                }
+            });
+        }
+
+        // Refresh tasks
+        function refreshTasks() {
+            loadTasks();
+        }
+
+        // Helper functions
+        function getTimeRemaining(dueDate) {
+            const now = new Date();
+            const due = new Date(dueDate);
+            return due - now;
+        }
+
+        function getTimerClass(timeRemaining) {
+            if (timeRemaining < 0) {
+                return 'timer-overdue';
+            } else if (timeRemaining < 4 * 60 * 60 * 1000) { // 4 hours
+                return 'timer-urgent';
+            }
+            return 'timer-normal';
+        }
+
+        function formatDueTime(dueDate) {
+            const due = new Date(dueDate);
+            const now = new Date();
+            const diff = due - now;
+            
+            if (diff < 0) {
+                const hours = Math.floor(Math.abs(diff) / (60 * 60 * 1000));
+                return `${hours}h OVERDUE`;
+            } else if (diff < 60 * 60 * 1000) { // Less than 1 hour
+                const minutes = Math.floor(diff / (60 * 1000));
+                return `${minutes}m`;
+            } else if (diff < 24 * 60 * 60 * 1000) { // Less than 1 day
+                const hours = Math.floor(diff / (60 * 60 * 1000));
+                const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+                return `${hours}h ${minutes}m`;
+            } else {
+                return due.toLocaleDateString() + ' ' + due.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            }
+        }
+
+        function showLoadingSkeleton() {
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = Array(3).fill().map(() => `
+                <div class="task-item">
+                    <div class="task-header">
+                        <div class="loading-skeleton" style="height: 20px; margin-bottom: 10px; border-radius: 5px;"></div>
+                        <div class="loading-skeleton" style="height: 16px; width: 60%; border-radius: 5px;"></div>
+                    </div>
+                    <div class="task-body">
+                        <div class="loading-skeleton" style="height: 40px; margin-bottom: 15px; border-radius: 5px;"></div>
+                        <div class="loading-skeleton" style="height: 40px; border-radius: 5px;"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function hideLoadingSkeleton() {
+            // Clear loading skeleton - actual content will replace it
+            const taskList = document.getElementById('taskList');
+            if (taskList) {
+                taskList.innerHTML = '';
+            }
+        }
+
+        function checkOnlineStatus() {
+            setInterval(() => {
+                if (navigator.onLine !== isOnline) {
+                    isOnline = navigator.onLine;
+                    if (isOnline) {
+                        document.getElementById('offlineIndicator').classList.remove('show');
+                        syncOfflineData();
+                    } else {
+                        document.getElementById('offlineIndicator').classList.add('show');
+                    }
+                }
+            }, 5000);
+        }
+
+        function loadOfflineTasks() {
+            // Load tasks from local storage if available
+            const offlineTasks = localStorage.getItem('cims_offline_tasks');
+            if (offlineTasks) {
+                allTasks = JSON.parse(offlineTasks);
+                filteredTasks = [...allTasks];
+                renderTasks();
+                updateTaskSummary();
+            }
+        }
+
+        function syncOfflineData() {
+            // Sync any offline data when connection is restored
+            console.log('Syncing offline data...');
+            loadTasks();
+        }
+
+        function showError(message) {
+            // Show error message to user
+            alert(message);
+        }
+
+        // Site management
+        let currentSite = 'Parafield Gardens';
+        let siteSchedules = {};
+        let isLoading = false; // Prevent multiple simultaneous loads
+        let isLoadingTasks = false; // Prevent multiple task loads
+        let lastClickTime = 0; // Debounce clicks
+        
+        // Initial loading state
+        let isInitialLoad = true;
+
+        // Site selection functions
+        function selectSite(siteName) {
+            // Debounce rapid clicks (prevent multiple calls within 500ms)
+            const now = Date.now();
+            if (now - lastClickTime < 500) {
+                return;
+            }
+            lastClickTime = now;
+
+            currentSite = siteName;
+            
+            // Update active tab
+            document.querySelectorAll('.site-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-site="${siteName}"]`).classList.add('active');
+            
+            // Update site name in header
+            document.getElementById('currentSiteName').textContent = siteName;
+            
+            // Load schedule for selected site
+            loadSiteSchedule(siteName);
+        }
+
+        // Load schedule for specific site
+        async function loadSiteSchedule(siteName) {
+            // Prevent multiple simultaneous loads
+            if (isLoading) {
+                console.log('Schedule loading already in progress, skipping...');
+                return;
+            }
+            
+            try {
+                isLoading = true;
+                showLoadingSkeleton();
+                
+                // Try cached API first, fallback to original API
+                let response = await fetch(`/api/cache/task-schedule/${encodeURIComponent(siteName)}`);
+                let useCache = response.ok;
+                
+                if (!response.ok) {
+                    console.log('Cache API failed, falling back to original API');
+                    response = await fetch(`/api/cims/schedule/${encodeURIComponent(siteName)}`);
+                    useCache = false;
+                }
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const scheduleData = data.schedule || data; // Handle both cached and original response formats
+                    siteSchedules[siteName] = scheduleData;
+                    renderScheduleTable(scheduleData);
+                    console.log(`Schedule loaded for ${siteName}:`, useCache ? '(cached)' : '(live)', scheduleData.length, 'tasks');
+                } else {
+                    console.error('Failed to load schedule:', response.status);
+                    showError('Failed to load schedule');
+                }
+                
+                hideLoadingSkeleton();
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                hideLoadingSkeleton(); // Hide loading skeleton on error
+                showError('Failed to load schedule');
+            } finally {
+                isLoading = false;
+            }
+        }
+
+
+        // Render schedule table
+        function renderScheduleTable(schedule) {
+            const tbody = document.getElementById('scheduleTableBody');
+            
+            if (schedule.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">No scheduled visits</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = schedule.map(item => {
+                const scheduledTime = new Date(item.time);
+                const timeStr = scheduledTime.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+                
+                const statusClass = `status-${item.status}`;
+                const timerClass = `timer-${item.urgency}`;
+                
+                const timeRemaining = getTimeRemaining(scheduledTime);
+                const isOverdue = item.status === 'overdue' || timeRemaining.includes('Overdue') || timeRemaining.includes('overdue');
+                
+                // Overdue인 경우 행에 특별한 클래스 추가
+                const rowClass = isOverdue ? 'overdue-task-row' : '';
+                
+                return `
+                    <tr class="${rowClass}">
+                        <td class="time-cell">
+                            <div>${timeStr}</div>
+                            <div class="countdown-timer ${timerClass}">${timeRemaining}</div>
+                        </td>
+                        <td class="resident-cell">${item.resident}</td>
+                        <td class="room-cell">Room ${item.room}</td>
+                        <td class="task-cell">${item.task}</td>
+                        <td>
+                            <span class="status-badge ${statusClass}">${item.status.toUpperCase()}</span>
+                        </td>
+                        <td>
+                            <div class="status-indicator">
+                                ${item.completed ? 
+                                    '<span class="status-completed-indicator"><i class="fas fa-check-circle"></i> Completed</span>' :
+                                    item.status === 'Pending' ?
+                                    '<span class="status-validating-indicator"><i class="fas fa-hourglass-half"></i> Validating</span>' :
+                                    isOverdue ? 
+                                    '<span class="status-overdue-indicator"><i class="fas fa-exclamation-triangle"></i> Overdue</span>' :
+                                    '<span class="status-pending-indicator"><i class="fas fa-clock"></i> Pending</span>'
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Get time remaining until scheduled time
+        function getTimeRemaining(scheduledTime) {
+            const now = new Date();
+            const diff = scheduledTime.getTime() - now.getTime();
+            
+            if (diff < 0) {
+                const hours = Math.floor(-diff / (1000 * 60 * 60));
+                const minutes = Math.floor((-diff % (1000 * 60 * 60)) / (1000 * 60));
+                return `-${hours}h ${minutes}m`;
+            } else {
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                return `${hours}h ${minutes}m`;
+            }
+        }
+
+        // Manual task completion (if needed)
+        async function completeTask(taskId) {
+            try {
+                // Find the task in current site schedule
+                const schedule = siteSchedules[currentSite];
+                const task = schedule.find(t => t.id === taskId);
+                
+                if (!task) {
+                    showError('Task not found');
+                    return;
+                }
+                
+                // Call the API to complete the task
+                const response = await fetch('/api/cims/schedule/complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        task_id: taskId,
+                        site_name: currentSite
+                    })
+                });
+                
+                if (response.ok) {
+                    // Mark as completed locally
+                    task.completed = true;
+                    task.status = 'completed';
+                    
+                    // Update the display
+                    renderScheduleTable(schedule);
+                    
+                    // Show success message
+                    showSuccessMessage(`Task completed: ${task.task} for ${task.resident}`);
+                } else {
+                    console.error('Failed to complete task:', response.status);
+                    showError('Failed to complete task');
+                }
+                
+            } catch (error) {
+                console.error('Error completing task:', error);
+                showError('Failed to complete task');
+            }
+        }
+
+        // Refresh schedule
+        function refreshSchedule() {
+            loadSiteSchedule(currentSite);
+        }
+
+        // Show success message
+        function showSuccessMessage(message) {
+            // Create a temporary success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success';
+            successDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 2000;
+                padding: 1rem 2rem;
+                border-radius: 10px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            `;
+            successDiv.innerHTML = `<i class="fas fa-check-circle me-2"></i>${message}`;
+            
+            document.body.appendChild(successDiv);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        }
+
+        // Update countdown timers every 5 minutes (reduced frequency)
+        setInterval(() => {
+            if (siteSchedules[currentSite]) {
+                renderScheduleTable(siteSchedules[currentSite]);
+            }
+        }, 300000); // 5 minutes instead of 1 minute
+
+        // Auto-refresh every 2 minutes when online (reduced frequency)
+        setInterval(() => {
+            if (isOnline && !isLoading && !isLoadingTasks) {
+                loadTasks();
+                if (siteSchedules[currentSite]) {
+                    loadSiteSchedule(currentSite);
+                }
+            }
+        }, 120000); // 2 minutes instead of 30 seconds
+    </script>
+</body>
+</html>

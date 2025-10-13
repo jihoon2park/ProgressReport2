@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIMS - Policy Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar {
+            background: white;
+            min-height: calc(100vh - 76px);
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 0;
+        }
+
+        .sidebar-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            font-weight: bold;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            border-bottom: 1px solid #eee;
+        }
+
+        .sidebar-menu a {
+            display: block;
+            padding: 1rem;
+            color: #333;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background-color: #e3f2fd;
+            color: var(--secondary-color);
+        }
+
+        .main-content {
+            padding: 2rem;
+        }
+
+        .policy-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .policy-header {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .policy-body {
+            padding: 1.5rem;
+        }
+
+        .status-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-planned {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .rule-builder {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 1rem 0;
+        }
+
+        .rule-block {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .rule-block .delete-rule {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: var(--danger-color);
+            cursor: pointer;
+        }
+
+        .condition-group {
+            background: #e3f2fd;
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .task-group {
+            background: #f3e5f5;
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .form-control, .form-select {
+            border-radius: 5px;
+            border: 1px solid #ced4da;
+        }
+
+        .btn-custom {
+            border-radius: 25px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .search-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .policy-table {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .table th {
+            background-color: #f8f9fa;
+            border: none;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .table td {
+            border: none;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .editor-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+
+        .json-preview {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .alarm-interval-settings {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 1rem 0;
+        }
+
+        .escalation-timeline {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .timeline-step {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .timeline-step .delete-step {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #e74c3c;
+            cursor: pointer;
+        }
+
+        .form-control {
+            border-radius: 5px;
+            border: 1px solid #ced4da;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                CIMS - Policy Management
+            </a>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>
+                        {{ current_user.display_name if current_user else 'Admin' }}
+                        <span class="badge bg-light text-dark ms-2">{{ current_user.role.title() if current_user else 'Admin' }}</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/incident_dashboard2"><i class="fas fa-tachometer-alt me-2"></i>CIMS Dashboard</a></li>
+                        <li><a class="dropdown-item" href="/progress-notes"><i class="fas fa-notes-medical me-2"></i>Progress Notes</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') if url_for else '#' }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 p-0">
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <i class="fas fa-cogs me-2"></i>
+                        Policy Management
+                    </div>
+                    <ul class="sidebar-menu">
+                        <li><a href="#policies" class="active" onclick="showSection('policies')"><i class="fas fa-list me-2"></i>Policy List</a></li>
+                        <li><a href="#editor" onclick="showSection('editor')"><i class="fas fa-edit me-2"></i>Policy Editor</a></li>
+                        <li><a href="#recipients" onclick="showSection('recipients')"><i class="fas fa-users me-2"></i>Recipients</a></li>
+                        <li><a href="#fcm-devices" onclick="showSection('fcm-devices')"><i class="fas fa-mobile-alt me-2"></i>FCM Devices</a></li>
+                        <li><a href="#templates" onclick="showSection('templates')"><i class="fas fa-copy me-2"></i>Templates</a></li>
+                        <li><a href="#analytics" onclick="showSection('analytics')"><i class="fas fa-chart-bar me-2"></i>Analytics</a></li>
+                        <li><a href="#settings" onclick="showSection('settings')"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9">
+                <div class="main-content">
+                    <!-- Policy List Section -->
+                    <div id="policies-section" class="content-section">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h2><i class="fas fa-list me-3"></i>Policy Management</h2>
+                            <div class="btn-group">
+                                <button class="btn btn-primary btn-custom" onclick="createNewPolicy()">
+                                    <i class="fas fa-plus me-2"></i>New Policy
+                                </button>
+                                <button class="btn btn-success btn-custom" onclick="startManadIntegrator()">
+                                    <i class="fas fa-sync me-2"></i>Start MANAD Sync
+                                </button>
+                                <button class="btn btn-info btn-custom" onclick="checkIntegratorStatus()">
+                                    <i class="fas fa-info-circle me-2"></i>Check Status
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search and Filter -->
+                        <div class="search-section">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control" id="searchPolicies" placeholder="Search policies...">
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select" id="statusFilter">
+                                        <option value="">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="planned">Planned</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select" id="typeFilter">
+                                        <option value="">All Types</option>
+                                        <option value="Fall">Fall</option>
+                                        <option value="Skin Breakdown">Skin Breakdown</option>
+                                        <option value="Medication Error">Medication Error</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                        <i class="fas fa-times"></i> Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Policy Table -->
+                        <div class="policy-table">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Policy Name</th>
+                                        <th>Version</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="policyTableBody">
+                                    <!-- Policies will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Policy Editor Section -->
+                    <div id="editor-section" class="content-section" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h2><i class="fas fa-edit me-3"></i>Policy Editor</h2>
+                            <div>
+                                <button class="btn btn-success btn-custom me-2" onclick="savePolicy()">
+                                    <i class="fas fa-save me-2"></i>Save Policy
+                                </button>
+                                <button class="btn btn-secondary btn-custom" onclick="cancelEdit()">
+                                    <i class="fas fa-times me-2"></i>Cancel
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="editor-section">
+                            <form id="policyForm">
+                                <!-- Policy Details -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label for="policyName" class="form-label">Policy Name *</label>
+                                        <input type="text" class="form-control" id="policyName" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="policyVersion" class="form-label">Version *</label>
+                                        <input type="text" class="form-control" id="policyVersion" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="policyStatus" class="form-label">Status *</label>
+                                        <select class="form-select" id="policyStatus" required>
+                                            <option value="active">Active</option>
+                                            <option value="planned">Planned</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Incident Association Settings -->
+                                <div class="mb-4">
+                                    <h5><i class="fas fa-exclamation-triangle me-2"></i>Incident Association</h5>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <label for="incidentType" class="form-label">Incident Type *</label>
+                                                    <select class="form-select" id="incidentType" required onchange="updatePolicyPreview()">
+                                                        <option value="">Select Incident Type</option>
+                                                        <option value="Fall">Fall</option>
+                                                        <option value="Skin Breakdown">Skin Breakdown</option>
+                                                        <option value="Medication Error">Medication Error</option>
+                                                        <option value="Wound/Skin integrity">Wound/Skin integrity</option>
+                                                        <option value="Behavioral">Behavioral</option>
+                                                        <option value="Medical Emergency">Medical Emergency</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label for="severityLevel" class="form-label">Severity Level *</label>
+                                                    <select class="form-select" id="severityLevel" required onchange="updatePolicyPreview()">
+                                                        <option value="All">All Severities</option>
+                                                        <option value="Low">Low</option>
+                                                        <option value="Medium">Medium</option>
+                                                        <option value="High">High</option>
+                                                        <option value="Injury Suspected">Injury Suspected</option>
+                                                        <option value="Critical">Critical</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Policy Preview 제거된 Applicable Sites -->
+                                            <div class="row d-none">
+                                                <div class="col-md-4">
+                                                    <label for="applicableSites" class="form-label">Applicable Sites</label>
+                                                    <select class="form-select" id="applicableSites" multiple onchange="updatePolicyPreview()" style="display: none;">
+                                                        <option value="All" selected>All Sites</option>
+                                                        <option value="Parafield Gardens">Parafield Gardens</option>
+                                                        <option value="Nerrilda">Nerrilda</option>
+                                                        <option value="Ramsay">Ramsay</option>
+                                                        <option value="West Park">West Park</option>
+                                                        <option value="Yankalilla">Yankalilla</option>
+                                                    </select>
+                                                    <small class="form-text text-muted">Hold Ctrl to select multiple sites</small>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Policy Preview -->
+                                            <div class="mt-3" id="policyPreview" style="display: none;">
+                                                <h6><i class="fas fa-eye me-2"></i>Policy Preview</h6>
+                                                <div class="alert alert-info">
+                                                    <strong>This policy will apply to:</strong>
+                                                    <ul class="mb-0 mt-2">
+                                                        <li id="previewIncidentType"></li>
+                                                        <li id="previewSeverity"></li>
+                                                        <li id="previewSites"></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="mb-4">
+                                    <label for="policyDescription" class="form-label">Description</label>
+                                    <textarea class="form-control" id="policyDescription" rows="3"></textarea>
+                                </div>
+
+                                <!-- Alarm Interval Settings -->
+                                <div class="mb-4">
+                                    <h4>Alarm Interval Settings</h4>
+                                    <div class="alarm-interval-settings">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="eventType" class="form-label">Event Type</label>
+                                                <select id="eventType" class="form-control">
+                                                    <option value="emergency">Emergency</option>
+                                                    <option value="normal">Normal</option>
+                                                    <option value="medication">Medication Reminder</option>
+                                                    <option value="handover">Shift Handover</option>
+                                                    <option value="maintenance">Facility Inspection</option>
+                                                    <option value="medical">Medical Call</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="priority" class="form-label">Priority</label>
+                                                <select id="priority" class="form-control">
+                                                    <option value="high">High</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="normal">Normal</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">📊 Escalation Timetable</label>
+                                            <div class="escalation-timeline" id="escalationTimeline">
+                                                <!-- Dynamically generated -->
+                                            </div>
+                                            <button type="button" class="btn btn-warning" onclick="addTimelineStep()" style="margin-top: 10px;">
+                                                ➕ Add Timeline Step
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- JSON Preview -->
+                                <div class="mb-4">
+                                    <h4>JSON Preview</h4>
+                                    <div id="jsonPreview" class="json-preview">
+                                        <!-- JSON preview will be shown here -->
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Other sections (templates, analytics, settings) -->
+
+                    <!-- Recipients Section -->
+                    <div id="recipients-section" class="content-section" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h2><i class="fas fa-users me-3"></i>Recipients Management</h2>
+                            <button class="btn btn-success btn-custom" onclick="addNewRecipient()">
+                                <i class="fas fa-user-plus me-2"></i>Add Recipient
+                            </button>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="policy-card">
+                                    <div class="policy-header">
+                                        <h5>👥 Recipients List</h5>
+                                    </div>
+                                    <div class="policy-body">
+                                        <div id="recipientsList">
+                                            <div class="text-center py-4">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2">Loading recipients...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="policy-card">
+                                    <div class="policy-header">
+                                        <h5>📈 Recipients Statistics</h5>
+                                    </div>
+                                    <div class="policy-body">
+                                        <div class="row text-center">
+                                            <div class="col-6">
+                                                <h4 class="text-primary" id="totalRecipients">0</h4>
+                                                <small class="text-muted">Total Recipients</small>
+                                            </div>
+                                            <div class="col-6">
+                                                <h4 class="text-success" id="activeRecipients">0</h4>
+                                                <small class="text-muted">Active</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FCM Devices Section -->
+                    <div id="fcm-devices-section" class="content-section" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h2><i class="fas fa-mobile-alt me-3"></i>FCM Device Management</h2>
+                            <button class="btn btn-info btn-custom" onclick="refreshFCMDevices()">
+                                <i class="fas fa-sync me-2"></i>Refresh Devices
+                            </button>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="policy-card">
+                                    <div class="policy-header">
+                                        <h5>📱 Registered FCM Devices</h5>
+                                    </div>
+                                    <div class="policy-body">
+                                        <div id="fcmDeviceList">
+                                            <div class="text-center py-4">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2">Loading FCM devices...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="policy-card">
+                                    <div class="policy-header">
+                                        <h5>📊 Device Statistics</h5>
+                                    </div>
+                                    <div class="policy-body">
+                                        <div class="row text-center">
+                                            <div class="col-6">
+                                                <h4 class="text-primary" id="totalDevices">0</h4>
+                                                <small class="text-muted">Total Devices</small>
+                                            </div>
+                                            <div class="col-6">
+                                                <h4 class="text-success" id="activeDevices">0</h4>
+                                                <small class="text-muted">Active</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="templates-section" class="content-section" style="display: none;">
+                        <h2><i class="fas fa-copy me-3"></i>Policy Templates</h2>
+                        <p>Policy templates will be available here.</p>
+                    </div>
+
+                    <div id="analytics-section" class="content-section" style="display: none;">
+                        <h2><i class="fas fa-chart-bar me-3"></i>Policy Analytics</h2>
+                        <p>Policy usage analytics will be available here.</p>
+                    </div>
+
+                    <div id="settings-section" class="content-section" style="display: none;">
+                        <h2><i class="fas fa-cog me-3"></i>Settings</h2>
+                        <p>Policy management settings will be available here.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentPolicy = null;
+        let ruleCounter = 0;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPolicies();
+            setupEventListeners();
+        });
+
+        // Section navigation
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Show selected section
+            document.getElementById(sectionName + '-section').style.display = 'block';
+            
+            // Update sidebar active state
+            document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.querySelector(`[href="#${sectionName}"]`).classList.add('active');
+            
+            // Load section-specific data
+            switch(sectionName) {
+                case 'recipients':
+                    loadRecipients();
+                    break;
+                case 'fcm-devices':
+                    loadFCMDevices();
+                    break;
+            }
+        }
+
+        // Load policies from server
+        async function loadPolicies() {
+            try {
+                const response = await fetch('/api/cims/policies', {
+                    credentials: 'same-origin'  // 세션 쿠키 포함
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Check if data is an array
+                    if (Array.isArray(data)) {
+                        renderPolicyTable(data);
+                    } else {
+                        console.error('Expected array but got:', data);
+                        showAlert('Invalid data format received', 'danger');
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to load policies');
+                }
+            } catch (error) {
+                console.error('Error loading policies:', error);
+                showAlert(`Failed to load policies: ${error.message}`, 'danger');
+            }
+        }
+
+        // Render policy table
+        function renderPolicyTable(policies) {
+            const tbody = document.getElementById('policyTableBody');
+            
+            if (!policies || policies.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No policies found</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = policies.map(policy => `
+                <tr>
+                    <td>
+                        <strong>${policy.name}</strong>
+                        <br><small class="text-muted">${policy.policy_id}</small>
+                    </td>
+                    <td>${policy.version}</td>
+                    <td>
+                        <span class="status-badge status-${policy.is_active ? 'active' : 'inactive'}">
+                            ${policy.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editPolicy(${policy.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePolicy(${policy.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Create new policy
+        function createNewPolicy() {
+            currentPolicy = null;
+            document.getElementById('policyForm').reset();
+            
+            // Reset alarm settings
+            document.getElementById('eventType').value = 'Emergency';
+            document.getElementById('priority').value = 'High';
+            document.getElementById('escalationTimeline').innerHTML = '';
+            
+            // Reset incident association
+            document.getElementById('incidentType').value = '';
+            document.getElementById('severityLevel').value = 'All';  // 기본값 All
+            document.getElementById('policyPreview').style.display = 'none';
+            
+            // Add default timeline step
+            addTimelineStep();
+            
+            showSection('editor');
+        }
+
+        // Edit existing policy
+        async function editPolicy(policyId) {
+            try {
+                const response = await fetch(`/api/cims/policies/${policyId}`, {
+                    credentials: 'same-origin'  // 세션 쿠키 포함
+                });
+                const policy = await response.json();
+                
+                currentPolicy = policy;
+                
+                // Fill form
+                document.getElementById('policyName').value = policy.name;
+                document.getElementById('policyVersion').value = policy.version;
+                document.getElementById('policyStatus').value = policy.is_active ? 'active' : 'inactive';
+                document.getElementById('policyDescription').value = policy.description || '';
+                
+                // Load alarm settings
+                loadAlarmSettingsFromJSON(policy.rules_json);
+                
+                // Load incident association settings
+                loadIncidentAssociationFromJSON(policy.rules_json);
+                
+                showSection('editor');
+            } catch (error) {
+                console.error('Error loading policy:', error);
+                showAlert('Failed to load policy', 'danger');
+            }
+        }
+
+        // Add timeline step
+        function addTimelineStep() {
+            const timelineContainer = document.getElementById('escalationTimeline');
+            const stepNumber = timelineContainer.children.length + 1;
+            
+            const stepHTML = `
+                <div class="timeline-step" data-step="${stepNumber}">
+                    <div class="delete-step" onclick="deleteTimelineStep(${stepNumber})">
+                        <i class="fas fa-times"></i>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">Delay (minutes)</label>
+                            <input type="number" class="form-control" value="0" min="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Repeat Count</label>
+                            <input type="number" class="form-control" value="1" min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Message</label>
+                            <input type="text" class="form-control" placeholder="e.g., 🚨 Immediate attention required">
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            timelineContainer.insertAdjacentHTML('beforeend', stepHTML);
+        }
+
+        // Delete timeline step
+        function deleteTimelineStep(stepNumber) {
+            const step = document.querySelector(`[data-step="${stepNumber}"]`);
+            if (step) {
+                step.remove();
+            }
+        }
+
+        // Update policy preview
+        function updatePolicyPreview() {
+            const incidentType = document.getElementById('incidentType').value;
+            const severityLevel = document.getElementById('severityLevel').value;
+            
+            if (incidentType && severityLevel) {
+                document.getElementById('previewIncidentType').textContent = `Incident Type: ${incidentType}`;
+                document.getElementById('previewSeverity').textContent = `Severity Level: ${severityLevel}`;
+                
+                // Applicable Sites는 항상 All Sites
+                document.getElementById('previewSites').textContent = 'Applicable Sites: All Sites';
+                
+                document.getElementById('policyPreview').style.display = 'block';
+            } else {
+                document.getElementById('policyPreview').style.display = 'none';
+            }
+        }
+
+        // Collect incident association data from form
+        function collectIncidentAssociation() {
+            const incidentType = document.getElementById('incidentType').value;
+            const severityLevel = document.getElementById('severityLevel').value;
+            
+            // Applicable Sites는 항상 'All'로 설정 (모든 사이트에 동일하게 적용)
+            return {
+                incident_type: incidentType,
+                severity_level: severityLevel,
+                applicable_sites: ['All']
+            };
+        }
+
+        // Update JSON preview
+        function updateJSONPreview() {
+            const settings = collectAlarmSettings();
+            const incidentAssociation = collectIncidentAssociation();
+            const combinedSettings = {
+                ...settings,
+                incident_association: incidentAssociation
+            };
+            const jsonPreview = document.getElementById('jsonPreview');
+            jsonPreview.textContent = JSON.stringify(combinedSettings, null, 2);
+        }
+
+        // Collect alarm settings from form
+        function collectAlarmSettings() {
+            const settings = {
+                policy_name: document.getElementById('policyName').value,
+                policy_id: currentPolicy ? currentPolicy.policy_id : generatePolicyId(),
+                event_type: document.getElementById('eventType').value,
+                priority: document.getElementById('priority').value,
+                escalation_timeline: []
+            };
+
+            // Collect timeline steps
+            document.querySelectorAll('.timeline-step').forEach(step => {
+                const delay = parseInt(step.querySelector('input[type="number"]:first-of-type').value) || 0;
+                const repeat = parseInt(step.querySelector('input[type="number"]:last-of-type').value) || 1;
+                const message = step.querySelector('input[type="text"]').value;
+
+                if (message) {
+                    settings.escalation_timeline.push({
+                        delay: delay,
+                        repeat: repeat,
+                        message: message
+                    });
+                }
+            });
+
+            return settings;
+        }
+
+        // Save policy
+        async function savePolicy() {
+            try {
+                // Validate required fields
+                const policyName = document.getElementById('policyName').value;
+                const policyVersion = document.getElementById('policyVersion').value;
+                
+                if (!policyName || !policyVersion) {
+                    showAlert('Please fill in all required fields', 'warning');
+                    return;
+                }
+
+                // Collect incident association data
+                const incidentAssociation = collectIncidentAssociation();
+                
+                // Validate incident association
+                if (!incidentAssociation.incident_type) {
+                    showAlert('Please select incident type', 'warning');
+                    return;
+                }
+                
+                // Severity level은 'All'이 기본값이므로 항상 유효함
+
+                const formData = {
+                    name: policyName,
+                    version: policyVersion,
+                    description: document.getElementById('policyDescription').value || '',
+                    is_active: document.getElementById('policyStatus').value === 'active',
+                    rules_json: JSON.stringify({
+                        ...collectAlarmSettings(),
+                        incident_association: incidentAssociation
+                    })
+                };
+
+                console.log('Saving policy:', formData);
+
+                const url = currentPolicy ? `/api/cims/policies/${currentPolicy.id}` : '/api/cims/policies';
+                const method = currentPolicy ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',  // 세션 쿠키 포함
+                    body: JSON.stringify(formData)
+                });
+
+                const responseData = await response.json();
+                console.log('API Response:', responseData);
+
+                if (response.ok) {
+                    showAlert('Policy saved successfully', 'success');
+                    loadPolicies();
+                    showSection('policies');
+                } else {
+                    throw new Error(responseData.error || 'Failed to save policy');
+                }
+            } catch (error) {
+                console.error('Error saving policy:', error);
+                showAlert(`Failed to save policy: ${error.message}`, 'danger');
+            }
+        }
+
+        // Helper functions
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+
+
+        function generatePolicyId() {
+            const name = document.getElementById('policyName').value;
+            const prefix = name.split(' ')[0].toUpperCase();
+            const timestamp = Date.now().toString().slice(-3);
+            return `${prefix}-${timestamp}`;
+        }
+
+        // MANAD Plus Integrator functions
+        async function startManadIntegrator() {
+            try {
+                const response = await fetch('/api/cims/integrator/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'same-origin'  // 세션 쿠키 포함
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('MANAD Plus Integrator started successfully', 'success');
+                } else {
+                    showAlert(`Failed to start integrator: ${data.error}`, 'danger');
+                }
+            } catch (error) {
+                console.error('Error starting integrator:', error);
+                showAlert('Failed to start integrator', 'danger');
+            }
+        }
+
+        async function checkIntegratorStatus() {
+            try {
+                const response = await fetch('/api/cims/integrator/status', {
+                    credentials: 'same-origin'  // 세션 쿠키 포함
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const status = data.is_running ? 'Running' : 'Stopped';
+                    const message = `MANAD Plus Integrator Status: ${status}`;
+                    showAlert(message, data.is_running ? 'success' : 'warning');
+                } else {
+                    showAlert(`Failed to get status: ${data.error}`, 'danger');
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+                showAlert('Failed to check integrator status', 'danger');
+            }
+        }
+
+        function showAlert(message, type) {
+            // Implementation for showing alerts
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+
+        function setupEventListeners() {
+            // Add event listeners for form changes to update JSON preview
+            document.addEventListener('input', function(e) {
+                if (e.target.closest('#policyForm')) {
+                    updateJSONPreview();
+                }
+            });
+
+            document.addEventListener('change', function(e) {
+                if (e.target.closest('#policyForm')) {
+                    updateJSONPreview();
+                }
+            });
+        }
+
+        // Additional helper functions for dynamic form building
+
+
+        function loadAlarmSettingsFromJSON(settingsJson) {
+            try {
+                const settings = JSON.parse(settingsJson);
+                
+                // Load basic settings
+                document.getElementById('eventType').value = settings.event_type || 'emergency';
+                document.getElementById('priority').value = settings.priority || 'high';
+                
+                // Clear existing timeline
+                document.getElementById('escalationTimeline').innerHTML = '';
+                
+                // Load timeline steps
+                if (settings.escalation_timeline && settings.escalation_timeline.length > 0) {
+                    settings.escalation_timeline.forEach(step => {
+                        addTimelineStep();
+                        const lastStep = document.querySelector('.timeline-step:last-child');
+                        lastStep.querySelector('input[type="number"]:first-of-type').value = step.delay || 0;
+                        lastStep.querySelector('input[type="number"]:last-of-type').value = step.repeat || 1;
+                        lastStep.querySelector('input[type="text"]').value = step.message || '';
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading alarm settings:', error);
+            }
+        }
+
+        // Load incident association settings from JSON
+        function loadIncidentAssociationFromJSON(settingsJson) {
+            try {
+                const settings = JSON.parse(settingsJson);
+                
+                if (settings.incident_association) {
+                    const incidentAssoc = settings.incident_association;
+                    
+                    document.getElementById('incidentType').value = incidentAssoc.incident_type || '';
+                    document.getElementById('severityLevel').value = incidentAssoc.severity_level || 'All';
+                    
+                    // Applicable Sites는 제거되었으므로 업데이트 불필요
+                    
+                    updatePolicyPreview();
+                }
+            } catch (error) {
+                console.error('Error loading incident association settings:', error);
+            }
+        }
+
+        function cancelEdit() {
+            showSection('policies');
+        }
+
+        function clearFilters() {
+            document.getElementById('searchPolicies').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('typeFilter').value = '';
+            loadPolicies();
+        }
+
+        async function deletePolicy(policyId) {
+            if (!confirm('Are you sure you want to delete this policy? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/cims/policies/${policyId}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin',  // 세션 쿠키 포함
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Policy deleted successfully', 'success');
+                    loadPolicies();  // 목록 새로고침
+                } else {
+                    throw new Error(data.error || 'Failed to delete policy');
+                }
+                
+            } catch (error) {
+                console.error('Error deleting policy:', error);
+                showAlert(`Failed to delete policy: ${error.message}`, 'danger');
+            }
+        }
+
+
+
+        // Load recipients
+        async function loadRecipients() {
+            try {
+                const response = await fetch('/api/recipients');
+                if (response.ok) {
+                    const recipients = await response.json();
+                    renderRecipientsList(recipients);
+                    updateRecipientsStatistics(recipients);
+                } else {
+                    throw new Error('Failed to load recipients');
+                }
+            } catch (error) {
+                console.error('Error loading recipients:', error);
+                document.getElementById('recipientsList').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Failed to load recipients. Please try again.
+                    </div>
+                `;
+            }
+        }
+
+        // Render recipients list
+        function renderRecipientsList(recipients) {
+            const container = document.getElementById('recipientsList');
+            
+            if (recipients.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No recipients found</p>
+                        <button class="btn btn-success" onclick="addNewRecipient()">
+                            <i class="fas fa-user-plus me-2"></i>Add First Recipient
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = recipients.map(recipient => `
+                <div class="policy-item mb-3 p-3 border rounded">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${recipient.name || 'Unnamed Recipient'}</h6>
+                            <p class="text-muted mb-2">${recipient.email || 'No email'}</p>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-${recipient.status === 'active' ? 'success' : 'secondary'}">
+                                    ${recipient.status || 'inactive'}
+                                </span>
+                                <span class="badge bg-info">${recipient.role || 'user'}</span>
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="editRecipient('${recipient.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteRecipient('${recipient.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update recipients statistics
+        function updateRecipientsStatistics(recipients) {
+            const total = recipients.length;
+            const active = recipients.filter(r => r.status === 'active').length;
+            
+            document.getElementById('totalRecipients').textContent = total;
+            document.getElementById('activeRecipients').textContent = active;
+        }
+
+        // Load FCM devices
+        async function loadFCMDevices() {
+            try {
+                const response = await fetch('/api/fcm/export-tokens');
+                if (response.ok) {
+                    const data = await response.json();
+                    renderFCMDeviceList(data.tokens || []);
+                    updateDeviceStatistics(data.tokens || []);
+                } else {
+                    throw new Error('Failed to load FCM devices');
+                }
+            } catch (error) {
+                console.error('Error loading FCM devices:', error);
+                document.getElementById('fcmDeviceList').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Failed to load FCM devices. Please try again.
+                    </div>
+                `;
+            }
+        }
+
+        // Render FCM device list
+        function renderFCMDeviceList(devices) {
+            const container = document.getElementById('fcmDeviceList');
+            
+            if (devices.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-mobile-alt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No FCM devices registered</p>
+                        <button class="btn btn-info" onclick="refreshFCMDevices()">
+                            <i class="fas fa-sync me-2"></i>Refresh Devices
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = devices.map(device => `
+                <div class="policy-item mb-3 p-3 border rounded">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${device.username || 'Unknown User'}</h6>
+                            <p class="text-muted mb-2 small">${device.token ? device.token.substring(0, 50) + '...' : 'No token'}</p>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-success">Active</span>
+                                <span class="badge bg-info">${device.device_type || 'Unknown'}</span>
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-info" onclick="viewDeviceDetails('${device.id}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="testNotification('${device.id}')">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update device statistics
+        function updateDeviceStatistics(devices) {
+            const total = devices.length;
+            const active = devices.filter(d => d.status !== 'inactive').length;
+            
+            document.getElementById('totalDevices').textContent = total;
+            document.getElementById('activeDevices').textContent = active;
+        }
+
+        // Action functions
+
+        function addNewRecipient() {
+            alert('Add new recipient functionality will be implemented here.');
+        }
+
+        function editRecipient(recipientId) {
+            alert(`Edit recipient ${recipientId} functionality will be implemented here.`);
+        }
+
+        function deleteRecipient(recipientId) {
+            if (confirm('Are you sure you want to delete this recipient?')) {
+                alert(`Delete recipient ${recipientId} functionality will be implemented here.`);
+            }
+        }
+
+        function refreshFCMDevices() {
+            loadFCMDevices();
+        }
+
+        function viewDeviceDetails(deviceId) {
+            alert(`View device details ${deviceId} functionality will be implemented here.`);
+        }
+
+        function testNotification(deviceId) {
+            alert(`Test notification for device ${deviceId} functionality will be implemented here.`);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIMS - Compliance-Driven Incident Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .dashboard-header {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .task-card:hover {
+            transform: translateY(-1px);
+        }
+
+        .task-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .task-body {
+            padding: 1.5rem;
+        }
+
+        .priority-urgent {
+            border-left: 5px solid var(--danger-color);
+        }
+
+        .priority-high {
+            border-left: 5px solid var(--warning-color);
+        }
+
+        .priority-normal {
+            border-left: 5px solid var(--info-color);
+        }
+
+        .priority-low {
+            border-left: 5px solid var(--success-color);
+        }
+
+        .status-overdue {
+            background-color: #fff5f5;
+            border-color: var(--danger-color);
+        }
+
+        .status-due-soon {
+            background-color: #fffbf0;
+            border-color: var(--warning-color);
+        }
+
+        .countdown-timer {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .timer-critical {
+            color: var(--danger-color);
+            animation: pulse 1s infinite;
+        }
+
+        .timer-warning {
+            color: var(--warning-color);
+        }
+
+        .timer-normal {
+            color: var(--success-color);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .incident-form {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+
+        .btn-custom {
+            border-radius: 25px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .alert-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .filter-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .role-badge {
+            font-size: 0.8rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+        }
+
+        .incident-type-fall { background-color: #fff3cd; color: #856404; }
+        .incident-type-skin { background-color: #d1ecf1; color: #0c5460; }
+        .incident-type-medication { background-color: #f8d7da; color: #721c24; }
+        .incident-type-other { background-color: #e2e3e5; color: #383d41; }
+
+        .progress-bar-container {
+            background-color: #e9ecef;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                CIMS - Incident Management
+            </a>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>
+                        {{ current_user.display_name }}
+                        <span class="badge bg-light text-dark ms-2">{{ current_user.role.title() }}</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-user-cog me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2">
+                        <i class="fas fa-tachometer-alt me-3"></i>
+                        {% if current_user.is_admin() %}
+                            Admin Compliance Dashboard
+                        {% elif current_user.is_clinical_manager() %}
+                            Clinical Manager Dashboard
+                        {% elif current_user.is_nurse() %}
+                            Nurse Task Dashboard
+                        {% elif current_user.is_carer() %}
+                            Carer Task Dashboard
+                        {% else %}
+                            CIMS Dashboard
+                        {% endif %}
+                    </h1>
+                    <p class="text-muted mb-0">
+                        Real-time incident management and policy compliance monitoring
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex justify-content-end gap-2">
+                        {% if current_user.can_manage_incidents() %}
+                        <button class="btn btn-primary btn-custom" data-bs-toggle="modal" data-bs-target="#newIncidentModal">
+                            <i class="fas fa-plus me-2"></i>New Incident
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-outline-primary btn-custom" onclick="refreshDashboard()">
+                            <i class="fas fa-sync-alt me-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row">
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="stat-number text-primary" id="openIncidents">{{ stats.open_incidents or 0 }}</div>
+                            <div class="stat-label">Open Incidents</div>
+                        </div>
+                        <div class="text-primary">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="stat-number text-danger" id="overdueTasks">{{ stats.overdue_tasks or 0 }}</div>
+                            <div class="stat-label">Overdue Tasks</div>
+                        </div>
+                        <div class="text-danger">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="stat-number text-warning" id="dueSoonTasks">{{ stats.due_soon_tasks or 0 }}</div>
+                            <div class="stat-label">Due Soon (2hrs)</div>
+                        </div>
+                        <div class="text-warning">
+                            <i class="fas fa-hourglass-half fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="stat-number text-success" id="completedToday">{{ stats.completed_today or 0 }}</div>
+                            <div class="stat-label">Completed Today</div>
+                        </div>
+                        <div class="text-success">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <select class="form-select" id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="overdue">Overdue</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="priorityFilter">
+                                <option value="">All Priority</option>
+                                <option value="urgent">Urgent</option>
+                                <option value="high">High</option>
+                                <option value="normal">Normal</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="typeFilter">
+                                <option value="">All Types</option>
+                                <option value="Fall">Fall</option>
+                                <option value="Skin Breakdown">Skin Breakdown</option>
+                                <option value="Medication Error">Medication Error</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" id="searchFilter" placeholder="Search resident...">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-outline-secondary btn-custom" onclick="clearFilters()">
+                        <i class="fas fa-times me-2"></i>Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Task List -->
+            <div class="col-lg-8">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>
+                        {% if current_user.is_admin() or current_user.is_clinical_manager() %}
+                            All Active Tasks
+                        {% else %}
+                            My Assigned Tasks
+                        {% endif %}
+                    </h3>
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="viewMode" id="listView" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary" for="listView">
+                            <i class="fas fa-list"></i>
+                        </label>
+                        <input type="radio" class="btn-check" name="viewMode" id="cardView" autocomplete="off">
+                        <label class="btn btn-outline-primary" for="cardView">
+                            <i class="fas fa-th"></i>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="taskContainer">
+                    <!-- Tasks will be loaded here -->
+                </div>
+
+                <!-- Pagination -->
+                <nav aria-label="Task pagination" class="mt-4">
+                    <ul class="pagination justify-content-center" id="taskPagination">
+                        <!-- Pagination will be generated here -->
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Quick Actions -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if current_user.can_manage_incidents() %}
+                        <button class="btn btn-primary btn-custom w-100 mb-2" data-bs-toggle="modal" data-bs-target="#newIncidentModal">
+                            <i class="fas fa-plus me-2"></i>Report New Incident
+                        </button>
+                        {% endif %}
+                        {% if current_user.is_admin() %}
+                        <button class="btn btn-info btn-custom w-100 mb-2" onclick="openPolicyManager()">
+                            <i class="fas fa-cogs me-2"></i>Manage Policies
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-success btn-custom w-100 mb-2" onclick="openProgressNotes()">
+                            <i class="fas fa-notes-medical me-2"></i>Progress Notes
+                        </button>
+                        <button class="btn btn-warning btn-custom w-100" onclick="viewAuditLog()">
+                            <i class="fas fa-history me-2"></i>Audit Log
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Activity</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="recentActivity">
+                            <!-- Recent activity will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compliance Status -->
+                {% if current_user.is_admin() or current_user.is_clinical_manager() %}
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Compliance Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>On Time Completion</span>
+                                <span class="text-success">{{ compliance.on_time_rate or 85 }}%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar bg-success" style="width: {{ compliance.on_time_rate or 85 }}%"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Policy Adherence</span>
+                                <span class="text-info">{{ compliance.policy_adherence or 92 }}%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar bg-info" style="width: {{ compliance.policy_adherence or 92 }}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Documentation Rate</span>
+                                <span class="text-warning">{{ compliance.documentation_rate or 78 }}%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar bg-warning" style="width: {{ compliance.documentation_rate or 78 }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- New Incident Modal -->
+    <div class="modal fade" id="newIncidentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Report New Incident
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="newIncidentForm">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="residentSelect" class="form-label">Resident *</label>
+                                    <select class="form-select" id="residentSelect" required>
+                                        <option value="">Select Resident...</option>
+                                        <!-- Residents will be loaded dynamically -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="incidentType" class="form-label">Incident Type *</label>
+                                    <select class="form-select" id="incidentType" required>
+                                        <option value="">Select Type...</option>
+                                        <option value="Fall">Fall</option>
+                                        <option value="Skin Breakdown">Skin Breakdown</option>
+                                        <option value="Medication Error">Medication Error</option>
+                                        <option value="Behavioral">Behavioral</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="incidentSeverity" class="form-label">Severity *</label>
+                                    <select class="form-select" id="incidentSeverity" required>
+                                        <option value="">Select Severity...</option>
+                                        <option value="High">High - Injury Suspected</option>
+                                        <option value="Medium">Medium - Minor Injury</option>
+                                        <option value="Low/No Injury">Low - No Injury</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="incidentLocation" class="form-label">Location</label>
+                                    <input type="text" class="form-control" id="incidentLocation" placeholder="e.g., Room 101, Dining Room">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="incidentDescription" class="form-label">Description *</label>
+                            <textarea class="form-control" id="incidentDescription" rows="4" required 
+                                placeholder="Describe what happened, when, and any immediate actions taken..."></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="witnesses" class="form-label">Witnesses</label>
+                                    <input type="text" class="form-control" id="witnesses" placeholder="Names of witnesses">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="initialActions" class="form-label">Initial Actions Taken</label>
+                                    <input type="text" class="form-control" id="initialActions" placeholder="Immediate response actions">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Submit Incident
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentPage = 1;
+        let tasksPerPage = 10;
+        let allTasks = [];
+        let filteredTasks = [];
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            loadRecentActivity();
+            loadResidents();
+            setupEventListeners();
+            startAutoRefresh();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Filter change events
+            document.getElementById('statusFilter').addEventListener('change', applyFilters);
+            document.getElementById('priorityFilter').addEventListener('change', applyFilters);
+            document.getElementById('typeFilter').addEventListener('change', applyFilters);
+            document.getElementById('searchFilter').addEventListener('input', applyFilters);
+
+            // Form submission
+            document.getElementById('newIncidentForm').addEventListener('submit', submitIncident);
+
+            // View mode changes
+            document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    renderTasks();
+                });
+            });
+        }
+
+        // Load tasks from server
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/cims/tasks');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allTasks = data.tasks;
+                    filteredTasks = [...allTasks];
+                    renderTasks();
+                    updateStatistics();
+                } else {
+                    showAlert('Error loading tasks: ' + data.message, 'danger');
+                }
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                showAlert('Failed to load tasks', 'danger');
+            }
+        }
+
+        // Apply filters to tasks
+        function applyFilters() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+
+            filteredTasks = allTasks.filter(task => {
+                return (!statusFilter || task.status === statusFilter) &&
+                       (!priorityFilter || task.priority === priorityFilter) &&
+                       (!typeFilter || task.incident_type === typeFilter) &&
+                       (!searchFilter || task.resident_name.toLowerCase().includes(searchFilter));
+            });
+
+            currentPage = 1;
+            renderTasks();
+        }
+
+        // Clear all filters
+        function clearFilters() {
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('priorityFilter').value = '';
+            document.getElementById('typeFilter').value = '';
+            document.getElementById('searchFilter').value = '';
+            applyFilters();
+        }
+
+        // Render tasks based on current view mode
+        function renderTasks() {
+            const container = document.getElementById('taskContainer');
+            const isCardView = document.getElementById('cardView').checked;
+            
+            if (filteredTasks.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No tasks found</h5>
+                        <p class="text-muted">Try adjusting your filters or check back later.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const startIndex = (currentPage - 1) * tasksPerPage;
+            const endIndex = startIndex + tasksPerPage;
+            const tasksToShow = filteredTasks.slice(startIndex, endIndex);
+
+            if (isCardView) {
+                renderTaskCards(tasksToShow, container);
+            } else {
+                renderTaskList(tasksToShow, container);
+            }
+
+            renderPagination();
+        }
+
+        // Render tasks as cards
+        function renderTaskCards(tasks, container) {
+            const cardsHtml = tasks.map(task => {
+                const timeRemaining = getTimeRemaining(task.due_date);
+                const priorityClass = `priority-${task.priority}`;
+                const statusClass = getStatusClass(task, timeRemaining);
+                
+                return `
+                    <div class="col-md-6 mb-3">
+                        <div class="task-card ${priorityClass} ${statusClass}">
+                            <div class="task-header">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">${task.task_name}</h6>
+                                        <small class="text-muted">
+                                            <i class="fas fa-user me-1"></i>${task.resident_name}
+                                            <span class="badge incident-type-${task.incident_type.toLowerCase().replace(' ', '-')} ms-2">
+                                                ${task.incident_type}
+                                            </span>
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-${getPriorityColor(task.priority)}">${task.priority}</span>
+                                </div>
+                            </div>
+                            <div class="task-body">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <small class="text-muted">Due:</small><br>
+                                        <span class="countdown-timer ${getTimerClass(timeRemaining)}">
+                                            ${formatDueDate(task.due_date)}
+                                        </span>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Assigned:</small><br>
+                                        <span class="role-badge badge bg-secondary">${task.assigned_role}</span>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <div class="btn-group w-100" role="group">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="viewTaskDetails(${task.id})">
+                                            <i class="fas fa-eye"></i> View
+                                        </button>
+                                        {% if current_user.can_complete_tasks() %}
+                                        <button class="btn btn-success btn-sm" onclick="completeTask(${task.id})">
+                                            <i class="fas fa-check"></i> Complete
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-info btn-sm" onclick="addProgressNote(${task.id})">
+                                            <i class="fas fa-notes-medical"></i> Note
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `<div class="row">${cardsHtml}</div>`;
+        }
+
+        // Render tasks as list
+        function renderTaskList(tasks, container) {
+            const listHtml = tasks.map(task => {
+                const timeRemaining = getTimeRemaining(task.due_date);
+                const priorityClass = `priority-${task.priority}`;
+                const statusClass = getStatusClass(task, timeRemaining);
+                
+                return `
+                    <div class="task-card ${priorityClass} ${statusClass}">
+                        <div class="task-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <h6 class="mb-1">${task.task_name}</h6>
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>${task.resident_name}
+                                        <span class="badge incident-type-${task.incident_type.toLowerCase().replace(' ', '-')} ms-2">
+                                            ${task.incident_type}
+                                        </span>
+                                    </small>
+                                </div>
+                                <div class="col-md-2">
+                                    <span class="badge bg-${getPriorityColor(task.priority)}">${task.priority}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <span class="role-badge badge bg-secondary">${task.assigned_role}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <span class="countdown-timer ${getTimerClass(timeRemaining)}">
+                                        ${formatDueDate(task.due_date)}
+                                    </span>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="viewTaskDetails(${task.id})" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if current_user.can_complete_tasks() %}
+                                        <button class="btn btn-success btn-sm" onclick="completeTask(${task.id})" title="Complete Task">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-info btn-sm" onclick="addProgressNote(${task.id})" title="Add Note">
+                                            <i class="fas fa-notes-medical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = listHtml;
+        }
+
+        // Helper functions
+        function getTimeRemaining(dueDate) {
+            const now = new Date();
+            const due = new Date(dueDate);
+            return due - now;
+        }
+
+        function getStatusClass(task, timeRemaining) {
+            if (task.status === 'overdue' || timeRemaining < 0) {
+                return 'status-overdue';
+            } else if (timeRemaining < 2 * 60 * 60 * 1000) { // 2 hours
+                return 'status-due-soon';
+            }
+            return '';
+        }
+
+        function getTimerClass(timeRemaining) {
+            if (timeRemaining < 0) {
+                return 'timer-critical';
+            } else if (timeRemaining < 2 * 60 * 60 * 1000) { // 2 hours
+                return 'timer-warning';
+            }
+            return 'timer-normal';
+        }
+
+        function getPriorityColor(priority) {
+            const colors = {
+                'urgent': 'danger',
+                'high': 'warning',
+                'normal': 'info',
+                'low': 'success'
+            };
+            return colors[priority] || 'secondary';
+        }
+
+        function formatDueDate(dueDate) {
+            const due = new Date(dueDate);
+            const now = new Date();
+            const diff = due - now;
+            
+            if (diff < 0) {
+                return 'OVERDUE';
+            } else if (diff < 60 * 60 * 1000) { // Less than 1 hour
+                const minutes = Math.floor(diff / (60 * 1000));
+                return `${minutes}m`;
+            } else if (diff < 24 * 60 * 60 * 1000) { // Less than 1 day
+                const hours = Math.floor(diff / (60 * 60 * 1000));
+                const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+                return `${hours}h ${minutes}m`;
+            } else {
+                return due.toLocaleDateString() + ' ' + due.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            }
+        }
+
+        // Action functions
+        function viewTaskDetails(taskId) {
+            // Implementation for viewing task details
+            console.log('View task details:', taskId);
+        }
+
+        function completeTask(taskId) {
+            // Implementation for completing task
+            console.log('Complete task:', taskId);
+        }
+
+        function addProgressNote(taskId) {
+            // Implementation for adding progress note
+            console.log('Add progress note:', taskId);
+        }
+
+        function refreshDashboard() {
+            loadTasks();
+            loadRecentActivity();
+            showAlert('Dashboard refreshed', 'success');
+        }
+
+        function showAlert(message, type) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show alert-popup" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', alertHtml);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                const alert = document.querySelector('.alert-popup');
+                if (alert) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        // Auto-refresh every 30 seconds
+        function startAutoRefresh() {
+            setInterval(() => {
+                loadTasks();
+            }, 30000);
+        }
+
+        // Placeholder functions
+        function loadRecentActivity() {
+            // Implementation for loading recent activity
+        }
+
+        function loadResidents() {
+            // Implementation for loading residents
+        }
+
+        function submitIncident(event) {
+            event.preventDefault();
+            // Implementation for submitting incident
+        }
+
+        function renderPagination() {
+            // Implementation for pagination
+        }
+
+        function updateStatistics() {
+            // Implementation for updating statistics
+        }
+    </script>
+</body>
+</html>

@@ -55,30 +55,6 @@ class User(UserMixin):
     def is_site_admin(self):
         """사이트 관리자인지 확인"""
         return self.role == 'site_admin'
-    
-    def is_nurse(self):
-        """간호사인지 확인"""
-        return self.role in ['nurse', 'registered_nurse']
-    
-    def is_registered_nurse(self):
-        """정규 간호사인지 확인"""
-        return self.role == 'registered_nurse'
-    
-    def is_carer(self):
-        """케어러인지 확인"""
-        return self.role == 'carer'
-    
-    def is_clinical_manager(self):
-        """임상 관리자인지 확인"""
-        return self.role == 'clinical_manager'
-    
-    def can_manage_incidents(self):
-        """인시던트 관리 권한이 있는지 확인"""
-        return self.role in ['admin', 'clinical_manager', 'registered_nurse']
-    
-    def can_complete_tasks(self):
-        """태스크 완료 권한이 있는지 확인"""
-        return self.role in ['nurse', 'registered_nurse', 'carer', 'clinical_manager']
 
 class FCMToken:
     """FCM 토큰 관리 모델"""
