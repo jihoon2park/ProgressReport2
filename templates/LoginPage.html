@@ -129,6 +129,42 @@
             color: #6c757d;
             margin-top: 10px;
         }
+        
+        /* IT Support Contact Styles */
+        .support-contact {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .support-contact p {
+            margin: 0 0 8px 0;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+        .support-email {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background-color: white;
+            color: #6c757d;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            border: 1px solid #dee2e6;
+        }
+        .support-email:hover {
+            background-color: #f8f9fa;
+            color: #495057;
+            border-color: #adb5bd;
+        }
+        .support-email i {
+            font-size: 1rem;
+        }
 
     </style>
 </head>
@@ -164,6 +200,15 @@
                 <input type="password" name="password" placeholder="Password" required>
             </div>
             <button type="submit" class="login-button">Login</button>
+            
+            <!-- IT Support Contact -->
+            <div class="support-contact">
+                <p>Need help or experiencing issues?</p>
+                <a href="mailto:it.support@eden-field.com.au" class="support-email">
+                    <span>📧</span>
+                    <span>it.support@eden-field.com.au</span>
+                </a>
+            </div>
         </form>
     </div>
 
