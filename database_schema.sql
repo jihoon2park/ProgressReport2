@@ -14,7 +14,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'site_admin', 'doctor', 'physiotherapist')),
+    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'site_admin', 'doctor', 'physiotherapist', 'nurse', 'registered_nurse', 'carer', 'clinical_manager')),
     position VARCHAR(100),
     location TEXT, -- JSON 배열로 저장 ["Parafield Gardens", "Ramsay"]
     is_active BOOLEAN DEFAULT 1,

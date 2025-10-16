@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Admin Management System{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1>🛡️ Admin Management Dashboard</h1>
+        <p>Welcome, {{ current_user.display_name }}! Manage incidents, policies, and FCM notifications.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-card">
+            <div class="card-icon">🚨</div>
+            <div class="card-content">
+                <h3>Incident Viewer</h3>
+                <p>Monitor and manage incidents across all sites</p>
+                <a href="{{ url_for('incident_viewer') }}" class="card-button">Open Incident Viewer</a>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="card-icon">📋</div>
+            <div class="card-content">
+                <h3>Policy Management</h3>
+                <p>Configure escalation policies and alarm settings</p>
+                <a href="{{ url_for('policy_management') }}" class="card-button">Manage Policies</a>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="card-icon">🔥</div>
+            <div class="card-content">
+                <h3>FCM Dashboard</h3>
+                <p>Manage push notifications and device tokens</p>
+                <a href="{{ url_for('fcm_dashboard') }}" class="card-button">Open FCM Dashboard</a>
+            </div>
+        </div>
+
+        <div class="dashboard-card external">
+            <div class="card-icon">🏥</div>
+            <div class="card-content">
+                <h3>Core System</h3>
+                <p>Access ROD Dashboard and Progress Notes</p>
+                <a href="http://127.0.0.1:5000" class="card-button external" target="_blank">Open Core System</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="system-info">
+        <div class="info-card">
+            <h4>System Information</h4>
+            <ul>
+                <li><strong>User:</strong> {{ current_user.display_name }} ({{ current_user.role }})</li>
+                <li><strong>Position:</strong> {{ current_user.position }}</li>
+                <li><strong>System:</strong> Admin Management System</li>
+                <li><strong>Port:</strong> 5001</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.dashboard-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.dashboard-header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 2.5em;
+}
+
+.dashboard-header p {
+    color: #7f8c8d;
+    font-size: 1.1em;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+.dashboard-card.external {
+    border: 2px solid #3498db;
+}
+
+.card-icon {
+    font-size: 3em;
+    margin-bottom: 20px;
+}
+
+.card-content h3 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 1.3em;
+}
+
+.card-content p {
+    color: #7f8c8d;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.card-button {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: transform 0.2s;
+}
+
+.card-button:hover {
+    transform: translateY(-2px);
+}
+
+.card-button.external {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+}
+
+.system-info {
+    margin-top: 40px;
+}
+
+.info-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    border-left: 4px solid #667eea;
+}
+
+.info-card h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.info-card ul {
+    list-style: none;
+    padding: 0;
+}
+
+.info-card li {
+    padding: 5px 0;
+    color: #5a6c7d;
+}
+</style>
+{% endblock %}

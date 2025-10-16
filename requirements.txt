@@ -19,4 +19,3 @@ wheel==0.46.1
 firebase-admin==6.4.0
 croniter==2.0.1
 schedule==1.2.0
-# cryptography==44.0.2  # 암호화 사용하지 않음 

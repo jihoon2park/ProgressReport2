@@ -445,6 +445,9 @@
         {% if current_user.role in ['admin', 'site_admin'] %}
         <button class="btn-incident" onclick="window.location.href='/incident-viewer?site={{ site }}'">🚨 Incident Viewer</button>
         {% endif %}
+        {% if current_user.can_complete_tasks() or current_user.is_admin() %}
+        <button class="btn-cims" onclick="window.location.href='/integrated_dashboard'" style="background-color: #28a745; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🛡️ CIMS Dashboard</button>
+        {% endif %}
         {% if current_user.role in ['admin', 'site_admin'] %}
         <button class="btn-admin-settings" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🔧 Settings</button>
         {% endif %}
@@ -517,6 +520,16 @@
 </div>
 
 <script>
+    // Suppress Chrome extension errors
+    window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && event.reason.message && 
+            event.reason.message.includes('message channel closed')) {
+            // Chrome extension error - suppress
+            event.preventDefault();
+            console.warn('Chrome extension error suppressed:', event.reason.message);
+        }
+    });
+    
     // Set site information received from server as global variable
     window.currentSite = '{{ site }}';
     console.log('Site from server:', window.currentSite);

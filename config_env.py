@@ -43,6 +43,9 @@ def get_flask_config():
         'API_TIMEOUT': int(get_config_value('API_TIMEOUT', '30')),
         'API_RETRY_COUNT': int(get_config_value('API_RETRY_COUNT', '3')),
         
+        # 백그라운드 프로세서 설정 (개발환경에서는 기본적으로 비활성화)
+        'ENABLE_BACKGROUND_PROCESSOR': get_config_value('ENABLE_BACKGROUND_PROCESSOR', 'True' if environment == 'production' else 'False').lower() == 'true',
+        
         # 데이터베이스 설정 (향후 사용)
         'DATABASE_URL': get_config_value('DATABASE_URL', None),
     }
@@ -69,21 +72,21 @@ def get_cache_policy():
         }
 
 def print_current_config():
-    """현재 설정을 출력 (디버깅용)"""
+    """Print current configuration (for debugging)"""
     config = get_flask_config()
     cache_policy = get_cache_policy()
     environment = get_environment()
     
-    print(f"\n=== 현재 환경: {environment.upper()} ===")
-    print(f"SECRET_KEY: {'*' * len(config['SECRET_KEY'])}")  # 보안상 마스킹
+    print(f"\n=== Current Environment: {environment.upper()} ===")
+    print(f"SECRET_KEY: {'*' * len(config['SECRET_KEY'])}")  # Masked for security
     print(f"DEBUG: {config['DEBUG']}")
     print(f"HOST: {config['HOST']}")
     print(f"PORT: {config['PORT']}")
     print(f"LOG_LEVEL: {config['LOG_LEVEL']}")
     print(f"API_TIMEOUT: {config['API_TIMEOUT']}")
-    print(f"캐시 사용 정책:")
-    print(f"  - API 실패시 캐시 사용: {cache_policy['use_cache_on_failure']}")
-    print(f"  - 캐시 만료 시간: {cache_policy['cache_expiry_hours']}시간")
-    print(f"  - 강제 API 새로고침: {cache_policy['force_api_refresh']}")
-    print(f"  - 로그인시 data 폴더 정리: {cache_policy['cleanup_data_on_login']}")
+    print(f"Cache Policy:")
+    print(f"  - Use cache on API failure: {cache_policy['use_cache_on_failure']}")
+    print(f"  - Cache expiry time: {cache_policy['cache_expiry_hours']} hours")
+    print(f"  - Force API refresh: {cache_policy['force_api_refresh']}")
+    print(f"  - Cleanup data folder on login: {cache_policy['cleanup_data_on_login']}")
     print("=" * 50) 

@@ -9,12 +9,10 @@
         :root {
             --primary-color: #2c3e50;
             --secondary-color: #3498db;
-            --accent-color: #3498db;
+            --accent-color: #e74c3c;
             --success-color: #27ae60;
             --warning-color: #f39c12;
-            --danger-color: #e74c3c;
-            --info-color: #17a2b8;
-            --light-bg: #f8f9fa;
+            --light-bg: #ecf0f1;
             --dark-text: #2c3e50;
             --border-color: #bdc3c7;
         }
@@ -136,7 +134,7 @@
         }
 
         .btn-back {
-            background: var(--primary-color);
+            background: var(--accent-color);
             color: white;
             border: none;
             padding: 12px 25px;
@@ -148,11 +146,11 @@
         }
 
         .btn-back:hover {
-            background: var(--secondary-color);
+            background: #c0392b;
         }
 
         .btn-logout {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
             color: white;
             border: none;
             padding: 12px 25px;
@@ -161,13 +159,13 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
         }
 
         .btn-logout:hover {
-            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            background: linear-gradient(135deg, #c0392b, #a93226);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
         }
 
         .incident-grid {
@@ -187,9 +185,9 @@
         }
         
         .incident-card.high-risk {
-            background: #fff3e0;
-            border: 3px solid var(--warning-color);
-            box-shadow: 0 0 10px rgba(243, 156, 18, 0.3);
+            background: #ffccbc;
+            border: 3px solid #e65100;
+            box-shadow: 0 0 10px rgba(230, 81, 0, 0.3);
         }
 
         .incident-card {
@@ -203,7 +201,7 @@
 
         /* Alarm sending button styles */
         .alarm-button {
-            background: linear-gradient(135deg, var(--secondary-color), #2980b9);
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -218,13 +216,13 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
         }
 
         .alarm-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-            background: linear-gradient(135deg, #2980b9, var(--secondary-color));
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+            background: linear-gradient(135deg, #ff5252, #d63031);
         }
 
         .alarm-button:active {
@@ -232,30 +230,30 @@
         }
 
         .alarm-button.sending {
-            background: linear-gradient(135deg, var(--info-color), #138496);
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
             cursor: not-allowed;
         }
 
         .alarm-button.success {
-            background: linear-gradient(135deg, var(--success-color), #229954);
+            background: linear-gradient(135deg, #00b894, #00a085);
             cursor: not-allowed;
         }
 
         .alarm-button.error {
-            background: linear-gradient(135deg, var(--danger-color), #c0392b);
+            background: linear-gradient(135deg, #e17055, #d63031);
             cursor: not-allowed;
         }
 
         .alarm-button.high-priority {
-            background: linear-gradient(135deg, var(--warning-color), #e67e22);
+            background: linear-gradient(135deg, #ff4757, #c44569);
             animation: pulse 2s infinite;
-            box-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
+            box-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
         }
 
         .alarm-button.high-priority:hover {
-            background: linear-gradient(135deg, #e67e22, var(--warning-color));
+            background: linear-gradient(135deg, #ff3742, #b33939);
             transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(243, 156, 18, 0.7);
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.7);
         }
 
         .workflow-button {
@@ -823,6 +821,13 @@
             </div>
         </div>
 
+        <!-- Alarm Sending History -->
+        <div class="stats-summary" id="alarmHistory" style="display: none;">
+            <h3 style="margin-bottom: 20px; color: var(--primary-color);">📱 Recent Alarm History</h3>
+            <div id="alarmHistoryContent">
+                <!-- Alarm history will be displayed here -->
+            </div>
+        </div>
 
         <!-- Active Users by Site -->
         <div class="stats-summary" id="activeUsersSection">
@@ -1028,9 +1033,8 @@
                 }
                 
                 console.log(`Loading incidents for ${currentSite} from ${startDate} to ${endDate}`);
-                console.log('🔄 Fetching real-time data from MANAD API for data validation...');
                 
-                // Load incidents directly from MANAD API (real-time data for validation)
+                // Load incidents
                 const incidentsResponse = await fetch('/api/fetch-incidents', {
                     method: 'POST',
                     headers: {
@@ -1070,29 +1074,19 @@
 
                 const incidentsData = await incidentsResponse.json();
                 
-                console.log('🔍 Full API response:', incidentsData);
-                console.log('🔍 Response structure:', Object.keys(incidentsData));
-                
-                // MANAD API returns data with incidents and clients
-                incidents = incidentsData.data?.incidents || [];
-                clients = incidentsData.data?.clients || [];
-                
-                console.log(`✅ Loaded ${incidents.length} incidents from MANAD API (real-time)`);
-                console.log(`✅ Loaded ${clients.length} clients from MANAD API`);
-                
-                // Debug: Log incident data structure
-                if (incidents.length > 0) {
-                    console.log('📋 Sample incident data structure:', incidents[0]);
-                    console.log('📋 Available incident fields:', Object.keys(incidents[0]));
-                } else {
-                    console.warn('⚠️ No incidents found in response');
+                if (!incidentsData.success) {
+                    throw new Error(incidentsData.message || 'Failed to load incidents');
                 }
                 
+                incidents = incidentsData.data.incidents || [];
+                clients = incidentsData.data.clients || [];
+                
+                console.log(`Loaded ${incidents.length} incidents and ${clients.length} clients`);
+                
+                // Debug: Log client data structure
                 if (clients.length > 0) {
-                    console.log('👤 Sample client data structure:', clients[0]);
-                    console.log('👤 Available client fields:', Object.keys(clients[0]));
-                } else {
-                    console.warn('⚠️ No clients found in response');
+                    console.log('Sample client data structure:', clients[0]);
+                    console.log('Available client fields:', Object.keys(clients[0]));
                 }
                 
                 // Display incidents
@@ -1119,7 +1113,6 @@
             grid.innerHTML = '';
             
             incidents.forEach(incident => {
-                // MANAD API data - find client by ClientId
                 const client = findClientById(incident.ClientId);
                 const card = createIncidentCard(incident, client);
                 grid.appendChild(card);
@@ -1129,13 +1122,7 @@
         // Create incident card HTML
         function createIncidentCard(incident, client) {
             const card = document.createElement('div');
-            
-            // MANAD API data structure - 실제 필드명 사용
-            const eventType = incident.EventTypeNames && incident.EventTypeNames.length > 0 
-                ? incident.EventTypeNames.join(', ') 
-                : 'No Event Type';
-            const severityRating = incident.SeverityRating || incident.RiskRatingName || 'N/A';
-            const riskClass = getRiskClass(severityRating);
+            const riskClass = getRiskClass(incident.RiskRatingName);
             
             // Change background color for High Risk cases
             if (riskClass === 'risk-high') {
@@ -1146,44 +1133,33 @@
             
             const incidentDate = new Date(incident.Date).toLocaleDateString();
             
-            // Client name from incident data directly
-            const clientName = incident.FirstName && incident.LastName 
-                ? `${incident.FirstName} ${incident.LastName}` 
-                : (client ? formatClientName(client) : 'N/A');
-            const roomName = incident.RoomName || client?.Room || 'N/A';
-            
             card.innerHTML = `
                 <div class="incident-header">
-                    <div class="incident-title">${eventType}</div>
+                    <div class="incident-title">${incident.EventTypeNames ? incident.EventTypeNames.join(', ') : 'No Event Type'}</div>
                     <div class="incident-date">${incidentDate}</div>
                 </div>
                 <div class="incident-details">
                     <div class="detail-row">
-                        <span class="detail-label">Resident:</span>
+                        <span class="detail-label">Client:</span>
                         <span class="detail-value">
-                            ${clientName} (Room: ${roomName})
+                            ${client ? 
+                                `${formatClientName(client)} (${client.RoomName || 'N/A'})` : 
+                                `ID: ${incident.ClientId} (No client data)`
+                            }
                         </span>
                     </div>
 
                     <div class="detail-row">
-                        <span class="detail-label">Severity:</span>
-                        <span class="detail-value ${riskClass}">${severityRating}</span>
+                        <span class="detail-label">Risk Rating:</span>
+                        <span class="detail-value ${riskClass}">${incident.RiskRatingName || 'N/A'}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Reported By:</span>
                         <span class="detail-value">${incident.ReportedByName || 'N/A'}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">Incident ID:</span>
-                        <span class="detail-value">${incident.Id || 'N/A'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Status:</span>
-                        <span class="detail-value">
-                            <span class="badge ${incident.Status === 'Open' ? 'bg-warning' : 'bg-success'}">
-                                ${incident.Status || 'N/A'}
-                            </span>
-                        </span>
+                        <span class="detail-label">Reported Date:</span>
+                        <span class="detail-value">${incident.ReportedDate ? new Date(incident.ReportedDate).toLocaleDateString() : 'N/A'}</span>
                     </div>
                     ${incident.Description ? `
                     <div class="detail-row">
@@ -1200,12 +1176,12 @@
                 </div>
                 
                 <!-- Alarm Send Button -->
-                <button class="alarm-button ${riskClass === 'risk-high' ? 'high-priority' : ''}" onclick="sendAlarmToMobile('${incident.Id}', '${eventType}', '${clientName}', '${severityRating}')">
-                    ${riskClass === 'risk-high' ? '🚨 URGENT: Send Alarm' : '📱 Send Alarm to Mobile'}
+                <button class="alarm-button ${getRiskClass(incident.RiskRatingName) === 'risk-high' ? 'high-priority' : ''}" onclick="sendAlarmToMobile(${incident.Id}, '${incident.EventTypeNames ? incident.EventTypeNames.join(', ') : 'Incident'}', '${client ? formatClientName(client) : 'Unknown Client'}', '${incident.RiskRatingName || 'Unknown'}')">
+                    ${getRiskClass(incident.RiskRatingName) === 'risk-high' ? '🚨 URGENT: Send Alarm' : '📱 Send Alarm to Mobile'}
                 </button>
                 
                 <!-- Create Workflow Button -->
-                <button class="workflow-button" onclick="createWorkflow('${incident.Id}', '${eventType}', '${clientName}', '${incident.ClientId}', '${severityRating}')">
+                <button class="workflow-button" onclick="createWorkflow(${incident.Id}, '${incident.EventTypeNames ? incident.EventTypeNames.join(', ') : 'Incident'}', '${client ? formatClientName(client) : 'Unknown Client'}', ${client ? client.PersonId : 0}, '${incident.RiskRatingName || 'normal'}')">
                     📋 Create Workflow
                 </button>
                 
@@ -1214,7 +1190,7 @@
             `;
             
             // Add click event to show popup
-            card.addEventListener('click', () => showIncidentPopup(incident, null));
+            card.addEventListener('click', () => showIncidentPopup(incident, client));
             
             return card;
         }
@@ -1284,25 +1260,27 @@
             statsSummary.style.display = 'block';
             
             const totalIncidents = incidents.length;
-            const highRisk = incidents.filter(i => getRiskClass(i.SeverityRating || i.RiskRatingName) === 'risk-high').length;
-            const mediumRisk = incidents.filter(i => getRiskClass(i.SeverityRating || i.RiskRatingName) === 'risk-medium').length;
-            const lowRisk = incidents.filter(i => getRiskClass(i.SeverityRating || i.RiskRatingName) === 'risk-low').length;
+            const highRisk = incidents.filter(i => getRiskClass(i.RiskRatingName) === 'risk-high').length;
+            const mediumRisk = incidents.filter(i => getRiskClass(i.RiskRatingName) === 'risk-medium').length;
+            const lowRisk = incidents.filter(i => getRiskClass(i.RiskRatingName) === 'risk-low').length;
             
-            // MANAD API data statistics
-            const uniqueClients = [...new Set(incidents.map(i => i.ClientId))].length;
-            const eventTypes = [...new Set(incidents.map(i => i.EventType))].length;
+            // Client matching statistics
+            const matchedClients = incidents.filter(i => findClientById(i.ClientId)).length;
+            const clientMatchRate = totalIncidents > 0 ? Math.round((matchedClients / totalIncidents) * 100) : 0;
             
             document.getElementById('totalIncidents').textContent = totalIncidents;
             document.getElementById('highRiskIncidents').textContent = highRisk;
             document.getElementById('mediumRiskIncidents').textContent = mediumRisk;
             document.getElementById('lowRiskIncidents').textContent = lowRisk;
             
-            // Output MANAD API data statistics to console
-            console.log(`📊 MANAD API real-time data statistics:`);
+            // Output client matching information to console
+            console.log(`Client matching statistics:`);
             console.log(`- Total incidents: ${totalIncidents}`);
-            console.log(`- Unique clients: ${uniqueClients}`);
-            console.log(`- Event types: ${eventTypes}`);
-            console.log(`- High risk: ${highRisk}, Medium: ${mediumRisk}, Low: ${lowRisk}`);
+            console.log(`- Matched clients: ${matchedClients}`);
+            console.log(`- Match rate: ${clientMatchRate}%`);
+            
+            // Load alarm history
+            loadAlarmHistory();
         }
 
         // UI helper functions
@@ -1339,43 +1317,33 @@
             const popupTitle = document.getElementById('popupTitle');
             const popupDetails = document.getElementById('popupDetails');
             
-            // Find client info
-            if (!client && incident.ClientId) {
-                client = findClientById(incident.ClientId);
-            }
-            
             // Set popup title
-            const eventTypes = incident.EventTypeNames && incident.EventTypeNames.length > 0
-                ? incident.EventTypeNames.join(', ')
-                : 'No Event Type';
+            const eventTypes = incident.EventTypeNames ? incident.EventTypeNames.join(', ') : 'No Event Type';
             const incidentDate = new Date(incident.Date).toLocaleDateString();
             popupTitle.textContent = `${eventTypes} - ${incidentDate}`;
             
             // Build popup content
             let content = '';
             
-            // Resident information
-            const clientName = incident.FirstName && incident.LastName
-                ? `${incident.FirstName} ${incident.LastName}`
-                : (client ? formatClientName(client) : 'N/A');
-            const roomName = incident.RoomName || client?.Room || 'N/A';
-            
+            // Client information
             content += `
                 <div class="popup-detail-row">
-                    <div class="popup-detail-label">Resident:</div>
+                    <div class="popup-detail-label">Client:</div>
                     <div class="popup-detail-value">
-                        ${clientName} (Room: ${roomName})
+                        ${client ? 
+                            `${formatClientName(client)} (${client.RoomName || 'N/A'})` : 
+                            `ID: ${incident.ClientId} (No client data)`
+                        }
                     </div>
                 </div>
             `;
             
-            // Severity Rating
-            const severityRating = incident.SeverityRating || incident.RiskRatingName || 'N/A';
+            // Risk Rating
             content += `
                 <div class="popup-detail-row">
-                    <div class="popup-detail-label">Severity:</div>
-                    <div class="popup-detail-value ${getRiskClass(severityRating)}">
-                        ${severityRating}
+                    <div class="popup-detail-label">Risk Rating:</div>
+                    <div class="popup-detail-value ${getRiskClass(incident.RiskRatingName)}">
+                        ${incident.RiskRatingName || 'N/A'}
                     </div>
                 </div>
             `;
@@ -1388,24 +1356,12 @@
                 </div>
             `;
             
-            // Incident ID
+            // Reported Date
             content += `
                 <div class="popup-detail-row">
-                    <div class="popup-detail-label">Incident ID:</div>
+                    <div class="popup-detail-label">Reported Date:</div>
                     <div class="popup-detail-value">
-                        ${incident.Id || 'N/A'}
-                    </div>
-                </div>
-            `;
-            
-            // Status
-            content += `
-                <div class="popup-detail-row">
-                    <div class="popup-detail-label">Status:</div>
-                    <div class="popup-detail-value">
-                        <span class="badge ${incident.Status === 'Open' ? 'bg-warning' : 'bg-success'}">
-                            ${incident.Status || 'N/A'}
-                        </span>
+                        ${incident.ReportedDate ? new Date(incident.ReportedDate).toLocaleDateString() : 'N/A'}
                     </div>
                 </div>
             `;
@@ -1420,11 +1376,11 @@
                 `;
             }
             
-            // Full Actions Taken (if available)
+            // Full Action Taken (if available)
             if (incident.ActionTaken) {
                 content += `
                     <div class="popup-detail-row">
-                        <div class="popup-detail-label">Actions Taken:</div>
+                        <div class="popup-detail-label">Action Taken:</div>
                         <div class="popup-detail-value">${incident.ActionTaken}</div>
                     </div>
                 `;
@@ -1623,6 +1579,8 @@
                 }, 3000);
             }
             
+            // 알람 히스토리 새로고침
+            loadAlarmHistory();
         }
 
         function showAlarmError(incidentId, errorMessage) {
@@ -1647,11 +1605,77 @@
                 }, 5000);
             }
             
+            // 알람 히스토리 새로고침
+            loadAlarmHistory();
         }
 
         function closeAlarmModal() {
             document.getElementById('alarmModal').style.display = 'none';
             currentAlarmData = null;
+        }
+
+        // 알람 히스토리 로드 및 표시
+        async function loadAlarmHistory() {
+            try {
+                const response = await fetch('/api/alarm-history');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        displayAlarmHistory(data.alarms || []);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading alarm history:', error);
+            }
+        }
+
+        function displayAlarmHistory(alarms) {
+            const historyDiv = document.getElementById('alarmHistory');
+            const contentDiv = document.getElementById('alarmHistoryContent');
+            
+            if (alarms.length === 0) {
+                historyDiv.style.display = 'none';
+                return;
+            }
+            
+            historyDiv.style.display = 'block';
+            
+            // 최근 5개 알람만 표시
+            const recentAlarms = alarms.slice(-5);
+            
+            let html = '<div style="display: grid; gap: 15px;">';
+            
+            recentAlarms.forEach(alarm => {
+                const timestamp = new Date(alarm.timestamp).toLocaleString();
+                const statusClass = alarm.success ? 'success' : 'error';
+                const statusIcon = alarm.success ? '✅' : '❌';
+                
+                html += `
+                    <div style="background: var(--light-bg); padding: 15px; border-radius: 10px; border-left: 4px solid var(--${statusClass === 'success' ? 'success' : 'accent'}-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <strong style="color: var(--primary-color);">${alarm.alarm_data.event_type}</strong>
+                            <span style="font-size: 0.9em; color: #7f8c8d;">${timestamp}</span>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span style="color: var(--dark-text);">${alarm.alarm_data.client_name} at ${alarm.alarm_data.site}</span>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span style="font-size: 0.9em; color: var(--accent-color); font-weight: 600;">
+                                Risk: ${alarm.alarm_data.risk_rating || 'Unknown'}
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.8em; color: #7f8c8d;">Sent by: ${alarm.user}</span>
+                            <span style="color: var(--${statusClass === 'success' ? 'success' : 'accent'}-color); font-weight: 600;">
+                                ${statusIcon} ${alarm.success ? 'Sent' : 'Failed'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            contentDiv.innerHTML = html;
         }
 
         // 모달 외부 클릭 시 닫기

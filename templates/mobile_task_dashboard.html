@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Nurse Visit Schedule</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* Header */
+        .mobile-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 0;
+        }
+
+        .header-subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 0.3rem;
+        }
+
+        .last-update {
+            color: #999;
+            font-size: 0.8rem;
+            margin-top: 0.3rem;
+        }
+        
+        .last-update-inline {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 0.3rem;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        /* Current Time Display */
+        .current-time-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 0.8rem 2rem 0.5rem 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            animation: pulse-glow 2s infinite;
+            text-align: center;
+        }
+
+        .current-time-value {
+            font-size: 3rem;
+            font-weight: 900;
+            color: white;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 3px;
+            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+            animation: blink-time 1.5s infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            }
+            50% {
+                box-shadow: 0 6px 25px rgba(102, 126, 234, 0.7);
+            }
+        }
+        
+        @keyframes blink-time {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.85;
+                transform: scale(1.05);
+            }
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: white;
+            margin: 1rem;
+            padding: 1rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .filter-group {
+            flex: 1;
+        }
+
+        .filter-group label {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+            margin-bottom: 0.3rem;
+            display: block;
+        }
+
+        .filter-select {
+            width: 100%;
+            padding: 0.6rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            border-color: var(--secondary-color);
+            outline: none;
+        }
+        
+        /* Clear Cache Button */
+        .btn-clear-cache {
+            background: linear-gradient(135deg, var(--warning-color), #e67e22);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .btn-clear-cache:hover {
+            background: linear-gradient(135deg, #e67e22, var(--warning-color));
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .btn-clear-cache:active {
+            transform: translateY(0);
+        }
+
+        /* Timetable */
+        .timetable-container {
+            background: white;
+            margin: 1rem;
+            padding: 0;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .timetable-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timetable-header h6 {
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .visit-count {
+            background: rgba(255,255,255,0.3);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .schedule-table-wrapper {
+            overflow-x: auto;
+            max-height: calc(100vh - 300px);
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .schedule-table thead th {
+            background: #f8f9fa;
+            color: var(--primary-color);
+            font-weight: bold;
+            padding: 0.8rem 0.5rem;
+            text-align: left;
+            border-bottom: 2px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-size: 0.85rem;
+        }
+
+        .schedule-table tbody td {
+            padding: 1rem 0.6rem;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 1.1rem;
+            font-weight: 600;
+            vertical-align: top;
+        }
+
+        .schedule-table tbody tr:hover {
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        .schedule-table tbody tr.overdue {
+            background: #fff5f5;
+        }
+
+        /* Incident color coding */
+        .incident-color-1 { background: #e3f2fd !important; }
+        .incident-color-2 { background: #f3e5f5 !important; }
+        .incident-color-3 { background: #e8f5e9 !important; }
+        .incident-color-4 { background: #fff3e0 !important; }
+        .incident-color-5 { background: #fce4ec !important; }
+        .incident-color-6 { background: #e0f2f1 !important; }
+        
+        .incident-color-1.overdue { background: #ffcdd2 !important; }
+        .incident-color-2.overdue { background: #ffcdd2 !important; }
+        .incident-color-3.overdue { background: #ffcdd2 !important; }
+        .incident-color-4.overdue { background: #ffcdd2 !important; }
+        .incident-color-5.overdue { background: #ffcdd2 !important; }
+        .incident-color-6.overdue { background: #ffcdd2 !important; }
+
+        /* Current time task - blink animation (빨간색 계열) */
+        .current-task {
+            animation: blink-current 1.2s infinite;
+            border: 3px solid #dc3545 !important;
+        }
+
+        @keyframes blink-current {
+            0%, 100% { 
+                background: #ffebee !important;
+                box-shadow: 0 0 15px rgba(220, 53, 69, 0.6);
+                opacity: 1;
+            }
+            50% { 
+                background: #ffcdd2 !important;
+                box-shadow: 0 0 25px rgba(220, 53, 69, 0.9);
+                opacity: 0.95;
+            }
+        }
+        
+        .current-task td {
+            font-weight: 600 !important;
+            color: #c62828 !important;
+        }
+
+        .time-cell {
+            font-weight: 700;
+            color: var(--info-color);
+            white-space: nowrap;
+            font-size: 1.2rem;
+        }
+
+        .patient-cell {
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: var(--primary-color);
+        }
+
+        .location-cell {
+            color: #666;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .type-cell {
+            font-size: 1.1rem;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .occurred-cell {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .incident-cell {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .incident-cell:hover {
+            background: rgba(0, 0, 0, 0.05);
+            transform: scale(1.05);
+        }
+
+        .incident-id {
+            font-weight: 900;
+            font-size: 1.4rem;
+            color: var(--primary-color);
+            display: block;
+        }
+
+        .incident-description {
+            color: #666;
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-top: 0.3rem;
+            line-height: 1.3;
+        }
+
+        .tasks-cell {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #555;
+            line-height: 1.3;
+        }
+
+        .status-cell {
+            text-align: center;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 0.8rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-ok {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-overdue {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .phase-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 0.4rem 0.7rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-left: 0.3rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Loading */
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading-spinner.active {
+            display: block;
+        }
+
+        /* Auto Refresh Indicator */
+        .auto-refresh-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: none;
+        }
+
+        .auto-refresh-indicator.active {
+            display: block;
+        }
+
+        /* Modal popup */
+        .incident-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .incident-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { 
+                transform: translate(-50%, -60%);
+                opacity: 0;
+            }
+            to { 
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .modal-title {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--primary-color);
+        }
+
+        .modal-close {
+            background: #dc3545;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #c82333;
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .modal-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-section-title {
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .modal-section-content {
+            color: #333;
+            padding: 0.8rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .auto-close-timer {
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="mobile-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="header-title">
+                    <i class="fas fa-user-nurse me-2"></i>Nurse Visit Schedule
+                </h5>
+            </div>
+            <div class="current-time-display">
+                <div class="current-time-value" id="currentTimeDisplay">--:--:--</div>
+                <div class="last-update-inline" id="lastUpdate">Updated: --</div>
+            </div>
+            <button class="btn-back-dashboard" onclick="window.location.href='/integrated_dashboard'">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        </div>
+        
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label><i class="fas fa-hospital me-1"></i>Site</label>
+            <select class="filter-select" id="siteSelect" onchange="loadSchedule()">
+                <option value="">Select Site...</option>
+                <option value="Parafield Gardens">Parafield Gardens</option>
+                <option value="Nerrilda">Nerrilda</option>
+                <option value="Ramsay">Ramsay</option>
+                <option value="West Park">West Park</option>
+                <option value="Yankalilla">Yankalilla</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-calendar-day me-1"></i>Date</label>
+            <select class="filter-select" id="dateSelect" onchange="loadSchedule()">
+                <!-- Dynamically generated -->
+            </select>
+    </div>
+        <div class="filter-group" style="flex: 0; min-width: auto;">
+            <label>&nbsp;</label>
+            <button class="btn-clear-cache" onclick="clearCacheAndReload()" title="Clear cache and reload fresh data">
+                <i class="fas fa-sync-alt"></i> Clear Cache
+            </button>
+        </div>
+    </div>
+
+    <!-- Timetable -->
+    <div class="timetable-container">
+        <div class="timetable-header">
+            <h6 style="font-size: 1.3rem; font-weight: 700;"><i class="fas fa-clock me-2"></i>Visit Schedule</h6>
+            <span class="visit-count" id="visitCount">0 visits</span>
+    </div>
+
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+    </div>
+            <p class="mt-2">Loading schedule...</p>
+        </div>
+        
+        <div class="schedule-table-wrapper">
+            <table class="schedule-table" id="scheduleTable">
+                <thead>
+                    <tr>
+                        <th style="width: 90px;">Time</th>
+                        <th style="width: 150px;">Patient</th>
+                        <th style="width: 90px;">Room</th>
+                        <th style="width: 110px;">Type</th>
+                        <th style="width: 130px;">Occurred</th>
+                        <th style="width: 80px; text-align: center;">INC #</th>
+                        <th style="width: 220px;">Tasks</th>
+                        <th style="width: 70px;">Phase</th>
+                        <th style="width: 90px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleTableBody">
+                    <tr>
+                        <td colspan="9" class="text-center" style="padding: 3rem;">
+                            <i class="fas fa-calendar-alt" style="font-size: 3rem; color: #ccc; display: block; margin-bottom: 1rem;"></i>
+                            <p style="color: #999; font-size: 1.2rem; font-weight: 600;">Select site and date</p>
+                            <small style="color: #ccc;">Select a site and date to view visit schedule</small>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Auto Refresh Indicator -->
+    <div class="auto-refresh-indicator" id="autoRefreshIndicator">
+        <i class="fas fa-sync-alt fa-spin me-2"></i>Updating...
+    </div>
+
+    <script>
+        let selectedSite = null;
+        let selectedDate = null;
+        let autoRefreshInterval = null;
+        
+        // 🚀 Phase 3: Local Storage 캐싱
+        const CACHE_TTL = 5 * 60 * 1000;  // 5분
+        const CACHE_PREFIX = 'visit_schedule_';
+
+        // Initialize date dropdown (2 days later to 4 days ago)
+        function initializeDateDropdown() {
+            const dateSelect = document.getElementById('dateSelect');
+            const today = new Date();
+            
+            // Future dates (2 days later, tomorrow)
+            for (let i = 2; i >= 1; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                
+                const dateStr = date.toISOString().split('T')[0];
+                const dayLabel = i === 1 ? 'Tomorrow' : i === 2 ? 'Day after tomorrow' : `${i} days later`;
+                const displayDate = date.toLocaleDateString('en-AU', {
+                    month: 'short',
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                
+                const option = document.createElement('option');
+                option.value = dateStr;
+                option.textContent = `${dayLabel} (${displayDate})`;
+                
+                dateSelect.appendChild(option);
+            }
+            
+            // Today and past dates
+            for (let i = 0; i < 5; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                
+                const dateStr = date.toISOString().split('T')[0];
+                const dayLabel = i === 0 ? 'Today' : i === 1 ? 'Yesterday' : `${i} days ago`;
+                const displayDate = date.toLocaleDateString('en-AU', {
+                    month: 'short',
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                
+                const option = document.createElement('option');
+                option.value = dateStr;
+                option.textContent = `${dayLabel} (${displayDate})`;
+                if (i === 0) option.selected = true;
+                
+                dateSelect.appendChild(option);
+            }
+            
+            // Set today as default
+            selectedDate = today.toISOString().split('T')[0];
+        }
+
+        // 🚀 Phase 3: Local Storage 캐시 조회
+        function getCachedSchedule(site, date) {
+            const cacheKey = `${CACHE_PREFIX}${site}_${date}`;
+            const cached = localStorage.getItem(cacheKey);
+            
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    const age = Date.now() - data.timestamp;
+                    
+                    if (age < CACHE_TTL) {
+                        console.log(`✅ [${site}] Cache HIT - Age: ${Math.round(age/1000)}s`);
+                        return data.schedule;
+                    } else {
+                        console.log(`⏰ [${site}] Cache EXPIRED - Age: ${Math.round(age/1000)}s`);
+                        localStorage.removeItem(cacheKey);
+                    }
+                } catch (e) {
+                    console.error('Cache parse error:', e);
+                    localStorage.removeItem(cacheKey);
+                }
+            }
+            
+            console.log(`📦 [${site}] Cache MISS`);
+            return null;
+        }
+        
+        // 🚀 Phase 3: Local Storage 캐시 저장
+        function setCachedSchedule(site, date, schedule) {
+            const cacheKey = `${CACHE_PREFIX}${site}_${date}`;
+            try {
+                const cacheData = {
+                    schedule: schedule,
+                    timestamp: Date.now(),
+                    site: site,
+                    date: date
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                console.log(`💾 [${site}] Cache SAVED`);
+            } catch (e) {
+                console.error('Cache save error:', e);
+                // LocalStorage 용량 초과 시 오래된 캐시 삭제
+                clearOldCache();
+            }
+        }
+        
+        // 오래된 캐시 정리
+        function clearOldCache() {
+            const keys = Object.keys(localStorage);
+            const cacheKeys = keys.filter(k => k.startsWith(CACHE_PREFIX));
+            
+            // timestamp 기준으로 정렬하여 오래된 것부터 삭제
+            cacheKeys.sort((a, b) => {
+                const aData = JSON.parse(localStorage.getItem(a));
+                const bData = JSON.parse(localStorage.getItem(b));
+                return aData.timestamp - bData.timestamp;
+            });
+            
+            // 가장 오래된 캐시 5개 삭제
+            for (let i = 0; i < Math.min(5, cacheKeys.length); i++) {
+                localStorage.removeItem(cacheKeys[i]);
+                console.log(`🗑️  Removed old cache: ${cacheKeys[i]}`);
+            }
+        }
+        
+        // 🧹 모든 캐시 클리어 및 새로고침
+        function clearCacheAndReload() {
+            const keys = Object.keys(localStorage);
+            const cacheKeys = keys.filter(k => k.startsWith(CACHE_PREFIX));
+            
+            console.log(`🧹 Clear Cache 버튼 클릭 - 현재 캐시: ${cacheKeys.length}개`);
+            
+            // 모든 방문 스케줄 캐시 삭제
+            cacheKeys.forEach(key => {
+                localStorage.removeItem(key);
+                console.log(`  🗑️  Deleted: ${key}`);
+            });
+            
+            console.log(`✅ Cleared ${cacheKeys.length} cached schedules`);
+            
+            // 버튼 피드백
+            const btn = event.target.closest('.btn-clear-cache');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check me-2"></i>Cleared!';
+            btn.style.background = 'linear-gradient(135deg, #27ae60, #229954)';
+            
+            // 날짜 드롭다운을 오늘로 재설정
+            const dateSelect = document.getElementById('dateSelect');
+            const today = new Date().toISOString().split('T')[0];
+            
+            // 오늘 날짜 옵션 찾기
+            for (let i = 0; i < dateSelect.options.length; i++) {
+                if (dateSelect.options[i].value === today) {
+                    dateSelect.selectedIndex = i;
+                    selectedDate = today;
+                    console.log(`📅 날짜를 오늘로 재설정: ${today}`);
+                    break;
+                }
+            }
+            
+            // 1초 후 스케줄 새로고침
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.background = '';
+                loadSchedule();
+            }, 1000);
+        }
+
+        // Load visit schedule
+        async function loadSchedule() {
+            // Get selected site from dropdown
+            selectedSite = document.getElementById('siteSelect').value;
+            selectedDate = document.getElementById('dateSelect').value;
+            
+            if (!selectedSite) {
+                showEmpty('Select a site', 'Please select a site to continue');
+                return;
+            }
+
+            if (!selectedDate) {
+                showEmpty('Select a date', 'Please select a date to continue');
+                return;
+            }
+
+            // 🚀 Phase 3: 캐시 확인
+            const cached = getCachedSchedule(selectedSite, selectedDate);
+            if (cached) {
+                try {
+                    await renderScheduleFromCache(cached);
+                    updateLastUpdateTime();
+                    return;
+                } catch (e) {
+                    console.error('Cache render error:', e);
+                    // 캐시 렌더링 실패 시 API 호출로 fallback
+                }
+            }
+
+            showLoading();
+
+            try {
+                // 🚀 Phase 2: Batch API 호출 (한 번에 모든 데이터 조회)
+                console.log(`🚀 [${selectedSite}] Batch API call...`);
+                const response = await fetch(`/api/cims/schedule-batch/${encodeURIComponent(selectedSite)}/${selectedDate}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load schedule');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load schedule');
+                }
+                
+                // 🚀 Phase 3: 캐시 저장
+                setCachedSchedule(selectedSite, selectedDate, data);
+                
+                // 스케줄 렌더링
+                await renderScheduleFromBatchAPI(data);
+
+                // Update last update time
+                updateLastUpdateTime();
+                
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+            }
+        }
+
+        // 🚀 Phase 3: 캐시에서 스케줄 렌더링
+        async function renderScheduleFromCache(cachedData) {
+            console.log(`⚡ [${selectedSite}] Rendering from cache...`);
+            
+            if (!cachedData.incidents || cachedData.incidents.length === 0) {
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                return;
+            }
+            
+            // Batch API 형식과 동일하게 처리
+            await renderScheduleFromBatchAPI(cachedData);
+        }
+        
+        // 🚀 Phase 2: Batch API 응답으로 스케줄 렌더링
+        async function renderScheduleFromBatchAPI(data) {
+            const tableBody = document.getElementById('scheduleTableBody');
+            const visitCount = document.getElementById('visitCount');
+            
+            const incidents = data.incidents || [];
+            const policy = data.policy;
+            
+            console.log(`🔍 [${selectedSite}] Batch API - Incidents: ${incidents.length}, Policy: ${policy ? 'OK' : 'N/A'}`);
+            
+            if (incidents.length === 0) {
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                return;
+            }
+            
+            if (!policy) {
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                return;
+            }
+            
+            const policyRules = policy.rules;
+            const visitSchedule = policyRules.nurse_visit_schedule || [];
+            const commonTasks = policyRules.common_assessment_tasks || '';
+            
+            // incidentTasksMap 구성 (Batch API는 이미 tasks 포함)
+            const incidentTasksMap = {};
+            incidents.forEach(inc => {
+                incidentTasksMap[inc.id] = inc.tasks || [];
+            });
+            
+            // Generate all visits for all Fall incidents
+            const allVisits = [];
+            
+            incidents.forEach(incident => {
+                const incidentTime = new Date(incident.incident_date);
+                let phaseStartTime = new Date(incidentTime);
+                
+                // Process each phase sequentially
+                visitSchedule.forEach((phase, phaseIndex) => {
+                    const interval = parseInt(phase.interval) || 30;
+                    const intervalUnit = phase.interval_unit || 'minutes';
+                    const duration = parseInt(phase.duration) || 2;
+                    const durationUnit = phase.duration_unit || 'hours';
+                    
+                    // Convert to minutes
+                    const intervalMinutes = intervalUnit === 'hours' ? interval * 60 : interval;
+                    const durationMinutes = durationUnit === 'hours' ? duration * 60 : duration;
+                    
+                    // Number of visits in this phase
+                    const numberOfVisits = Math.ceil(durationMinutes / intervalMinutes);
+                    
+                    // Generate visits for this phase
+                    for (let visitNum = 0; visitNum < numberOfVisits; visitNum++) {
+                        const visitTime = new Date(phaseStartTime.getTime() + (visitNum * intervalMinutes * 60000));
+                        
+                        // Match with actual task completion status
+                        const tasks = incidentTasksMap[incident.id] || [];
+                        let taskStatus = 'pending';
+                        let completedAt = null;
+                        
+                        const matchedTask = tasks.find(task => {
+                            if (!task.due_date) return false;
+                            const taskDueDate = new Date(task.due_date);
+                            const timeDiff = Math.abs((visitTime - taskDueDate) / 1000 / 60);
+                            return timeDiff <= 30;
+                        });
+                        
+                        if (matchedTask) {
+                            taskStatus = matchedTask.status || 'pending';
+                            completedAt = matchedTask.completed_at;
+                        }
+                        
+                        allVisits.push({
+                            incidentId: incident.id,
+                            residentName: incident.resident_name,
+                            location: incident.location || '',
+                            incidentType: incident.incident_type,
+                            incidentDate: incident.incident_date,
+                            description: incident.description || '',
+                            visitTime: visitTime,
+                            phaseIndex: phaseIndex + 1,
+                            tasks: commonTasks,  // Full tasks for modal
+                            taskStatus: taskStatus,
+                            completedAt: completedAt
+                        });
+                    }
+                    
+                    // Next phase starts after current phase duration
+                    phaseStartTime = new Date(phaseStartTime.getTime() + (durationMinutes * 60000));
+                });
+            });
+            
+            // Sort by visit time
+            allVisits.sort((a, b) => a.visitTime - b.visitTime);
+            
+            // 🔍 선택한 날짜의 방문만 필터링 (로컬 날짜 기준)
+            console.log(`📅 선택한 날짜: ${selectedDate}`);
+            
+            const filteredVisits = allVisits.filter(visit => {
+                // visitTime의 로컬 날짜 추출 (YYYY-MM-DD)
+                const visitLocalDate = visit.visitTime.toLocaleDateString('en-CA'); // ISO format (YYYY-MM-DD)
+                const match = visitLocalDate === selectedDate;
+                
+                if (!match && allVisits.indexOf(visit) < 3) {
+                    console.log(`  🔍 Visit ${allVisits.indexOf(visit)}: ${visitLocalDate} vs ${selectedDate} = ${match}`);
+                }
+                
+                return match;
+            });
+            
+            console.log(`🔍 [${selectedSite}] Total visits: ${allVisits.length}, Filtered (${selectedDate}): ${filteredVisits.length}`);
+            
+            // 필터링된 방문이 없으면 empty state
+            if (filteredVisits.length === 0) {
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                return;
+            }
+            
+            // Color mapping for incidents (필터링된 방문 기준)
+            const incidentColorMap = {};
+            const colors = ['incident-color-1', 'incident-color-2', 'incident-color-3', 
+                          'incident-color-4', 'incident-color-5', 'incident-color-6'];
+            let colorIndex = 0;
+            
+            filteredVisits.forEach(visit => {
+                if (!incidentColorMap[visit.incidentId]) {
+                    incidentColorMap[visit.incidentId] = colors[colorIndex % colors.length];
+                    colorIndex++;
+                }
+            });
+            
+            // Render table rows
+            tableBody.innerHTML = '';
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            
+            filteredVisits.forEach(visit => {
+                const row = document.createElement('tr');
+                const isPast = visit.visitTime < now;
+                const isCompleted = visit.taskStatus === 'completed';
+                const isOverdue = isPast && !isCompleted;
+                
+                // Current task detection (due within next hour, not completed)
+                const timeDiff = (visit.visitTime - now) / 1000 / 60;
+                const isCurrent = !isPast && timeDiff >= 0 && timeDiff <= 60 && 
+                                 selectedDate === todayStr && !isCompleted;
+                
+                // Apply color class
+                row.className = incidentColorMap[visit.incidentId];
+                
+                if (isOverdue) {
+                    row.classList.add('overdue');
+                }
+                
+                if (isCurrent) {
+                    row.classList.add('current-task');
+                }
+                
+                // Time cell
+                const timeCell = document.createElement('td');
+                timeCell.className = 'time-cell';
+                timeCell.textContent = visit.visitTime.toLocaleTimeString('en-AU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+                row.appendChild(timeCell);
+                
+                // Patient cell
+                const patientCell = document.createElement('td');
+                patientCell.className = 'patient-cell';
+                patientCell.textContent = visit.residentName;
+                row.appendChild(patientCell);
+                
+                // Room cell
+                const roomCell = document.createElement('td');
+                roomCell.className = 'location-cell';
+                roomCell.textContent = visit.location;
+                row.appendChild(roomCell);
+                
+                // Type cell
+                const typeCell = document.createElement('td');
+                typeCell.className = 'type-cell';
+                typeCell.textContent = visit.incidentType;
+                row.appendChild(typeCell);
+                
+                // Occurred cell
+                const occurredCell = document.createElement('td');
+                occurredCell.className = 'occurred-cell';
+                const incidentDate = new Date(visit.incidentDate);
+                occurredCell.textContent = incidentDate.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short'
+                }) + ', ' + incidentDate.toLocaleTimeString('en-AU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                row.appendChild(occurredCell);
+                
+                // Incident Details cell (ID only, click to view details)
+                const incidentCell = document.createElement('td');
+                incidentCell.className = 'incident-cell';
+                incidentCell.title = 'Click to view details';
+                
+                const incidentId = document.createElement('div');
+                incidentId.className = 'incident-id';
+                incidentId.textContent = `${visit.incidentId}`;
+                
+                incidentCell.appendChild(incidentId);
+                
+                // Click event to show modal
+                incidentCell.onclick = function() {
+                    const occurredDate = incidentDate.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                    }) + ', ' + incidentDate.toLocaleTimeString('en-AU', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                    
+                    showIncidentModal({
+                        incidentId: visit.incidentId,
+                        residentName: visit.residentName,
+                        occurred: occurredDate,
+                        location: visit.location,
+                        incidentType: visit.incidentType,
+                        description: visit.description,
+                        tasks: visit.tasks
+                    });
+                };
+                
+                row.appendChild(incidentCell);
+                
+                // Tasks cell (show more content with smaller font)
+                const tasksCell = document.createElement('td');
+                tasksCell.className = 'tasks-cell';
+                const shortTasks = visit.tasks.substring(0, 80);
+                tasksCell.textContent = shortTasks + (visit.tasks.length > 80 ? '...' : '');
+                row.appendChild(tasksCell);
+                
+                // Phase cell
+                const phaseCell = document.createElement('td');
+                phaseCell.className = 'text-center';
+                const phaseBadge = document.createElement('span');
+                phaseBadge.className = 'phase-badge';
+                phaseBadge.textContent = `P${visit.phaseIndex}`;
+                phaseCell.appendChild(phaseBadge);
+                row.appendChild(phaseCell);
+                
+                // Status cell
+                const statusCell = document.createElement('td');
+                statusCell.className = 'text-center';
+                const statusBadge = document.createElement('span');
+                
+                // 🔍 Status 로직 개선
+                let statusText = '';
+                let statusClass = '';
+                
+                // 디버그 로그 (Warren HENDERSON만)
+                if (visit.residentName.includes('HENDERSON')) {
+                    console.log(`[Status Debug] ${visit.residentName} at ${visit.visitTime.toLocaleTimeString('en-AU')}:`);
+                    console.log(`  - Current time (Local): ${now.toLocaleString('en-AU')}`);
+                    console.log(`  - Current time (UTC): ${now.toISOString()}`);
+                    console.log(`  - Visit time (Local): ${visit.visitTime.toLocaleString('en-AU')}`);
+                    console.log(`  - Visit time (UTC): ${visit.visitTime.toISOString()}`);
+                    console.log(`  - Time diff (minutes): ${Math.round((now - visit.visitTime) / 1000 / 60)}`);
+                    console.log(`  - isPast: ${isPast} (visitTime < now: ${visit.visitTime < now})`);
+                    console.log(`  - taskStatus: ${visit.taskStatus}`);
+                }
+                
+                if (visit.taskStatus === 'completed') {
+                    // 완료됨
+                    statusText = 'OK';
+                    statusClass = 'status-ok';
+                } else if (isPast) {
+                    // 시간이 지났는데 완료 안됨 → Overdue
+                    statusText = 'NOK';
+                    statusClass = 'status-overdue';
+                    } else {
+                    // 아직 시간이 안됨 → Waiting
+                    statusText = 'Waiting';
+                    statusClass = 'status-pending';
+                }
+                
+                statusBadge.className = `status-badge ${statusClass}`;
+                statusBadge.textContent = statusText;
+                
+                statusCell.appendChild(statusBadge);
+                row.appendChild(statusCell);
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Update visit count (필터링된 방문 기준)
+            visitCount.textContent = `${filteredVisits.length} visits`;
+            
+            // Hide loading
+            hideLoading();
+        }
+
+        // Generate visit schedule from incidents (table format)
+        async function generateVisitSchedule(incidents) {
+            const tableBody = document.getElementById('scheduleTableBody');
+            const visitCount = document.getElementById('visitCount');
+
+            console.log(`🔍 [${selectedSite}] Total incidents:`, incidents.length);
+
+            // Filter Fall incidents first (before fetching tasks)
+            const fallIncidents = incidents.filter(inc => 
+                (inc.incident_type || '').toLowerCase().includes('fall')
+            );
+
+            console.log(`🔍 [${selectedSite}] Fall incidents:`, fallIncidents.length);
+
+            if (fallIncidents.length === 0) {
+                console.log(`ℹ️ [${selectedSite}] No Fall incidents found, showing empty state`);
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                return;
+            }
+
+            // Fetch task data for Fall incidents only
+            const incidentTasksMap = {};
+            for (const incident of fallIncidents) {
+                try {
+                    const response = await fetch(`/api/cims/incident/${incident.id}/tasks`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        incidentTasksMap[incident.id] = data.tasks || [];
+                    }
+                } catch (error) {
+                    console.error(`Failed to load tasks for incident ${incident.id}:`, error);
+                    incidentTasksMap[incident.id] = [];
+                }
+            }
+
+            // Fetch Fall policy
+            const policyResponse = await fetch('/api/cims/policies');
+            const policies = await policyResponse.json();
+            const fallPolicy = policies.find(p => {
+                try {
+                    const rules = JSON.parse(p.rules_json);
+                    const association = rules.incident_association || {};
+                    return association.incident_type === 'Fall';
+                } catch {
+                    return false;
+                }
+            });
+
+            if (!fallPolicy) {
+                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                return;
+            }
+
+            const policyRules = JSON.parse(fallPolicy.rules_json);
+            const visitSchedule = policyRules.nurse_visit_schedule || [];
+            const commonTasks = policyRules.common_assessment_tasks || '';
+
+            // Generate all visits for all Fall incidents
+            const allVisits = [];
+
+            fallIncidents.forEach(incident => {
+                const incidentTime = new Date(incident.incident_date);
+                let phaseStartTime = new Date(incidentTime);
+                
+                // Process each phase sequentially
+                visitSchedule.forEach((schedule, idx) => {
+                    const interval = schedule.interval;
+                    const intervalUnit = schedule.interval_unit;
+                    const duration = schedule.duration;
+                    const durationUnit = schedule.duration_unit;
+
+                    // Convert to minutes
+                    const intervalMinutes = intervalUnit === 'hours' ? interval * 60 : interval;
+                    const durationMinutes = durationUnit === 'hours' ? duration * 60 : 
+                                          durationUnit === 'days' ? duration * 24 * 60 : duration;
+
+                    // Calculate number of visits in this phase
+                    const numberOfVisits = Math.floor(durationMinutes / intervalMinutes);
+                    
+                    // Generate visits for this phase
+                    for (let i = 1; i <= numberOfVisits; i++) {
+                        const visitTime = new Date(phaseStartTime.getTime() + (intervalMinutes * i * 60 * 1000));
+                        
+                        // Only include if on selected date
+                        if (visitTime.toISOString().split('T')[0] === selectedDate) {
+                            // Find matching task by due_date
+                            const incidentTasks = incidentTasksMap[incident.id] || [];
+                            const matchingTask = incidentTasks.find(task => {
+                                if (!task.due_date) return false;
+                                const taskDue = new Date(task.due_date);
+                                // Match within 30 minute window (to match backend logic)
+                                const timeDiff = Math.abs(taskDue - visitTime);
+                                return timeDiff < 30 * 60 * 1000;
+                            });
+                            
+                            allVisits.push({
+                                time: visitTime,
+                                incident: incident,
+                                schedule: schedule,
+                                phase: idx + 1,
+                                visitNumber: i,
+                                totalVisitsInPhase: numberOfVisits,
+                                tasks: commonTasks,
+                                interval: `Every ${interval} ${intervalUnit}`,
+                                duration: `For ${duration} ${durationUnit}`,
+                                taskStatus: matchingTask ? matchingTask.status : 'pending'
+                            });
+                        }
+                    }
+                    
+                    // Next phase starts after current phase ends
+                    phaseStartTime = new Date(phaseStartTime.getTime() + durationMinutes * 60 * 1000);
+                });
+            });
+
+            // Sort by time
+            allVisits.sort((a, b) => a.time - b.time);
+
+            // Assign color index to each unique incident
+            const incidentColorMap = {};
+            let colorIndex = 1;
+            allVisits.forEach(visit => {
+                const incidentId = visit.incident.incident_id;
+                if (!incidentColorMap[incidentId]) {
+                    incidentColorMap[incidentId] = colorIndex;
+                    colorIndex = (colorIndex % 6) + 1; // Cycle through 6 colors
+                }
+            });
+
+            // Display as table
+            let html = '';
+            const now = new Date();
+
+            allVisits.forEach(visit => {
+                const timeStr = visit.time.toLocaleTimeString('en-AU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+                
+                const isPast = visit.time < now;
+                const isOverdue = isPast && selectedDate === new Date().toISOString().split('T')[0];
+                
+                // Check if this is a current task (현재 시간부터 1시간 이내에 방문해야 하는 경우)
+                const timeDiff = (visit.time - now) / (1000 * 60); // 분 단위 차이
+                const todayStr = new Date().toISOString().split('T')[0];
+                const isCurrent = !isPast && timeDiff >= 0 && timeDiff <= 60 && selectedDate === todayStr;
+                
+                // Debug logging for Warren HENDERSON or current hour tasks
+                if (visit.incident.resident_name.includes('HENDERSON') || (timeDiff >= 0 && timeDiff <= 60)) {
+                    console.log(`[Blink Debug] ${visit.incident.resident_name} at ${timeStr}:`);
+                    console.log(`  - Current time: ${now.toLocaleTimeString('en-AU')}`);
+                    console.log(`  - Visit time: ${visit.time.toLocaleTimeString('en-AU')}`);
+                    console.log(`  - Time diff: ${timeDiff.toFixed(1)} minutes`);
+                    console.log(`  - isPast: ${isPast}`);
+                    console.log(`  - selectedDate: ${selectedDate}, todayStr: ${todayStr}`);
+                    console.log(`  - taskStatus: ${visit.taskStatus}`);
+                    console.log(`  - isCurrent: ${isCurrent}`);
+                    console.log(`  - Will blink: ${isCurrent && visit.taskStatus !== 'completed'}`);
+                }
+                
+                // Get incident color
+                const incidentColor = incidentColorMap[visit.incident.incident_id];
+                let rowClass = `incident-color-${incidentColor}`;
+                
+                // Apply status classes
+                if (isOverdue) {
+                    rowClass += ' overdue';
+                } else if (isCurrent && visit.taskStatus !== 'completed') {
+                    rowClass += ' current-task';
+                }
+                
+                // Extract room from location
+                const location = visit.incident.location || '';
+                const roomMatch = location.match(/(\d{3}:\s*\w+)|(\d{3})|Room\s+\d+/i);
+                const room = roomMatch ? roomMatch[0] : location.split(',')[0].trim();
+                
+                // Format incident date/time
+                const incidentDate = new Date(visit.incident.incident_date);
+                const incidentDateStr = incidentDate.toLocaleDateString('en-AU', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                });
+                const incidentTimeStr = incidentDate.toLocaleTimeString('en-AU', {
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+                
+                // Get incident type
+                const incidentType = visit.incident.incident_type || 'Unknown';
+                
+                // Simplified description (50 characters)
+                const description = visit.incident.description || '';
+                const descWords = description.split(' ');
+                let descSummary = '';
+                for (let i = 0; i < descWords.length && descSummary.length < 50; i++) {
+                    descSummary += descWords[i] + ' ';
+                }
+                if (description.length > 50) descSummary += '...';
+                
+                // Shortened tasks (first line only, 30 chars)
+                const taskLines = visit.tasks.split('\n').filter(t => t.trim());
+                const firstTask = taskLines.length > 0 ? taskLines[0].replace(/^[•\-\s]+/, '').trim() : 'Assessment';
+                const tasksSummary = firstTask.substring(0, 30) + (firstTask.length > 30 ? '...' : '');
+                
+                // Check Progress Note status via task completion
+                // Tasks are expected to have a status field from the backend
+                const progressNoteStatus = visit.taskStatus || 'pending';
+                
+                // Debug log for task status
+                if (visit.incident.resident_name.includes('Maxwell')) {
+                    console.log(`[Task Status] ${visit.incident.resident_name} at ${timeStr}: taskStatus=${visit.taskStatus}, progressNoteStatus=${progressNoteStatus}`);
+                }
+                
+                // 🔍 Status 로직 개선
+                let statusBadge = '';
+                if (visit.taskStatus === 'completed' || progressNoteStatus === 'completed') {
+                    // 완료됨
+                    statusBadge = '<span class="status-badge status-ok"><i class="fas fa-check-circle me-1"></i>OK</span>';
+                } else if (isPast) {
+                    // 시간이 지났는데 완료 안됨 → Overdue
+                    statusBadge = '<span class="status-badge status-overdue"><i class="fas fa-exclamation-circle me-1"></i>NOK</span>';
+                } else {
+                    // 아직 시간이 안됨 → Waiting
+                    statusBadge = '<span class="status-badge status-pending"><i class="fas fa-clock me-1"></i>Waiting</span>';
+                }
+
+                html += `
+                    <tr class="${rowClass}" onclick="showVisitDetails('${visit.incident.incident_id}', '${timeStr}')">
+                        <td class="time-cell">${timeStr}</td>
+                        <td class="patient-cell">${visit.incident.resident_name}</td>
+                        <td class="location-cell">${room}</td>
+                        <td class="type-cell">${incidentType}</td>
+                        <td class="occurred-cell">${incidentDateStr}<br>${incidentTimeStr}</td>
+                        <td class="incident-cell">
+                            <span class="incident-id">${visit.incident.incident_id}</span>
+                            <div class="incident-description">${descSummary.trim()}</div>
+                        </td>
+                        <td class="tasks-cell">${tasksSummary}</td>
+                        <td class="text-center">
+                            <span class="phase-badge">P${visit.phase}</span>
+                        </td>
+                        <td class="status-cell">
+                            ${statusBadge}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+            visitCount.textContent = `${allVisits.length} visits`;
+            hideLoading();
+        }
+
+        // Show visit details
+        // Legacy function - replaced by showIncidentModal
+        function showVisitDetails(incidentId, time) {
+            // No longer used - incident modal is used instead
+        }
+
+        // Show loading
+        function showLoading() {
+            document.getElementById('loadingSpinner').classList.add('active');
+            document.querySelector('.schedule-table-wrapper').style.display = 'none';
+        }
+
+        // Hide loading
+        function hideLoading() {
+            document.getElementById('loadingSpinner').classList.remove('active');
+            document.querySelector('.schedule-table-wrapper').style.display = 'block';
+        }
+
+        // Show empty state
+        function showEmpty(message, subtitle) {
+            hideLoading();
+            const tableBody = document.getElementById('scheduleTableBody');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center" style="padding: 3rem;">
+                        <i class="fas fa-calendar-alt" style="font-size: 4rem; color: #ccc; display: block; margin-bottom: 1.5rem;"></i>
+                        <p style="color: #666; font-size: 1.4rem; font-weight: 700;">${message}</p>
+                        <small style="color: #999; font-size: 1.1rem; font-weight: 600;">${subtitle}</small>
+                        </td>
+                    </tr>
+                `;
+            document.getElementById('visitCount').textContent = '0 visits';
+        }
+
+        // Update last update time
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-AU', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('lastUpdate').textContent = `Updated: ${timeStr}`;
+        }
+        
+        // 🕐 현재 시간 업데이트 (1초마다)
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-AU', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            document.getElementById('currentTimeDisplay').textContent = timeStr;
+        }
+
+        // Auto refresh
+        function startAutoRefresh() {
+            // Refresh every 5 minutes
+            autoRefreshInterval = setInterval(() => {
+                if (selectedSite && selectedDate) {
+                    const indicator = document.getElementById('autoRefreshIndicator');
+                    indicator.classList.add('active');
+                    
+                    loadSchedule().then(() => {
+                        setTimeout(() => {
+                            indicator.classList.remove('active');
+                        }, 2000);
+                    });
+                }
+            }, 5 * 60 * 1000); // 5 minutes
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeDateDropdown();
+            
+            // 🕐 현재 시간 표시 시작 (1초마다 업데이트)
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+            
+            // Load saved site from localStorage
+            const savedSite = localStorage.getItem('selectedSite');
+            if (savedSite) {
+                document.getElementById('siteSelect').value = savedSite;
+                selectedSite = savedSite;
+                loadSchedule();
+            }
+            
+            // Save site selection
+            document.getElementById('siteSelect').addEventListener('change', (e) => {
+                localStorage.setItem('selectedSite', e.target.value);
+            });
+
+            // Start auto refresh
+            startAutoRefresh();
+        });
+
+        // Incident Modal functions
+        let modalAutoCloseTimer = null;
+
+        function showIncidentModal(incidentData) {
+            const modal = document.getElementById('incidentModal');
+            
+            // Populate modal content
+            document.getElementById('modalIncidentId').textContent = `INC-${incidentData.incidentId}`;
+            document.getElementById('modalPatientName').textContent = incidentData.residentName;
+            document.getElementById('modalOccurred').textContent = incidentData.occurred;
+            document.getElementById('modalLocation').textContent = incidentData.location;
+            document.getElementById('modalType').textContent = incidentData.incidentType;
+            document.getElementById('modalDescription').textContent = incidentData.description;
+            document.getElementById('modalTasks').innerHTML = incidentData.tasks.replace(/\n/g, '<br>');
+            
+            // Show modal
+            modal.style.display = 'block';
+            
+            // Start auto-close timer (5 seconds)
+            let secondsLeft = 5;
+            document.getElementById('timerSeconds').textContent = secondsLeft;
+            
+            modalAutoCloseTimer = setInterval(() => {
+                secondsLeft--;
+                document.getElementById('timerSeconds').textContent = secondsLeft;
+                
+                if (secondsLeft <= 0) {
+                    closeIncidentModal();
+                }
+            }, 1000);
+            
+            // Click outside to close
+            modal.onclick = function(event) {
+                if (event.target === modal) {
+                    closeIncidentModal();
+                }
+            };
+        }
+
+        function closeIncidentModal() {
+            const modal = document.getElementById('incidentModal');
+            modal.style.display = 'none';
+            
+            // Clear timer
+            if (modalAutoCloseTimer) {
+                clearInterval(modalAutoCloseTimer);
+                modalAutoCloseTimer = null;
+            }
+        }
+    </script>
+
+    <!-- Incident Details Modal -->
+    <div id="incidentModal" class="incident-modal">
+        <div class="incident-modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalIncidentId">INC-123</div>
+                <button class="modal-close" onclick="closeIncidentModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <div class="modal-section-title">👤 Patient</div>
+                    <div class="modal-section-content" id="modalPatientName">-</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">📅 Occurred</div>
+                    <div class="modal-section-content" id="modalOccurred">-</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">📍 Location</div>
+                    <div class="modal-section-content" id="modalLocation">-</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">📋 Incident Type</div>
+                    <div class="modal-section-content" id="modalType">-</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">📝 Description</div>
+                    <div class="modal-section-content" id="modalDescription">-</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">✅ Assessment Tasks</div>
+                    <div class="modal-section-content" id="modalTasks">-</div>
+                </div>
+            </div>
+            <div class="auto-close-timer" id="autoCloseTimer">Auto-closing in <span id="timerSeconds">5</span>s...</div>
+        </div>
+    </div>
+
+</body>
+</html>

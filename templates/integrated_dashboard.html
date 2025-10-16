@@ -1,0 +1,3356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIMS - Integrated Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        body {
+            padding-top: 76px;
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        #manad-status {
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        #manad-indicator {
+            font-size: 0.6rem;
+            margin-right: 0.5rem;
+        }
+
+        #manad-indicator.connected {
+            color: #27ae60;
+        }
+
+        #manad-indicator.disconnected {
+            color: #e74c3c;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.3; }
+        }
+
+        .sidebar {
+            background: white;
+            min-height: 100vh;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.1);
+            padding: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            z-index: 999;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            border-bottom: 1px solid #eee;
+        }
+
+        .sidebar-menu a {
+            display: block;
+            padding: 1rem 1.5rem;
+            color: #333;
+            text-decoration: none;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background: linear-gradient(90deg, #e3f2fd, transparent);
+            color: var(--secondary-color);
+            border-left: 4px solid var(--secondary-color);
+        }
+
+        .sidebar-menu a i {
+            width: 20px;
+            margin-right: 10px;
+        }
+
+        .menu-divider {
+            border-top: 1px solid #eee;
+            margin: 0.5rem 0;
+        }
+
+        .menu-label {
+            display: block;
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .main-content {
+            padding: 2rem;
+            margin-left: 250px;
+        }
+
+        .kpi-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .kpi-number {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .kpi-label {
+            color: #6c757d;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-change {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .kpi-change.positive {
+            color: var(--success-color);
+        }
+
+        .kpi-change.negative {
+            color: var(--danger-color);
+        }
+
+        .kpi-description {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+
+        .kpi-description.text-success {
+            color: var(--success-color);
+        }
+
+        .kpi-description.text-warning {
+            color: var(--warning-color);
+        }
+
+        .kpi-description.text-danger {
+            color: var(--danger-color);
+        }
+
+        .kpi-description.text-info {
+            color: var(--info-color);
+        }
+
+        .alert-card {
+            background: linear-gradient(135deg, #fff5f5, #ffe6e6);
+            border: 1px solid #fecaca;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .alert-card.danger {
+            background: linear-gradient(135deg, #fff5f5, #ffe6e6);
+            border-color: #fecaca;
+        }
+
+        .alert-card.warning {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-color: #fde68a;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container canvas {
+            max-height: 300px !important;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .task-card:hover {
+            transform: translateY(-1px);
+        }
+
+        .task-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-body {
+            padding: 1.5rem;
+        }
+
+        .priority-urgent {
+            border-left: 5px solid var(--danger-color);
+        }
+
+        .priority-high {
+            border-left: 5px solid var(--warning-color);
+        }
+
+        .priority-normal {
+            border-left: 5px solid var(--info-color);
+        }
+
+        .btn-task {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-task:hover {
+            background: var(--primary-color);
+        }
+
+        .btn-task.completed {
+            background: var(--success-color);
+        }
+
+        .btn-task.overdue {
+            background: var(--danger-color);
+        }
+
+        .role-switcher {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-right: 0.5rem;
+        }
+
+        .role-badge.admin {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .role-badge.nurse {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .role-badge.carer {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+        }
+
+        .role-badge.clinical_manager {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+                z-index: 1050;
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .kpi-number {
+                font-size: 2rem;
+            }
+        }
+
+        /* Incident Viewer Styles */
+        .incident-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .incident-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .incident-card.high-risk {
+            background: #ffccbc;
+            border: 3px solid #e65100;
+            box-shadow: 0 0 10px rgba(230, 81, 0, 0.3);
+        }
+        
+        .incident-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        .incident-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .incident-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .incident-date {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            background: #ecf0f1;
+            padding: 5px 10px;
+            border-radius: 15px;
+        }
+
+        .incident-details {
+            display: grid;
+            gap: 15px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #2c3e50;
+            min-width: 120px;
+        }
+
+        .detail-value {
+            color: #2c3e50;
+            text-align: left;
+            max-width: 300px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .risk-high {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        .risk-medium {
+            color: #f39c12;
+            font-weight: 600;
+        }
+
+        .risk-low {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .alarm-button {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .alarm-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+            background: linear-gradient(135deg, #ff5252, #d63031);
+        }
+
+        .alarm-button.high-priority {
+            background: linear-gradient(135deg, #ff4757, #c44569);
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
+        }
+
+        .alarm-button.high-priority:hover {
+            background: linear-gradient(135deg, #ff3742, #b33939);
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.7);
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 20px rgba(226, 5, 23, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(226, 5, 23, 0.8);
+            }
+            100% {
+                box-shadow: 0 0 20px rgba(226, 5, 23, 0.5);
+            }
+        }
+
+        .workflow-button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .workflow-button:hover {
+            background: linear-gradient(135deg, #2980b9, #1f618d);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .alarm-status {
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .alarm-status.sending {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .alarm-status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .alarm-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .site-selector {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .site-label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .site-select {
+            padding: 12px 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            color: #2c3e50;
+            min-width: 200px;
+        }
+
+        .date-selector {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .date-input {
+            padding: 10px 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .btn-load {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-load:hover {
+            background: #2980b9;
+        }
+
+        .stats-summary {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            display: block !important;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .site-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #3498db;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .site-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .site-card.high-risk {
+            border-left-color: #e74c3c;
+        }
+
+        .site-card.medium-risk {
+            border-left-color: #f39c12;
+        }
+
+        .site-card.low-risk {
+            border-left-color: #27ae60;
+        }
+        
+        .site-card.no-risk {
+            border-left-color: #28a745;
+            background-color: #f8f9fa;
+        }
+        
+        /* Site status styles */
+        .site-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-icon {
+            font-size: 16px;
+        }
+        
+        .status-text {
+            color: #666;
+        }
+        
+        .site-card.no-risk .site-count.zero {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        /* Table styles for incident summary */
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .table thead th {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            font-weight: 600;
+            padding: 15px 12px;
+        }
+        
+        .table tbody tr {
+            transition: all 0.3s ease;
+        }
+        
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-1px);
+        }
+        
+        .table tbody td {
+            padding: 15px 12px;
+            vertical-align: middle;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .recent-incidents {
+            max-width: 300px;
+        }
+        
+        .incident-detail {
+            margin-bottom: 8px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-icon {
+            font-size: 18px;
+        }
+        
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .badge {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+
+        /* Overdue blinking animation */
+        .status-overdue {
+            color: #dc3545 !important;
+            animation: blink-overdue 1s infinite;
+            font-weight: 600;
+        }
+
+        .overdue-task-row {
+            background-color: rgba(220, 53, 69, 0.1) !important;
+            border-left: 4px solid #dc3545 !important;
+            /* animation: blink-overdue 2s infinite; */ /* 깜박임 제거 */
+        }
+
+        .overdue-task-row td {
+            color: #dc3545 !important;
+            font-weight: 600;
+        }
+
+        /* 깜박임 애니메이션 비활성화
+        @keyframes blink-overdue {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        */
+
+        /* Nurse Station Real-time Alerts */
+        .alert-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+            z-index: 9999;
+            min-width: 350px;
+            animation: slideInRight 0.5s ease-out, pulse 2s infinite;
+            border-left: 5px solid #fff;
+        }
+
+        .alert-popup.warning {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #212529;
+            box-shadow: 0 8px 25px rgba(255, 193, 7, 0.4);
+        }
+
+        .alert-popup.critical {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            animation: slideInRight 0.5s ease-out, pulse 1s infinite, blink-critical 1s infinite;
+        }
+
+        .alert-popup .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .alert-popup .alert-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .alert-popup .alert-title i {
+            margin-right: 8px;
+            font-size: 20px;
+        }
+
+        .alert-popup .alert-timer {
+            font-size: 16px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+        }
+
+        .alert-popup .alert-content {
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .alert-popup .alert-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .alert-popup .btn-acknowledge {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .alert-popup .btn-acknowledge:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .alert-popup .btn-dismiss {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .alert-popup .btn-dismiss:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes blink-critical {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.7; }
+        }
+
+        /* Countdown Timer Styles */
+        .countdown-timer {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            font-size: 16px;
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+
+        .countdown-timer.normal {
+            background: #28a745;
+            color: white;
+        }
+
+        .countdown-timer.warning {
+            background: #ffc107;
+            color: #212529;
+            animation: pulse 2s infinite;
+        }
+
+        .countdown-timer.critical {
+            background: #dc3545;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        /* Audio Control */
+        .audio-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            z-index: 1000;
+        }
+
+        .audio-controls button {
+            background: transparent;
+            border: 1px solid #fff;
+            color: white;
+            padding: 5px 10px;
+            margin: 0 2px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .audio-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Validating status indicator */
+        .status-validating {
+            color: #ffc107 !important;
+            font-weight: 600;
+        }
+
+        .status-validating-indicator {
+            color: #ffc107;
+            font-weight: 500;
+        }
+        
+        /* Loading indicator styles */
+        .loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            text-align: center;
+        }
+        
+        .loading-content {
+            min-width: 350px;
+        }
+        
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+        }
+        
+        .progress-bar {
+            background-color: #007bff;
+            transition: width 0.3s ease;
+        }
+        
+        /* Chart container styles */
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            height: 280px;
+            position: relative;
+        }
+        
+        /* Open Incidents specific styling */
+        .incidents-container {
+            height: 500px;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .incidents-container h5 {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+            flex-shrink: 0;
+        }
+        
+        .incidents-table-container {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        
+        .incidents-table-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .incidents-table-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .incidents-table-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .incidents-table-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* Sticky table header for incidents */
+        .incidents-table-container .table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #2c3e50 !important;
+            color: white !important;
+            border: none;
+            font-weight: 600;
+            padding: 12px 8px;
+        }
+        
+        /* Remove all hover effects for incidents table */
+        .incidents-table-container .table tbody tr:hover {
+            background-color: transparent !important;
+            transform: none !important;
+        }
+        
+        .incidents-table-container .table tbody tr {
+            background-color: transparent !important;
+        }
+        
+        .incidents-table-container .table tbody tr:nth-child(even) {
+            background-color: #f8f9fa !important;
+        }
+        
+        .chart-container canvas {
+            max-height: 200px !important;
+        }
+        
+        .no-data-message {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Site analysis container styles */
+        .site-analysis-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .site-analysis-container:hover {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .chart-container-small {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            height: 200px;
+            position: relative;
+            border: 1px solid #e9ecef;
+        }
+        
+        .chart-container-small canvas {
+            max-height: 120px !important;
+        }
+        
+        /* Period selector styles */
+        .period-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .period-selector .form-select {
+            min-width: 120px;
+        }
+        
+        .period-selector .btn {
+            white-space: nowrap;
+        }
+
+        .site-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .site-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .site-count {
+            background: #3498db;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .site-count.high {
+            background: #e74c3c;
+        }
+
+        .site-count.medium {
+            background: #f39c12;
+        }
+
+        .site-count.low {
+            background: #27ae60;
+        }
+
+        .incident-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .incident-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+        .incident-item:last-child {
+            border-bottom: none;
+        }
+
+        .incident-info {
+            flex: 1;
+        }
+
+        .incident-type {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9em;
+        }
+
+        .incident-resident {
+            color: #7f8c8d;
+            font-size: 0.8em;
+            margin-top: 2px;
+        }
+
+        .incident-risk {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .incident-risk.high {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .incident-risk.medium {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .incident-risk.low {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .no-incidents {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                CIMS Integrated Dashboard
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3" id="manad-status">
+                    <i class="fas fa-circle" id="manad-indicator"></i>
+                    <span id="manad-status-text">Checking...</span>
+                </span>
+                <span class="navbar-text">
+                    <i class="fas fa-user me-2"></i>
+                    <span id="current-user">Loading...</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar (Fixed Position) -->
+    <div class="sidebar">
+                    <div class="sidebar-header">
+                        <i class="fas fa-tachometer-alt me-2"></i>
+                        Menu
+                    </div>
+                    <ul class="sidebar-menu">
+                        <li><a href="#" class="active" data-section="dashboard">
+                            <i class="fas fa-home"></i> Dashboard
+                        </a></li>
+                        <li><a href="/mobile_dashboard">
+                            <i class="fas fa-tasks"></i> Task Management
+                        </a></li>
+                        <li><a href="/incident-viewer">
+                            <i class="fas fa-exclamation-triangle"></i> Incidents
+                        </a></li>
+                        <li><a href="/policy_admin">
+                            <i class="fas fa-cog"></i> Policy Management
+                        </a></li>
+                        <li><a href="#" data-section="settings">
+                            <i class="fas fa-tools"></i> System Settings
+                        </a></li>
+                        <li><a href="#" data-section="analytics">
+                            <i class="fas fa-chart-bar"></i> Analytics
+                        </a></li>
+                        <li><a href="#" data-section="users">
+                            <i class="fas fa-users"></i> User Management
+                        </a></li>
+                        <li><a href="#" data-section="audit">
+                            <i class="fas fa-clipboard-list"></i> Audit Log
+                        </a></li>
+                        
+                        <!-- System Links -->
+                        <li class="menu-divider">
+                            <span class="menu-label">System</span>
+                        </li>
+                        <li><a href="/progress-notes">
+                            <i class="fas fa-file-medical"></i> Progress Notes
+                        </a></li>
+                        <li><a href="/">
+                            <i class="fas fa-arrow-left"></i> Main System
+                        </a></li>
+                        <li><a href="/logout">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a></li>
+                    </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+                    <!-- Role Switcher with Period & Type Filters -->
+                    <div class="role-switcher">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h5><i class="fas fa-user-tag me-2"></i>Current Role</h5>
+                                <span id="current-role" class="role-badge">Loading...</span>
+                                <small class="text-muted ms-2">Different views are displayed based on your role</small>
+                            </div>
+                            <div class="period-filter">
+                                <label for="globalPeriodSelect" class="form-label me-2 mb-0" style="font-weight: 500;">📅 Period:</label>
+                                <select id="globalPeriodSelect" class="form-select" style="width: auto; display: inline-block;" onchange="applyFilters()">
+                                    <option value="today">Today</option>
+                                    <option value="week" selected>This Week</option>
+                                    <option value="month">This Month</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Incident Type Filter -->
+                        <div class="incident-type-filter" style="padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px;">
+                            <label class="form-label mb-2" style="font-weight: 500;">🏥 Incident Type:</label>
+                            <div class="btn-group btn-group-sm" role="group" id="incidentTypeFilter">
+                                <input type="radio" class="btn-check" name="incidentType" id="typeAll" value="all" checked autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-primary" for="typeAll">All</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeFall" value="fall" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="typeFall">Fall</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeWound" value="wound" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="typeWound">Wound/Skin</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeMedication" value="medication" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-info" for="typeMedication">Medication</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeBehaviour" value="behaviour" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-success" for="typeBehaviour">Behaviour</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeOther" value="other" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-secondary" for="typeOther">Other</label>
+                            </div>
+                        </div>
+                    </div>
+
+    <!-- Audio Controls -->
+    <div class="audio-controls" id="audioControls" style="display: none;">
+        <button onclick="toggleAudio()" id="audioToggle">🔊 Audio ON</button>
+        <button onclick="testAlert()">Test Alert</button>
+    </div>
+
+    <!-- Admin View -->
+    <div id="admin-view" style="display: none;">
+                        <!-- KPI Cards -->
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number" id="compliance-rate">--</div>
+                                    <div class="kpi-label">Overall Compliance Rate</div>
+                                    <div class="kpi-description" id="compliance-desc">No data</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-danger" id="overdue-tasks">--</div>
+                                    <div class="kpi-label">Overdue Tasks</div>
+                                    <div class="kpi-description" id="overdue-desc">All tasks on time</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-warning" id="open-incidents">--</div>
+                                    <div class="kpi-label">Open Incidents</div>
+                                    <div class="kpi-description" id="incidents-change">Not visited</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-info" id="total-incidents">--</div>
+                                    <div class="kpi-label">Total Incidents</div>
+                                    <div class="kpi-description" id="total-incidents-desc">This Week</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Incident Viewer Section -->
+                        <div class="incident-viewer-section">
+
+                            <!-- Site Analysis Dashboard -->
+                            <div class="mt-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3 style="color: #2c3e50; margin: 0;">📊 Site Analysis Dashboard</h3>
+                                    <button class="btn btn-primary btn-sm" onclick="loadIncidents()">🔄 Refresh</button>
+                                </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-4">
+                                            <div class="site-analysis-container">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Parafield Gardens</h5>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">📈 Incidents by Type</h6>
+                                                            <canvas id="incidentsChartParafield" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
+                                                            <canvas id="complianceChartParafield" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <div class="site-analysis-container">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Nerrilda</h5>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">📈 Incidents by Type</h6>
+                                                            <canvas id="incidentsChartNerrilda" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
+                                                            <canvas id="complianceChartNerrilda" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <div class="site-analysis-container">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Ramsay</h5>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">📈 Incidents by Type</h6>
+                                                            <canvas id="incidentsChartRamsay" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
+                                                            <canvas id="complianceChartRamsay" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <div class="site-analysis-container">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 West Park</h5>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">📈 Incidents by Type</h6>
+                                                            <canvas id="incidentsChartWestPark" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
+                                                            <canvas id="complianceChartWestPark" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <div class="site-analysis-container">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Yankalilla</h5>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">📈 Incidents by Type</h6>
+                                                            <canvas id="incidentsChartYankalilla" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="chart-container-small">
+                                                            <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
+                                                            <canvas id="complianceChartYankalilla" width="200" height="150"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Stats Summary -->
+                        <div class="stats-summary" id="statsSummary">
+                            <h3 style="color: #2c3e50; margin-bottom: 20px;">📊 Incident Summary by Site</h3>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Site Name</th>
+                                            <th>Current Incidents</th>
+                                            <th>Risk Level</th>
+                                            <th>Recent Incidents</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sitesTableBody">
+                                        <!-- Sites will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <!-- Settings Section (Admin/Clinical Manager only) -->
+                    <div id="settings-view" style="display: none;">
+                        <div class="container-fluid">
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="card shadow-sm">
+                                        <div class="card-header bg-primary text-white">
+                                            <h4 class="mb-0"><i class="fas fa-tools me-2"></i>System Settings</h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- Force Sync Section -->
+                                            <div class="mb-4">
+                                                <h5 class="text-primary mb-3">
+                                                    <i class="fas fa-sync-alt me-2"></i>Data Synchronization
+                                                </h5>
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-2"></i>
+                                                    <strong>Force Synchronization</strong> will perform a complete database update:
+                                                    <ul class="mb-0 mt-2">
+                                                        <li>Sync all incidents from MANAD Plus (last 30 days)</li>
+                                                        <li>Auto-generate missing tasks for Fall incidents</li>
+                                                        <li>Sync progress notes and update task completion status</li>
+                                                        <li>Update all incident statuses (Open/Overdue/Closed)</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <button id="forceSyncBtn" class="btn btn-primary btn-lg" onclick="performForceSync()">
+                                                        <i class="fas fa-sync-alt me-2"></i>Force Synchronization
+                                                    </button>
+                                                    <div id="syncStatus" class="text-muted"></div>
+                                                </div>
+                                                <div id="syncProgress" class="mt-3" style="display: none;">
+                                                    <div class="progress" style="height: 30px;">
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                             id="syncProgressBar" 
+                                                             role="progressbar" 
+                                                             style="width: 0%">0%</div>
+                                                    </div>
+                                                    <div id="syncDetails" class="mt-2 small text-muted"></div>
+                                                </div>
+                                                <div id="syncResult" class="mt-3" style="display: none;"></div>
+                                            </div>
+
+                                            <!-- Auto Sync Info -->
+                                            <div class="mb-4">
+                                                <h5 class="text-secondary mb-3">
+                                                    <i class="fas fa-clock me-2"></i>Automatic Synchronization
+                                                </h5>
+                                                <div class="alert alert-secondary">
+                                                    <i class="fas fa-info-circle me-2"></i>
+                                                    The system automatically synchronizes data every <strong>5 minutes</strong> in the background.
+                                                    Use Force Sync only when you need immediate updates or to fix data inconsistencies.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User View (Nurse/Carer) -->
+                    <div id="user-view" style="display: none;">
+                        <!-- User KPI Cards -->
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-danger" id="my-overdue">--</div>
+                                    <div class="kpi-label">My Overdue Tasks</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-warning" id="my-due-today">--</div>
+                                    <div class="kpi-label">Due Today</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-info" id="my-total">--</div>
+                                    <div class="kpi-label">Total Assigned</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- My Tasks -->
+                        <div class="chart-container">
+                            <h5><i class="fas fa-tasks me-2"></i>My Assigned Tasks</h5>
+                            <div id="my-tasks-list">
+                                <!-- User tasks will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="loading-state" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentUser = null;
+        let currentRole = null;
+        let audioEnabled = true;
+        let alertSound = null;
+        let activeAlerts = new Map();
+        let countdownIntervals = new Map();
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserInfo();
+            setupEventListeners();
+            initializeAudio();
+            startAlertMonitoring();
+            checkManadStatus(); // Check MANAD Plus connection status
+            
+            // Check MANAD Plus status every 5 minutes
+            setInterval(checkManadStatus, 300000);
+        });
+
+        // Check MANAD Plus connection status
+        async function checkManadStatus() {
+            const indicator = document.getElementById('manad-indicator');
+            const statusText = document.getElementById('manad-status-text');
+            const statusContainer = document.getElementById('manad-status');
+            
+            try {
+                const response = await fetch('/api/v1/integrator/status');
+                
+                if (response.ok) {
+                    const status = await response.json();
+                    
+                    if (status.api_connected) {
+                        indicator.className = 'fas fa-circle connected';
+                        statusText.textContent = 'MANAD Plus: Connected';
+                        statusContainer.title = `Last checked: ${status.last_checked}`;
+                    } else {
+                        indicator.className = 'fas fa-circle disconnected';
+                        statusText.textContent = 'MANAD Plus: Offline';
+                        statusContainer.title = status.connection_error || 'Connection error';
+                    }
+                } else {
+                    indicator.className = 'fas fa-circle disconnected';
+                    statusText.textContent = 'MANAD Plus: Status Unknown';
+                    statusContainer.title = 'Failed to check status';
+                }
+            } catch (error) {
+                indicator.className = 'fas fa-circle disconnected';
+                statusText.textContent = 'MANAD Plus: Offline';
+                statusContainer.title = 'Unable to connect to MANAD Plus API';
+                console.error('Error checking MANAD Plus status:', error);
+            }
+        }
+
+        // Load user information
+        async function loadUserInfo() {
+            try {
+                // Get user info from Flask template variables
+                currentUser = '{{ current_user.username if current_user.is_authenticated else "Guest" }}';
+                currentRole = '{{ user_role if user_role else "nurse" }}';
+                
+                document.getElementById('current-user').textContent = currentUser;
+                updateRoleBadge(currentRole);
+                
+                // Show appropriate view based on role
+                if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                    showAdminView();
+                    loadAdminData();
+                } else {
+                    document.getElementById('admin-view').style.display = 'none';
+                    document.getElementById('user-view').style.display = 'block';
+                    loadUserData();
+                }
+                
+                document.getElementById('loading-state').style.display = 'none';
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                document.getElementById('loading-state').innerHTML = 
+                    '<div class="alert alert-danger">Unable to load user information.</div>';
+            }
+        }
+
+        // Update role badge
+        function updateRoleBadge(role) {
+            const roleElement = document.getElementById('current-role');
+            roleElement.textContent = role;
+            roleElement.className = `role-badge ${role}`;
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Sidebar navigation
+            document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    // Check if it's an external link (has href starting with /)
+                    if (this.href && this.href.startsWith(window.location.origin + '/') && !this.href.includes('#')) {
+                        // External link - let it navigate normally
+                        return;
+                    }
+                    
+                    // Internal section navigation
+                    e.preventDefault();
+                    const section = this.dataset.section;
+                    if (section) {
+                        navigateToSection(section);
+                    }
+                });
+            });
+        }
+
+        // Navigate to section
+        function navigateToSection(section) {
+            // Update active menu item
+            document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.querySelector(`[data-section="${section}"]`).classList.add('active');
+            
+            // Handle section-specific logic
+            switch(section) {
+                case 'dashboard':
+                    if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                        loadAdminData();
+                    } else {
+                        loadUserData();
+                    }
+                    break;
+                case 'analytics':
+                    loadAnalytics();
+                    break;
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'audit':
+                    loadAuditLog();
+                    break;
+            }
+        }
+
+        // Load admin data
+        async function loadAdminData() {
+            try {
+                // 먼저 인시던트 데이터 로드 (filteredIncidents 설정)
+                await initializeIncidentViewer();
+                
+                // 그 다음 나머지 데이터 로드
+                // loadComplianceSummary() is deprecated - updateKPICards() handles this
+                // loadOverdueTasks() // Removed - will be re-implemented later
+                
+                // 마지막으로 Open Incidents 표시 (filteredIncidents 사용)
+                // displayOpenIncidents(filteredIncidents); // Removed - duplicate content
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+            }
+        }
+
+        // Load user data
+        async function loadUserData() {
+            try {
+                await loadMyTasks();
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        }
+
+        // Removed - KPI updates now handled by updateKPICards()
+        async function loadComplianceSummary() {
+            // This function is deprecated
+            // KPI cards are now updated by updateKPICards() which uses /api/cims/dashboard-kpis
+            console.log('ℹ️ loadComplianceSummary() is deprecated - using updateKPICards() instead');
+        }
+
+        // Load incidents by type
+
+        // Load overdue tasks
+        // Removed - will be re-implemented later
+        /*
+        async function loadOverdueTasks() {
+            try {
+                const response = await fetch('/api/v1/tasks/overdue');
+                console.log('Overdue tasks response:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayUrgentAlerts(data);
+                } else {
+                    console.error('Overdue tasks error:', response.status, response.statusText);
+                    const errorData = await response.json();
+                    console.error('Error details:', errorData);
+                }
+            } catch (error) {
+                console.error('Error loading overdue tasks:', error);
+            }
+        }
+        */
+
+        // Note: loadOpenIncidents는 loadAdminData()에서 initializeIncidentViewer()로 대체됨
+        // Open Incidents 테이블은 filteredIncidents를 사용하여 displayOpenIncidents()로 표시
+
+        // Load my tasks
+        async function loadMyTasks() {
+            try {
+                const response = await fetch('/api/v1/tasks/me');
+                if (response.ok) {
+                    const data = await response.json();
+                    displayMyTasks(data);
+                    updateUserKPIs(data);
+                } else {
+                    console.error('Error loading my tasks:', response.status, response.statusText);
+                    // Set default values when API fails
+                    updateUserKPIs([]);
+                }
+            } catch (error) {
+                console.error('Error loading my tasks:', error);
+                // Set default values when error occurs
+                updateUserKPIs([]);
+            }
+        }
+
+
+        // Removed - will be re-implemented later
+        /*
+        function displayUrgentAlerts(tasks) {
+            const alertsContainer = document.getElementById('urgent-alerts-list');
+            const alertsCard = document.getElementById('urgent-alerts');
+            
+            if (tasks && tasks.length > 0) {
+                // 2일(48시간) 이내의 overdue tasks만 필터링
+                const now = new Date();
+                const twoDaysAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+                
+                const recentTasks = tasks.filter(task => {
+                    if (!task.due_date) return false;
+                    const dueDate = new Date(task.due_date);
+                    // 2일 이내에 마감된 Task만 표시
+                    return dueDate >= twoDaysAgo;
+                });
+                
+                if (recentTasks.length > 0) {
+                    alertsCard.style.display = 'block';
+                    alertsContainer.innerHTML = recentTasks.map(task => `
+                        <div class="alert alert-danger mb-2">
+                            <strong>${task.task_id}</strong> - ${task.resident_name}: ${task.description}
+                            <br><small>담당자: ${task.assigned_user} | 초과: ${task.overdue_by_hours}시간</small>
+                        </div>
+                    `).join('');
+                } else {
+                    alertsCard.style.display = 'none';
+                }
+            } else {
+                alertsCard.style.display = 'none';
+            }
+        }
+        */
+
+        // Removed - duplicate content
+        /*
+        function displayOpenIncidents(incidents) {
+            const tableBody = document.getElementById('incidents-table');
+            if (incidents && incidents.length > 0) {
+                // Sort by site and then by date (newest first)
+                const sortedIncidents = [...incidents].sort((a, b) => {
+                    // First sort by site
+                    if (a.site < b.site) return -1;
+                    if (a.site > b.site) return 1;
+                    // Then sort by date (newest first)
+                    return new Date(b.incident_date) - new Date(a.incident_date);
+                });
+                
+                tableBody.innerHTML = sortedIncidents.map(incident => {
+                    // Check if incident is overdue (older than 24 hours and still open)
+                    const incidentDate = new Date(incident.incident_date);
+                    const now = new Date();
+                    const hoursDiff = (now - incidentDate) / (1000 * 60 * 60);
+                    const isOverdue = hoursDiff > 24 && incident.status === 'Open';
+                    
+                    const rowClass = isOverdue ? 'overdue-task-row' : '';
+                    
+                    // Get severity badge color (support SeverityRating, RiskRatingName, and severity)
+                    const severity = incident.severity || incident.SeverityRating || incident.RiskRatingName;
+                    let severityColor = 'secondary';
+                    let severityText = 'N/A';
+                    
+                    if (severity) {
+                        severityText = severity;
+                        const sev = severity.toLowerCase();
+                        
+                        // Handle different formats: "3 - Mild", "High", "Moderate", etc.
+                        if (sev.includes('critical') || sev.includes('severe') || sev.includes('high') || 
+                            sev.includes('5 -') || sev.includes('4 -')) {
+                            severityColor = 'danger';
+                        } else if (sev.includes('moderate') || sev.includes('medium') || 
+                                   sev.includes('3 -') || sev.includes('2 -')) {
+                            severityColor = 'warning';
+                        } else if (sev.includes('mild') || sev.includes('low') || sev.includes('1 -')) {
+                            severityColor = 'success';
+                        }
+                    }
+                    
+                    // Format date to Australian format
+                    const dateObj = new Date(incident.incident_date);
+                    const formattedDate = dateObj.toLocaleString('en-AU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    // Support both site and SiteName fields
+                    const siteName = incident.site || incident.SiteName || 'Unknown';
+                    
+                    return `
+                        <tr class="${rowClass}">
+                            <td>${incident.incident_id || 'N/A'}</td>
+                            <td>${incident.incident_type || 'Unknown'}</td>
+                            <td><span class="badge bg-${severityColor}">${severityText}</span></td>
+                            <td>${formattedDate}</td>
+                            <td>${incident.resident_name || 'Unknown'}</td>
+                            <td><strong>${siteName}</strong></td>
+                            <td><button class="btn btn-sm btn-outline-primary" onclick="viewIncidentDetails('${incident.incident_id}')">View</button></td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No open incidents</td></tr>';
+            }
+        }
+        */
+
+        // View incident details
+        function viewIncidentDetails(incidentId) {
+            // Redirect to incident viewer page with the incident ID
+            window.location.href = `/incident-viewer?incident_id=${incidentId}`;
+        }
+
+        // Display my tasks
+        function displayMyTasks(tasks) {
+            const tasksContainer = document.getElementById('my-tasks-list');
+            if (tasks && tasks.length > 0) {
+                tasksContainer.innerHTML = tasks.map(task => `
+                    <div class="task-card priority-${task.urgency === 'High' ? 'urgent' : task.urgency === 'Medium' ? 'high' : 'normal'}">
+                        <div class="task-header">
+                            <h6 class="mb-0">${task.description}</h6>
+                            <span class="badge bg-${task.urgency === 'High' ? 'danger' : task.urgency === 'Medium' ? 'warning' : 'info'}">${task.urgency}</span>
+                        </div>
+                        <div class="task-body">
+                            <p class="mb-2"><strong>Resident:</strong> ${task.resident_name}</p>
+                            <p class="mb-2"><strong>Due Date:</strong> ${new Date(task.due_date).toLocaleString()}</p>
+                            <button class="btn-task ${task.status === 'completed' ? 'completed' : task.overdue ? 'overdue' : ''}" 
+                                    onclick="completeTask('${task.task_id}')">
+                                ${task.status === 'completed' ? 'Completed' : task.overdue ? 'Overdue' : 'Start Task'}
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                tasksContainer.innerHTML = '<div class="text-center py-4"><p class="text-muted">No assigned tasks</p></div>';
+            }
+        }
+
+        // Update user KPIs
+        function updateUserKPIs(tasks) {
+            if (!tasks || !Array.isArray(tasks)) {
+                // Set default values when no tasks data
+                document.getElementById('my-overdue').textContent = '0';
+                document.getElementById('my-due-today').textContent = '0';
+                document.getElementById('my-total').textContent = '0';
+                return;
+            }
+
+            const overdue = tasks.filter(task => task.urgency === 'Overdue' || task.status === 'overdue').length;
+            const dueToday = tasks.filter(task => {
+                const today = new Date();
+                const dueDate = new Date(task.due_date);
+                return dueDate.toDateString() === today.toDateString() && task.urgency !== 'Overdue';
+            }).length;
+            const total = tasks.length;
+
+            document.getElementById('my-overdue').textContent = overdue || '0';
+            document.getElementById('my-due-today').textContent = dueToday || '0';
+            document.getElementById('my-total').textContent = total || '0';
+        }
+
+        // Complete task
+        function completeTask(taskId) {
+            if (confirm('Do you want to complete this task?')) {
+                // Redirect to task completion page
+                window.location.href = `/task_confirmation?task_id=${taskId}`;
+            }
+        }
+
+
+        // Load analytics section
+        function loadAnalytics() {
+            document.getElementById('main-content').innerHTML = `
+                <div class="row">
+                    <div class="col-12">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-chart-bar me-2"></i>Analytics Dashboard</h3>
+                            <p>Advanced analytics and reporting features.</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="kpi-card text-center">
+                                        <div class="kpi-number">--</div>
+                                        <div class="kpi-label">Compliance Rate</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="kpi-card text-center">
+                                        <div class="kpi-number">--</div>
+                                        <div class="kpi-label">Task Completion</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load users section
+        function loadUsers() {
+            document.getElementById('main-content').innerHTML = `
+                <div class="row">
+                    <div class="col-12">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-users me-2"></i>User Management</h3>
+                            <p>User account and role management.</p>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>Role</th>
+                                            <th>Status</th>
+                                            <th>Last Login</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="5" class="text-center">User management features coming soon</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load audit log section
+        function loadAuditLog() {
+            document.getElementById('main-content').innerHTML = `
+                <div class="row">
+                    <div class="col-12">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-clipboard-list me-2"></i>Audit Log</h3>
+                            <p>System activity and compliance audit trail.</p>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>User</th>
+                                            <th>Action</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="4" class="text-center">Audit log features coming soon</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Destroy all charts when page unloads
+        function destroyAllCharts() {
+            Object.keys(chartInstances).forEach(chartId => {
+                if (chartInstances[chartId]) {
+                    chartInstances[chartId].destroy();
+                    delete chartInstances[chartId];
+                }
+            });
+        }
+
+        // Add event listener for page unload
+        window.addEventListener('beforeunload', destroyAllCharts);
+
+        // Auto-refresh data every 30 seconds
+        setInterval(() => {
+            if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                // Admin view: 인시던트 데이터만 갱신
+                loadIncidents();
+                // loadComplianceSummary(); // Deprecated - updateKPICards() handles this
+                // loadOverdueTasks(); // Removed - will be re-implemented later
+            } else {
+                loadUserData();
+            }
+        }, 30000);
+
+        // Incident Viewer Functions
+        let currentSite = 'Parafield Gardens';
+        let incidents = [];  // 전체 인시던트 데이터
+        let filteredIncidents = [];  // 필터링된 인시던트 데이터
+        let clients = [];
+        let chartInstances = {}; // Store chart instances to destroy them properly
+        let currentPeriod = 'week'; // 현재 선택된 기간 (기본값: This Week)
+        let currentIncidentType = 'all'; // 현재 선택된 incident type (기본값: All)
+
+        // Initialize incident viewer
+        async function initializeIncidentViewer() {
+            // Auto-load incidents for all sites
+            await loadIncidents();
+        }
+
+        // Auto-load incidents for all sites
+        function loadAllSites() {
+            loadIncidents();
+        }
+
+        // Load incidents from CIMS database (much faster than external API calls)
+        async function loadIncidents() {
+            try {
+                showLoading();
+                hideError();
+                hideNoData();
+                
+                // Load incidents directly from CIMS database instead of external APIs
+                const response = await fetch('/api/cims/incidents');
+                if (response.ok) {
+                    const data = await response.json();
+                    const allIncidents = data.incidents || [];
+                    
+                    console.log(`✅ Loaded ${allIncidents.length} incidents from CIMS DB`);
+                    
+                    // Set global variables for other functions
+                    incidents = allIncidents;
+                    clients = []; // Not needed for CIMS data
+                    
+                    // 초기 로드 시에는 filteredIncidents를 전체로 설정
+                    filteredIncidents = allIncidents;
+                    
+                    // 필터 적용 후 화면 갱신
+                    applyFilters();
+                    
+                } else {
+                    console.error('Failed to load incidents from CIMS database:', response.status);
+                    showError('Failed to load incidents');
+                }
+                
+            } catch (error) {
+                console.error('Error loading incidents:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+
+        // Find client by ID
+        function findClientById(clientId) {
+            if (!clientId) return null;
+            
+            // Try matching with multiple ID fields
+            const client = clients.find(client => 
+                client.PersonId === clientId || 
+                client.MainClientServiceId === clientId ||
+                client.Id === clientId ||
+                client.ClientRecordId === clientId
+            );
+            
+            return client;
+        }
+        
+        // Format client name
+        function formatClientName(client) {
+            if (!client) return null;
+            
+            // When FirstName and LastName are available
+            if (client.FirstName || client.LastName) {
+                const firstName = client.FirstName || '';
+                const lastName = client.LastName || '';
+                return `${firstName} ${lastName}`.trim();
+            }
+            
+            // When ClientName is available
+            if (client.ClientName) {
+                return client.ClientName;
+            }
+            
+            // When PreferredName is available
+            if (client.PreferredName) {
+                return client.PreferredName;
+            }
+            
+            return null;
+        }
+
+        // Get risk class for styling
+        function getRiskClass(riskRating) {
+            if (!riskRating) return '';
+            
+            const rating = riskRating.toLowerCase();
+            if (rating.includes('high') || rating.includes('05') || rating.includes('06') || rating.includes('07') || rating.includes('08') || rating.includes('09') || rating.includes('10')) {
+                return 'risk-high';
+            } else if (rating.includes('medium') || rating.includes('03') || rating.includes('04')) {
+                return 'risk-medium';
+            } else {
+                return 'risk-low';
+            }
+        }
+
+        // Combined filter function (Period + Incident Type)
+        function applyFilters() {
+            const period = document.getElementById('globalPeriodSelect').value;
+            const incidentType = document.querySelector('input[name="incidentType"]:checked').value;
+            
+            currentPeriod = period;
+            currentIncidentType = incidentType;
+            
+            const now = new Date();
+            let startDate;
+            
+            // Period filter
+            if (period === 'today') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (period === 'week') {
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 7);
+            } else if (period === 'month') {
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 30);
+            }
+            
+            // Filter incidents by date and type
+            filteredIncidents = incidents.filter(incident => {
+                const incidentDate = new Date(incident.incident_date);
+                const dateMatch = incidentDate >= startDate;
+                
+                // Type filter
+                let typeMatch = true;
+                if (incidentType !== 'all') {
+                    const incidentTypeStr = (incident.incident_type || '').toLowerCase();
+                    
+                    if (incidentType === 'fall') {
+                        typeMatch = incidentTypeStr.includes('fall');
+                    } else if (incidentType === 'wound') {
+                        typeMatch = incidentTypeStr.includes('wound') || incidentTypeStr.includes('skin');
+                    } else if (incidentType === 'medication') {
+                        typeMatch = incidentTypeStr.includes('medication');
+                    } else if (incidentType === 'behaviour') {
+                        typeMatch = incidentTypeStr.includes('behaviour') || incidentTypeStr.includes('behavior');
+                    } else if (incidentType === 'other') {
+                        typeMatch = !incidentTypeStr.includes('fall') && 
+                                   !incidentTypeStr.includes('wound') && 
+                                   !incidentTypeStr.includes('skin') && 
+                                   !incidentTypeStr.includes('medication') && 
+                                   !incidentTypeStr.includes('behaviour') &&
+                                   !incidentTypeStr.includes('behavior');
+                    }
+                }
+                
+                return dateMatch && typeMatch;
+            });
+            
+            // Filters applied silently
+            
+            // 화면 갱신
+            displayStats();
+            createSiteSpecificCharts();
+            updateKPICards();
+            // displayOpenIncidents(filteredIncidents);  // Removed - duplicate content
+        }
+        
+        // Legacy function for backward compatibility
+        function applyPeriodFilter() {
+            applyFilters();
+        }
+        
+        // Update KPI cards with filtered data
+        async function updateKPICards() {
+            try {
+                // Get KPI data from backend
+                const response = await fetch(`/api/cims/dashboard-kpis?period=${currentPeriod}&incident_type=${currentIncidentType}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch KPI data');
+                }
+                
+                const kpiData = await response.json();
+                console.log('📊 KPI Data:', kpiData);
+                
+                // Update Overall Compliance Rate
+                const complianceRateEl = document.getElementById('compliance-rate');
+                const complianceDescEl = document.getElementById('compliance-desc');
+                if (complianceRateEl && complianceDescEl) {
+                    complianceRateEl.textContent = `${kpiData.compliance_rate}%`;
+                    if (kpiData.compliance_rate >= 90) {
+                        complianceDescEl.textContent = 'Excellent compliance';
+                        complianceDescEl.className = 'kpi-description text-success';
+                    } else if (kpiData.compliance_rate >= 70) {
+                        complianceDescEl.textContent = 'Good compliance';
+                        complianceDescEl.className = 'kpi-description text-warning';
+                    } else {
+                        complianceDescEl.textContent = 'Needs improvement';
+                        complianceDescEl.className = 'kpi-description text-danger';
+                    }
+                }
+                
+                // Update Overdue Tasks
+                const overdueTasksEl = document.getElementById('overdue-tasks');
+                const overdueDescEl = document.getElementById('overdue-desc');
+                if (overdueTasksEl && overdueDescEl) {
+                    overdueTasksEl.textContent = kpiData.overdue_tasks;
+                    if (kpiData.overdue_tasks === 0) {
+                        overdueDescEl.textContent = 'All tasks on time';
+                        overdueDescEl.className = 'kpi-description text-success';
+                    } else {
+                        overdueDescEl.textContent = `${kpiData.overdue_tasks} incident${kpiData.overdue_tasks > 1 ? 's' : ''} overdue`;
+                        overdueDescEl.className = 'kpi-description text-danger';
+                    }
+                }
+                
+                // Update Open Incidents (never visited)
+                const openIncidentsEl = document.getElementById('open-incidents');
+                const incidentsChangeEl = document.getElementById('incidents-change');
+                if (openIncidentsEl && incidentsChangeEl) {
+                    openIncidentsEl.textContent = kpiData.open_incidents;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    incidentsChangeEl.textContent = `${periodText}: ${kpiData.open_incidents} not visited`;
+                }
+                
+                // Update Total Incidents (renamed from Total Tasks)
+                const totalIncidentsEl = document.getElementById('total-incidents');
+                const totalIncidentsDescEl = document.getElementById('total-incidents-desc');
+                if (totalIncidentsEl && totalIncidentsDescEl) {
+                    totalIncidentsEl.textContent = kpiData.total_incidents;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    totalIncidentsDescEl.textContent = `${periodText}: ${kpiData.total_incidents}`;
+                }
+                
+            } catch (error) {
+                console.error('Error updating KPI cards:', error);
+                // Show error state in KPI cards
+                document.getElementById('compliance-rate').textContent = '--';
+                document.getElementById('overdue-tasks').textContent = '--';
+                document.getElementById('open-incidents').textContent = '--';
+                document.getElementById('total-incidents').textContent = '--';
+            }
+        }
+        
+        // Display statistics by site
+        function displayStats() {
+            
+            const statsSummary = document.getElementById('statsSummary');
+            statsSummary.style.display = 'block';
+            
+            // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
+            const dataToDisplay = filteredIncidents;
+            
+            // Group incidents by site
+            const incidentsBySite = {};
+            dataToDisplay.forEach(incident => {
+                const site = incident.SiteName || 'Unknown Site';
+                if (!incidentsBySite[site]) {
+                    incidentsBySite[site] = [];
+                }
+                incidentsBySite[site].push(incident);
+            });
+            
+            // Display sites
+            displaySites(incidentsBySite);
+        }
+
+        // Display sites with incidents in table format
+        function displaySites(incidentsBySite) {
+            const tableBody = document.getElementById('sitesTableBody');
+            tableBody.innerHTML = '';
+            
+            // Define all 5 sites in order
+            const allSites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
+            
+            allSites.forEach(siteName => {
+                const siteIncidents = incidentsBySite[siteName] || [];
+                const tableRow = createSiteTableRow(siteName, siteIncidents);
+                tableBody.appendChild(tableRow);
+            });
+        }
+
+        // Create site table row
+        function createSiteTableRow(siteName, siteIncidents) {
+            const row = document.createElement('tr');
+            const totalIncidents = siteIncidents.length;
+            
+            // Use severity field (support SeverityRating, RiskRatingName formats)
+            const highRiskCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                if (!sev) return false;
+                const sevLower = sev.toLowerCase();
+                return sevLower.includes('critical') || sevLower.includes('severe') || 
+                       sevLower.includes('high') || sevLower.includes('5 -') || sevLower.includes('4 -');
+            }).length;
+            
+            const mediumRiskCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                if (!sev) return false;
+                const sevLower = sev.toLowerCase();
+                return sevLower.includes('moderate') || sevLower.includes('medium') || 
+                       sevLower.includes('3 -') || sevLower.includes('2 -');
+            }).length;
+            
+            const lowRiskCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                if (!sev) return false;
+                const sevLower = sev.toLowerCase();
+                return sevLower.includes('mild') || sevLower.includes('low') || sevLower.includes('1 -');
+            }).length;
+            
+            const unratedCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                return !sev;
+            }).length;
+            
+            // Determine overall risk level for the site
+            let riskLevel = 'No Risk';
+            let riskClass = 'success';
+            let statusIcon = '✅';
+            let statusText = 'No incidents';
+            
+            if (totalIncidents > 0) {
+                if (highRiskCount > 0) {
+                    riskLevel = 'High Risk';
+                    riskClass = 'danger';
+                    statusIcon = '🔴';
+                    statusText = 'High risk incidents';
+                } else if (mediumRiskCount > 0) {
+                    riskLevel = 'Medium Risk';
+                    riskClass = 'warning';
+                    statusIcon = '🟡';
+                    statusText = 'Medium risk incidents';
+                } else if (lowRiskCount > 0) {
+                    riskLevel = 'Low Risk';
+                    riskClass = 'info';
+                    statusIcon = '🟢';
+                    statusText = 'Low risk incidents';
+                } else if (unratedCount > 0) {
+                    riskLevel = 'Not Rated';
+                    riskClass = 'secondary';
+                    statusIcon = '⚪';
+                    statusText = 'Risk not rated';
+                }
+            }
+            
+            // Get recent incidents (max 3 for table display)
+            const recentIncidents = siteIncidents.slice(0, 3);
+            
+            // Create recent incidents details
+            let recentIncidentsHtml = '';
+            if (recentIncidents.length > 0) {
+                recentIncidentsHtml = recentIncidents.map(incident => {
+                    // Use CIMS DB field names (filteredIncidents format)
+                    const eventType = incident.incident_type || 'Unknown';
+                    const residentName = incident.resident_name || 'Unknown';
+                    const incidentDate = new Date(incident.incident_date).toLocaleDateString('en-AU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                    
+                    return `
+                        <div class="incident-detail">
+                            <strong>${eventType}</strong> - ${residentName}<br>
+                            <small class="text-muted">${incidentDate}</small>
+                        </div>
+                    `;
+                }).join('');
+                
+                if (totalIncidents > 3) {
+                    recentIncidentsHtml += `<div class="text-muted"><small>... and ${totalIncidents - 3} more</small></div>`;
+                }
+            } else {
+                recentIncidentsHtml = '<span class="text-muted">No recent incidents</span>';
+            }
+            
+            row.innerHTML = `
+                <td><strong>${siteName}</strong></td>
+                <td>
+                    <span class="badge bg-${totalIncidents > 0 ? 'primary' : 'secondary'} fs-6">
+                        ${totalIncidents}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge bg-${riskClass}">${riskLevel}</span>
+                </td>
+                <td>
+                    <div class="recent-incidents">
+                        ${recentIncidentsHtml}
+                    </div>
+                </td>
+                <td>
+                    <span class="status-indicator">
+                        <span class="status-icon">${statusIcon}</span>
+                        <span class="status-text">${statusText}</span>
+                    </span>
+                </td>
+            `;
+            
+            return row;
+        }
+
+        // UI helper functions
+        function showLoading() {
+            const periodSelect = document.getElementById('globalPeriodSelect');
+            const selectedPeriod = periodSelect ? periodSelect.value : 'today';
+            const periodText = selectedPeriod === 'today' ? 'today\'s' : 
+                              selectedPeriod === 'week' ? 'this week\'s' : 
+                              'this month\'s';
+            
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loadingIndicator';
+            loadingDiv.className = 'loading-indicator';
+            loadingDiv.innerHTML = `
+                <div class="loading-content">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2" id="loadingMessage">🔄 Loading ${periodText} incident data...</p>
+                    <div class="progress mt-3" style="width: 300px;">
+                        <div id="loadingProgress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <p id="loadingText" class="mt-2 text-muted">Preparing to load sites...</p>
+                </div>
+            `;
+            document.querySelector('.incident-viewer-section').appendChild(loadingDiv);
+        }
+
+        function hideLoading() {
+            const loadingDiv = document.getElementById('loadingIndicator');
+            if (loadingDiv) {
+                loadingDiv.remove();
+            }
+        }
+
+        function updateLoadingProgress(current, total, siteName) {
+            const progressBar = document.getElementById('loadingProgress');
+            const loadingText = document.getElementById('loadingText');
+            
+            if (progressBar && loadingText) {
+                const percentage = (current / total) * 100;
+                progressBar.style.width = `${percentage}%`;
+                loadingText.textContent = `Loading ${siteName}... (${current}/${total})`;
+            }
+        }
+
+        // Create site-specific charts
+        function createSiteSpecificCharts() {
+            
+            const sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
+            const incidentsChartIds = ['incidentsChartParafield', 'incidentsChartNerrilda', 'incidentsChartRamsay', 'incidentsChartWestPark', 'incidentsChartYankalilla'];
+            const complianceChartIds = ['complianceChartParafield', 'complianceChartNerrilda', 'complianceChartRamsay', 'complianceChartWestPark', 'complianceChartYankalilla'];
+            
+            sites.forEach((siteName, index) => {
+                // Create incidents chart
+                createIncidentsChartForSite(siteName, incidentsChartIds[index]);
+                // Create compliance chart
+                createComplianceChartForSite(siteName, complianceChartIds[index]);
+            });
+        }
+
+        // Create incidents chart for specific site
+        function createIncidentsChartForSite(siteName, chartId) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx) {
+                console.error(`❌ Canvas not found: ${chartId}`);
+                return;
+            }
+
+            // Destroy existing chart if it exists
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].destroy();
+                delete chartInstances[chartId];
+            }
+
+            // 필터링된 인시던트 사용 (항상 filteredIncidents)
+            const dataToDisplay = filteredIncidents;
+            
+            // Filter incidents for this specific site
+            const siteIncidents = dataToDisplay.filter(incident => incident.SiteName === siteName);
+            
+            // Count incidents by type for this site
+            const incidentTypes = {};
+            siteIncidents.forEach(incident => {
+                const eventTypes = incident.EventTypeNames || ['Unknown'];
+                eventTypes.forEach(type => {
+                    incidentTypes[type] = (incidentTypes[type] || 0) + 1;
+                });
+            });
+
+            const labels = Object.keys(incidentTypes);
+            const data = Object.values(incidentTypes);
+
+            // If no data, show a placeholder chart with "No data" message
+            if (labels.length === 0) {
+                
+                // 캔버스는 유지하고 빈 차트 생성
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e0e0e0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: false
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            chartInstances[chartId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#FF6384',
+                            '#36A2EB',
+                            '#FFCE56',
+                            '#4BC0C0',
+                            '#9966FF',
+                            '#FF9F40',
+                            '#FF6384',
+                            '#C9CBCF'
+                        ],
+                        borderWidth: 1,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Create compliance chart for specific site
+        function createComplianceChartForSite(siteName, chartId) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].destroy();
+                delete chartInstances[chartId];
+            }
+
+            // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
+            const dataToDisplay = filteredIncidents;
+            
+            // Filter incidents for this specific site
+            const siteIncidents = dataToDisplay.filter(incident => incident.SiteName === siteName);
+            
+            // Calculate compliance data based on incident status and dates
+            let closedOnTime = 0;
+            let overdue = 0;
+            let open = 0;
+            
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+            
+            siteIncidents.forEach(incident => {
+                const incidentDate = new Date(incident.Date);
+                const daysSinceIncident = Math.floor((now - incidentDate) / (1000 * 60 * 60 * 24));
+                
+                // Check if incident is closed (check various possible status fields)
+                const status = incident.Status || incident.status || incident.IncidentStatus || 'open';
+                const isClosed = status.toLowerCase().includes('closed') || status.toLowerCase().includes('resolved');
+                
+                if (isClosed) {
+                    // If closed within 3 days, consider it on time (for 7-day data)
+                    if (daysSinceIncident <= 3) {
+                        closedOnTime++;
+                    } else {
+                        overdue++;
+                    }
+                } else {
+                    // If still open and more than 3 days old, consider overdue
+                    if (daysSinceIncident > 3) {
+                        overdue++;
+                    } else {
+                        open++;
+                    }
+                }
+            });
+
+            // If no incidents, show empty chart
+            if (siteIncidents.length === 0) {
+                // 캔버스는 유지하고 빈 차트 생성
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e0e0e0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: false
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            const complianceData = {
+                'Closed On Time': closedOnTime,
+                'Overdue': overdue,
+                'Open': open
+            };
+
+            const labels = Object.keys(complianceData);
+            const data = Object.values(complianceData);
+
+            chartInstances[chartId] = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#28a745',  // Closed On Time - Green
+                            '#dc3545',  // Overdue - Red
+                            '#ffc107'   // Open - Yellow
+                        ],
+                        borderWidth: 1,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = siteIncidents.length;
+                                    const percentage = total > 0 ? Math.round((context.parsed / total) * 100) : 0;
+                                    return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                                },
+                                footer: function(tooltipItems) {
+                                    const total = siteIncidents.length;
+                                    return 'Total Incidents: ' + total;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Create compliance by staff chart
+        function createComplianceChart() {
+            const ctx = document.getElementById('complianceChart');
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            if (chartInstances['complianceChart']) {
+                chartInstances['complianceChart'].destroy();
+                delete chartInstances['complianceChart'];
+            }
+
+            // Sample compliance data (since CIMS system is not fully implemented yet)
+            const complianceData = {
+                'Registered Nurses': 0,
+                'Carers': 0,
+                'Clinical Managers': 0,
+                'Admin Staff': 0,
+                'Other Staff': 0
+            };
+
+            const labels = Object.keys(complianceData);
+            const data = Object.values(complianceData);
+
+            chartInstances['complianceChart'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Tasks Completed (%)',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(255, 206, 86, 0.8)',
+                            'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y + '% compliance rate';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showError(message) {
+            console.error('Error:', message);
+        }
+
+        function hideError() {
+            // Error handling is not needed for summary view
+        }
+
+        function showNoData() {
+            // No data handling is not needed for summary view
+        }
+
+        function hideNoData() {
+            // No data handling is not needed for summary view
+        }
+
+
+        // Initialize incident viewer when admin view is shown
+        function showAdminView() {
+            document.getElementById('admin-view').style.display = 'block';
+            document.getElementById('user-view').style.display = 'none';
+            
+            // Show audio controls for Nurse Station
+            document.getElementById('audioControls').style.display = 'block';
+            
+            // Note: initializeIncidentViewer() is called by loadAdminData()
+            // Removed duplicate call to prevent loading incidents twice
+            
+            // Show stats summary
+            const statsSummary = document.getElementById('statsSummary');
+            if (statsSummary) {
+                statsSummary.style.display = 'block';
+            }
+            
+            // Add event listener for period selector
+            const periodSelect = document.getElementById('periodSelect');
+            if (periodSelect) {
+                periodSelect.addEventListener('change', function() {
+                    loadIncidents();
+                });
+            }
+        }
+
+        // ===== NURSE STATION ALERT SYSTEM =====
+
+        // Initialize audio system
+        function initializeAudio() {
+            // Create alert sound using Web Audio API
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                alertSound = audioContext;
+            } catch (e) {
+                console.warn('Audio not supported:', e);
+            }
+        }
+
+        // Toggle audio on/off
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const toggleBtn = document.getElementById('audioToggle');
+            toggleBtn.textContent = audioEnabled ? '🔊 Audio ON' : '🔇 Audio OFF';
+            
+            // Stop all active alerts if audio is disabled
+            if (!audioEnabled) {
+                stopAllAlerts();
+            }
+        }
+
+        // Play alert sound
+        function playAlertSound(frequency = 800, duration = 200) {
+            if (!audioEnabled || !alertSound) return;
+            
+            try {
+                const oscillator = alertSound.createOscillator();
+                const gainNode = alertSound.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(alertSound.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, alertSound.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, alertSound.currentTime + duration / 1000);
+                
+                oscillator.start(alertSound.currentTime);
+                oscillator.stop(alertSound.currentTime + duration / 1000);
+            } catch (e) {
+                console.warn('Failed to play alert sound:', e);
+            }
+        }
+
+        // Start monitoring for urgent tasks
+        function startAlertMonitoring() {
+            setInterval(() => {
+                if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                    checkUrgentTasks();
+                }
+            }, 30000); // Check every 30 seconds
+        }
+
+        // Check for urgent tasks that need alerts
+        async function checkUrgentTasks() {
+            try {
+                const response = await fetch('/api/v1/tasks/overdue');
+                if (!response.ok) return;
+                
+                const tasks = await response.json();
+                
+                tasks.forEach(task => {
+                    const taskId = task.task_id;
+                    const dueDate = new Date(task.due_date);
+                    const now = new Date();
+                    const timeRemaining = dueDate - now;
+                    
+                    // Don't show alert if already active
+                    if (activeAlerts.has(taskId)) return;
+                    
+                    // Show alerts based on time remaining
+                    if (timeRemaining <= 60000 && timeRemaining > 0) { // 1 minute
+                        showUrgentAlert(task, 'critical', timeRemaining);
+                    } else if (timeRemaining <= 300000 && timeRemaining > 0) { // 5 minutes
+                        showUrgentAlert(task, 'warning', timeRemaining);
+                    } else if (timeRemaining <= 600000 && timeRemaining > 0) { // 10 minutes
+                        showUrgentAlert(task, 'warning', timeRemaining);
+                    }
+                });
+            } catch (error) {
+                console.error('Error checking urgent tasks:', error);
+            }
+        }
+
+        // Show urgent alert popup
+        function showUrgentAlert(task, severity, timeRemaining) {
+            const alertId = `alert-${task.task_id}`;
+            
+            // Don't show duplicate alerts
+            if (activeAlerts.has(alertId)) return;
+            
+            const alertPopup = document.createElement('div');
+            alertPopup.id = alertId;
+            alertPopup.className = `alert-popup ${severity}`;
+            
+            const timeString = formatTimeRemaining(timeRemaining);
+            const severityText = severity === 'critical' ? 'CRITICAL' : 'URGENT';
+            const icon = severity === 'critical' ? '🚨' : '⚠️';
+            
+            alertPopup.innerHTML = `
+                <div class="alert-header">
+                    <div class="alert-title">
+                        <i>${icon}</i>
+                        ${severityText} TASK ALERT
+                    </div>
+                    <div class="alert-timer" id="timer-${alertId}">${timeString}</div>
+                </div>
+                <div class="alert-content">
+                    <strong>Task:</strong> ${task.description}<br>
+                    <strong>Resident:</strong> ${task.resident_name}<br>
+                    <strong>Due:</strong> ${new Date(task.due_date).toLocaleString()}
+                </div>
+                <div class="alert-actions">
+                    <button class="btn-acknowledge" onclick="acknowledgeAlert('${alertId}')">
+                        Acknowledge
+                    </button>
+                    <button class="btn-dismiss" onclick="dismissAlert('${alertId}')">
+                        Dismiss
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(alertPopup);
+            activeAlerts.set(alertId, {
+                task: task,
+                severity: severity,
+                startTime: Date.now()
+            });
+            
+            // Start countdown timer
+            startCountdownTimer(alertId, timeRemaining);
+            
+            // Play alert sound based on severity
+            if (severity === 'critical') {
+                playAlertSound(1000, 300); // Higher frequency, longer duration
+                setTimeout(() => playAlertSound(1000, 300), 500);
+                setTimeout(() => playAlertSound(1000, 300), 1000);
+            } else {
+                playAlertSound(800, 200);
+                setTimeout(() => playAlertSound(800, 200), 1000);
+            }
+        }
+
+        // Start countdown timer for alert
+        function startCountdownTimer(alertId, initialTime) {
+            const timerElement = document.getElementById(`timer-${alertId}`);
+            let timeRemaining = initialTime;
+            
+            const interval = setInterval(() => {
+                timeRemaining -= 1000;
+                
+                if (timeRemaining <= 0) {
+                    clearInterval(interval);
+                    timerElement.textContent = 'OVERDUE';
+                    timerElement.style.background = '#dc3545';
+                    
+                    // Play overdue sound
+                    playAlertSound(1200, 500);
+                } else {
+                    timerElement.textContent = formatTimeRemaining(timeRemaining);
+                    
+                    // Change color based on urgency
+                    if (timeRemaining <= 60000) { // 1 minute
+                        timerElement.style.background = '#dc3545';
+                    } else if (timeRemaining <= 300000) { // 5 minutes
+                        timerElement.style.background = '#ffc107';
+                    }
+                }
+            }, 1000);
+            
+            countdownIntervals.set(alertId, interval);
+        }
+
+        // Format time remaining
+        function formatTimeRemaining(milliseconds) {
+            const totalSeconds = Math.ceil(milliseconds / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            
+            if (minutes > 0) {
+                return `${minutes}m ${seconds}s`;
+            } else {
+                return `${seconds}s`;
+            }
+        }
+
+        // Acknowledge alert (silence audio but keep visual)
+        function acknowledgeAlert(alertId) {
+            const alert = activeAlerts.get(alertId);
+            if (alert) {
+                alert.acknowledged = true;
+                
+                // Update button
+                const btn = document.querySelector(`#${alertId} .btn-acknowledge`);
+                btn.textContent = 'Acknowledged';
+                btn.disabled = true;
+                btn.style.background = '#28a745';
+                
+                // Stop countdown and sound
+                const interval = countdownIntervals.get(alertId);
+                if (interval) {
+                    clearInterval(interval);
+                    countdownIntervals.delete(alertId);
+                }
+                
+                console.log(`Alert acknowledged: ${alert.task.description}`);
+            }
+        }
+
+        // Dismiss alert completely
+        function dismissAlert(alertId) {
+            const alertElement = document.getElementById(alertId);
+            if (alertElement) {
+                alertElement.remove();
+                activeAlerts.delete(alertId);
+                
+                const interval = countdownIntervals.get(alertId);
+                if (interval) {
+                    clearInterval(interval);
+                    countdownIntervals.delete(alertId);
+                }
+            }
+        }
+
+        // Stop all active alerts
+        function stopAllAlerts() {
+            activeAlerts.forEach((alert, alertId) => {
+                dismissAlert(alertId);
+            });
+        }
+
+        // Test alert function
+        function testAlert() {
+            const testTask = {
+                task_id: 'TEST-001',
+                description: 'Test Task - Post Fall Assessment',
+                resident_name: 'Test Resident',
+                due_date: new Date(Date.now() + 300000).toISOString() // 5 minutes from now
+            };
+            
+            showUrgentAlert(testTask, 'warning', 300000);
+        }
+
+        // Force Synchronization
+        async function performForceSync() {
+            const btn = document.getElementById('forceSyncBtn');
+            const status = document.getElementById('syncStatus');
+            const progress = document.getElementById('syncProgress');
+            const progressBar = document.getElementById('syncProgressBar');
+            const details = document.getElementById('syncDetails');
+            const result = document.getElementById('syncResult');
+            
+            // Disable button
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Synchronizing...';
+            
+            // Show progress
+            progress.style.display = 'block';
+            result.style.display = 'none';
+            status.textContent = 'Starting synchronization...';
+            
+            // Animate progress bar
+            let progressValue = 0;
+            const progressInterval = setInterval(() => {
+                progressValue += 2;
+                if (progressValue >= 90) {
+                    clearInterval(progressInterval);
+                }
+                progressBar.style.width = progressValue + '%';
+                progressBar.textContent = progressValue + '%';
+            }, 200);
+            
+            try {
+                details.textContent = '1️⃣ Syncing incidents from MANAD Plus (30 days)...';
+                
+                const response = await fetch('/api/cims/force-sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        details.textContent = 'Sync completed successfully!';
+                        status.textContent = '';
+                        
+                        result.className = 'alert alert-success';
+                        result.innerHTML = `
+                            <h5><i class="fas fa-check-circle me-2"></i>Synchronization Complete!</h5>
+                            <ul class="mb-0">
+                                <li><strong>${data.details.incidents_synced || 0}</strong> new incidents synced</li>
+                                <li><strong>${data.details.incidents_updated || 0}</strong> existing incidents updated</li>
+                                <li><strong>${data.details.tasks_generated || 0}</strong> tasks auto-generated for ${data.details.incidents_with_new_tasks || 0} Fall incidents</li>
+                                <li><strong>${data.details.statuses_updated || 0}</strong> incident statuses updated</li>
+                            </ul>
+                        `;
+                        result.style.display = 'block';
+                        
+                        // Refresh dashboard after 2 seconds
+                        setTimeout(() => {
+                            loadIncidents();
+                        }, 2000);
+                    } else {
+                        throw new Error(data.error || 'Sync failed');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                clearInterval(progressInterval);
+                console.error('Force sync error:', error);
+                
+                details.textContent = 'Sync failed!';
+                status.textContent = '';
+                
+                result.className = 'alert alert-danger';
+                result.innerHTML = `
+                    <h5><i class="fas fa-exclamation-circle me-2"></i>Synchronization Failed</h5>
+                    <p class="mb-0">Error: ${error.message}</p>
+                `;
+                result.style.display = 'block';
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Force Synchronization';
+                
+                // Hide progress after 3 seconds
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Section navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarLinks = document.querySelectorAll('.sidebar-menu a[data-section]');
+            
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const section = this.getAttribute('data-section');
+                    
+                    // Remove active class from all links
+                    sidebarLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Hide all sections
+                    document.getElementById('admin-view').style.display = 'none';
+                    document.getElementById('settings-view').style.display = 'none';
+                    // Add other sections as needed
+                    
+                    // Show selected section
+                    if (section === 'dashboard') {
+                        if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                            document.getElementById('admin-view').style.display = 'block';
+                        } else {
+                            document.getElementById('user-view').style.display = 'block';
+                        }
+                    } else if (section === 'settings') {
+                        // Only show for admin/clinical manager
+                        if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                            document.getElementById('settings-view').style.display = 'block';
+                        }
+                    }
+                    // Add other sections as needed
+                });
+            });
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            stopAllAlerts();
+            countdownIntervals.forEach(interval => clearInterval(interval));
+        });
+    </script>
+</body>
+</html>

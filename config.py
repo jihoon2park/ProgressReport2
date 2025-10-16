@@ -22,15 +22,15 @@ SITE_SERVERS = {
 try:
     from api_key_manager_json import get_api_headers, get_server_info, get_site_servers
     USE_DB_API_KEYS = True
-    print("JSON 기반 API 키 관리자 로드 성공")
+    print("JSON API key manager loaded successfully")
 except ImportError as e:
     # 폴백: 기본 설정 (개발/테스트용)
     USE_DB_API_KEYS = False
-    print(f"JSON 기반 API 키 관리자 로드 실패, 폴백 사용: {e}")
+    print(f"JSON API key manager load failed, using fallback: {e}")
 except Exception as e:
     # 기타 오류도 폴백으로 처리
     USE_DB_API_KEYS = False
-    print(f"JSON 기반 API 키 관리자 로드 중 오류, 폴백 사용: {e}")
+    print(f"JSON API key manager error, using fallback: {e}")
     
     def get_api_headers(site):
         """사이트에 맞는 API 헤더 반환 (폴백)"""
@@ -79,17 +79,17 @@ if USE_DB_API_KEYS:
             for api_data in manager.get_all_api_keys():
                 servers[api_data['site_name']] = f"{api_data['server_ip']}:{api_data['server_port']}"
             
-            print(f"JSON에서 사이트 서버 정보 로드 성공: {list(servers.keys())}")
+            print(f"JSON site server info loaded successfully: {list(servers.keys())}")
             return servers
         except Exception as e:
-            print(f"JSON에서 사이트 서버 정보 로드 실패, 폴백 사용: {e}")
+            print(f"JSON site server info load failed, using fallback: {e}")
             return SITE_SERVERS  # 기본값 반환
     
     try:
         SITE_SERVERS = get_site_servers()
         # DB에서 로드된 사이트가 비어있으면 기본값 사용
         if not SITE_SERVERS:
-            print("DB에서 로드된 사이트가 비어있음, 기본값 사용")
+            print("DB loaded sites empty, using default values")
             SITE_SERVERS = {
                 'Parafield Gardens': '192.168.1.11:8080',
                 'Nerrilda': '192.168.21.12:8080',
@@ -98,9 +98,9 @@ if USE_DB_API_KEYS:
                 'Yankalilla': '192.168.51.12:8080'
             }
     except Exception as e:
-        print(f"SITE_SERVERS 초기화 실패, 기본값 사용: {e}")
+        print(f"SITE_SERVERS initialization failed, using default: {e}")
         # 기본값은 이미 위에서 정의됨
 else:
     # 기존 방식 사용
-    print("폴백 모드: 기본 SITE_SERVERS 사용")
+    print("Fallback mode: using default SITE_SERVERS")
     pass

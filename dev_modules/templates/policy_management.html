@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Policy & Recipients Management - Progress Report System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --light-bg: #ecf0f1;
+            --dark-text: #2c3e50;
+            --border-color: #bdc3c7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .nav-buttons {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .nav-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 0 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .main-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-button.active {
+            background: white;
+            color: var(--secondary-color);
+            border-bottom-color: var(--secondary-color);
+        }
+
+        .tab-button:hover {
+            background: #e9ecef;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+        }
+
+        .list-panel, .editor-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .list-panel h3, .editor-panel h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 1.4em;
+        }
+
+        .policy-item, .recipient-item {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .policy-item:hover, .recipient-item:hover {
+            border-color: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .policy-item.selected, .recipient-item.selected {
+            border-color: var(--secondary-color);
+            background-color: #f8f9fa;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .item-name {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .priority-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .priority-high {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .priority-medium {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .priority-normal {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .escalation-timeline {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .timeline-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid var(--secondary-color);
+        }
+
+        .step-badge {
+            background-color: var(--secondary-color);
+            color: white;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-timing {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .step-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .step-edit-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .device-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .device-item:last-child {
+            border-bottom: none;
+        }
+
+        .device-info {
+            flex: 1;
+        }
+
+        .device-name {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .device-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .device-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .status-inactive {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-color);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #219a52;
+        }
+
+        .btn-danger {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #e67e22;
+        }
+
+        .notification {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .notification.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .notification.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .notification.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .selected-recipients {
+            background-color: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .recipient-tag {
+            display: inline-block;
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 3px;
+            font-size: 0.9em;
+        }
+
+        .recipient-tag .remove {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .recipient-tag .remove:hover {
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Policy & Recipients Management</h1>
+            <p>Integrated Alarm Policy and Recipient Management System</p>
+        </div>
+
+        <div class="nav-buttons">
+            <button class="nav-btn" onclick="window.location.href='/fcm-admin-dashboard'">← FCM Dashboard</button>
+            <button class="nav-btn" onclick="window.location.href='/incident-viewer'">Incident Viewer</button>
+            <button class="nav-btn" onclick="window.location.href='/progress-notes'">Progress Notes</button>
+        </div>
+
+        <div id="notification" class="notification"></div>
+
+        <!-- Main Tabs -->
+        <div class="main-tabs">
+            <button class="tab-button active" onclick="switchTab('policy')">
+                🚨 Policy Management
+            </button>
+            <button class="tab-button" onclick="switchTab('recipients')">
+                📱 Recipients Management
+            </button>
+        </div>
+
+        <!-- Policy Management Tab -->
+        <div id="policyTab" class="tab-content active">
+            <div class="content-grid">
+                <!-- Policy List -->
+                <div class="list-panel">
+                    <h3>📋 Alarm Policy List</h3>
+                    <div id="policyList">
+                        <div style="text-align: center; padding: 20px; color: #666;">
+                            Loading policies...
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="createNewPolicy()" style="margin-top: 15px; width: 100%;">
+                        ➕ Create New Policy
+                    </button>
+                </div>
+
+                <!-- Policy Editor -->
+                <div class="editor-panel">
+                    <h3>✏️ Policy Editor</h3>
+                    <div id="policyEditor">
+                        <form id="policyForm">
+                            <div class="form-group">
+                                <label for="policyName">Policy Name</label>
+                                <input type="text" id="policyName" class="form-control" placeholder="e.g., Emergency Night Escalation">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="policyDescription">Policy Description</label>
+                                <textarea id="policyDescription" class="form-control" rows="3" placeholder="Describe when and how this policy is used"></textarea>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div class="form-group">
+                                    <label for="eventType">Event Type</label>
+                                    <select id="eventType" class="form-control">
+                                        <option value="emergency">Emergency</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="medication">Medication Reminder</option>
+                                        <option value="handover">Shift Handover</option>
+                                        <option value="maintenance">Facility Inspection</option>
+                                        <option value="medical">Medical Call</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="priority">Priority</label>
+                                    <select id="priority" class="form-control">
+                                        <option value="high">High</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="normal">Normal</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>📊 Escalation Timetable</label>
+                                <div class="escalation-timeline" id="escalationTimeline">
+                                    <!-- Dynamically generated -->
+                                </div>
+                                <button type="button" class="btn btn-warning" onclick="addTimelineStep()" style="margin-top: 10px;">
+                                    ➕ Add Timeline Step
+                                </button>
+                            </div>
+
+                            <div style="text-align: center; margin-top: 30px;">
+                                <button type="button" class="btn btn-success" onclick="savePolicyChanges()" style="margin-right: 10px;">
+                                    💾 Save Policy
+                                </button>
+                                <button type="button" class="btn btn-warning" onclick="testPolicyExecution()" style="margin-right: 10px;">
+                                    🧪 Test Policy
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="deletePolicyConfirm()">
+                                    🗑️ Delete Policy
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipients Management Tab -->
+        <div id="recipientsTab" class="tab-content">
+            <div class="content-grid">
+                <!-- FCM Device List -->
+                <div class="list-panel">
+                    <h3>📱 Registered FCM Devices</h3>
+                    <div id="fcmDeviceList">
+                        <div style="text-align: center; padding: 20px; color: #666;">
+                            Loading devices...
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshFCMDevices()" style="margin-top: 15px; width: 100%;">
+                        🔄 Refresh Device List
+                    </button>
+                </div>
+
+                <!-- Recipient Management -->
+                <div class="editor-panel">
+                    <h3>👥 Alarm Recipient Management</h3>
+                    <div id="recipientEditor">
+                        <div class="form-group">
+                            <label>Selected Recipient Devices</label>
+                            <div id="selectedRecipients" class="selected-recipients">
+                                <div style="color: #666; text-align: center; padding: 20px;">
+                                    Select devices from the left to register as recipients
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="recipientGroup">Recipient Group</label>
+                            <select id="recipientGroup" class="form-control">
+                                <option value="emergency">Emergency Response Team</option>
+                                <option value="medical">Medical Staff</option>
+                                <option value="management">Management Team</option>
+                                <option value="maintenance">Facility Management Team</option>
+                                <option value="night_shift">Night Shift Team</option>
+                                <option value="weekend">Weekend Team</option>
+                            </select>
+                        </div>
+
+                        <div style="text-align: center; margin-top: 30px;">
+                            <button type="button" class="btn btn-success" onclick="saveRecipientGroup()" style="margin-right: 10px;">
+                                💾 Save Recipient Group
+                            </button>
+                            <button type="button" class="btn btn-warning" onclick="testGroupNotification()">
+                                📤 Test Group Notification
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'policy';
+        let currentPolicyId = null;
+        let selectedDevices = new Set();
+        let fcmDevices = [];
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPolicies();
+            loadFCMDevices();
+            createDefaultEscalationTimeline();
+        });
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Change tab button state
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+            // Show/hide tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+
+            currentTab = tabName;
+
+            // Tab-specific initialization
+            if (tabName === 'recipients') {
+                loadFCMDevices();
+            }
+        }
+
+        // Load policy list
+        async function loadPolicies() {
+            try {
+                const response = await fetch('/api/escalation-policies');
+                const result = await response.json();
+
+                if (result.success) {
+                    displayPolicies(result.policies);
+                } else {
+                    showNotification('Unable to load policy list.', 'error');
+                }
+            } catch (error) {
+                console.error('Policy load error:', error);
+                showNotification('An error occurred while loading policies.', 'error');
+            }
+        }
+
+        // Display policy list
+        function displayPolicies(policies) {
+            const container = document.getElementById('policyList');
+            
+            if (policies.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No registered policies.</div>';
+                return;
+            }
+
+            let html = '';
+            policies.forEach(policy => {
+                const priorityClass = `priority-${policy.priority}`;
+                html += `
+                    <div class="policy-item" onclick="selectPolicy(${policy.id})" id="policy-${policy.id}">
+                        <div class="item-header">
+                            <div class="item-name">${policy.policy_name}</div>
+                            <div class="priority-badge ${priorityClass}">${policy.priority.toUpperCase()}</div>
+                        </div>
+                        <div style="color: #666; font-size: 0.9em; margin-bottom: 5px;">${policy.event_type}</div>
+                        <div style="font-size: 0.8em; color: #999;">${policy.step_count}-step escalation</div>
+                        <div style="font-size: 0.8em; color: #999; margin-top: 3px;">${policy.description || ''}</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Policy selection
+        async function selectPolicy(policyId) {
+            currentPolicyId = policyId;
+            
+            // Display selection state
+            document.querySelectorAll('.policy-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.getElementById(`policy-${policyId}`).classList.add('selected');
+            
+            try {
+                const response = await fetch(`/api/escalation-policies/${policyId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    loadPolicyToEditor(result.policy);
+                } else {
+                    showNotification('Unable to load policy information.', 'error');
+                }
+            } catch (error) {
+                console.error('Policy load error:', error);
+                showNotification('An error occurred while loading policies.', 'error');
+            }
+        }
+
+        // Load policy to editor
+        function loadPolicyToEditor(policy) {
+            document.getElementById('policyName').value = policy.policy_name || '';
+            document.getElementById('policyDescription').value = policy.description || '';
+            document.getElementById('eventType').value = policy.event_type || 'normal';
+            document.getElementById('priority').value = policy.priority || 'normal';
+
+            // Load escalation timeline
+            loadEscalationTimeline(policy.steps || []);
+        }
+
+        // Create default escalation timeline (15min 4x → 30min 2x → 1hr 2x → 6hr 2x)
+        function createDefaultEscalationTimeline() {
+            const defaultSteps = [
+                { delay: 0, repeat: 1, message: '🚨 Immediate attention required - situation occurred.' },
+                { delay: 15, repeat: 4, message: '🚨 15-minute interval repeat alarm - unhandled situation.' },
+                { delay: 30, repeat: 2, message: '🚨 30-minute interval repeat alarm - situation is ongoing.' },
+                { delay: 60, repeat: 2, message: '🚨 1-hour interval repeat alarm - prolonged situation.' },
+                { delay: 360, repeat: 2, message: '🚨 6-hour interval repeat alarm - critical situation.' }
+            ];
+
+            loadEscalationTimeline(defaultSteps);
+        }
+
+        // Load escalation timeline
+        function loadEscalationTimeline(steps) {
+            const container = document.getElementById('escalationTimeline');
+            container.innerHTML = '';
+
+            if (steps.length === 0) {
+                createDefaultEscalationTimeline();
+                return;
+            }
+
+            steps.forEach((step, index) => {
+                addTimelineStep(step, index + 1);
+            });
+        }
+
+        // Add timeline step
+        function addTimelineStep(stepData = null, stepNumber = null) {
+            const container = document.getElementById('escalationTimeline');
+            const currentSteps = container.querySelectorAll('.timeline-step').length;
+            const step = stepNumber || currentSteps + 1;
+
+            const data = stepData || {
+                delay_minutes: 15,
+                repeat_count: 1,
+                message_template: 'Please enter notification message'
+            };
+
+            const stepHtml = `
+                <div class="timeline-step" id="timeline-step-${step}">
+                    <div class="step-badge">${step}</div>
+                    <div class="step-content">
+                        <div class="step-timing">
+                            Step ${step}: ${data.delay_minutes === 0 ? 'Immediately' : data.delay_minutes + ' minutes after'} ${data.repeat_count} times repeat
+                        </div>
+                        <div class="step-edit-controls">
+                            <div>
+                                <label style="font-size: 0.9em;">Delay Time (minutes)</label>
+                                <input type="number" class="form-control" name="delay-${step}" value="${data.delay_minutes}" min="0" max="1440" onchange="updateStepDisplay(${step})">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em;">Repeat Count</label>
+                                <input type="number" class="form-control" name="repeat-${step}" value="${data.repeat_count}" min="1" max="10" onchange="updateStepDisplay(${step})">
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-danger" onclick="removeTimelineStep(${step})" style="margin-top: 20px; padding: 8px 12px;">
+                                    ❌ Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label style="font-size: 0.9em;">Alarm Message</label>
+                            <textarea class="form-control" name="message-${step}" rows="2" placeholder="Notification message to send at this step">${data.message_template || ''}</textarea>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', stepHtml);
+        }
+
+        // Update timeline step display
+        function updateStepDisplay(stepNumber) {
+            const stepElement = document.getElementById(`timeline-step-${stepNumber}`);
+            const delay = parseInt(stepElement.querySelector(`[name="delay-${stepNumber}"]`).value) || 0;
+            const repeat = parseInt(stepElement.querySelector(`[name="repeat-${stepNumber}"]`).value) || 1;
+            
+            const timingElement = stepElement.querySelector('.step-timing');
+            const delayText = delay === 0 ? 'Immediately' : delay + ' minutes after';
+            timingElement.textContent = `Step ${stepNumber}: ${delayText} ${repeat} times repeat`;
+        }
+
+        // Remove timeline step
+        function removeTimelineStep(stepNumber) {
+            const stepElement = document.getElementById(`timeline-step-${stepNumber}`);
+            if (stepElement) {
+                stepElement.remove();
+                renumberTimelineSteps();
+            }
+        }
+
+        // Renumber timeline steps
+        function renumberTimelineSteps() {
+            const steps = document.querySelectorAll('.timeline-step');
+            steps.forEach((step, index) => {
+                const newNumber = index + 1;
+                const oldId = step.id;
+                const stepId = oldId.split('-').pop();
+                
+                // Update ID
+                step.id = `timeline-step-${newNumber}`;
+                
+                // Update step number
+                const badge = step.querySelector('.step-badge');
+                badge.textContent = newNumber;
+                
+                // Update input field names
+                const delayInput = step.querySelector('[name^="delay-"]');
+                const repeatInput = step.querySelector('[name^="repeat-"]');
+                const messageInput = step.querySelector('[name^="message-"]');
+                const removeBtn = step.querySelector('button[onclick^="removeTimelineStep"]');
+                
+                if (delayInput) delayInput.name = `delay-${newNumber}`;
+                if (repeatInput) repeatInput.name = `repeat-${newNumber}`;
+                if (messageInput) messageInput.name = `message-${newNumber}`;
+                if (removeBtn) removeBtn.setAttribute('onclick', `removeTimelineStep(${newNumber})`);
+                
+                // Update display text
+                updateStepDisplay(newNumber);
+            });
+        }
+
+        // Load FCM device list
+        async function loadFCMDevices() {
+            try {
+                const response = await fetch('/api/fcm/export-tokens');
+                const result = await response.json();
+
+                if (result.success) {
+                    fcmDevices = result.tokens || [];
+                    displayFCMDevices(fcmDevices);
+                } else {
+                    showNotification('Unable to load FCM device list.', 'error');
+                }
+            } catch (error) {
+                console.error('FCM device load error:', error);
+                showNotification('An error occurred while loading FCM devices.', 'error');
+            }
+        }
+
+        // Display FCM device list
+        function displayFCMDevices(devices) {
+            const container = document.getElementById('fcmDeviceList');
+            
+            if (devices.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No registered devices.</div>';
+                return;
+            }
+
+            let html = '<div class="device-list">';
+            devices.forEach(device => {
+                const isSelected = selectedDevices.has(device.user_id);
+                const statusClass = device.is_active ? 'status-active' : 'status-inactive';
+                const statusText = device.is_active ? 'Active' : 'Inactive';
+                
+                html += `
+                    <div class="device-item ${isSelected ? 'selected' : ''}" onclick="toggleDeviceSelection('${device.user_id}')">
+                        <div class="device-info">
+                            <div class="device-name">${device.user_id}</div>
+                            <div class="device-details">${device.device_info || 'Unknown Device'}</div>
+                            <div style="font-size: 0.8em; color: #999;">
+                                Registered: ${device.created_at ? new Date(device.created_at).toLocaleDateString() : 'Unknown'}
+                            </div>
+                        </div>
+                        <div class="device-status ${statusClass}">${statusText}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        // Toggle device selection
+        function toggleDeviceSelection(deviceId) {
+            if (selectedDevices.has(deviceId)) {
+                selectedDevices.delete(deviceId);
+            } else {
+                selectedDevices.add(deviceId);
+            }
+            
+            updateSelectedRecipientsDisplay();
+            displayFCMDevices(fcmDevices); // Reflect selection state
+        }
+
+        // Update selected recipients display
+        function updateSelectedRecipientsDisplay() {
+            const container = document.getElementById('selectedRecipients');
+            
+            if (selectedDevices.size === 0) {
+                container.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">Select devices from the left to register as recipients</div>';
+                return;
+            }
+
+            let html = '';
+            selectedDevices.forEach(deviceId => {
+                const device = fcmDevices.find(d => d.user_id === deviceId);
+                if (device) {
+                    html += `
+                        <div class="recipient-tag">
+                            ${device.user_id} (${device.device_info || 'Unknown'})
+                            <span class="remove" onclick="toggleDeviceSelection('${deviceId}')">×</span>
+                        </div>
+                    `;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Create new policy
+        function createNewPolicy() {
+            currentPolicyId = null;
+            document.getElementById('policyForm').reset();
+            
+            // Deselect all policy items
+            document.querySelectorAll('.policy-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            createDefaultEscalationTimeline();
+            showNotification('Creating new policy. Please enter information.', 'info');
+        }
+
+        // Save policy
+        async function savePolicyChanges() {
+            try {
+                const formData = collectPolicyFormData();
+                
+                if (!validatePolicyFormData(formData)) {
+                    return;
+                }
+
+                const url = currentPolicyId ? `/api/escalation-policies/${currentPolicyId}` : '/api/escalation-policies';
+                const method = currentPolicyId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification('Policy saved successfully.', 'success');
+                    loadPolicies(); // Refresh list
+                } else {
+                    showNotification(`Policy save failed: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Policy save error:', error);
+                showNotification('An error occurred while saving the policy.', 'error');
+            }
+        }
+
+        // Collect policy form data
+        function collectPolicyFormData() {
+            const steps = [];
+            const stepElements = document.querySelectorAll('.timeline-step');
+
+            stepElements.forEach((stepElement, index) => {
+                const stepNum = index + 1;
+                const delay = parseInt(stepElement.querySelector(`[name="delay-${stepNum}"]`).value) || 0;
+                const repeat = parseInt(stepElement.querySelector(`[name="repeat-${stepNum}"]`).value) || 1;
+                const message = stepElement.querySelector(`[name="message-${stepNum}"]`).value || '';
+
+                steps.push({
+                    step_number: stepNum,
+                    delay_minutes: delay,
+                    repeat_count: repeat,
+                    recipients: Array.from(selectedDevices), // Selected FCM devices
+                    message_template: message
+                });
+            });
+
+            return {
+                policy_id: currentPolicyId,
+                policy_name: document.getElementById('policyName').value,
+                description: document.getElementById('policyDescription').value,
+                event_type: document.getElementById('eventType').value,
+                priority: document.getElementById('priority').value,
+                steps: steps
+            };
+        }
+
+        // Validate form data
+        function validatePolicyFormData(formData) {
+            if (!formData.policy_name.trim()) {
+                showNotification('Please enter a policy name.', 'error');
+                return false;
+            }
+
+            if (formData.steps.length === 0) {
+                showNotification('At least 1 escalation step is required.', 'error');
+                return false;
+            }
+
+            if (selectedDevices.size === 0) {
+                showNotification('Please select recipient devices in the Recipients tab.', 'error');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Save recipient group
+        async function saveRecipientGroup() {
+            if (selectedDevices.size === 0) {
+                showNotification('Please select devices to save.', 'error');
+                return;
+            }
+
+            const groupName = document.getElementById('recipientGroup').value;
+            const deviceList = Array.from(selectedDevices);
+
+            try {
+                const response = await fetch('/api/recipient-groups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        group_name: groupName,
+                        devices: deviceList
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(`${deviceList.length} devices saved to ${groupName} group.`, 'success');
+                } else {
+                    showNotification(`Group save failed: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Group save error:', error);
+                showNotification('An error occurred while saving the group.', 'error');
+            }
+        }
+
+        // Test group notification
+        async function testGroupNotification() {
+            if (selectedDevices.size === 0) {
+                showNotification('Please select devices to test.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/test-group-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        devices: Array.from(selectedDevices),
+                        message: 'This is a test notification.'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(`Test notification sent to ${selectedDevices.size} devices.`, 'success');
+                } else {
+                    showNotification(`Test notification failed: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Test notification error:', error);
+                showNotification('An error occurred during test notification.', 'error');
+            }
+        }
+
+        // Refresh FCM devices
+        function refreshFCMDevices() {
+            showNotification('Refreshing FCM device list...', 'info');
+            loadFCMDevices();
+        }
+
+        // Test policy
+        async function testPolicyExecution() {
+            const formData = collectPolicyFormData();
+            
+            if (!validatePolicyFormData(formData)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/escalation-policies/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(`Policy test completed: ${result.total_notifications} notifications scheduled to be sent to ${selectedDevices.size} devices`, 'success');
+                } else {
+                    showNotification(`Policy test failed: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Policy test error:', error);
+                showNotification('An error occurred during policy test.', 'error');
+            }
+        }
+
+        // Confirm policy deletion
+        function deletePolicyConfirm() {
+            if (!currentPolicyId) {
+                showNotification('Please select a policy to delete.', 'error');
+                return;
+            }
+
+            const policyName = document.getElementById('policyName').value;
+            if (confirm(`Are you sure you want to delete the "${policyName}" policy?`)) {
+                deletePolicy();
+            }
+        }
+
+        // Delete policy
+        async function deletePolicy() {
+            try {
+                const response = await fetch(`/api/escalation-policies/${currentPolicyId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification('Policy deleted successfully.', 'success');
+                    loadPolicies(); // Refresh list
+                    createNewPolicy(); // Initialize editor
+                } else {
+                    showNotification(`Policy deletion failed: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Policy deletion error:', error);
+                showNotification('An error occurred while deleting the policy.', 'error');
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
