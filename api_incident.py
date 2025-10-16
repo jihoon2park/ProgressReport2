@@ -257,8 +257,16 @@ class IncidentAPI:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False, None
 
-def fetch_incidents_with_client_data(site: str, start_date: str, end_date: str) -> Optional[Dict[str, Any]]:
-    """Incident 데이터와 클라이언트 데이터를 함께 가져와서 매칭합니다."""
+def fetch_incidents_with_client_data(site: str, start_date: str, end_date: str, fetch_clients: bool = True) -> Optional[Dict[str, Any]]:
+    """
+    Incident 데이터와 클라이언트 데이터를 함께 가져와서 매칭합니다.
+    
+    Args:
+        site: 사이트 이름
+        start_date: 시작 날짜
+        end_date: 종료 날짜
+        fetch_clients: 클라이언트 데이터도 가져올지 여부 (기본: True, 캐시 사용 시: False)
+    """
     try:
         logger.info(f"Fetching incidents with client data for {site} from {start_date} to {end_date}")
         
@@ -271,14 +279,19 @@ def fetch_incidents_with_client_data(site: str, start_date: str, end_date: str) 
             logger.error(f"Failed to fetch incidents for {site}")
             return None
         
-        # 클라이언트 데이터 가져오기
-        clients_success, clients = incident_api.fetch_clients()
-        if not clients_success:
-            logger.error(f"Failed to fetch clients for {site}")
-            return None
+        # 클라이언트 데이터 가져오기 (선택적)
+        clients = []
+        if fetch_clients:
+            clients_success, clients = incident_api.fetch_clients()
+            if not clients_success:
+                logger.warning(f"Failed to fetch clients for {site}, proceeding with empty client list")
+                clients = []
+        else:
+            logger.info(f"클라이언트 데이터 스킵 (로컬 캐시 사용): {site}")
         
-        # 클라이언트 데이터도 JSON으로 저장
-        incident_api._save_clients_to_json(clients, site)
+        # 클라이언트 데이터도 JSON으로 저장 (클라이언트가 있을 때만)
+        if clients:
+            incident_api._save_clients_to_json(clients, site)
         
         # 데이터 매칭 및 가공
         processed_incidents = process_incident_data(incidents, clients)
@@ -331,6 +344,7 @@ def process_incident_data(incidents: List[Dict[str, Any]], clients: List[Dict[st
                 'RoomName': incident.get('RoomName'),
                 'BedRoom': incident.get('BedRoom'),
                 'DepartmentName': incident.get('DepartmentName'),
+                'SeverityRating': incident.get('SeverityRating'),  # Add SeverityRating field
                 'RiskRatingName': incident.get('RiskRatingName'),
                 'ReportedByName': incident.get('ReportedByName'),
                 'ReportedDate': incident.get('ReportedDate'),

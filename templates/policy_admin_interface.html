@@ -470,42 +470,42 @@
                                     <textarea class="form-control" id="policyDescription" rows="3"></textarea>
                                 </div>
 
-                                <!-- Alarm Interval Settings -->
+                                <!-- Nurse Visit Schedule -->
                                 <div class="mb-4">
-                                    <h4>Alarm Interval Settings</h4>
-                                    <div class="alarm-interval-settings">
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label for="eventType" class="form-label">Event Type</label>
-                                                <select id="eventType" class="form-control">
-                                                    <option value="emergency">Emergency</option>
-                                                    <option value="normal">Normal</option>
-                                                    <option value="medication">Medication Reminder</option>
-                                                    <option value="handover">Shift Handover</option>
-                                                    <option value="maintenance">Facility Inspection</option>
-                                                    <option value="medical">Medical Call</option>
-                                                </select>
+                                    <h4><i class="fas fa-user-nurse me-2"></i>Nurse Visit Schedule</h4>
+                                    <p class="text-muted">Set nurse visit times based on incident occurrence time</p>
+                                    
+                                    <!-- 공통 체크 항목 -->
+                                    <div class="card mb-3" style="background: #fff3cd; border: 2px solid #ffc107;">
+                                        <div class="card-body">
+                                            <h6 class="card-title" style="color: #856404;">
+                                                <i class="fas fa-clipboard-list me-2"></i>Common Assessment Tasks (Applied to all visits)
+                                            </h6>
+                                            <textarea class="form-control mb-3" id="commonAssessmentTasks" rows="4" placeholder="예:&#10;• Take vital and neurological observations&#10;• Monitor level of consciousness&#10;• Check for headache, confusion, amnesia or vomiting"></textarea>
+                                            
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold"><i class="fas fa-exclamation-triangle me-1"></i>Conditions</label>
+                                                    <input type="text" class="form-control" id="commonConditions" placeholder="예: If fall was unwitnessed or resident hit their head">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold"><i class="fas fa-notes-medical me-1"></i>Additional Instructions</label>
+                                                    <input type="text" class="form-control" id="commonInstructions" placeholder="예: Send to hospital if condition deteriorates">
+                                                </div>
                                             </div>
-                                            <div class="col-md-6">
-                                                <label for="priority" class="form-label">Priority</label>
-                                                <select id="priority" class="form-control">
-                                                    <option value="high">High</option>
-                                                    <option value="medium">Medium</option>
-                                                    <option value="normal">Normal</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">📊 Escalation Timetable</label>
-                                            <div class="escalation-timeline" id="escalationTimeline">
-                                                <!-- Dynamically generated -->
-                                            </div>
-                                            <button type="button" class="btn btn-warning" onclick="addTimelineStep()" style="margin-top: 10px;">
-                                                ➕ Add Timeline Step
-                                            </button>
                                         </div>
                                     </div>
+                                    
+                                    <!-- Visit Schedule Times -->
+                                    <label class="form-label fw-bold mt-3">
+                                        <i class="fas fa-calendar-check me-2"></i>Visit Schedule Times
+                                    </label>
+                                    <div class="escalation-timeline" id="escalationTimeline">
+                                        <!-- Dynamically generated -->
+                                    </div>
+                                    <button type="button" class="btn btn-success" onclick="addTimelineStep()" style="margin-top: 10px;">
+                                        <i class="fas fa-plus me-2"></i>Add Visit Time
+                                    </button>
                                 </div>
 
                                 <!-- JSON Preview -->
@@ -750,9 +750,12 @@
             currentPolicy = null;
             document.getElementById('policyForm').reset();
             
-            // Reset alarm settings
-            document.getElementById('eventType').value = 'Emergency';
-            document.getElementById('priority').value = 'High';
+            // Reset common assessment items
+            document.getElementById('commonAssessmentTasks').value = '';
+            document.getElementById('commonConditions').value = '';
+            document.getElementById('commonInstructions').value = '';
+            
+            // Reset visit schedule
             document.getElementById('escalationTimeline').innerHTML = '';
             
             // Reset incident association
@@ -795,29 +798,46 @@
             }
         }
 
-        // Add timeline step
+        // Add timeline step (nurse visit schedule - simplified)
         function addTimelineStep() {
             const timelineContainer = document.getElementById('escalationTimeline');
             const stepNumber = timelineContainer.children.length + 1;
             
             const stepHTML = `
-                <div class="timeline-step" data-step="${stepNumber}">
+                <div class="timeline-step" data-step="${stepNumber}" style="background: #e3f2fd; border: 1px solid #90caf9; padding: 15px; margin-bottom: 10px;">
                     <div class="delete-step" onclick="deleteTimelineStep(${stepNumber})">
                         <i class="fas fa-times"></i>
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-3">
-                            <label class="form-label">Delay (minutes)</label>
-                            <input type="number" class="form-control" value="0" min="0">
+                    <div class="row align-items-center">
+                        <div class="col-md-1 text-center">
+                            <strong style="color: #1976d2; font-size: 1.1em;">#${stepNumber}</strong>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Repeat Count</label>
-                            <input type="number" class="form-control" value="1" min="1">
+                        <div class="col-md-5">
+                            <label class="form-label mb-1 small"><i class="fas fa-clock me-1"></i>Interval</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Every</span>
+                                <input type="number" class="form-control visit-interval" value="1" min="0.5" step="0.5" placeholder="1">
+                                <select class="form-select visit-interval-unit" style="max-width: 100px;">
+                                    <option value="minutes">minutes</option>
+                                    <option value="hours" selected>hours</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Message</label>
-                            <input type="text" class="form-control" placeholder="e.g., 🚨 Immediate attention required">
+                        <div class="col-md-5">
+                            <label class="form-label mb-1 small"><i class="fas fa-hourglass-half me-1"></i>지속 시간 (Duration)</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">For</span>
+                                <input type="number" class="form-control visit-duration" value="24" min="1" placeholder="24">
+                                <select class="form-select visit-duration-unit" style="max-width: 100px;">
+                                    <option value="hours" selected>hours</option>
+                                    <option value="days">days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-1 text-center">
+                            <small class="text-muted d-block">간격</small>
+                            <i class="fas fa-arrow-right text-primary"></i>
                         </div>
                     </div>
                 </div>
@@ -882,24 +902,27 @@
             const settings = {
                 policy_name: document.getElementById('policyName').value,
                 policy_id: currentPolicy ? currentPolicy.policy_id : generatePolicyId(),
-                event_type: document.getElementById('eventType').value,
-                priority: document.getElementById('priority').value,
-                escalation_timeline: []
+                // 공통 항목
+                common_assessment_tasks: document.getElementById('commonAssessmentTasks').value,
+                common_conditions: document.getElementById('commonConditions').value,
+                common_instructions: document.getElementById('commonInstructions').value,
+                // 방문 일정
+                nurse_visit_schedule: []
             };
 
-            // Collect timeline steps
+            // Collect visit schedule (only interval and duration)
             document.querySelectorAll('.timeline-step').forEach(step => {
-                const delay = parseInt(step.querySelector('input[type="number"]:first-of-type').value) || 0;
-                const repeat = parseInt(step.querySelector('input[type="number"]:last-of-type').value) || 1;
-                const message = step.querySelector('input[type="text"]').value;
+                const interval = parseFloat(step.querySelector('.visit-interval').value) || 1;
+                const intervalUnit = step.querySelector('.visit-interval-unit').value;
+                const duration = parseFloat(step.querySelector('.visit-duration').value) || 24;
+                const durationUnit = step.querySelector('.visit-duration-unit').value;
 
-                if (message) {
-                    settings.escalation_timeline.push({
-                        delay: delay,
-                        repeat: repeat,
-                        message: message
-                    });
-                }
+                settings.nurse_visit_schedule.push({
+                    interval: interval,
+                    interval_unit: intervalUnit,
+                    duration: duration,
+                    duration_unit: durationUnit
+                });
             });
 
             return settings;
@@ -1054,21 +1077,43 @@
             try {
                 const settings = JSON.parse(settingsJson);
                 
-                // Load basic settings
-                document.getElementById('eventType').value = settings.event_type || 'emergency';
-                document.getElementById('priority').value = settings.priority || 'high';
+                // Load common assessment items
+                document.getElementById('commonAssessmentTasks').value = settings.common_assessment_tasks || '';
+                document.getElementById('commonConditions').value = settings.common_conditions || '';
+                document.getElementById('commonInstructions').value = settings.common_instructions || '';
                 
-                // Clear existing timeline
+                // Clear existing schedule
                 document.getElementById('escalationTimeline').innerHTML = '';
                 
-                // Load timeline steps
-                if (settings.escalation_timeline && settings.escalation_timeline.length > 0) {
-                    settings.escalation_timeline.forEach(step => {
+                // Load nurse visit schedule (backward compatible with old formats)
+                const visitSchedule = settings.nurse_visit_schedule || settings.escalation_timeline || [];
+                
+                if (visitSchedule.length > 0) {
+                    visitSchedule.forEach(visit => {
                         addTimelineStep();
                         const lastStep = document.querySelector('.timeline-step:last-child');
-                        lastStep.querySelector('input[type="number"]:first-of-type').value = step.delay || 0;
-                        lastStep.querySelector('input[type="number"]:last-of-type').value = step.repeat || 1;
-                        lastStep.querySelector('input[type="text"]').value = step.message || '';
+                        
+                        // For new simplified format (nurse_visit_schedule)
+                        if (visit.interval !== undefined) {
+                            lastStep.querySelector('.visit-interval').value = visit.interval;
+                            lastStep.querySelector('.visit-interval-unit').value = visit.interval_unit || 'hours';
+                            lastStep.querySelector('.visit-duration').value = visit.duration;
+                            lastStep.querySelector('.visit-duration-unit').value = visit.duration_unit || 'hours';
+                        }
+                        // For old format with visit_time_hours
+                        else if (visit.visit_time_hours !== undefined) {
+                            lastStep.querySelector('.visit-interval').value = visit.visit_time_hours;
+                            lastStep.querySelector('.visit-interval-unit').value = 'hours';
+                            lastStep.querySelector('.visit-duration').value = 1;
+                            lastStep.querySelector('.visit-duration-unit').value = 'hours';
+                        }
+                        // For legacy escalation_timeline - convert minutes to hours
+                        else if (visit.delay !== undefined) {
+                            lastStep.querySelector('.visit-interval').value = (visit.delay / 60).toFixed(1);
+                            lastStep.querySelector('.visit-interval-unit').value = 'hours';
+                            lastStep.querySelector('.visit-duration').value = 1;
+                            lastStep.querySelector('.visit-duration-unit').value = 'hours';
+                        }
                     });
                 }
             } catch (error) {

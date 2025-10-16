@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Cache</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .btn {
+            background: #e74c3c;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #c0392b;
+        }
+        .success {
+            background: #27ae60;
+        }
+        .info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧹 Cache Management</h1>
+    
+    <div class="info">
+        <h3>Current Cache Status</h3>
+        <p id="cacheInfo">Loading...</p>
+    </div>
+    
+    <button class="btn" onclick="clearCache()">Clear Visit Schedule Cache</button>
+    <button class="btn success" onclick="location.href='/mobile_dashboard'">Go to Mobile Dashboard</button>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+    
+    <script>
+        function showCacheInfo() {
+            const keys = Object.keys(localStorage);
+            const cacheKeys = keys.filter(k => k.startsWith('visit_schedule_'));
+            
+            let info = `<strong>${cacheKeys.length} cached schedules</strong><br><br>`;
+            
+            cacheKeys.forEach(key => {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    const age = Math.round((Date.now() - data.timestamp) / 1000);
+                    info += `${key.replace('visit_schedule_', '')}: ${age}s ago<br>`;
+                } catch(e) {}
+            });
+            
+            document.getElementById('cacheInfo').innerHTML = info || 'No cache found';
+        }
+        
+        function clearCache() {
+            const keys = Object.keys(localStorage);
+            const cacheKeys = keys.filter(k => k.startsWith('visit_schedule_'));
+            
+            cacheKeys.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            document.getElementById('result').innerHTML = 
+                `<div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
+                    ✅ Cleared ${cacheKeys.length} cached schedules
+                </div>`;
+            
+            setTimeout(() => {
+                showCacheInfo();
+            }, 500);
+        }
+        
+        showCacheInfo();
+    </script>
+</body>
+</html>

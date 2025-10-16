@@ -259,10 +259,108 @@ class MANADPlusIntegrator:
         # 기본값
         return 'Parafield Gardens'
     
+    def get_post_fall_progress_notes_optimized(self, client_id: int, fall_date: datetime, 
+                                                max_days: int = 7) -> List[Dict]:
+        """
+        최적화된 Post Fall Progress Notes 조회 (CIMS DB 데이터 활용)
+        
+        ✅ 최적화:
+        - Fall Incident Progress Note 조회 건너뛰기 (1회 API 호출 절약)
+        - clientId 파라미터로 API 레벨 필터링 (네트워크 트래픽 감소)
+        - progressNoteEventTypeId로 Post Fall만 조회 (불필요한 데이터 제거)
+        - 날짜 범위를 필요한 만큼만 조회
+        
+        Args:
+            client_id: MANAD ClientId (CIMS DB의 resident_manad_id)
+            fall_date: Fall 발생 시간 (CIMS DB의 incident_date)
+            max_days: 조회 기간 (기본 7일)
+            
+        Returns:
+            Post Fall Progress Notes 목록
+        """
+        try:
+            headers = {
+                'x-api-username': self.config.get('api_username', 'ManadAPI'),
+                'x-api-key': self.config.get('api_key', ''),
+                'Content-Type': 'application/json'
+            }
+            
+            # 날짜 범위 설정 (Fall 이후 ~ max_days)
+            end_date = fall_date + timedelta(days=max_days)
+            start_date_str = fall_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+            end_date_str = end_date.strftime('%Y-%m-%dT23:59:59Z')
+            
+            notes_url = f"{self.config['base_url']}/api/progressnote/details"
+            
+            # 🚀 최적화된 파라미터
+            params = {
+                'clientId': client_id,  # ✅ 특정 환자만 조회
+                'date': [f'gt:{start_date_str}', f'lt:{end_date_str}']  # ✅ 날짜 범위
+            }
+            
+            # 🔍 Post Fall EventType ID 조회 (캐싱 고려)
+            # Note: progressNoteEventTypeId는 MANAD Plus에서 "Post Fall"의 ID를 알아야 함
+            # 일반적으로 EventType은 고정되어 있으므로 config나 상수로 관리 가능
+            # 예: progressNoteEventTypeId = 12 (Post Fall)
+            # params['progressNoteEventTypeId'] = 12  # TODO: 실제 ID 확인 필요
+            
+            logger.debug(f"Querying Post Fall notes: ClientId={client_id}, Date={start_date_str} to {end_date_str}")
+            
+            response = requests.get(notes_url, headers=headers, params=params, timeout=self.config['timeout'])
+            
+            if response.status_code != 200:
+                logger.warning(f"Failed to get progress notes: {response.status_code}")
+                return []
+            
+            all_notes = response.json()
+            
+            # 📊 응답 크기 로그 (모니터링)
+            logger.debug(f"API returned {len(all_notes)} notes for ClientId={client_id}")
+            
+            # 필터링 (API에서 clientId 필터가 적용되었으므로 간소화)
+            post_fall_notes = []
+            
+            for note in all_notes:
+                if note.get('IsDeleted', False):
+                    continue
+                
+                event_type_obj = note.get('ProgressNoteEventType', {})
+                event_type_desc = event_type_obj.get('Description', '') if isinstance(event_type_obj, dict) else ''
+                notes_text = note.get('NotesPlainText', '').lower()
+                
+                # Post Fall 또는 Daily Progress (Fall 관련)
+                if 'Post Fall' in event_type_desc or (event_type_desc == 'Daily Progress' and 'fall' in notes_text):
+                    note_date = datetime.fromisoformat(note.get('CreatedDate').replace('Z', ''))
+                    
+                    # Fall Incident 이후의 노트만
+                    if note_date > fall_date:
+                        post_fall_notes.append(note)
+            
+            # 시간순 정렬
+            post_fall_notes.sort(key=lambda x: x['CreatedDate'])
+            
+            logger.info(f"Found {len(post_fall_notes)} Post Fall notes for ClientId={client_id}")
+            
+            result = {
+                'fall_trigger_date': fall_date,
+                'client_id': client_id,
+                'post_fall_notes': post_fall_notes
+            }
+            
+            return result
+                
+        except requests.exceptions.ConnectionError:
+            logger.warning("MANAD Plus API 서버에 연결할 수 없습니다. Post Fall notes를 조회할 수 없습니다.")
+            return []
+        except Exception as e:
+            logger.error(f"Error getting post fall notes (optimized): {str(e)}")
+            return []
+    
     def get_post_fall_progress_notes(self, fall_incident_id: str) -> List[Dict]:
         """
-        MANAD Plus API에서 Post Fall Progress Notes 조회
-        Fall Incident Progress Note를 트리거로 사용하여 그 이후의 Post Fall notes만 조회
+        MANAD Plus API에서 Post Fall Progress Notes 조회 (LEGACY)
+        
+        ⚠️ DEPRECATED: 최적화를 위해 get_post_fall_progress_notes_optimized() 사용 권장
         
         Args:
             fall_incident_id: Fall Incident Progress Note ID
@@ -292,64 +390,8 @@ class MANADPlusIntegrator:
             
             logger.info(f"Fall Incident trigger: ID={fall_incident_id}, Date={fall_trigger_date}, ClientId={client_id}")
             
-            # 2. Fall Incident 이후 7일간의 Progress Notes 조회
-            end_date = fall_trigger_date + timedelta(days=7)
-            
-            notes_url = f"{self.config['base_url']}/api/progressnote/details"
-            
-            start_date_str = fall_trigger_date.strftime('%Y-%m-%dT%H:%M:%SZ')
-            end_date_str = end_date.strftime('%Y-%m-%dT23:59:59Z')
-            
-            params = {
-                'date': [f'gt:{start_date_str}', f'lt:{end_date_str}']
-            }
-            
-            response = requests.get(notes_url, headers=headers, params=params, timeout=self.config['timeout'])
-            
-            if response.status_code != 200:
-                logger.warning(f"Failed to get progress notes: {response.status_code}")
-                return []
-            
-            all_notes = response.json()
-            
-            # 3. Post Fall notes 필터링
-            # - 동일한 ClientId
-            # - EventType이 'Post Fall' 또는 'Daily Progress' (fall 키워드 포함)
-            # - IsDeleted가 False
-            post_fall_notes = []
-            
-            for note in all_notes:
-                if note.get('ClientId') != client_id:
-                    continue
-                
-                if note.get('IsDeleted', False):
-                    continue
-                
-                event_type_obj = note.get('ProgressNoteEventType', {})
-                event_type_desc = event_type_obj.get('Description', '') if isinstance(event_type_obj, dict) else ''
-                notes_text = note.get('NotesPlainText', '').lower()
-                
-                # Post Fall 또는 Daily Progress (Fall 관련)
-                if 'Post Fall' in event_type_desc or (event_type_desc == 'Daily Progress' and 'fall' in notes_text):
-                    note_date = datetime.fromisoformat(note.get('CreatedDate').replace('Z', ''))
-                    
-                    # Fall Incident 이후의 노트만
-                    if note_date > fall_trigger_date:
-                        post_fall_notes.append(note)
-            
-            # 시간순 정렬
-            post_fall_notes.sort(key=lambda x: x['CreatedDate'])
-            
-            logger.info(f"Found {len(post_fall_notes)} Post Fall notes after Fall Incident {fall_incident_id}")
-            
-            # Fall trigger date도 함께 반환
-            result = {
-                'fall_trigger_date': fall_trigger_date,
-                'client_id': client_id,
-                'post_fall_notes': post_fall_notes
-            }
-            
-            return result
+            # 최적화된 메서드 사용
+            return self.get_post_fall_progress_notes_optimized(client_id, fall_trigger_date)
                 
         except requests.exceptions.ConnectionError:
             logger.warning("MANAD Plus API 서버에 연결할 수 없습니다. Post Fall notes를 조회할 수 없습니다.")

@@ -27,6 +27,15 @@
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             box-shadow: 0 2px 15px rgba(0,0,0,0.1);
             padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        body {
+            padding-top: 76px;
         }
 
         .navbar-brand {
@@ -60,14 +69,15 @@
 
         .sidebar {
             background: white;
-            min-height: calc(100vh - 76px);
+            min-height: 100vh;
             box-shadow: 2px 0 15px rgba(0,0,0,0.1);
             padding: 0;
-            position: sticky;
-            top: 76px;
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 250px;
-            z-index: 1000;
-            height: calc(100vh - 76px);
+            z-index: 999;
+            height: 100vh;
             overflow-y: auto;
         }
 
@@ -126,6 +136,7 @@
 
         .main-content {
             padding: 2rem;
+            margin-left: 250px;
         }
 
         .kpi-card {
@@ -183,6 +194,29 @@
 
         .kpi-change.negative {
             color: var(--danger-color);
+        }
+
+        .kpi-description {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+
+        .kpi-description.text-success {
+            color: var(--success-color);
+        }
+
+        .kpi-description.text-warning {
+            color: var(--warning-color);
+        }
+
+        .kpi-description.text-danger {
+            color: var(--danger-color);
+        }
+
+        .kpi-description.text-info {
+            color: var(--info-color);
         }
 
         .alert-card {
@@ -750,7 +784,7 @@
         .overdue-task-row {
             background-color: rgba(220, 53, 69, 0.1) !important;
             border-left: 4px solid #dc3545 !important;
-            animation: blink-overdue 2s infinite;
+            /* animation: blink-overdue 2s infinite; */ /* 깜박임 제거 */
         }
 
         .overdue-task-row td {
@@ -758,10 +792,12 @@
             font-weight: 600;
         }
 
+        /* 깜박임 애니메이션 비활성화
         @keyframes blink-overdue {
             0%, 50% { opacity: 1; }
             51%, 100% { opacity: 0.3; }
         }
+        */
 
         /* Nurse Station Real-time Alerts */
         .alert-popup {
@@ -1226,11 +1262,8 @@
         </div>
     </nav>
 
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 px-0">
-                <div class="sidebar">
+    <!-- Sidebar (Fixed Position) -->
+    <div class="sidebar">
                     <div class="sidebar-header">
                         <i class="fas fa-tachometer-alt me-2"></i>
                         Menu
@@ -1247,6 +1280,9 @@
                         </a></li>
                         <li><a href="/policy_admin">
                             <i class="fas fa-cog"></i> Policy Management
+                        </a></li>
+                        <li><a href="#" data-section="settings">
+                            <i class="fas fa-tools"></i> System Settings
                         </a></li>
                         <li><a href="#" data-section="analytics">
                             <i class="fas fa-chart-bar"></i> Analytics
@@ -1272,17 +1308,50 @@
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </a></li>
                     </ul>
-                </div>
-            </div>
+    </div>
 
-            <!-- Main Content -->
-            <div class="col-md-9 col-lg-10">
-                <div class="main-content">
-                    <!-- Role Switcher -->
+    <!-- Main Content -->
+    <div class="main-content">
+                    <!-- Role Switcher with Period & Type Filters -->
                     <div class="role-switcher">
-                        <h5><i class="fas fa-user-tag me-2"></i>Current Role</h5>
-                        <span id="current-role" class="role-badge">Loading...</span>
-                        <small class="text-muted ms-2">Different views are displayed based on your role</small>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h5><i class="fas fa-user-tag me-2"></i>Current Role</h5>
+                                <span id="current-role" class="role-badge">Loading...</span>
+                                <small class="text-muted ms-2">Different views are displayed based on your role</small>
+                            </div>
+                            <div class="period-filter">
+                                <label for="globalPeriodSelect" class="form-label me-2 mb-0" style="font-weight: 500;">📅 Period:</label>
+                                <select id="globalPeriodSelect" class="form-select" style="width: auto; display: inline-block;" onchange="applyFilters()">
+                                    <option value="today">Today</option>
+                                    <option value="week" selected>This Week</option>
+                                    <option value="month">This Month</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Incident Type Filter -->
+                        <div class="incident-type-filter" style="padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px;">
+                            <label class="form-label mb-2" style="font-weight: 500;">🏥 Incident Type:</label>
+                            <div class="btn-group btn-group-sm" role="group" id="incidentTypeFilter">
+                                <input type="radio" class="btn-check" name="incidentType" id="typeAll" value="all" checked autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-primary" for="typeAll">All</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeFall" value="fall" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-danger" for="typeFall">Fall</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeWound" value="wound" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-warning" for="typeWound">Wound/Skin</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeMedication" value="medication" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-info" for="typeMedication">Medication</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeBehaviour" value="behaviour" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-success" for="typeBehaviour">Behaviour</label>
+                                
+                                <input type="radio" class="btn-check" name="incidentType" id="typeOther" value="other" autocomplete="off" onchange="applyFilters()">
+                                <label class="btn btn-outline-secondary" for="typeOther">Other</label>
+                            </div>
+                        </div>
                     </div>
 
     <!-- Audio Controls -->
@@ -1299,40 +1368,31 @@
                                 <div class="kpi-card text-center">
                                     <div class="kpi-number" id="compliance-rate">--</div>
                                     <div class="kpi-label">Overall Compliance Rate</div>
-                                    <div class="kpi-change positive" id="compliance-change">+2.5%</div>
+                                    <div class="kpi-description" id="compliance-desc">No data</div>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="kpi-card text-center">
                                     <div class="kpi-number text-danger" id="overdue-tasks">--</div>
                                     <div class="kpi-label">Overdue Tasks</div>
-                                    <div class="kpi-change negative" id="overdue-change">Immediate Action Required</div>
+                                    <div class="kpi-description" id="overdue-desc">All tasks on time</div>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="kpi-card text-center">
                                     <div class="kpi-number text-warning" id="open-incidents">--</div>
                                     <div class="kpi-label">Open Incidents</div>
-                                    <div class="kpi-change" id="incidents-change">Total Open</div>
+                                    <div class="kpi-description" id="incidents-change">Not visited</div>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="kpi-card text-center">
-                                    <div class="kpi-number text-info" id="total-tasks">--</div>
-                                    <div class="kpi-label">Total Tasks</div>
-                                    <div class="kpi-change" id="tasks-change">This Week</div>
+                                    <div class="kpi-number text-info" id="total-incidents">--</div>
+                                    <div class="kpi-label">Total Incidents</div>
+                                    <div class="kpi-description" id="total-incidents-desc">This Week</div>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Urgent Alerts -->
-                        <div class="alert-card danger" id="urgent-alerts" style="display: none;">
-                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Urgent Alerts</h5>
-                            <div id="urgent-alerts-list">
-                                <!-- Urgent alerts will be loaded here -->
-                            </div>
-                        </div>
-
 
                         <!-- Incident Viewer Section -->
                         <div class="incident-viewer-section">
@@ -1341,19 +1401,7 @@
                             <div class="mt-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h3 style="color: #2c3e50; margin: 0;">📊 Site Analysis Dashboard</h3>
-                                    <div class="period-selector">
-                                        <label for="periodSelect" class="form-label me-2">Period:</label>
-                                        <select id="periodSelect" class="form-select" style="width: auto; display: inline-block;">
-                                            <option value="1" selected>Last 1 Day</option>
-                                            <option value="2">Last 2 Days</option>
-                                            <option value="3">Last 3 Days</option>
-                                            <option value="4">Last 4 Days</option>
-                                            <option value="5">Last 5 Days</option>
-                                            <option value="6">Last 6 Days</option>
-                                            <option value="7">Last 7 Days</option>
-                                        </select>
-                                        <button class="btn btn-primary btn-sm ms-2" onclick="loadIncidents()">🔄 Refresh</button>
-                                    </div>
+                                    <button class="btn btn-primary btn-sm" onclick="loadIncidents()">🔄 Refresh</button>
                                 </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-4">
@@ -1477,31 +1525,67 @@
                             </div>
                         </div>
                         
-                        <!-- Open Incidents Table -->
-                        <div class="chart-container incidents-container">
-                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Open Incidents</h5>
-                            <div class="incidents-table-container">
-                                <div class="table-responsive">
-                                    <table class="table table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Incident ID</th>
-                                                <th>Type</th>
-                                                <th>Severity</th>
-                                                <th>Date</th>
-                                                <th>Resident</th>
-                                                <th>Site</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="incidents-table">
-                                            <!-- Incidents will be loaded here -->
-                                        </tbody>
-                                    </table>
+                    </div>
+
+                    <!-- Settings Section (Admin/Clinical Manager only) -->
+                    <div id="settings-view" style="display: none;">
+                        <div class="container-fluid">
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="card shadow-sm">
+                                        <div class="card-header bg-primary text-white">
+                                            <h4 class="mb-0"><i class="fas fa-tools me-2"></i>System Settings</h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- Force Sync Section -->
+                                            <div class="mb-4">
+                                                <h5 class="text-primary mb-3">
+                                                    <i class="fas fa-sync-alt me-2"></i>Data Synchronization
+                                                </h5>
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-2"></i>
+                                                    <strong>Force Synchronization</strong> will perform a complete database update:
+                                                    <ul class="mb-0 mt-2">
+                                                        <li>Sync all incidents from MANAD Plus (last 30 days)</li>
+                                                        <li>Auto-generate missing tasks for Fall incidents</li>
+                                                        <li>Sync progress notes and update task completion status</li>
+                                                        <li>Update all incident statuses (Open/Overdue/Closed)</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <button id="forceSyncBtn" class="btn btn-primary btn-lg" onclick="performForceSync()">
+                                                        <i class="fas fa-sync-alt me-2"></i>Force Synchronization
+                                                    </button>
+                                                    <div id="syncStatus" class="text-muted"></div>
+                                                </div>
+                                                <div id="syncProgress" class="mt-3" style="display: none;">
+                                                    <div class="progress" style="height: 30px;">
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                             id="syncProgressBar" 
+                                                             role="progressbar" 
+                                                             style="width: 0%">0%</div>
+                                                    </div>
+                                                    <div id="syncDetails" class="mt-2 small text-muted"></div>
+                                                </div>
+                                                <div id="syncResult" class="mt-3" style="display: none;"></div>
+                                            </div>
+
+                                            <!-- Auto Sync Info -->
+                                            <div class="mb-4">
+                                                <h5 class="text-secondary mb-3">
+                                                    <i class="fas fa-clock me-2"></i>Automatic Synchronization
+                                                </h5>
+                                                <div class="alert alert-secondary">
+                                                    <i class="fas fa-info-circle me-2"></i>
+                                                    The system automatically synchronizes data every <strong>5 minutes</strong> in the background.
+                                                    Use Force Sync only when you need immediate updates or to fix data inconsistencies.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-
                     </div>
 
                     <!-- User View (Nurse/Carer) -->
@@ -1693,11 +1777,15 @@
         // Load admin data
         async function loadAdminData() {
             try {
-                await Promise.all([
-                    loadComplianceSummary(),
-                    loadOverdueTasks(),
-                    loadOpenIncidents()
-                ]);
+                // 먼저 인시던트 데이터 로드 (filteredIncidents 설정)
+                await initializeIncidentViewer();
+                
+                // 그 다음 나머지 데이터 로드
+                // loadComplianceSummary() is deprecated - updateKPICards() handles this
+                // loadOverdueTasks() // Removed - will be re-implemented later
+                
+                // 마지막으로 Open Incidents 표시 (filteredIncidents 사용)
+                // displayOpenIncidents(filteredIncidents); // Removed - duplicate content
             } catch (error) {
                 console.error('Error loading admin data:', error);
             }
@@ -1712,82 +1800,18 @@
             }
         }
 
-        // Load compliance summary
+        // Removed - KPI updates now handled by updateKPICards()
         async function loadComplianceSummary() {
-            try {
-                // Try cached API first, fallback to original API
-                let response = await fetch('/api/cache/dashboard/kpi');
-                let useCache = response.ok;
-                
-                if (!response.ok) {
-                    console.log('Cache API failed, falling back to original API');
-                    response = await fetch('/api/v1/analytics/compliance-summary?period=last_30_days');
-                    useCache = false;
-                }
-                
-                console.log('Compliance summary response:', response.status, useCache ? '(cached)' : '(live)');
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Compliance data:', data);
-                    
-                    // Update KPI cards with actual data
-                    document.getElementById('compliance-rate').textContent = data.compliance_metrics?.overall_compliance_rate || '0';
-                    document.getElementById('overdue-tasks').textContent = data.compliance_metrics?.overdue_tasks_count || '0';
-                    document.getElementById('open-incidents').textContent = data.incident_counts?.open_incidents || '0';
-                    document.getElementById('total-tasks').textContent = data.compliance_metrics?.total_tasks || '0';
-                    
-                    // Update change indicators
-                    const complianceChange = document.getElementById('compliance-change');
-                    const overdueChange = document.getElementById('overdue-change');
-                    const incidentsChange = document.getElementById('incidents-change');
-                    const tasksChange = document.getElementById('tasks-change');
-                    
-                    // Set appropriate change indicators
-                    if (data.compliance_metrics?.overall_compliance_rate > 0) {
-                        complianceChange.textContent = '+2.5%';
-                        complianceChange.className = 'kpi-change positive';
-                    } else {
-                        complianceChange.textContent = 'No data';
-                        complianceChange.className = 'kpi-change';
-                    }
-                    
-                    if (data.compliance_metrics?.overdue_tasks_count > 0) {
-                        overdueChange.textContent = 'Immediate Action Required';
-                        overdueChange.className = 'kpi-change negative';
-                    } else {
-                        overdueChange.textContent = 'All tasks on time';
-                        overdueChange.className = 'kpi-change positive';
-                    }
-                    
-                    incidentsChange.textContent = `Total Open: ${data.incident_counts?.open_incidents || 0}`;
-                    tasksChange.textContent = `This Week: ${data.compliance_metrics?.total_tasks || 0}`;
-                    
-                } else {
-                    console.error('Compliance summary error:', response.status, response.statusText);
-                    const errorData = await response.json();
-                    console.error('Error details:', errorData);
-                    
-                    // Set default values when API fails
-                    document.getElementById('compliance-rate').textContent = '0';
-                    document.getElementById('overdue-tasks').textContent = '0';
-                    document.getElementById('open-incidents').textContent = '0';
-                    document.getElementById('total-tasks').textContent = '0';
-                }
-            } catch (error) {
-                console.error('Error loading compliance summary:', error);
-                
-                // Set default values when error occurs
-                document.getElementById('compliance-rate').textContent = '0';
-                document.getElementById('overdue-tasks').textContent = '0';
-                document.getElementById('open-incidents').textContent = '0';
-                document.getElementById('total-tasks').textContent = '0';
-            }
+            // This function is deprecated
+            // KPI cards are now updated by updateKPICards() which uses /api/cims/dashboard-kpis
+            console.log('ℹ️ loadComplianceSummary() is deprecated - using updateKPICards() instead');
         }
 
         // Load incidents by type
 
         // Load overdue tasks
+        // Removed - will be re-implemented later
+        /*
         async function loadOverdueTasks() {
             try {
                 const response = await fetch('/api/v1/tasks/overdue');
@@ -1805,32 +1829,10 @@
                 console.error('Error loading overdue tasks:', error);
             }
         }
+        */
 
-        // Load open incidents
-        let firstIncidentLoad = true;
-        async function loadOpenIncidents() {
-            try {
-                // Force sync on first load to get latest data from MANAD API
-                const syncParam = firstIncidentLoad ? '?sync=true' : '';
-                const response = await fetch(`/api/cims/incidents${syncParam}`);
-                console.log('Open incidents response:', response.status);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    displayOpenIncidents(data);
-                    if (firstIncidentLoad) {
-                        console.log('✅ Initial incident sync completed');
-                        firstIncidentLoad = false;
-                    }
-                } else {
-                    console.error('Open incidents error:', response.status, response.statusText);
-                    const errorData = await response.json();
-                    console.error('Error details:', errorData);
-                }
-            } catch (error) {
-                console.error('Error loading open incidents:', error);
-            }
-        }
+        // Note: loadOpenIncidents는 loadAdminData()에서 initializeIncidentViewer()로 대체됨
+        // Open Incidents 테이블은 filteredIncidents를 사용하여 displayOpenIncidents()로 표시
 
         // Load my tasks
         async function loadMyTasks() {
@@ -1853,25 +1855,43 @@
         }
 
 
-        // Display urgent alerts
+        // Removed - will be re-implemented later
+        /*
         function displayUrgentAlerts(tasks) {
             const alertsContainer = document.getElementById('urgent-alerts-list');
             const alertsCard = document.getElementById('urgent-alerts');
             
             if (tasks && tasks.length > 0) {
-                alertsCard.style.display = 'block';
-                alertsContainer.innerHTML = tasks.map(task => `
-                    <div class="alert alert-danger mb-2">
-                        <strong>${task.task_id}</strong> - ${task.resident_name}: ${task.description}
-                        <br><small>담당자: ${task.assigned_user} | 초과: ${task.overdue_by_hours}시간</small>
-                    </div>
-                `).join('');
+                // 2일(48시간) 이내의 overdue tasks만 필터링
+                const now = new Date();
+                const twoDaysAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+                
+                const recentTasks = tasks.filter(task => {
+                    if (!task.due_date) return false;
+                    const dueDate = new Date(task.due_date);
+                    // 2일 이내에 마감된 Task만 표시
+                    return dueDate >= twoDaysAgo;
+                });
+                
+                if (recentTasks.length > 0) {
+                    alertsCard.style.display = 'block';
+                    alertsContainer.innerHTML = recentTasks.map(task => `
+                        <div class="alert alert-danger mb-2">
+                            <strong>${task.task_id}</strong> - ${task.resident_name}: ${task.description}
+                            <br><small>담당자: ${task.assigned_user} | 초과: ${task.overdue_by_hours}시간</small>
+                        </div>
+                    `).join('');
+                } else {
+                    alertsCard.style.display = 'none';
+                }
             } else {
                 alertsCard.style.display = 'none';
             }
         }
+        */
 
-        // Display open incidents
+        // Removed - duplicate content
+        /*
         function displayOpenIncidents(incidents) {
             const tableBody = document.getElementById('incidents-table');
             if (incidents && incidents.length > 0) {
@@ -1893,13 +1913,25 @@
                     
                     const rowClass = isOverdue ? 'overdue-task-row' : '';
                     
-                    // Get severity badge color
-                    let severityColor = 'info';
-                    const sev = (incident.severity || '').toLowerCase();
-                    if (sev.includes('high') || sev.includes('5') || sev.includes('4')) {
-                        severityColor = 'danger';
-                    } else if (sev.includes('medium') || sev.includes('3') || sev.includes('2')) {
-                        severityColor = 'warning';
+                    // Get severity badge color (support SeverityRating, RiskRatingName, and severity)
+                    const severity = incident.severity || incident.SeverityRating || incident.RiskRatingName;
+                    let severityColor = 'secondary';
+                    let severityText = 'N/A';
+                    
+                    if (severity) {
+                        severityText = severity;
+                        const sev = severity.toLowerCase();
+                        
+                        // Handle different formats: "3 - Mild", "High", "Moderate", etc.
+                        if (sev.includes('critical') || sev.includes('severe') || sev.includes('high') || 
+                            sev.includes('5 -') || sev.includes('4 -')) {
+                            severityColor = 'danger';
+                        } else if (sev.includes('moderate') || sev.includes('medium') || 
+                                   sev.includes('3 -') || sev.includes('2 -')) {
+                            severityColor = 'warning';
+                        } else if (sev.includes('mild') || sev.includes('low') || sev.includes('1 -')) {
+                            severityColor = 'success';
+                        }
                     }
                     
                     // Format date to Australian format
@@ -1912,14 +1944,17 @@
                         minute: '2-digit'
                     });
                     
+                    // Support both site and SiteName fields
+                    const siteName = incident.site || incident.SiteName || 'Unknown';
+                    
                     return `
                         <tr class="${rowClass}">
                             <td>${incident.incident_id || 'N/A'}</td>
                             <td>${incident.incident_type || 'Unknown'}</td>
-                            <td><span class="badge bg-${severityColor}">${incident.severity || 'Unknown'}</span></td>
+                            <td><span class="badge bg-${severityColor}">${severityText}</span></td>
                             <td>${formattedDate}</td>
                             <td>${incident.resident_name || 'Unknown'}</td>
-                            <td><strong>${incident.site || 'Unknown'}</strong></td>
+                            <td><strong>${siteName}</strong></td>
                             <td><button class="btn btn-sm btn-outline-primary" onclick="viewIncidentDetails('${incident.incident_id}')">View</button></td>
                         </tr>
                     `;
@@ -1928,6 +1963,7 @@
                 tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No open incidents</td></tr>';
             }
         }
+        */
 
         // View incident details
         function viewIncidentDetails(incidentId) {
@@ -2099,7 +2135,10 @@
         // Auto-refresh data every 30 seconds
         setInterval(() => {
             if (currentRole === 'admin' || currentRole === 'clinical_manager') {
-                loadAdminData();
+                // Admin view: 인시던트 데이터만 갱신
+                loadIncidents();
+                // loadComplianceSummary(); // Deprecated - updateKPICards() handles this
+                // loadOverdueTasks(); // Removed - will be re-implemented later
             } else {
                 loadUserData();
             }
@@ -2107,14 +2146,17 @@
 
         // Incident Viewer Functions
         let currentSite = 'Parafield Gardens';
-        let incidents = [];
+        let incidents = [];  // 전체 인시던트 데이터
+        let filteredIncidents = [];  // 필터링된 인시던트 데이터
         let clients = [];
         let chartInstances = {}; // Store chart instances to destroy them properly
+        let currentPeriod = 'week'; // 현재 선택된 기간 (기본값: This Week)
+        let currentIncidentType = 'all'; // 현재 선택된 incident type (기본값: All)
 
         // Initialize incident viewer
-        function initializeIncidentViewer() {
+        async function initializeIncidentViewer() {
             // Auto-load incidents for all sites
-            loadIncidents();
+            await loadIncidents();
         }
 
         // Auto-load incidents for all sites
@@ -2129,50 +2171,23 @@
                 hideError();
                 hideNoData();
                 
-                console.log('Loading incidents from CIMS database (fast)...');
-                
                 // Load incidents directly from CIMS database instead of external APIs
                 const response = await fetch('/api/cims/incidents');
                 if (response.ok) {
                     const data = await response.json();
                     const allIncidents = data.incidents || [];
                     
-                    console.log(`✅ Loaded ${allIncidents.length} incidents from CIMS database`);
-                    
-                    // Group incidents by site for display
-                    const sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
-                    const siteResults = {};
-                    
-                    sites.forEach(site => {
-                        const siteIncidents = allIncidents.filter(incident => incident.site === site);
-                        siteResults[site] = {
-                            incidents: siteIncidents.length,
-                            clients: 0, // Not needed for CIMS data
-                            success: true
-                        };
-                        console.log(`✅ ${site}: ${siteIncidents.length} incidents`);
-                    });
+                    console.log(`✅ Loaded ${allIncidents.length} incidents from CIMS DB`);
                     
                     // Set global variables for other functions
                     incidents = allIncidents;
                     clients = []; // Not needed for CIMS data
                     
-                    // Log summary of all sites
-                    console.log('=== Site Loading Summary ===');
-                    Object.keys(siteResults).forEach(site => {
-                        const result = siteResults[site];
-                        if (result.success) {
-                            console.log(`✅ ${site}: ${result.incidents} incidents`);
-                        } else {
-                            console.log(`❌ ${site}: Failed - ${result.error}`);
-                        }
-                    });
+                    // 초기 로드 시에는 filteredIncidents를 전체로 설정
+                    filteredIncidents = allIncidents;
                     
-                    console.log(`Total loaded: ${incidents.length} incidents from CIMS database`);
-                    
-                    // Display stats and charts
-                    displayStats();
-                    createSiteSpecificCharts();
+                    // 필터 적용 후 화면 갱신
+                    applyFilters();
                     
                 } else {
                     console.error('Failed to load incidents from CIMS database:', response.status);
@@ -2242,14 +2257,158 @@
             }
         }
 
+        // Combined filter function (Period + Incident Type)
+        function applyFilters() {
+            const period = document.getElementById('globalPeriodSelect').value;
+            const incidentType = document.querySelector('input[name="incidentType"]:checked').value;
+            
+            currentPeriod = period;
+            currentIncidentType = incidentType;
+            
+            const now = new Date();
+            let startDate;
+            
+            // Period filter
+            if (period === 'today') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (period === 'week') {
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 7);
+            } else if (period === 'month') {
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 30);
+            }
+            
+            // Filter incidents by date and type
+            filteredIncidents = incidents.filter(incident => {
+                const incidentDate = new Date(incident.incident_date);
+                const dateMatch = incidentDate >= startDate;
+                
+                // Type filter
+                let typeMatch = true;
+                if (incidentType !== 'all') {
+                    const incidentTypeStr = (incident.incident_type || '').toLowerCase();
+                    
+                    if (incidentType === 'fall') {
+                        typeMatch = incidentTypeStr.includes('fall');
+                    } else if (incidentType === 'wound') {
+                        typeMatch = incidentTypeStr.includes('wound') || incidentTypeStr.includes('skin');
+                    } else if (incidentType === 'medication') {
+                        typeMatch = incidentTypeStr.includes('medication');
+                    } else if (incidentType === 'behaviour') {
+                        typeMatch = incidentTypeStr.includes('behaviour') || incidentTypeStr.includes('behavior');
+                    } else if (incidentType === 'other') {
+                        typeMatch = !incidentTypeStr.includes('fall') && 
+                                   !incidentTypeStr.includes('wound') && 
+                                   !incidentTypeStr.includes('skin') && 
+                                   !incidentTypeStr.includes('medication') && 
+                                   !incidentTypeStr.includes('behaviour') &&
+                                   !incidentTypeStr.includes('behavior');
+                    }
+                }
+                
+                return dateMatch && typeMatch;
+            });
+            
+            // Filters applied silently
+            
+            // 화면 갱신
+            displayStats();
+            createSiteSpecificCharts();
+            updateKPICards();
+            // displayOpenIncidents(filteredIncidents);  // Removed - duplicate content
+        }
+        
+        // Legacy function for backward compatibility
+        function applyPeriodFilter() {
+            applyFilters();
+        }
+        
+        // Update KPI cards with filtered data
+        async function updateKPICards() {
+            try {
+                // Get KPI data from backend
+                const response = await fetch(`/api/cims/dashboard-kpis?period=${currentPeriod}&incident_type=${currentIncidentType}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch KPI data');
+                }
+                
+                const kpiData = await response.json();
+                console.log('📊 KPI Data:', kpiData);
+                
+                // Update Overall Compliance Rate
+                const complianceRateEl = document.getElementById('compliance-rate');
+                const complianceDescEl = document.getElementById('compliance-desc');
+                if (complianceRateEl && complianceDescEl) {
+                    complianceRateEl.textContent = `${kpiData.compliance_rate}%`;
+                    if (kpiData.compliance_rate >= 90) {
+                        complianceDescEl.textContent = 'Excellent compliance';
+                        complianceDescEl.className = 'kpi-description text-success';
+                    } else if (kpiData.compliance_rate >= 70) {
+                        complianceDescEl.textContent = 'Good compliance';
+                        complianceDescEl.className = 'kpi-description text-warning';
+                    } else {
+                        complianceDescEl.textContent = 'Needs improvement';
+                        complianceDescEl.className = 'kpi-description text-danger';
+                    }
+                }
+                
+                // Update Overdue Tasks
+                const overdueTasksEl = document.getElementById('overdue-tasks');
+                const overdueDescEl = document.getElementById('overdue-desc');
+                if (overdueTasksEl && overdueDescEl) {
+                    overdueTasksEl.textContent = kpiData.overdue_tasks;
+                    if (kpiData.overdue_tasks === 0) {
+                        overdueDescEl.textContent = 'All tasks on time';
+                        overdueDescEl.className = 'kpi-description text-success';
+                    } else {
+                        overdueDescEl.textContent = `${kpiData.overdue_tasks} incident${kpiData.overdue_tasks > 1 ? 's' : ''} overdue`;
+                        overdueDescEl.className = 'kpi-description text-danger';
+                    }
+                }
+                
+                // Update Open Incidents (never visited)
+                const openIncidentsEl = document.getElementById('open-incidents');
+                const incidentsChangeEl = document.getElementById('incidents-change');
+                if (openIncidentsEl && incidentsChangeEl) {
+                    openIncidentsEl.textContent = kpiData.open_incidents;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    incidentsChangeEl.textContent = `${periodText}: ${kpiData.open_incidents} not visited`;
+                }
+                
+                // Update Total Incidents (renamed from Total Tasks)
+                const totalIncidentsEl = document.getElementById('total-incidents');
+                const totalIncidentsDescEl = document.getElementById('total-incidents-desc');
+                if (totalIncidentsEl && totalIncidentsDescEl) {
+                    totalIncidentsEl.textContent = kpiData.total_incidents;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    totalIncidentsDescEl.textContent = `${periodText}: ${kpiData.total_incidents}`;
+                }
+                
+            } catch (error) {
+                console.error('Error updating KPI cards:', error);
+                // Show error state in KPI cards
+                document.getElementById('compliance-rate').textContent = '--';
+                document.getElementById('overdue-tasks').textContent = '--';
+                document.getElementById('open-incidents').textContent = '--';
+                document.getElementById('total-incidents').textContent = '--';
+            }
+        }
+        
         // Display statistics by site
         function displayStats() {
+            
             const statsSummary = document.getElementById('statsSummary');
             statsSummary.style.display = 'block';
             
+            // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
+            const dataToDisplay = filteredIncidents;
+            
             // Group incidents by site
             const incidentsBySite = {};
-            incidents.forEach(incident => {
+            dataToDisplay.forEach(incident => {
                 const site = incident.SiteName || 'Unknown Site';
                 if (!incidentsBySite[site]) {
                     incidentsBySite[site] = [];
@@ -2280,9 +2439,35 @@
         function createSiteTableRow(siteName, siteIncidents) {
             const row = document.createElement('tr');
             const totalIncidents = siteIncidents.length;
-            const highRiskCount = siteIncidents.filter(i => getRiskClass(i.RiskRatingName) === 'risk-high').length;
-            const mediumRiskCount = siteIncidents.filter(i => getRiskClass(i.RiskRatingName) === 'risk-medium').length;
-            const lowRiskCount = siteIncidents.filter(i => getRiskClass(i.RiskRatingName) === 'risk-low').length;
+            
+            // Use severity field (support SeverityRating, RiskRatingName formats)
+            const highRiskCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                if (!sev) return false;
+                const sevLower = sev.toLowerCase();
+                return sevLower.includes('critical') || sevLower.includes('severe') || 
+                       sevLower.includes('high') || sevLower.includes('5 -') || sevLower.includes('4 -');
+            }).length;
+            
+            const mediumRiskCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                if (!sev) return false;
+                const sevLower = sev.toLowerCase();
+                return sevLower.includes('moderate') || sevLower.includes('medium') || 
+                       sevLower.includes('3 -') || sevLower.includes('2 -');
+            }).length;
+            
+            const lowRiskCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                if (!sev) return false;
+                const sevLower = sev.toLowerCase();
+                return sevLower.includes('mild') || sevLower.includes('low') || sevLower.includes('1 -');
+            }).length;
+            
+            const unratedCount = siteIncidents.filter(i => {
+                const sev = i.severity || i.SeverityRating || i.RiskRatingName;
+                return !sev;
+            }).length;
             
             // Determine overall risk level for the site
             let riskLevel = 'No Risk';
@@ -2301,11 +2486,16 @@
                     riskClass = 'warning';
                     statusIcon = '🟡';
                     statusText = 'Medium risk incidents';
-                } else {
+                } else if (lowRiskCount > 0) {
                     riskLevel = 'Low Risk';
                     riskClass = 'info';
                     statusIcon = '🟢';
                     statusText = 'Low risk incidents';
+                } else if (unratedCount > 0) {
+                    riskLevel = 'Not Rated';
+                    riskClass = 'secondary';
+                    statusIcon = '⚪';
+                    statusText = 'Risk not rated';
                 }
             }
             
@@ -2316,10 +2506,14 @@
             let recentIncidentsHtml = '';
             if (recentIncidents.length > 0) {
                 recentIncidentsHtml = recentIncidents.map(incident => {
-                    const client = findClientById(incident.ClientId);
-                    const eventType = incident.EventTypeNames ? incident.EventTypeNames.join(', ') : 'Unknown';
-                    const residentName = client ? formatClientName(client) : `ID: ${incident.ClientId}`;
-                    const incidentDate = new Date(incident.Date).toLocaleDateString();
+                    // Use CIMS DB field names (filteredIncidents format)
+                    const eventType = incident.incident_type || 'Unknown';
+                    const residentName = incident.resident_name || 'Unknown';
+                    const incidentDate = new Date(incident.incident_date).toLocaleDateString('en-AU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
                     
                     return `
                         <div class="incident-detail">
@@ -2364,9 +2558,11 @@
 
         // UI helper functions
         function showLoading() {
-            const periodSelect = document.getElementById('periodSelect');
-            const selectedDays = periodSelect ? parseInt(periodSelect.value) : 1;
-            const dayText = selectedDays === 1 ? 'day' : 'days';
+            const periodSelect = document.getElementById('globalPeriodSelect');
+            const selectedPeriod = periodSelect ? periodSelect.value : 'today';
+            const periodText = selectedPeriod === 'today' ? 'today\'s' : 
+                              selectedPeriod === 'week' ? 'this week\'s' : 
+                              'this month\'s';
             
             const loadingDiv = document.createElement('div');
             loadingDiv.id = 'loadingIndicator';
@@ -2376,7 +2572,7 @@
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p class="mt-2" id="loadingMessage">🔄 Loading ${selectedDays} ${dayText} of incident data...</p>
+                    <p class="mt-2" id="loadingMessage">🔄 Loading ${periodText} incident data...</p>
                     <div class="progress mt-3" style="width: 300px;">
                         <div id="loadingProgress" class="progress-bar" role="progressbar" style="width: 0%"></div>
                     </div>
@@ -2406,6 +2602,7 @@
 
         // Create site-specific charts
         function createSiteSpecificCharts() {
+            
             const sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
             const incidentsChartIds = ['incidentsChartParafield', 'incidentsChartNerrilda', 'incidentsChartRamsay', 'incidentsChartWestPark', 'incidentsChartYankalilla'];
             const complianceChartIds = ['complianceChartParafield', 'complianceChartNerrilda', 'complianceChartRamsay', 'complianceChartWestPark', 'complianceChartYankalilla'];
@@ -2421,7 +2618,10 @@
         // Create incidents chart for specific site
         function createIncidentsChartForSite(siteName, chartId) {
             const ctx = document.getElementById(chartId);
-            if (!ctx) return;
+            if (!ctx) {
+                console.error(`❌ Canvas not found: ${chartId}`);
+                return;
+            }
 
             // Destroy existing chart if it exists
             if (chartInstances[chartId]) {
@@ -2429,8 +2629,11 @@
                 delete chartInstances[chartId];
             }
 
+            // 필터링된 인시던트 사용 (항상 filteredIncidents)
+            const dataToDisplay = filteredIncidents;
+            
             // Filter incidents for this specific site
-            const siteIncidents = incidents.filter(incident => incident.SiteName === siteName);
+            const siteIncidents = dataToDisplay.filter(incident => incident.SiteName === siteName);
             
             // Count incidents by type for this site
             const incidentTypes = {};
@@ -2444,14 +2647,33 @@
             const labels = Object.keys(incidentTypes);
             const data = Object.values(incidentTypes);
 
-            // If no data, show a message
+            // If no data, show a placeholder chart with "No data" message
             if (labels.length === 0) {
-                ctx.parentElement.innerHTML = `
-                    <h6 style="color: #2c3e50; margin-bottom: 10px;">📈 Incidents by Type</h6>
-                    <div class="no-data-message text-center py-2">
-                        <div class="text-muted small">No incidents</div>
-                    </div>
-                `;
+                
+                // 캔버스는 유지하고 빈 차트 생성
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e0e0e0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: false
+                            }
+                        }
+                    }
+                });
                 return;
             }
 
@@ -2505,8 +2727,11 @@
                 delete chartInstances[chartId];
             }
 
+            // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
+            const dataToDisplay = filteredIncidents;
+            
             // Filter incidents for this specific site
-            const siteIncidents = incidents.filter(incident => incident.SiteName === siteName);
+            const siteIncidents = dataToDisplay.filter(incident => incident.SiteName === siteName);
             
             // Calculate compliance data based on incident status and dates
             let closedOnTime = 0;
@@ -2541,14 +2766,32 @@
                 }
             });
 
-            // If no incidents, show no data message
+            // If no incidents, show empty chart
             if (siteIncidents.length === 0) {
-                ctx.parentElement.innerHTML = `
-                    <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
-                    <div class="no-data-message text-center py-2">
-                        <div class="text-muted small">No incidents</div>
-                    </div>
-                `;
+                // 캔버스는 유지하고 빈 차트 생성
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e0e0e0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: false
+                            }
+                        }
+                    }
+                });
                 return;
             }
 
@@ -2703,8 +2946,8 @@
             // Show audio controls for Nurse Station
             document.getElementById('audioControls').style.display = 'block';
             
-            // Initialize incident viewer
-            initializeIncidentViewer();
+            // Note: initializeIncidentViewer() is called by loadAdminData()
+            // Removed duplicate call to prevent loading incidents twice
             
             // Show stats summary
             const statsSummary = document.getElementById('statsSummary');
@@ -2968,6 +3211,140 @@
             
             showUrgentAlert(testTask, 'warning', 300000);
         }
+
+        // Force Synchronization
+        async function performForceSync() {
+            const btn = document.getElementById('forceSyncBtn');
+            const status = document.getElementById('syncStatus');
+            const progress = document.getElementById('syncProgress');
+            const progressBar = document.getElementById('syncProgressBar');
+            const details = document.getElementById('syncDetails');
+            const result = document.getElementById('syncResult');
+            
+            // Disable button
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Synchronizing...';
+            
+            // Show progress
+            progress.style.display = 'block';
+            result.style.display = 'none';
+            status.textContent = 'Starting synchronization...';
+            
+            // Animate progress bar
+            let progressValue = 0;
+            const progressInterval = setInterval(() => {
+                progressValue += 2;
+                if (progressValue >= 90) {
+                    clearInterval(progressInterval);
+                }
+                progressBar.style.width = progressValue + '%';
+                progressBar.textContent = progressValue + '%';
+            }, 200);
+            
+            try {
+                details.textContent = '1️⃣ Syncing incidents from MANAD Plus (30 days)...';
+                
+                const response = await fetch('/api/cims/force-sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        details.textContent = 'Sync completed successfully!';
+                        status.textContent = '';
+                        
+                        result.className = 'alert alert-success';
+                        result.innerHTML = `
+                            <h5><i class="fas fa-check-circle me-2"></i>Synchronization Complete!</h5>
+                            <ul class="mb-0">
+                                <li><strong>${data.details.incidents_synced || 0}</strong> new incidents synced</li>
+                                <li><strong>${data.details.incidents_updated || 0}</strong> existing incidents updated</li>
+                                <li><strong>${data.details.tasks_generated || 0}</strong> tasks auto-generated for ${data.details.incidents_with_new_tasks || 0} Fall incidents</li>
+                                <li><strong>${data.details.statuses_updated || 0}</strong> incident statuses updated</li>
+                            </ul>
+                        `;
+                        result.style.display = 'block';
+                        
+                        // Refresh dashboard after 2 seconds
+                        setTimeout(() => {
+                            loadIncidents();
+                        }, 2000);
+                    } else {
+                        throw new Error(data.error || 'Sync failed');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                clearInterval(progressInterval);
+                console.error('Force sync error:', error);
+                
+                details.textContent = 'Sync failed!';
+                status.textContent = '';
+                
+                result.className = 'alert alert-danger';
+                result.innerHTML = `
+                    <h5><i class="fas fa-exclamation-circle me-2"></i>Synchronization Failed</h5>
+                    <p class="mb-0">Error: ${error.message}</p>
+                `;
+                result.style.display = 'block';
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Force Synchronization';
+                
+                // Hide progress after 3 seconds
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Section navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarLinks = document.querySelectorAll('.sidebar-menu a[data-section]');
+            
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const section = this.getAttribute('data-section');
+                    
+                    // Remove active class from all links
+                    sidebarLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Hide all sections
+                    document.getElementById('admin-view').style.display = 'none';
+                    document.getElementById('settings-view').style.display = 'none';
+                    // Add other sections as needed
+                    
+                    // Show selected section
+                    if (section === 'dashboard') {
+                        if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                            document.getElementById('admin-view').style.display = 'block';
+                        } else {
+                            document.getElementById('user-view').style.display = 'block';
+                        }
+                    } else if (section === 'settings') {
+                        // Only show for admin/clinical manager
+                        if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                            document.getElementById('settings-view').style.display = 'block';
+                        }
+                    }
+                    // Add other sections as needed
+                });
+            });
+        });
 
         // Clean up on page unload
         window.addEventListener('beforeunload', function() {

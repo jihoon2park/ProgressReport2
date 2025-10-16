@@ -9,10 +9,12 @@
         :root {
             --primary-color: #2c3e50;
             --secondary-color: #3498db;
-            --accent-color: #e74c3c;
+            --accent-color: #3498db;
             --success-color: #27ae60;
             --warning-color: #f39c12;
-            --light-bg: #ecf0f1;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
             --dark-text: #2c3e50;
             --border-color: #bdc3c7;
         }
@@ -134,7 +136,7 @@
         }
 
         .btn-back {
-            background: var(--accent-color);
+            background: var(--primary-color);
             color: white;
             border: none;
             padding: 12px 25px;
@@ -146,11 +148,11 @@
         }
 
         .btn-back:hover {
-            background: #c0392b;
+            background: var(--secondary-color);
         }
 
         .btn-logout {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             color: white;
             border: none;
             padding: 12px 25px;
@@ -159,13 +161,13 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
         }
 
         .btn-logout:hover {
-            background: linear-gradient(135deg, #c0392b, #a93226);
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
         }
 
         .incident-grid {
@@ -185,9 +187,9 @@
         }
         
         .incident-card.high-risk {
-            background: #ffccbc;
-            border: 3px solid #e65100;
-            box-shadow: 0 0 10px rgba(230, 81, 0, 0.3);
+            background: #fff3e0;
+            border: 3px solid var(--warning-color);
+            box-shadow: 0 0 10px rgba(243, 156, 18, 0.3);
         }
 
         .incident-card {
@@ -201,7 +203,7 @@
 
         /* Alarm sending button styles */
         .alarm-button {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, var(--secondary-color), #2980b9);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -216,13 +218,13 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
 
         .alarm-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
-            background: linear-gradient(135deg, #ff5252, #d63031);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+            background: linear-gradient(135deg, #2980b9, var(--secondary-color));
         }
 
         .alarm-button:active {
@@ -230,30 +232,30 @@
         }
 
         .alarm-button.sending {
-            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            background: linear-gradient(135deg, var(--info-color), #138496);
             cursor: not-allowed;
         }
 
         .alarm-button.success {
-            background: linear-gradient(135deg, #00b894, #00a085);
+            background: linear-gradient(135deg, var(--success-color), #229954);
             cursor: not-allowed;
         }
 
         .alarm-button.error {
-            background: linear-gradient(135deg, #e17055, #d63031);
+            background: linear-gradient(135deg, var(--danger-color), #c0392b);
             cursor: not-allowed;
         }
 
         .alarm-button.high-priority {
-            background: linear-gradient(135deg, #ff4757, #c44569);
+            background: linear-gradient(135deg, var(--warning-color), #e67e22);
             animation: pulse 2s infinite;
-            box-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
+            box-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
         }
 
         .alarm-button.high-priority:hover {
-            background: linear-gradient(135deg, #ff3742, #b33939);
+            background: linear-gradient(135deg, #e67e22, var(--warning-color));
             transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(255, 71, 87, 0.7);
+            box-shadow: 0 0 30px rgba(243, 156, 18, 0.7);
         }
 
         .workflow-button {
