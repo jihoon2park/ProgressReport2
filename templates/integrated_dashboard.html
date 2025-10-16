@@ -1394,6 +1394,7 @@
                                     <h3 style="color: #2c3e50; margin: 0;">📊 Site Analysis Dashboard</h3>
                                     <button class="btn btn-primary btn-sm" onclick="loadIncidents()">🔄 Refresh</button>
                                 </div>
+                                    <!-- Row 1: Parafield Gardens + Nerrilda -->
                                     <div class="row">
                                         <div class="col-md-6 mb-4">
                                             <div class="site-analysis-container" style="transition: all 0.2s;">
@@ -1418,13 +1419,6 @@
                                                             <h6 style="color: #2c3e50; margin-bottom: 10px;">⏰ Processing Status</h6>
                                                             <canvas id="complianceChartParafield" width="200" height="150"></canvas>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                                <!-- Recent Incidents -->
-                                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
-                                                    <h6 style="color: #2c3e50; margin-bottom: 10px;">📋 Recent Incidents</h6>
-                                                    <div id="recentIncidentsParafield" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
-                                                        <!-- Recent incidents will be loaded here -->
                                                     </div>
                                                 </div>
                                             </div>
@@ -1456,6 +1450,9 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                    <!-- Row 2: Ramsay + West Park -->
+                                    <div class="row">
                                         <div class="col-md-6 mb-4">
                                             <div class="site-analysis-container" style="transition: all 0.2s;">
                                                 <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
@@ -1510,6 +1507,9 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                    <!-- Row 3: Yankalilla -->
+                                    <div class="row">
                                         <div class="col-md-6 mb-4">
                                             <div class="site-analysis-container" style="transition: all 0.2s;">
                                                 <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
@@ -1536,15 +1536,83 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                                <!-- Recent Incidents -->
-                                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
-                                                    <h6 style="color: #2c3e50; margin-bottom: 10px;">📋 Recent Incidents</h6>
-                                                    <div id="recentIncidentsYankalilla" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
-                                                        <!-- Recent incidents will be loaded here -->
-                                                    </div>
-                                                </div>
+                                        </div>
+                                    </div>
+                            </div>
+
+                            <!-- Recent Incidents Section -->
+                            <div class="mt-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3 style="color: #2c3e50; margin: 0;">📋 Recent Incidents by Site</h3>
+                                </div>
+                                <!-- Row 1: Parafield Gardens + Nerrilda -->
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card" style="border: 2px solid #e3f2fd; box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-bottom: 2px solid #2196f3;">
+                                                <h6 class="mb-0" style="color: #1976d2; font-weight: 700; font-size: 1rem;">
+                                                    <i class="fas fa-hospital-alt me-2"></i>Parafield Gardens
+                                                </h6>
+                                            </div>
+                                            <div class="card-body" id="recentIncidentsParafield" style="max-height: 250px; overflow-y: auto; padding: 0; background: #fafafa;">
+                                                <p class="text-muted text-center" style="padding: 1rem; margin: 0;">No incidents</p>
                                             </div>
                                         </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card" style="border: 2px solid #f3e5f5; box-shadow: 0 4px 12px rgba(156, 39, 176, 0.15);">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-bottom: 2px solid #9c27b0;">
+                                                <h6 class="mb-0" style="color: #7b1fa2; font-weight: 700; font-size: 1rem;">
+                                                    <i class="fas fa-hospital-alt me-2"></i>Nerrilda
+                                                </h6>
+                                            </div>
+                                            <div class="card-body" id="recentIncidentsNerrilda" style="max-height: 250px; overflow-y: auto; padding: 0; background: #fafafa;">
+                                                <p class="text-muted text-center" style="padding: 1rem; margin: 0;">No incidents</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Row 2: Ramsay + West Park -->
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card" style="border: 2px solid #e8f5e9; box-shadow: 0 4px 12px rgba(76, 175, 80, 0.15);">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-bottom: 2px solid #4caf50;">
+                                                <h6 class="mb-0" style="color: #388e3c; font-weight: 700; font-size: 1rem;">
+                                                    <i class="fas fa-hospital-alt me-2"></i>Ramsay
+                                                </h6>
+                                            </div>
+                                            <div class="card-body" id="recentIncidentsRamsay" style="max-height: 250px; overflow-y: auto; padding: 0; background: #fafafa;">
+                                                <p class="text-muted text-center" style="padding: 1rem; margin: 0;">No incidents</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card" style="border: 2px solid #fff3e0; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.15);">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-bottom: 2px solid #ff9800;">
+                                                <h6 class="mb-0" style="color: #f57c00; font-weight: 700; font-size: 1rem;">
+                                                    <i class="fas fa-hospital-alt me-2"></i>West Park
+                                                </h6>
+                                            </div>
+                                            <div class="card-body" id="recentIncidentsWestPark" style="max-height: 250px; overflow-y: auto; padding: 0; background: #fafafa;">
+                                                <p class="text-muted text-center" style="padding: 1rem; margin: 0;">No incidents</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Row 3: Yankalilla -->
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card" style="border: 2px solid #fce4ec; box-shadow: 0 4px 12px rgba(233, 30, 99, 0.15);">
+                                            <div class="card-header" style="background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%); border-bottom: 2px solid #e91e63;">
+                                                <h6 class="mb-0" style="color: #c2185b; font-weight: 700; font-size: 1rem;">
+                                                    <i class="fas fa-hospital-alt me-2"></i>Yankalilla
+                                                </h6>
+                                            </div>
+                                            <div class="card-body" id="recentIncidentsYankalilla2" style="max-height: 250px; overflow-y: auto; padding: 0; background: #fafafa;">
+                                                <p class="text-muted text-center" style="padding: 1rem; margin: 0;">No incidents</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2449,7 +2517,7 @@
                 { name: 'Nerrilda', id: 'recentIncidentsNerrilda' },
                 { name: 'Ramsay', id: 'recentIncidentsRamsay' },
                 { name: 'West Park', id: 'recentIncidentsWestPark' },
-                { name: 'Yankalilla', id: 'recentIncidentsYankalilla' }
+                { name: 'Yankalilla', id: 'recentIncidentsYankalilla2' }
             ];
             
             sites.forEach(site => {
@@ -2459,7 +2527,7 @@
                 if (!container) return;
                 
                 if (siteIncidents.length === 0) {
-                    container.innerHTML = '<p class="text-muted" style="margin: 0; padding: 8px;">No incidents</p>';
+                    container.innerHTML = '<div style="padding: 40px 20px; text-align: center;"><i class="fas fa-check-circle" style="font-size: 2rem; color: #4caf50; margin-bottom: 10px;"></i><p class="text-muted" style="margin: 0; font-size: 0.9rem;">No incidents</p></div>';
                     return;
                 }
                 
@@ -2471,7 +2539,7 @@
                 });
                 
                 // Display all incidents (one line each)
-                container.innerHTML = siteIncidents.map(inc => {
+                container.innerHTML = siteIncidents.map((inc, index) => {
                     const incidentDate = new Date(inc.incident_date || inc.Date);
                     const dateStr = incidentDate.toLocaleDateString('en-AU', { 
                         day: '2-digit', 
@@ -2487,17 +2555,29 @@
                                          severity.includes('Moderate') || severity.includes('Medium') || severity.includes('2 -') || severity.includes('3 -') ? 'warning' : 
                                          severity.includes('Severe') || severity.includes('High') || severity.includes('4 -') || severity.includes('5 -') ? 'danger' : 'secondary';
                     
+                    // Alternating row colors for better distinction
+                    const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+                    
                     return `
-                        <div style="padding: 8px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" 
+                        <div class="incident-row-hover" style="padding: 12px 16px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: ${bgColor}; transition: all 0.2s ease;" 
                              onclick="window.location.href='/incident-viewer?site=${encodeURIComponent(site.name)}&incident=${incidentId}'"
-                             onmouseover="this.style.background='#f8f9fa'"
-                             onmouseout="this.style.background=''">
-                            <div style="flex: 1;">
-                                <strong style="color: #007bff;">${incidentType}</strong> - ${residentName}
+                             onmouseover="this.style.background='#e8f4fd'; this.style.transform='translateX(5px)'; this.style.borderLeft='4px solid #2196f3'"
+                             onmouseout="this.style.background='${bgColor}'; this.style.transform='translateX(0)'; this.style.borderLeft='none'">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-chevron-right" style="color: #ccc; font-size: 0.75rem;"></i>
+                                <div>
+                                    <div style="margin-bottom: 2px;">
+                                        <strong style="color: #1976d2; font-size: 0.9rem;">${incidentType}</strong>
+                                        <span style="color: #666; font-size: 0.85rem;"> — ${residentName}</span>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 0.75rem;">
+                                        <i class="far fa-calendar-alt me-1"></i>${dateStr}
+                                    </small>
+                                </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <small class="text-muted">${dateStr}</small>
-                                <span class="badge bg-${severityClass}" style="font-size: 0.7rem;">${severity}</span>
+                                <span class="badge bg-${severityClass}" style="font-size: 0.75rem; padding: 4px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${severity}</span>
+                                <i class="fas fa-external-link-alt" style="color: #999; font-size: 0.7rem;"></i>
                             </div>
                         </div>
                     `;
