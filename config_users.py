@@ -171,6 +171,14 @@ USERS_DB = {
         "role": "admin",
         "position": "Admin",
         "location": ["Nerrilda"]
+    },
+    "philipd": {
+        "password_hash": hash_password("philip1234!"),
+        "first_name": "Philip",
+        "last_name": "West Park",
+        "role": "doctor",
+        "position": "GP",
+        "location": ["West Park"]
     }
 }
 
