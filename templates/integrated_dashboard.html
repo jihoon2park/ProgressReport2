@@ -1282,16 +1282,7 @@
                             <i class="fas fa-cog"></i> Policy Management
                         </a></li>
                         <li><a href="#" data-section="settings">
-                            <i class="fas fa-tools"></i> System Settings
-                        </a></li>
-                        <li><a href="#" data-section="analytics">
-                            <i class="fas fa-chart-bar"></i> Analytics
-                        </a></li>
-                        <li><a href="#" data-section="users">
-                            <i class="fas fa-users"></i> User Management
-                        </a></li>
-                        <li><a href="#" data-section="audit">
-                            <i class="fas fa-clipboard-list"></i> Audit Log
+                            <i class="fas fa-sync-alt"></i> Force Sync
                         </a></li>
                         
                         <!-- System Links -->
@@ -1301,8 +1292,8 @@
                         <li><a href="/progress-notes">
                             <i class="fas fa-file-medical"></i> Progress Notes
                         </a></li>
-                        <li><a href="/">
-                            <i class="fas fa-arrow-left"></i> Main System
+                        <li><a href="/admin-settings">
+                            <i class="fas fa-tools"></i> Admin Settings
                         </a></li>
                         <li><a href="/logout">
                             <i class="fas fa-sign-out-alt"></i> Logout
@@ -1405,8 +1396,16 @@
                                 </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-4">
-                                            <div class="site-analysis-container">
-                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Parafield Gardens</h5>
+                                            <div class="site-analysis-container" style="transition: all 0.2s;">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
+                                                    onclick="showSiteIncidents('Parafield Gardens')"
+                                                    onmouseover="this.style.color='#007bff'"
+                                                    onmouseout="this.style.color='#2c3e50'">
+                                                    🏥 Parafield Gardens
+                                                    <small class="text-muted" style="font-size: 0.8rem; font-weight: normal;">
+                                                        (Click to view all)
+                                                    </small>
+                                                </h5>
                                                 <div class="row">
                                                     <div class="col-6">
                                                         <div class="chart-container-small">
@@ -1421,11 +1420,26 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <!-- Recent Incidents -->
+                                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                                                    <h6 style="color: #2c3e50; margin-bottom: 10px;">📋 Recent Incidents</h6>
+                                                    <div id="recentIncidentsParafield" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
+                                                        <!-- Recent incidents will be loaded here -->
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="col-md-6 mb-4">
-                                            <div class="site-analysis-container">
-                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Nerrilda</h5>
+                                            <div class="site-analysis-container" style="transition: all 0.2s;">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
+                                                    onclick="showSiteIncidents('Nerrilda')"
+                                                    onmouseover="this.style.color='#007bff'"
+                                                    onmouseout="this.style.color='#2c3e50'">
+                                                    🏥 Nerrilda
+                                                    <small class="text-muted" style="font-size: 0.8rem; font-weight: normal;">
+                                                        (Click to view all)
+                                                    </small>
+                                                </h5>
                                                 <div class="row">
                                                     <div class="col-6">
                                                         <div class="chart-container-small">
@@ -1443,8 +1457,16 @@
                                             </div>
                                         </div>
                                         <div class="col-md-6 mb-4">
-                                            <div class="site-analysis-container">
-                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Ramsay</h5>
+                                            <div class="site-analysis-container" style="transition: all 0.2s;">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
+                                                    onclick="showSiteIncidents('Ramsay')"
+                                                    onmouseover="this.style.color='#007bff'"
+                                                    onmouseout="this.style.color='#2c3e50'">
+                                                    🏥 Ramsay
+                                                    <small class="text-muted" style="font-size: 0.8rem; font-weight: normal;">
+                                                        (Click to view all)
+                                                    </small>
+                                                </h5>
                                                 <div class="row">
                                                     <div class="col-6">
                                                         <div class="chart-container-small">
@@ -1462,8 +1484,16 @@
                                             </div>
                                         </div>
                                         <div class="col-md-6 mb-4">
-                                            <div class="site-analysis-container">
-                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 West Park</h5>
+                                            <div class="site-analysis-container" style="transition: all 0.2s;">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
+                                                    onclick="showSiteIncidents('West Park')"
+                                                    onmouseover="this.style.color='#007bff'"
+                                                    onmouseout="this.style.color='#2c3e50'">
+                                                    🏥 West Park
+                                                    <small class="text-muted" style="font-size: 0.8rem; font-weight: normal;">
+                                                        (Click to view all)
+                                                    </small>
+                                                </h5>
                                                 <div class="row">
                                                     <div class="col-6">
                                                         <div class="chart-container-small">
@@ -1481,8 +1511,16 @@
                                             </div>
                                         </div>
                                         <div class="col-md-6 mb-4">
-                                            <div class="site-analysis-container">
-                                                <h5 style="color: #2c3e50; margin-bottom: 15px;">🏥 Yankalilla</h5>
+                                            <div class="site-analysis-container" style="transition: all 0.2s;">
+                                                <h5 style="color: #2c3e50; margin-bottom: 15px; cursor: pointer;" 
+                                                    onclick="showSiteIncidents('Yankalilla')"
+                                                    onmouseover="this.style.color='#007bff'"
+                                                    onmouseout="this.style.color='#2c3e50'">
+                                                    🏥 Yankalilla
+                                                    <small class="text-muted" style="font-size: 0.8rem; font-weight: normal;">
+                                                        (Click to view all)
+                                                    </small>
+                                                </h5>
                                                 <div class="row">
                                                     <div class="col-6">
                                                         <div class="chart-container-small">
@@ -1498,47 +1536,35 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                                <!-- Recent Incidents -->
+                                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                                                    <h6 style="color: #2c3e50; margin-bottom: 10px;">📋 Recent Incidents</h6>
+                                                    <div id="recentIncidentsYankalilla" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
+                                                        <!-- Recent incidents will be loaded here -->
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Stats Summary -->
-                        <div class="stats-summary" id="statsSummary">
-                            <h3 style="color: #2c3e50; margin-bottom: 20px;">📊 Incident Summary by Site</h3>
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>Site Name</th>
-                                            <th>Current Incidents</th>
-                                            <th>Risk Level</th>
-                                            <th>Recent Incidents</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="sitesTableBody">
-                                        <!-- Sites will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        
                     </div>
+    </div>
+    <!-- End of Admin View -->
 
-                    <!-- Settings Section (Admin/Clinical Manager only) -->
-                    <div id="settings-view" style="display: none;">
+    <!-- Settings Section (Admin/Clinical Manager only) -->
+    <div id="settings-view" style="display: none; margin-left: 250px; padding: 2rem;">
                         <div class="container-fluid">
                             <div class="row">
                                 <div class="col-12">
                                     <div class="card shadow-sm">
                                         <div class="card-header bg-primary text-white">
-                                            <h4 class="mb-0"><i class="fas fa-tools me-2"></i>System Settings</h4>
+                                            <h4 class="mb-0"><i class="fas fa-sync-alt me-2"></i>Force Synchronization</h4>
                                         </div>
                                         <div class="card-body">
                                             <!-- Force Sync Section -->
-                                            <div class="mb-4">
+                                            <div>
                                                 <h5 class="text-primary mb-3">
                                                     <i class="fas fa-sync-alt me-2"></i>Data Synchronization
                                                 </h5>
@@ -2399,25 +2425,84 @@
         
         // Display statistics by site
         function displayStats() {
-            
-            const statsSummary = document.getElementById('statsSummary');
-            statsSummary.style.display = 'block';
-            
             // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
             const dataToDisplay = filteredIncidents;
             
             // Group incidents by site
             const incidentsBySite = {};
             dataToDisplay.forEach(incident => {
-                const site = incident.SiteName || 'Unknown Site';
+                const site = incident.site || incident.SiteName || 'Unknown Site';
                 if (!incidentsBySite[site]) {
                     incidentsBySite[site] = [];
                 }
                 incidentsBySite[site].push(incident);
             });
             
-            // Display sites
-            displaySites(incidentsBySite);
+            // Display recent incidents for each site
+            displayRecentIncidents(incidentsBySite);
+        }
+        
+        // Display recent incidents for each site
+        function displayRecentIncidents(incidentsBySite) {
+            const sites = [
+                { name: 'Parafield Gardens', id: 'recentIncidentsParafield' },
+                { name: 'Nerrilda', id: 'recentIncidentsNerrilda' },
+                { name: 'Ramsay', id: 'recentIncidentsRamsay' },
+                { name: 'West Park', id: 'recentIncidentsWestPark' },
+                { name: 'Yankalilla', id: 'recentIncidentsYankalilla' }
+            ];
+            
+            sites.forEach(site => {
+                const siteIncidents = incidentsBySite[site.name] || [];
+                const container = document.getElementById(site.id);
+                
+                if (!container) return;
+                
+                if (siteIncidents.length === 0) {
+                    container.innerHTML = '<p class="text-muted" style="margin: 0; padding: 8px;">No incidents</p>';
+                    return;
+                }
+                
+                // Sort by date (newest first)
+                siteIncidents.sort((a, b) => {
+                    const dateA = new Date(a.incident_date || a.Date);
+                    const dateB = new Date(b.incident_date || b.Date);
+                    return dateB - dateA;
+                });
+                
+                // Display all incidents (one line each)
+                container.innerHTML = siteIncidents.map(inc => {
+                    const incidentDate = new Date(inc.incident_date || inc.Date);
+                    const dateStr = incidentDate.toLocaleDateString('en-AU', { 
+                        day: '2-digit', 
+                        month: 'short'
+                    });
+                    
+                    const incidentType = inc.incident_type || (inc.EventTypeNames ? inc.EventTypeNames[0] : 'Unknown');
+                    const residentName = inc.resident_name || 'Unknown';
+                    const incidentId = inc.incident_id || inc.Id;
+                    const severity = inc.severity || inc.SeverityRating || inc.RiskRatingName || 'N/A';
+                    
+                    const severityClass = severity.includes('Mild') || severity.includes('Low') || severity.includes('1 -') ? 'success' : 
+                                         severity.includes('Moderate') || severity.includes('Medium') || severity.includes('2 -') || severity.includes('3 -') ? 'warning' : 
+                                         severity.includes('Severe') || severity.includes('High') || severity.includes('4 -') || severity.includes('5 -') ? 'danger' : 'secondary';
+                    
+                    return `
+                        <div style="padding: 8px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" 
+                             onclick="window.location.href='/incident-viewer?site=${encodeURIComponent(site.name)}&incident=${incidentId}'"
+                             onmouseover="this.style.background='#f8f9fa'"
+                             onmouseout="this.style.background=''">
+                            <div style="flex: 1;">
+                                <strong style="color: #007bff;">${incidentType}</strong> - ${residentName}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <small class="text-muted">${dateStr}</small>
+                                <span class="badge bg-${severityClass}" style="font-size: 0.7rem;">${severity}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            });
         }
 
         // Display sites with incidents in table format
@@ -3345,6 +3430,140 @@
                 });
             });
         });
+
+        // Show site incidents modal
+        function showSiteIncidents(siteName) {
+            const siteIncidents = filteredIncidents.filter(inc => 
+                (inc.site === siteName || inc.SiteName === siteName)
+            );
+            
+            if (siteIncidents.length === 0) {
+                alert(`No incidents found for ${siteName}`);
+                return;
+            }
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.id = 'siteIncidentsModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: fadeIn 0.3s;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white;
+                border-radius: 15px;
+                padding: 2rem;
+                max-width: 95%;
+                max-height: 90%;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                animation: slideIn 0.3s;
+            `;
+            
+            // Sort incidents by date (newest first)
+            siteIncidents.sort((a, b) => {
+                const dateA = new Date(a.incident_date || a.Date);
+                const dateB = new Date(b.incident_date || b.Date);
+                return dateB - dateA;
+            });
+            
+            modalContent.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #e9ecef;">
+                    <h3 style="margin: 0; color: #2c3e50;">
+                        <i class="fas fa-hospital me-2"></i>${siteName} - Incidents (${siteIncidents.length})
+                    </h3>
+                    <button onclick="closeSiteIncidentsModal()" style="background: #dc3545; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; transition: all 0.2s;">&times;</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="table table-striped table-hover" style="width: 100%; border-collapse: collapse;">
+                        <thead style="background: #f8f9fa; position: sticky; top: 0;">
+                            <tr>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">#</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">ID</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Date</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Resident</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Type</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Severity</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Status</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${siteIncidents.map((inc, index) => {
+                                const incidentDate = new Date(inc.incident_date || inc.Date);
+                                const dateStr = incidentDate.toLocaleDateString('en-AU', { 
+                                    day: '2-digit', 
+                                    month: 'short',
+                                    year: 'numeric'
+                                }) + ' ' + incidentDate.toLocaleTimeString('en-AU', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                });
+                                
+                                const severity = inc.severity || inc.SeverityRating || inc.RiskRatingName || 'N/A';
+                                const severityClass = severity.includes('Mild') || severity.includes('Low') ? 'success' : 
+                                                     severity.includes('Moderate') || severity.includes('Medium') ? 'warning' : 
+                                                     severity.includes('Severe') || severity.includes('High') ? 'danger' : 'secondary';
+                                
+                                const status = inc.status || 'Open';
+                                const statusClass = status === 'Closed' ? 'success' : 
+                                                   status === 'Overdue' ? 'danger' : 'warning';
+                                
+                                const incidentType = inc.incident_type || (inc.EventTypeNames ? inc.EventTypeNames.join(', ') : 'Unknown');
+                                const residentName = inc.resident_name || 'Unknown';
+                                const description = (inc.description || inc.Description || '').substring(0, 100);
+                                const incidentId = inc.incident_id || inc.Id;
+                                
+                                return `
+                                    <tr style="cursor: pointer;" onclick="window.location.href='/incident-viewer?site=${encodeURIComponent(siteName)}&incident=${incidentId}'">
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${index + 1}</td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 600; color: #007bff;">${incidentId}</td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; white-space: nowrap;">${dateStr}</td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 600;">${residentName}</td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${incidentType}</td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">
+                                            <span class="badge bg-${severityClass}">${severity}</span>
+                                        </td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">
+                                            <span class="badge bg-${statusClass}">${status}</span>
+                                        </td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; max-width: 300px;">${description}${description.length >= 100 ? '...' : ''}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Click outside to close
+            modal.onclick = function(event) {
+                if (event.target === modal) {
+                    closeSiteIncidentsModal();
+                }
+            };
+        }
+        
+        function closeSiteIncidentsModal() {
+            const modal = document.getElementById('siteIncidentsModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
 
         // Clean up on page unload
         window.addEventListener('beforeunload', function() {

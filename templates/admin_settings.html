@@ -336,6 +336,50 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Progress bar animation */
+        .progress {
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .progress-bar-striped {
+            background-image: linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.15) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.15) 50%,
+                rgba(255, 255, 255, 0.15) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 1rem 1rem;
+        }
+        
+        .progress-bar-animated {
+            animation: progress-bar-stripes 1s linear infinite;
+        }
+        
+        @keyframes progress-bar-stripes {
+            0% {
+                background-position: 1rem 0;
+            }
+            100% {
+                background-position: 0 0;
+            }
+        }
 
 </style>
 </head>
@@ -381,6 +425,39 @@
             <div class="settings-header">
                 <h3>⚙️ System Settings</h3>
                 <p>Manage system-wide settings.</p>
+            </div>
+            
+            <!-- Force Synchronization -->
+            <div class="form-group" style="border: 2px solid #007bff; border-radius: 8px; padding: 20px; background: #f0f8ff; margin-bottom: 25px;">
+                <h4 style="color: #007bff; margin-top: 0;">🔄 Data Synchronization</h4>
+                <div class="alert alert-info" style="margin-bottom: 15px;">
+                    <strong>Force Synchronization</strong> will perform a complete database update:
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li>Sync all incidents from MANAD Plus (last 30 days)</li>
+                        <li>Auto-generate missing tasks for Fall incidents</li>
+                        <li>Sync progress notes and update task completion status</li>
+                        <li>Update all incident statuses (Open/Overdue/Closed)</li>
+                    </ul>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button id="forceSyncBtn" class="btn btn-primary" style="font-size: 1.1em; padding: 12px 24px;" onclick="performForceSync()">
+                        <span style="font-size: 1.2em;">🔄</span> Force Synchronization
+                    </button>
+                    <div id="syncStatus" style="color: #6c757d; font-style: italic;"></div>
+                </div>
+                <div id="syncProgress" style="display: none; margin-top: 15px;">
+                    <div class="progress" style="height: 30px; background: #e9ecef; border-radius: 5px; overflow: hidden;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="syncProgressBar" 
+                             role="progressbar" 
+                             style="width: 0%; background: linear-gradient(90deg, #007bff, #0056b3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">0%</div>
+                    </div>
+                    <div id="syncDetails" style="margin-top: 10px; font-size: 0.9em; color: #6c757d;"></div>
+                </div>
+                <div id="syncResult" style="display: none; margin-top: 15px;"></div>
+                <div class="alert alert-secondary" style="margin-top: 15px; margin-bottom: 0;">
+                    <small><strong>ℹ️ Note:</strong> The system automatically synchronizes data every <strong>5 minutes</strong> in the background. Use Force Sync only when you need immediate updates or to fix data inconsistencies.</small>
+                </div>
             </div>
             
             <div class="form-group">
@@ -736,6 +813,103 @@
             }
         }
 
+
+        // Force Synchronization
+        async function performForceSync() {
+            const btn = document.getElementById('forceSyncBtn');
+            const status = document.getElementById('syncStatus');
+            const progress = document.getElementById('syncProgress');
+            const progressBar = document.getElementById('syncProgressBar');
+            const details = document.getElementById('syncDetails');
+            const result = document.getElementById('syncResult');
+            
+            // Disable button
+            btn.disabled = true;
+            btn.innerHTML = '<span style="font-size: 1.2em;">⏳</span> Synchronizing...';
+            
+            // Show progress
+            progress.style.display = 'block';
+            result.style.display = 'none';
+            status.textContent = 'Starting synchronization...';
+            
+            // Animate progress bar
+            let progressValue = 0;
+            const progressInterval = setInterval(() => {
+                progressValue += 2;
+                if (progressValue >= 90) {
+                    clearInterval(progressInterval);
+                }
+                progressBar.style.width = progressValue + '%';
+                progressBar.textContent = progressValue + '%';
+            }, 200);
+            
+            try {
+                details.textContent = '1️⃣ Syncing incidents from MANAD Plus (30 days)...';
+                
+                const response = await fetch('/api/cims/force-sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        details.textContent = '✅ Sync completed successfully!';
+                        status.textContent = '';
+                        
+                        result.className = 'alert alert-success';
+                        result.innerHTML = `
+                            <h4 style="margin-top: 0;"><span style="font-size: 1.2em;">✅</span> Synchronization Complete!</h4>
+                            <ul style="margin-bottom: 0;">
+                                <li><strong>${data.details.incidents_synced || 0}</strong> new incidents synced from MANAD Plus</li>
+                                <li><strong>${data.details.incidents_updated || 0}</strong> existing incidents updated</li>
+                                <li><strong>${data.details.tasks_generated || 0}</strong> tasks auto-generated for <strong>${data.details.incidents_with_new_tasks || 0}</strong> Fall incidents</li>
+                                <li><strong>${data.details.statuses_updated || 0}</strong> incident statuses updated</li>
+                            </ul>
+                        `;
+                        result.style.display = 'block';
+                        
+                        showAlert('✅ Force Sync completed successfully!', 'success');
+                    } else {
+                        throw new Error(data.error || 'Sync failed');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                clearInterval(progressInterval);
+                console.error('Force sync error:', error);
+                
+                details.textContent = '❌ Sync failed!';
+                status.textContent = '';
+                
+                result.className = 'alert alert-danger';
+                result.innerHTML = `
+                    <h4 style="margin-top: 0;"><span style="font-size: 1.2em;">❌</span> Synchronization Failed</h4>
+                    <p style="margin-bottom: 0;">Error: ${error.message}</p>
+                `;
+                result.style.display = 'block';
+                
+                showAlert('❌ Force Sync failed: ' + error.message, 'danger');
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                btn.innerHTML = '<span style="font-size: 1.2em;">🔄</span> Force Synchronization';
+                
+                // Hide progress after 3 seconds
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                }, 3000);
+            }
+        }
 
         // 알림 표시
         function showAlert(message, type) {

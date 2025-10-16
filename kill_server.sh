@@ -30,14 +30,14 @@ echo "$FLASK_PROCESSES"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# 확인 옵션이 없으면 사용자 확인 요청
-if [ "$1" != "--confirm" ] && [ "$1" != "-y" ]; then
-    read -p "이 프로세스들을 종료하시겠습니까? (y/N): " response
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "❌ 취소되었습니다."
-        exit 0
-    fi
-fi
+# # 확인 옵션이 없으면 사용자 확인 요청
+# if [ "$1" != "--confirm" ] && [ "$1" != "-y" ]; then
+#     read -p "이 프로세스들을 종료하시겠습니까? (y/N): " response
+#     if [[ ! "$response" =~ ^[Yy]$ ]]; then
+#         echo "❌ 취소되었습니다."
+#         exit 0
+#     fi
+# fi
 
 echo ""
 echo "🔄 Flask 서버 종료 중..."
