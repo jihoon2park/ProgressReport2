@@ -5778,7 +5778,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                     WHERE manad_incident_id = ?
                                 """, (
                                     incident_type_str if incident_type_str else 'Unknown',
-                                    incident.get('SeverityRating') or incident.get('RiskRatingName'),  # Use SeverityRating first, fallback to RiskRatingName
+                                    incident.get('SeverityRating') or incident.get('RiskRatingName') or 'Unknown',  # Default to 'Unknown' if both are None
                                     incident.get('Description', ''),
                                     incident.get('ActionTaken', ''),
                                     incident.get('ReportedByName', ''),
@@ -5816,7 +5816,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                 str(resident_id),
                                 resident_name,
                                 incident_type if incident_type else 'Unknown',
-                                incident.get('SeverityRating') or incident.get('RiskRatingName'),  # Use SeverityRating first, fallback to RiskRatingName
+                                incident.get('SeverityRating') or incident.get('RiskRatingName') or 'Unknown',  # Default to 'Unknown' if both are None
                                 incident.get('Status', 'Open'),  # Use status from API
                                 incident_date_iso,
                                 location,
