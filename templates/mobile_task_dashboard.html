@@ -268,6 +268,35 @@
         .current-task {
             animation: blink-current 1.2s infinite;
             border: 3px solid #dc3545 !important;
+            position: relative;
+        }
+        
+        /* Next task indicator */
+        .current-task::before {
+            content: '▶ NEXT';
+            position: absolute;
+            left: -5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 900;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.5);
+            animation: pulse-next 1.5s infinite;
+        }
+        
+        @keyframes pulse-next {
+            0%, 100% {
+                opacity: 1;
+                transform: translateY(-50%) scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: translateY(-50%) scale(1.1);
+            }
         }
 
         @keyframes blink-current {
@@ -432,6 +461,49 @@
 
         .auto-refresh-indicator.active {
             display: block;
+        }
+        
+        /* Scroll to Next Task Button */
+        .btn-scroll-next {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+            transition: all 0.3s ease;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-scroll-next:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.7);
+        }
+        
+        .btn-scroll-next:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-scroll-next i {
+            animation: bounce-down 1.5s infinite;
+        }
+        
+        @keyframes bounce-down {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(5px);
+            }
         }
 
         /* Modal popup */
@@ -638,6 +710,11 @@
     <div class="auto-refresh-indicator" id="autoRefreshIndicator">
         <i class="fas fa-sync-alt fa-spin me-2"></i>Updating...
     </div>
+    
+    <!-- Scroll to Next Task Button -->
+    <button class="btn-scroll-next" onclick="scrollToNextTask()" title="Jump to next task">
+        <i class="fas fa-arrow-down"></i>
+    </button>
 
     <script>
         let selectedSite = null;
@@ -1181,6 +1258,9 @@
             
             // Hide loading
             hideLoading();
+            
+            // 🎯 자동 스크롤: 현재 시간 이후 첫 번째 미완료 태스크로 이동
+            scrollToNextTask();
         }
 
         // Generate visit schedule from incidents (table format)
@@ -1537,6 +1617,74 @@
             startAutoRefresh();
         });
 
+        // 🎯 자동 스크롤: 현재 시간 기준 다음 태스크로 이동
+        function scrollToNextTask() {
+            // 약간의 지연 후 스크롤 (렌더링 완료 대기)
+            setTimeout(() => {
+                const now = new Date();
+                const todayStr = now.toISOString().split('T')[0];
+                
+                // 오늘 날짜가 아니면 스크롤하지 않음
+                if (selectedDate !== todayStr) {
+                    console.log(`📅 오늘이 아님 (${selectedDate}), 자동 스크롤 생략`);
+                    return;
+                }
+                
+                // 모든 행을 검사하여 다음 태스크 찾기
+                const rows = document.querySelectorAll('#scheduleTableBody tr');
+                let nextTaskRow = null;
+                let nextTaskIndex = -1;
+                
+                rows.forEach((row, index) => {
+                    // 이미 다음 태스크를 찾았으면 건너뛰기
+                    if (nextTaskRow) return;
+                    
+                    // Time 셀에서 시간 추출 (첫 번째 td)
+                    const timeCell = row.querySelector('.time-cell');
+                    if (!timeCell) return;
+                    
+                    const timeStr = timeCell.textContent.trim();
+                    
+                    // 시간 파싱 (HH:MM 형식)
+                    const [hours, minutes] = timeStr.split(':').map(Number);
+                    const taskTime = new Date();
+                    taskTime.setHours(hours, minutes, 0, 0);
+                    
+                    // Status 셀에서 완료 여부 확인
+                    const statusBadge = row.querySelector('.status-badge');
+                    const isCompleted = statusBadge && statusBadge.classList.contains('status-ok');
+                    
+                    // 현재 시간 이후이고 미완료인 첫 번째 태스크
+                    if (taskTime >= now && !isCompleted) {
+                        nextTaskRow = row;
+                        nextTaskIndex = index;
+                    }
+                });
+                
+                // 다음 태스크가 있으면 스크롤
+                if (nextTaskRow) {
+                    console.log(`🎯 다음 태스크로 자동 스크롤 (index: ${nextTaskIndex})`);
+                    
+                    // 페이지 중앙에 위치하도록 스크롤
+                    nextTaskRow.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center',  // 중앙에 위치!
+                        inline: 'nearest'
+                    });
+                    
+                    // 시각적 피드백: 잠깐 강조 표시
+                    nextTaskRow.style.transition = 'all 0.5s ease';
+                    nextTaskRow.style.transform = 'scale(1.02)';
+                    
+                    setTimeout(() => {
+                        nextTaskRow.style.transform = 'scale(1)';
+                    }, 1000);
+                } else {
+                    console.log(`ℹ️  다음 태스크 없음 (모두 완료 또는 과거)`);
+                }
+            }, 300);  // 300ms 지연 (렌더링 완료 대기)
+        }
+        
         // Incident Modal functions
         let modalAutoCloseTimer = null;
 
