@@ -309,8 +309,14 @@ class MANADPlusIntegrator:
             response = requests.get(notes_url, headers=headers, params=params, timeout=self.config['timeout'])
             
             if response.status_code != 200:
-                logger.warning(f"Failed to get progress notes: {response.status_code}")
-                return []
+                # HTTP 204 = No Content (정상, Progress Note가 없음)
+                if response.status_code == 204:
+                    logger.debug(f"No Progress Notes found for ClientId={client_id} (HTTP 204 - No Content)")
+                    return []
+                else:
+                    # 실제 에러인 경우만 WARNING 레벨로 로깅
+                    logger.warning(f"Failed to get progress notes for ClientId={client_id}: HTTP {response.status_code}")
+                    return []
             
             all_notes = response.json()
             
@@ -381,8 +387,14 @@ class MANADPlusIntegrator:
             fall_response = requests.get(fall_url, headers=headers, timeout=self.config['timeout'])
             
             if fall_response.status_code != 200:
-                logger.error(f"Failed to get Fall Incident note {fall_incident_id}: {fall_response.status_code}")
-                return []
+                # HTTP 204 = No Content (정상, Progress Note가 없음)
+                if fall_response.status_code == 204:
+                    logger.debug(f"No Progress Note found for Fall Incident {fall_incident_id} (HTTP 204 - No Content)")
+                    return []
+                else:
+                    # 실제 에러인 경우만 ERROR 레벨로 로깅
+                    logger.error(f"Failed to get Fall Incident note {fall_incident_id}: HTTP {fall_response.status_code}")
+                    return []
             
             fall_note = fall_response.json()
             fall_trigger_date = datetime.fromisoformat(fall_note.get('CreatedDate').replace('Z', ''))
