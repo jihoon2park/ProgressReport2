@@ -344,6 +344,76 @@
             color: white;
         }
 
+        /* 태블릿 반응형 (768px ~ 1024px) */
+        @media (min-width: 768px) and (max-width: 1024px) {
+            .sidebar {
+                width: 200px;  /* 좁은 사이드바 */
+            }
+            
+            .main-content {
+                margin-left: 200px;
+                padding: 1.5rem;
+            }
+            
+            /* KPI 카드 2열 배치 */
+            .row > .col-md-3 {
+                flex: 0 0 50%;
+                max-width: 50%;
+                margin-bottom: 1rem;
+            }
+            
+            /* Incident grid 2열 */
+            .incident-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+            
+            /* Site grid 2열 */
+            .sites-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+            
+            /* 테이블 폰트 크기 조정 */
+            .table thead th {
+                font-size: 0.85rem;
+                padding: 10px 6px;
+            }
+            
+            .table tbody td {
+                font-size: 0.85rem;
+                padding: 10px 6px;
+            }
+            
+            /* 차트 높이 조정 */
+            canvas {
+                max-height: 220px !important;
+            }
+            
+            /* 모달 크기 조정 */
+            .modal-dialog {
+                max-width: 85%;
+            }
+            
+            /* 버튼 크기 조정 */
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.5rem 1rem;
+            }
+            
+            /* Navbar 높이 감소 */
+            .navbar-brand {
+                font-size: 1.3rem;
+            }
+            
+            /* Sidebar 메뉴 패딩 감소 */
+            .sidebar-menu a {
+                padding: 0.8rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+        
+        /* 모바일 반응형 (768px 미만) */
         @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
@@ -357,18 +427,25 @@
             }
 
             .main-content {
+                margin-left: 0;
                 padding: 1rem;
             }
 
             .kpi-number {
                 font-size: 2rem;
             }
+            
+            /* KPI 카드 1열 배치 */
+            .row > .col-md-3 {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
         }
 
         /* Incident Viewer Styles */
         .incident-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 25px;
             margin-bottom: 30px;
         }
