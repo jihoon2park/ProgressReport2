@@ -260,7 +260,7 @@ class MANADPlusIntegrator:
         return 'Parafield Gardens'
     
     def get_post_fall_progress_notes_optimized(self, client_id: int, fall_date: datetime, 
-                                                max_days: int = 7) -> List[Dict]:
+                                                max_days: int = 7, max_hours: int = None) -> List[Dict]:
         """
         최적화된 Post Fall Progress Notes 조회 (CIMS DB 데이터 활용)
         
@@ -273,7 +273,8 @@ class MANADPlusIntegrator:
         Args:
             client_id: MANAD ClientId (CIMS DB의 resident_manad_id)
             fall_date: Fall 발생 시간 (CIMS DB의 incident_date)
-            max_days: 조회 기간 (기본 7일)
+            max_days: 조회 기간 (기본 7일, max_hours가 설정되면 무시됨)
+            max_hours: 조회 기간 (시간 단위, 예: 28시간). 설정되면 max_days보다 우선
             
         Returns:
             Post Fall Progress Notes 목록
@@ -285,10 +286,15 @@ class MANADPlusIntegrator:
                 'Content-Type': 'application/json'
             }
             
-            # 날짜 범위 설정 (Fall 이후 ~ max_days)
-            end_date = fall_date + timedelta(days=max_days)
+            # 날짜 범위 설정 (Fall 이후 ~ max_hours 또는 max_days)
+            if max_hours is not None:
+                # 시간 기반 윈도우 사용 (예: 28시간)
+                end_date = fall_date + timedelta(hours=max_hours)
+            else:
+                # 일 기반 윈도우 사용 (기본값)
+                end_date = fall_date + timedelta(days=max_days)
             start_date_str = fall_date.strftime('%Y-%m-%dT%H:%M:%SZ')
-            end_date_str = end_date.strftime('%Y-%m-%dT23:59:59Z')
+            end_date_str = end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
             
             notes_url = f"{self.config['base_url']}/api/progressnote/details"
             
@@ -338,8 +344,9 @@ class MANADPlusIntegrator:
                 if 'Post Fall' in event_type_desc or (event_type_desc == 'Daily Progress' and 'fall' in notes_text):
                     note_date = datetime.fromisoformat(note.get('CreatedDate').replace('Z', ''))
                     
-                    # Fall Incident 이후의 노트만
-                    if note_date > fall_date:
+                    # Fall Incident 이후의 노트만 (28시간 윈도우 내)
+                    window_end = fall_date + (timedelta(hours=max_hours) if max_hours else timedelta(days=max_days))
+                    if fall_date < note_date <= window_end:
                         post_fall_notes.append(note)
             
             # 시간순 정렬
@@ -402,8 +409,8 @@ class MANADPlusIntegrator:
             
             logger.info(f"Fall Incident trigger: ID={fall_incident_id}, Date={fall_trigger_date}, ClientId={client_id}")
             
-            # 최적화된 메서드 사용
-            return self.get_post_fall_progress_notes_optimized(client_id, fall_trigger_date)
+            # 최적화된 메서드 사용 (28시간 윈도우 적용)
+            return self.get_post_fall_progress_notes_optimized(client_id, fall_trigger_date, max_hours=28)
                 
         except requests.exceptions.ConnectionError:
             logger.warning("MANAD Plus API 서버에 연결할 수 없습니다. Post Fall notes를 조회할 수 없습니다.")

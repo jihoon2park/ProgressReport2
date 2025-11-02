@@ -1619,9 +1619,13 @@
 
                             <!-- Recent Incidents Section -->
                             <div class="mt-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h3 style="color: #2c3e50; margin: 0;">📋 Recent Incidents by Site</h3>
-                                </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 style="color: #2c3e50; margin: 0;">📋 Recent Incidents by Site</h3>
+                <div id="syncIndicator" class="d-flex align-items-center" style="gap:8px;">
+                    <span id="syncDot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#95a5a6"></span>
+                    <small id="syncText" class="text-muted">Idle</small>
+                </div>
+            </div>
                                 <!-- Row 1: Parafield Gardens + Nerrilda -->
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
@@ -2757,9 +2761,12 @@
                         year: 'numeric'
                     });
                     
+                    const incId = incident.id || incident.incident_db_id || incident.incidentId;
                     return `
                         <div class="incident-detail">
-                            <strong>${eventType}</strong> - ${residentName}<br>
+                            <a href="#" class="incident-task-link" data-incident-id="${incId}" title="View tasks">
+                                <strong>${eventType}</strong> - ${residentName}
+                            </a><br>
                             <small class="text-muted">${incidentDate}</small>
                         </div>
                     `;
@@ -2799,6 +2806,84 @@
         }
 
         // UI helper functions
+        // Incident task modal
+        function ensureIncidentTasksModal() {
+            if (document.getElementById('incidentTasksModal')) return;
+            const modalHtml = `
+            <div class="modal fade" id="incidentTasksModal" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Incident Tasks</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body" id="incidentTasksBody">
+                    <div class="text-muted">Loading tasks...</div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        document.addEventListener('click', async (e) => {
+            const link = e.target.closest('.incident-task-link');
+            if (!link) return;
+            e.preventDefault();
+            const incidentId = link.getAttribute('data-incident-id');
+            if (!incidentId) return;
+            ensureIncidentTasksModal();
+            const body = document.getElementById('incidentTasksBody');
+            body.innerHTML = '<div class="text-muted">Loading tasks...</div>';
+            try {
+                const res = await fetch(`/api/cims/incidents/${incidentId}/tasks`, { credentials: 'same-origin' });
+                const data = await res.json();
+                if (!data.success) throw new Error('Failed to load');
+                const { incident, counts, tasks } = data;
+                const headerHtml = `
+                    <div class="mb-3">
+                        <div><strong>Incident:</strong> ${incident.incident_id} • ${incident.resident_name} • ${incident.site}</div>
+                        <div class="small text-muted">Date: ${new Date(incident.incident_date).toLocaleString()}</div>
+                        <div class="mt-2">
+                            <span class="badge bg-primary">Total ${counts.total}</span>
+                            <span class="badge bg-success">Completed ${counts.completed}</span>
+                            <span class="badge bg-warning text-dark">In Progress ${counts.in_progress}</span>
+                            <span class="badge bg-secondary">Pending ${counts.pending}</span>
+                            <span class="badge bg-danger">Overdue ${counts.overdue}</span>
+                        </div>
+                    </div>`;
+                const rows = (tasks || []).map(t => `
+                    <tr>
+                        <td>${t.task_identifier || t.id}</td>
+                        <td>${t.task_name || ''}</td>
+                        <td>${t.assigned_role || ''}</td>
+                        <td>${t.priority || ''}</td>
+                        <td>${t.due_date ? new Date(t.due_date).toLocaleString() : ''}</td>
+                        <td>${(t.status || '').toString()}</td>
+                    </tr>`).join('');
+                const tableHtml = `
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle">
+                        <thead>
+                          <tr>
+                            <th>ID</th><th>Task</th><th>Role</th><th>Priority</th><th>Due</th><th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>${rows || '<tr><td colspan="6" class="text-muted">No tasks</td></tr>'}</tbody>
+                      </table>
+                    </div>`;
+                body.innerHTML = headerHtml + tableHtml;
+                const modal = new bootstrap.Modal(document.getElementById('incidentTasksModal'));
+                modal.show();
+            } catch (err) {
+                body.innerHTML = '<div class="text-danger">Failed to load tasks.</div>';
+                const modal = new bootstrap.Modal(document.getElementById('incidentTasksModal'));
+                modal.show();
+            }
+        });
         function showLoading() {
             const periodSelect = document.getElementById('globalPeriodSelect');
             const selectedPeriod = periodSelect ? periodSelect.value : 'today';
@@ -2841,6 +2926,30 @@
                 loadingText.textContent = `Loading ${siteName}... (${current}/${total})`;
             }
         }
+
+        // Sync indicator polling
+        async function pollSyncStatus() {
+            try {
+                const res = await fetch('/api/cache/status-current', { credentials: 'same-origin' });
+                const data = await res.json();
+                const dot = document.getElementById('syncDot');
+                const txt = document.getElementById('syncText');
+                if (!dot || !txt) return;
+                if (data && data.status === 'processing') {
+                    dot.style.background = '#2ecc71';
+                    txt.textContent = 'Syncing';
+                    txt.classList.remove('text-muted');
+                } else {
+                    dot.style.background = '#95a5a6';
+                    txt.textContent = 'Idle';
+                    txt.classList.add('text-muted');
+                }
+            } catch (e) {
+                // keep last state
+            }
+        }
+        setInterval(pollSyncStatus, 5000);
+        pollSyncStatus();
 
         // Create site-specific charts
         function createSiteSpecificCharts() {
