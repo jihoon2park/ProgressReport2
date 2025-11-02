@@ -80,3 +80,5 @@ __pycache__/config.cpython-311.pyc
 __pycache__/config_users.cpython-311.pyc
 __pycache__/api_client.cpython-311.pyc
 config_users.py
+progress_report.db-shm
+progress_report.db-wal
