@@ -10,8 +10,8 @@
 
 - **Database Type:** SQLite3
 - **Database File:** `progress_report.db`
-- **Total Tables:** 17 (excluding backups and internal tables)
-- **Total Records:** 1,300+
+- **Total Tables:** 32 (excluding sqlite_sequence internal table)
+- **Total Records:** Growing (Initial setup: 5 records)
 
 ---
 
@@ -26,6 +26,11 @@
 - `cims_task_assignments` - Task assignments
 - `cims_audit_logs` - Audit trail
 - `cims_dashboard_kpi_cache` - KPI cache
+- `cims_cache_management` - Cache management
+- `cims_incident_summary_cache` - Incident summary cache
+- `cims_site_analysis_cache` - Site analysis cache
+- `cims_task_schedule_cache` - Task schedule cache
+- `cims_user_task_cache` - User task cache
 
 ### 2. External Data Cache
 - `clients_cache` - Resident data from MANAD Plus
@@ -42,12 +47,21 @@
 - `care_areas` - Care area definitions
 - `event_types` - Incident event types
 - `system_settings` - System configuration
+- `alarm_templates` - Alarm templates
+- `alarm_recipients` - Alarm recipients
+- `progress_notes_cache` - Progress notes cache
+
+### 5. Policy & Task Management
+- `escalation_policies` - Escalation policies
+- `scheduled_tasks` - Scheduled tasks
+- `task_execution_logs` - Task execution logs
+- `policy_execution_results` - Policy execution results
 
 ---
 
 ## 📋 Detailed Schema
 
-### 1. `cims_incidents` (182 rows) 🚨
+### 1. `cims_incidents` (0 rows) 🚨
 
 **Purpose:** Central incident registry synced from MANAD Plus
 
@@ -56,22 +70,23 @@
 | `id` | INTEGER | - | - | **Primary Key** |
 | `incident_id` | VARCHAR(100) | YES | - | **Unique incident ID** (e.g., INC-408) |
 | `manad_incident_id` | VARCHAR(100) | NO | - | Original MANAD Plus incident ID |
-| `resident_id` | INTEGER | YES | - | Resident identifier |
-| `resident_name` | VARCHAR(200) | YES | - | Resident full name |
+| `resident_id` | INTEGER | YES | 0 | Resident identifier |
+| `resident_name` | VARCHAR(200) | YES | '' | Resident full name |
 | `incident_type` | VARCHAR(100) | YES | - | Fall, Wound/Skin, Medication, Behaviour, etc. |
-| `severity` | VARCHAR(50) | NO | - | Severity rating (e.g., "3 - Mild") |
-| `status` | VARCHAR(50) | NO | - | Open, Overdue, Closed |
+| `severity` | VARCHAR(50) | YES | - | Severity rating (e.g., "3 - Mild") |
+| `status` | VARCHAR(50) | NO | 'Open' | Open, Overdue, Closed |
 | `incident_date` | TIMESTAMP | YES | - | Incident occurrence date/time |
 | `location` | VARCHAR(200) | NO | - | Room, wing, department |
 | `description` | TEXT | NO | - | Detailed incident description |
-| `initial_actions_taken` | TEXT | NO | - | Actions taken immediately |
-| `witnesses` | TEXT | NO | - | Witness information |
-| `reported_by` | INTEGER | NO | - | User ID who reported (0 = system) |
-| `reported_by_name` | VARCHAR(200) | NO | - | Reporter's name |
+| `reported_by` | INTEGER | YES | - | User ID who reported |
 | `site` | VARCHAR(100) | YES | - | Site name (Parafield Gardens, etc.) |
+| `workflow_status` | VARCHAR(50) | NO | 'open' | Workflow status (open, in_progress, closed) |
+| `total_tasks` | INTEGER | NO | 0 | Total number of tasks for this incident |
+| `completed_tasks` | INTEGER | NO | 0 | Number of completed tasks |
 | `policy_applied` | INTEGER | NO | - | Policy ID applied to this incident |
-| `created_at` | TIMESTAMP | NO | - | Record creation time |
-| `updated_at` | TIMESTAMP | NO | - | Last update time |
+| `closed_at` | TIMESTAMP | NO | - | Incident closed timestamp |
+| `closed_by` | VARCHAR(100) | NO | - | User who closed the incident |
+| `created_at` | TIMESTAMP | NO | CURRENT_TIMESTAMP | Record creation time |
 
 **Indexes:**
 - UNIQUE: `incident_id`
@@ -134,15 +149,9 @@
 | `description` | TEXT | NO | - | Policy description |
 | `version` | VARCHAR(20) | YES | - | Version number |
 | `effective_date` | TIMESTAMP | YES | - | When policy becomes active |
-| `expiry_date` | TIMESTAMP | NO | - | Expiration date (NULL = no expiry) |
 | `rules_json` | TEXT | YES | - | **Policy rules in JSON format** |
 | `is_active` | BOOLEAN | NO | 1 | Active flag |
-| `created_by` | INTEGER | NO | - | User ID who created |
 | `created_at` | TIMESTAMP | NO | CURRENT_TIMESTAMP | Record creation time |
-| `updated_at` | TIMESTAMP | NO | CURRENT_TIMESTAMP | Last update time |
-
-**Foreign Keys:**
-- `created_by` → `users(id)`
 
 **rules_json Structure:**
 ```json
@@ -376,9 +385,12 @@
 
 | Column Name | Type | NOT NULL | Default | Description |
 |------------|------|----------|---------|-------------|
-| `key` | TEXT | - | - | **Primary Key** (setting key) |
-| `value` | TEXT | YES | - | Setting value |
-| `updated_at` | TEXT | YES | - | Last update timestamp |
+| `setting_key` | VARCHAR(100) | YES | - | **Primary Key** (setting key) |
+| `setting_value` | TEXT | NO | - | Setting value |
+| `setting_type` | VARCHAR(50) | NO | - | Setting type (timestamp, integer, etc.) |
+| `description` | TEXT | NO | - | Setting description |
+| `updated_by` | INTEGER | NO | - | User who updated |
+| `updated_at` | TIMESTAMP | NO | CURRENT_TIMESTAMP | Last update timestamp |
 
 **Common Settings:**
 - `last_incident_sync_time` - Last incident synchronization

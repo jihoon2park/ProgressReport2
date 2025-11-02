@@ -18,10 +18,13 @@ import logging
 import logging.handlers
 import json
 import os
+import sys
 import sqlite3
 from datetime import datetime, timedelta, timezone
+import time
 from dotenv import load_dotenv
 import uuid
+from dataclasses import asdict
 
 # .env 파일에서 환경변수 로딩
 load_dotenv()
@@ -37,13 +40,15 @@ from api_client import APIClient
 from api_carearea import APICareArea
 from api_eventtype import APIEventType
 from config import SITE_SERVERS, API_HEADERS, get_available_sites
-import logging
-import os
-import sys
-from datetime import datetime
-
-# 로깅 설정
-logger = logging.getLogger(__name__)
+from config_users import authenticate_user, get_user
+from config_env import get_flask_config, print_current_config, get_cache_policy
+from models import load_user, User
+from usage_logger import usage_logger
+from admin_api import admin_api
+from alarm_manager import get_alarm_manager
+from alarm_service import get_alarm_services
+from fcm_service import get_fcm_service
+from fcm_token_manager import get_fcm_token_manager
 
 # SITE_SERVERS 안전성 체크 및 폴백 처리
 def get_safe_site_servers():
@@ -93,47 +98,6 @@ def get_fallback_site_servers():
         'West Park': '192.168.41.12:8080',
         'Yankalilla': '192.168.51.12:8080'
     }
-
-def debug_site_servers():
-    """사이트 서버 정보 디버깅"""
-    try:
-        logger.info("=== 사이트 서버 정보 디버깅 시작 ===")
-        logger.info(f"USE_DB_API_KEYS: {getattr(app.config, 'USE_DB_API_KEYS', 'Not defined')}")
-        logger.info(f"SITE_SERVERS 타입: {type(SITE_SERVERS)}")
-        logger.info(f"SITE_SERVERS 내용: {SITE_SERVERS}")
-        logger.info(f"SITE_SERVERS 길이: {len(SITE_SERVERS) if SITE_SERVERS else 0}")
-        
-        # 안전한 사이트 서버 정보 확인
-        safe_servers = get_safe_site_servers()
-        logger.info(f"안전한 사이트 서버: {safe_servers}")
-        
-        logger.info("=== 사이트 서버 정보 디버깅 완료 ===")
-        return safe_servers
-    except Exception as e:
-        logger.error(f"사이트 서버 디버깅 중 오류: {e}")
-        return get_fallback_site_servers()
-from config_users import authenticate_user, get_user
-from config_env import get_flask_config, print_current_config, get_cache_policy
-from models import load_user, User
-from usage_logger import usage_logger
-
-# 알람 서비스 임포트
-from alarm_manager import get_alarm_manager
-from alarm_service import get_alarm_services
-from dataclasses import asdict
-
-# FCM 서비스 임포트
-from fcm_service import get_fcm_service
-from fcm_token_manager import get_fcm_token_manager
-
-# Task Manager 임포트 - JSON 전용 시스템으로 변경되어 비활성화
-# from task_manager import get_task_manager
-
-# Policy Scheduler 임포트 - JSON 전용 시스템으로 변경되어 비활성화
-# from policy_scheduler import start_policy_scheduler
-
-# Admin API 임포트
-from admin_api import admin_api
 
 # 환경별 설정 로딩
 flask_config = get_flask_config()
@@ -4938,16 +4902,144 @@ def send_task_notifications():
 # ==============================
 
 from cims_policy_engine import PolicyEngine
+from app_locks import write_lock
 
 # CIMS 정책 엔진 인스턴스
 policy_engine = PolicyEngine()
 
 # CIMS용 데이터베이스 연결 함수
-def get_db_connection():
+def get_db_connection(read_only: bool = False):
     """CIMS용 데이터베이스 연결"""
-    conn = sqlite3.connect('progress_report.db', timeout=30.0)
+    if read_only:
+        conn = sqlite3.connect('file:progress_report.db?mode=ro', timeout=60.0, uri=True)
+    else:
+        conn = sqlite3.connect('progress_report.db', timeout=60.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+    except Exception:
+        pass
     return conn
+
+@app.route('/api/cache/status-current', methods=['GET'])
+@login_required
+def get_cache_status_current():
+    """Return latest cache/sync status for dashboard indicator"""
+    try:
+        conn = get_db_connection(read_only=True)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT status, last_processed
+            FROM cims_cache_management
+            ORDER BY last_processed DESC
+            LIMIT 1
+        """)
+        row = cursor.fetchone()
+        status = row[0] if row else 'idle'
+        last = row[1] if row else None
+        return jsonify({'success': True, 'status': status, 'last_processed': last})
+    except Exception as e:
+        logger.error(f"get_cache_status_current error: {e}")
+        return jsonify({'success': True, 'status': 'idle'}), 200
+
+@app.route('/api/cims/incidents/<int:incident_db_id>/tasks', methods=['GET'], endpoint='get_incident_tasks_v2')
+@login_required
+def get_incident_tasks_v2(incident_db_id):
+    """주어진 인시던트의 태스크 목록과 요약 카운트 반환"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Incident 존재 확인 및 기본 정보
+        cursor.execute(
+            """
+            SELECT id, incident_id, resident_name, site, incident_date, status
+            FROM cims_incidents
+            WHERE id = ?
+            """,
+            (incident_db_id,)
+        )
+        incident = cursor.fetchone()
+        if not incident:
+            return jsonify({'success': False, 'message': 'Incident not found'}), 404
+
+        # 태스크 목록 조회
+        cursor.execute(
+            """
+            SELECT id, task_id, task_name, description, assigned_role,
+                   due_date, priority, status, completed_at
+            FROM cims_tasks
+            WHERE incident_id = ?
+            ORDER BY due_date ASC
+            """,
+            (incident_db_id,)
+        )
+        rows = cursor.fetchall()
+
+        tasks = []
+        counts = {
+            'total': 0,
+            'completed': 0,
+            'pending': 0,
+            'in_progress': 0,
+            'overdue': 0
+        }
+
+        now_iso = datetime.now().isoformat()
+
+        for r in rows:
+            task = {
+                'id': r['id'],
+                'task_identifier': r['task_id'],
+                'task_name': r['task_name'],
+                'description': r['description'],
+                'assigned_role': r['assigned_role'],
+                'due_date': r['due_date'],
+                'priority': r['priority'],
+                'status': r['status'],
+                'completed_at': r['completed_at']
+            }
+            tasks.append(task)
+
+            counts['total'] += 1
+            status = (r['status'] or '').lower()
+            if status == 'completed':
+                counts['completed'] += 1
+            elif status in ('in_progress', 'in progress'):
+                counts['in_progress'] += 1
+            else:
+                # pending 등
+                counts['pending'] += 1
+                # overdue 계산: due_date < now and not completed
+                try:
+                    if r['due_date'] and r['completed_at'] is None and datetime.fromisoformat(r['due_date']) < datetime.fromisoformat(now_iso):
+                        counts['overdue'] += 1
+                except Exception:
+                    pass
+
+        return jsonify({
+            'success': True,
+            'incident': {
+                'id': incident['id'],
+                'incident_id': incident['incident_id'],
+                'resident_name': incident['resident_name'],
+                'site': incident['site'],
+                'incident_date': incident['incident_date'],
+                'status': incident['status']
+            },
+            'counts': counts,
+            'tasks': tasks
+        })
+    except Exception as e:
+        logger.error(f"Incident tasks fetch error: {e}")
+        return jsonify({'success': False, 'message': 'Internal server error'}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 @app.route('/incident_dashboard2')
 @login_required
@@ -5386,8 +5478,26 @@ def sync_progress_notes_from_manad_to_cims():
                 api_config = get_api_config_for_site(site)
                 integrator = MANADPlusIntegrator(api_config)
                 
-                # 🚀 최적화: Post Fall Progress Notes 가져오기 (Legacy 메서드는 내부적으로 최적화됨)
-                result = integrator.get_post_fall_progress_notes(manad_incident_id)
+                # 🚀 28시간 윈도우 적용: Post Fall Progress Notes 가져오기
+                # incident_date를 datetime으로 변환
+                if isinstance(incident_date, str):
+                    fall_date = datetime.fromisoformat(incident_date.replace('Z', ''))
+                else:
+                    fall_date = incident_date
+                
+                # client_id는 resident_id (MANAD ClientId)
+                client_id = int(resident_id) if resident_id else None
+                
+                if not client_id:
+                    logger.warning(f"  ⚠️ {incident_id}: client_id가 없어 건너뜀")
+                    continue
+                
+                # 28시간 윈도우로 Post Fall Notes 조회
+                result = integrator.get_post_fall_progress_notes_optimized(
+                    client_id=client_id,
+                    fall_date=fall_date,
+                    max_hours=28  # ✅ 28시간 윈도우 적용
+                )
                 
                 if not result or not isinstance(result, dict):
                     continue
@@ -5979,8 +6089,8 @@ def get_cims_incidents():
         force_sync = request.args.get('sync', 'false').lower() == 'true'
         full_sync = request.args.get('full', 'false').lower() == 'true'  # 전체 동기화 (30일)
         
-        # 마지막 동기화 시간 확인
-        conn = get_db_connection()
+        # 마지막 동기화 시간 확인 (읽기 전용 연결로 잠금 충돌 방지)
+        conn = get_db_connection(read_only=True)
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -5989,27 +6099,22 @@ def get_cims_incidents():
         """)
         last_sync_result = cursor.fetchone()
         
+        # 잠금 충돌 방지를 위해 이 API에서는 강제 요청이 아닌 자동 동기화를 수행하지 않음
         should_sync = force_sync
-        if not should_sync and last_sync_result:
-            try:
-                last_sync_time = datetime.fromisoformat(last_sync_result[0])
-                # 5분마다 자동 동기화
-                if (datetime.now() - last_sync_time).total_seconds() > 300:
-                    should_sync = True
-            except:
-                should_sync = True
-        else:
-            # 동기화 기록이 없으면 동기화 필요
-            should_sync = True
         
         # 필요시 동기화 실행 (백그라운드로)
         if should_sync:
             # 동기화 시간 먼저 업데이트 (중복 실행 방지)
-            cursor.execute("""
-                INSERT OR REPLACE INTO system_settings (key, value, updated_at)
-                VALUES ('last_incident_sync_time', ?, ?)
-            """, (datetime.now().isoformat(), datetime.now().isoformat()))
-            conn.commit()
+            # 쓰기가 필요한 시점에만 쓰기 연결 사용
+            conn.close()
+            conn = get_db_connection(read_only=False)
+            cursor = conn.cursor()
+            with write_lock():
+                cursor.execute("""
+                    INSERT OR REPLACE INTO system_settings (key, value, updated_at)
+                    VALUES ('last_incident_sync_time', ?, ?)
+                """, (datetime.now().isoformat(), datetime.now().isoformat()))
+                conn.commit()
             
             # 백그라운드 스레드로 동기화 실행 (페이지 로딩 차단하지 않음)
             import threading
@@ -6059,7 +6164,24 @@ def get_cims_incidents():
         
         query += " ORDER BY incident_date DESC LIMIT 500"
         
-        cursor.execute(query, params)
+        # 조회는 읽기 전용 연결로 재수행 + 간단 재시도
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = get_db_connection(read_only=True)
+        cursor = conn.cursor()
+        for attempt in range(5):
+            try:
+                cursor.execute(query, params)
+                break
+            except sqlite3.OperationalError as e:
+                if 'database is locked' in str(e) and attempt < 4:
+                    time.sleep(0.25 * (attempt + 1))
+                    continue
+                # 폴백: 잠금 시 빈 리스트와 stale 플래그로 응답 준비
+                logger.error("Open 인시던트 조회 오류: database is locked (fallback)")
+                return jsonify({'incidents': [], 'stale': True}), 200
         
         incidents = cursor.fetchall()
         conn.close()
@@ -6088,7 +6210,7 @@ def get_cims_incidents():
             })
         
         logger.info(f"📤 API 응답: {len(result)}개 Open 인시던트 반환")
-        return jsonify({'incidents': result})
+        return jsonify({'incidents': result, 'stale': False})
         
     except Exception as e:
         logger.error(f"Open 인시던트 조회 오류: {str(e)}")
