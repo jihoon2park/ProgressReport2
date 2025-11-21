@@ -28,7 +28,15 @@ USERS_DB = {
         "position": "Site Administrator",
         "location": ["Parafield Gardens"]
     },
-    "PaulVaska": {
+    "ChanduraVadeen": {
+        "password_hash": hash_password("Chandura123!"),
+        "first_name": "Chandura",
+        "last_name": "Vadeen",
+        "role": "doctor",
+        "position": "GP",
+        "location": ["All"]
+    },
+     "PaulVaska": {
         "password_hash": hash_password("Paul123!"),
         "first_name": "Paul",
         "last_name": "Vaska",
