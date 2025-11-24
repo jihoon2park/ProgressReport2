@@ -212,4 +212,89 @@ def authenticate_user(username, password):
         return True, safe_user
     return False, None
 
+def get_all_users():
+    """모든 사용자 정보 조회 (패스워드 해시 제외)"""
+    users = []
+    for username, user_data in USERS_DB.items():
+        safe_user = {k: v for k, v in user_data.items() if k != "password_hash"}
+        safe_user["username"] = username
+        users.append(safe_user)
+    return users
+
+def get_username_by_lowercase(username):
+    """대소문자 구분 없이 실제 username 찾기"""
+    username_lower = username.lower()
+    for key in USERS_DB.keys():
+        if key.lower() == username_lower:
+            return key
+    return None
+
+def add_user(username, password, first_name, last_name, role, position, location):
+    """새로운 사용자 추가"""
+    if get_user(username):
+        return False, "User already exists"
+    
+    USERS_DB[username] = {
+        "password_hash": hash_password(password),
+        "first_name": first_name,
+        "last_name": last_name,
+        "role": role,
+        "position": position,
+        "location": location
+    }
+    return True, "User added successfully"
+
+def update_user(username, first_name=None, last_name=None, role=None, position=None, location=None, password=None):
+    """사용자 정보 수정"""
+    actual_username = get_username_by_lowercase(username)
+    if not actual_username:
+        return False, "User not found"
+    
+    if first_name is not None:
+        USERS_DB[actual_username]["first_name"] = first_name
+    if last_name is not None:
+        USERS_DB[actual_username]["last_name"] = last_name
+    if role is not None:
+        USERS_DB[actual_username]["role"] = role
+    if position is not None:
+        USERS_DB[actual_username]["position"] = position
+    if location is not None:
+        USERS_DB[actual_username]["location"] = location
+    if password is not None:
+        USERS_DB[actual_username]["password_hash"] = hash_password(password)
+    
+    return True, "User updated successfully"
+
+def delete_user(username):
+    """사용자 삭제"""
+    actual_username = get_username_by_lowercase(username)
+    if not actual_username:
+        return False, "User not found"
+    
+    del USERS_DB[actual_username]
+    return True, "User deleted successfully"
+
+def get_unique_roles():
+    """시스템의 모든 고유한 역할 목록 반환"""
+    roles = set()
+    for user_data in USERS_DB.values():
+        roles.add(user_data.get("role", ""))
+    return sorted(list(roles))
+
+def get_unique_positions():
+    """시스템의 모든 고유한 직책 목록 반환"""
+    positions = set()
+    for user_data in USERS_DB.values():
+        positions.add(user_data.get("position", ""))
+    return sorted(list(positions))
+
+def get_unique_locations():
+    """시스템의 모든 고유한 위치 목록 반환"""
+    locations = set()
+    for user_data in USERS_DB.values():
+        location_list = user_data.get("location", [])
+        if isinstance(location_list, list):
+            locations.update(location_list)
+    return sorted(list(locations))
+
  

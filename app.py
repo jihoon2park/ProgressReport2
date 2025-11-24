@@ -3750,6 +3750,182 @@ def admin_settings():
     
     return render_template('admin_settings.html')
 
+# ==============================
+# User Management Routes
+# ==============================
+
+@app.route('/user-management')
+@login_required
+def user_management():
+    """사용자 관리 페이지 (ADMIN 전용)"""
+    # 관리자 권한 확인
+    if current_user.role != 'admin':
+        flash('Access denied. This page is for admin users only.', 'error')
+        return redirect(url_for('home'))
+    
+    # 접속 로그 기록
+    user_info = {
+        "username": current_user.username,
+        "display_name": current_user.display_name,
+        "role": current_user.role,
+        "position": getattr(current_user, 'position', 'Unknown')
+    }
+    usage_logger.log_access(user_info, '/user-management')
+    
+    return render_template('user_management.html')
+
+@app.route('/api/users', methods=['GET'])
+@login_required
+def get_all_users_api():
+    """모든 사용자 목록 조회 API"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        from config_users import get_all_users
+        users = get_all_users()
+        return jsonify({'success': True, 'users': users})
+    except Exception as e:
+        logger.error(f"사용자 목록 조회 실패: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/users/<username>', methods=['GET'])
+@login_required
+def get_user_api(username):
+    """특정 사용자 정보 조회 API"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        user_data = get_user(username)
+        if user_data:
+            # 패스워드 해시는 제외
+            safe_user = {k: v for k, v in user_data.items() if k != "password_hash"}
+            from config_users import get_username_by_lowercase
+            actual_username = get_username_by_lowercase(username)
+            safe_user['username'] = actual_username
+            return jsonify({'success': True, 'user': safe_user})
+        else:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+    except Exception as e:
+        logger.error(f"사용자 정보 조회 실패: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+def add_user_api():
+    """새 사용자 추가 API"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        # 필수 필드 확인
+        required_fields = ['username', 'password', 'first_name', 'last_name', 'role', 'position', 'location']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+        
+        from config_users import add_user
+        success, message = add_user(
+            username=data['username'],
+            password=data['password'],
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            role=data['role'],
+            position=data['position'],
+            location=data['location']
+        )
+        
+        if success:
+            logger.info(f"사용자 추가 성공: {data['username']} by {current_user.username}")
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+            
+    except Exception as e:
+        logger.error(f"사용자 추가 실패: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/users/<username>', methods=['PUT'])
+@login_required
+def update_user_api(username):
+    """사용자 정보 수정 API"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        from config_users import update_user
+        success, message = update_user(
+            username=username,
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name'),
+            role=data.get('role'),
+            position=data.get('position'),
+            location=data.get('location'),
+            password=data.get('password')
+        )
+        
+        if success:
+            logger.info(f"사용자 수정 성공: {username} by {current_user.username}")
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+            
+    except Exception as e:
+        logger.error(f"사용자 수정 실패: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/users/<username>', methods=['DELETE'])
+@login_required
+def delete_user_api(username):
+    """사용자 삭제 API"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        # 자기 자신은 삭제할 수 없음
+        from config_users import get_username_by_lowercase
+        actual_username = get_username_by_lowercase(username)
+        if actual_username and actual_username.lower() == current_user.username.lower():
+            return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
+        
+        from config_users import delete_user
+        success, message = delete_user(username)
+        
+        if success:
+            logger.info(f"사용자 삭제 성공: {username} by {current_user.username}")
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+            
+    except Exception as e:
+        logger.error(f"사용자 삭제 실패: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/users/options', methods=['GET'])
+@login_required
+def get_user_options_api():
+    """사용자 옵션 조회 API (role, position, location 목록)"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        from config_users import get_unique_roles, get_unique_positions, get_unique_locations
+        
+        return jsonify({
+            'success': True,
+            'roles': get_unique_roles(),
+            'positions': get_unique_positions(),
+            'locations': get_unique_locations()
+        })
+    except Exception as e:
+        logger.error(f"사용자 옵션 조회 실패: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/fcm-admin-dashboard')
 @login_required
 def fcm_admin_dashboard():
@@ -5616,6 +5792,88 @@ def sync_progress_notes_from_manad_to_cims():
         logger.error(f"Progress Note 동기화 오류: {str(e)}")
         return {'success': False, 'error': str(e)}
 
+def ensure_fall_policy_exists():
+    """
+    Fall Policy가 DB에 존재하는지 확인하고 없으면 기본 Policy 생성
+    """
+    import json
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Check if Fall policy exists
+        cursor.execute("""
+            SELECT COUNT(*) FROM cims_policies 
+            WHERE policy_id = 'FALL-001' AND is_active = 1
+        """)
+        
+        if cursor.fetchone()[0] > 0:
+            logger.info("✅ Fall Policy already exists")
+            conn.close()
+            return
+        
+        # Create default Fall Policy
+        logger.info("📝 Creating default Fall Policy...")
+        
+        default_policy_json = {
+            "policy_name": "Fall Management Policy V3",
+            "policy_id": "FALL-001",
+            "incident_association": {
+                "incident_type": "Fall"
+            },
+            "nurse_visit_schedule": [
+                {
+                    "phase": 1,
+                    "interval": 30,
+                    "interval_unit": "minutes",
+                    "duration": 4,
+                    "duration_unit": "hours"
+                },
+                {
+                    "phase": 2,
+                    "interval": 2,
+                    "interval_unit": "hours",
+                    "duration": 20,
+                    "duration_unit": "hours"
+                },
+                {
+                    "phase": 3,
+                    "interval": 4,
+                    "interval_unit": "hours",
+                    "duration": 3,
+                    "duration_unit": "days"
+                }
+            ],
+            "common_assessment_tasks": "Complete neurological observations: GCS, pupil response, limb movement, vital signs"
+        }
+        
+        cursor.execute("""
+            INSERT INTO cims_policies 
+            (policy_id, name, description, version, effective_date, rules_json, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            'FALL-001',
+            'Fall Management Policy V3',
+            'Automatic post-fall neurological monitoring with phased visit schedule',
+            '3.0',
+            datetime.now().isoformat(),
+            json.dumps(default_policy_json),
+            1,
+            datetime.now().isoformat()
+        ))
+        
+        conn.commit()
+        logger.info("✅ Default Fall Policy created successfully")
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating Fall Policy: {str(e)}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor):
     """
     Fall incident에 대해 자동으로 task 생성
@@ -6106,14 +6364,25 @@ def get_cims_incidents():
         conn = get_db_connection(read_only=True)
         cursor = conn.cursor()
         
+        # 인시던트 개수 확인 (초기 로드 감지)
+        cursor.execute("SELECT COUNT(*) FROM cims_incidents")
+        incident_count = cursor.fetchone()[0]
+        
         cursor.execute("""
             SELECT value FROM system_settings 
             WHERE key = 'last_incident_sync_time'
         """)
         last_sync_result = cursor.fetchone()
         
-        # 잠금 충돌 방지를 위해 이 API에서는 강제 요청이 아닌 자동 동기화를 수행하지 않음
-        should_sync = force_sync
+        # 자동 초기 동기화 조건:
+        # 1. Force sync 요청
+        # 2. 또는 인시던트가 하나도 없고 한 번도 동기화하지 않았을 때
+        should_sync = force_sync or (incident_count == 0 and not last_sync_result)
+        
+        # 초기 동기화인 경우 전체 동기화로 전환
+        if incident_count == 0 and not last_sync_result and should_sync:
+            full_sync = True
+            logger.info(f"🆕 초기 로드 감지 - 자동 전체 동기화 시작 (인시던트: {incident_count}개)")
         
         # 필요시 동기화 실행 (백그라운드로)
         if should_sync:
@@ -6722,7 +6991,37 @@ def get_schedule_batch(site, date):
         
         conn.close()
         
-        logger.info(f"🚀 Batch API: {site}/{date} - {len(incidents_map)} incidents, {sum(len(i['tasks']) for i in incidents_map.values())} tasks")
+        total_tasks = sum(len(i['tasks']) for i in incidents_map.values())
+        logger.info(f"🚀 Batch API: {site}/{date} - {len(incidents_map)} incidents, {total_tasks} tasks")
+        
+        # Tasks가 없고 Fall incidents가 있으면 자동 생성 시도
+        if len(incidents_map) > 0 and total_tasks == 0 and fall_policy:
+            logger.info(f"💡 Tasks가 없습니다 - 자동 생성 시도 중...")
+            try:
+                conn_gen = get_db_connection()
+                cursor_gen = conn_gen.cursor()
+                
+                tasks_generated = 0
+                # 각 incident에 대해 tasks 생성
+                for incident_data in incidents_map.values():
+                    try:
+                        num_tasks = auto_generate_fall_tasks(
+                            incident_data['id'], 
+                            incident_data['incident_date'], 
+                            cursor_gen
+                        )
+                        tasks_generated += num_tasks
+                        logger.info(f"✅ Incident {incident_data['incident_id']}: {num_tasks} tasks 생성됨")
+                    except Exception as gen_err:
+                        logger.warning(f"⚠️ Incident {incident_data['incident_id']} task 생성 실패: {gen_err}")
+                
+                conn_gen.commit()
+                conn_gen.close()
+                
+                logger.info(f"✅ 총 {tasks_generated}개 tasks 생성 완료")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Task 자동 생성 실패: {e}")
         
         return jsonify({
             'success': True,
@@ -6731,7 +7030,8 @@ def get_schedule_batch(site, date):
             'site': site,
             'date': date,
             'cached': False,  # Server-side 캐싱 시 True로 변경
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'auto_generated': total_tasks == 0 and len(incidents_map) > 0 and fall_policy  # Tasks 자동 생성 여부
         })
         
     except Exception as e:
@@ -6862,7 +7162,39 @@ def mobile_dashboard():
             flash('Access denied. You do not have permission to access the task dashboard.', 'error')
             return redirect(url_for('rod_dashboard'))
         
-        return render_template('mobile_task_dashboard.html', current_user=current_user)
+        # 초기 로드 시 Policy 및 Tasks 확인
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Active Fall Policy 확인
+        cursor.execute("""
+            SELECT COUNT(*) FROM cims_policies WHERE is_active = 1
+        """)
+        policy_count = cursor.fetchone()[0]
+        
+        # Fall incidents 확인
+        cursor.execute("""
+            SELECT COUNT(*) FROM cims_incidents 
+            WHERE incident_type LIKE '%Fall%' AND status IN ('Open', 'Overdue')
+        """)
+        fall_incident_count = cursor.fetchone()[0]
+        
+        # Tasks 확인
+        cursor.execute("SELECT COUNT(*) FROM cims_tasks")
+        task_count = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        # Policy가 없거나 Fall incidents가 있는데 tasks가 없으면 초기화 필요
+        needs_init = (policy_count == 0) or (fall_incident_count > 0 and task_count == 0)
+        
+        if needs_init:
+            logger.info(f"🆕 Mobile Dashboard 초기화 필요 감지 - Policy: {policy_count}, Fall: {fall_incident_count}, Tasks: {task_count}")
+            logger.info(f"💡 Tip: Settings 페이지에서 Force Synchronization을 실행하면 Policy와 Tasks가 자동 생성됩니다.")
+        
+        return render_template('mobile_task_dashboard.html', 
+                             current_user=current_user,
+                             needs_init=needs_init)
         
     except Exception as e:
         logger.error(f"모바일 대시보드 로드 오류: {str(e)}")
