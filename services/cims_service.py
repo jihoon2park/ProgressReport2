@@ -105,6 +105,7 @@ class CIMSService:
     ) -> int:
         """
         Fall incident에 대해 자동으로 task 생성
+        Progress Note를 분석하여 Witnessed/Unwitnessed를 자동 감지하고 적절한 Policy 적용
         
         Args:
             incident_db_id: CIMS DB의 incident ID (integer)
@@ -115,28 +116,13 @@ class CIMSService:
             생성된 task 수
         """
         try:
-            # Get Fall policy
-            cursor.execute("""
-                SELECT id, rules_json
-                FROM cims_policies
-                WHERE is_active = 1
-            """)
+            # Fall 유형 감지 및 적절한 Policy 선택
+            from services.fall_policy_detector import fall_detector
             
-            policies = cursor.fetchall()
-            fall_policy = None
-            
-            for policy_row in policies:
-                try:
-                    rules = json.loads(policy_row[1])
-                    association = rules.get('incident_association', {})
-                    if association.get('incident_type') == 'Fall':
-                        fall_policy = {
-                            'id': policy_row[0],
-                            'rules': rules
-                        }
-                        break
-                except:
-                    continue
+            fall_policy = fall_detector.get_appropriate_policy_for_incident(
+                incident_db_id, 
+                cursor
+            )
             
             if not fall_policy:
                 logger.warning(f"No active Fall policy found for task generation")

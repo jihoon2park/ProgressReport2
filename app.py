@@ -5103,6 +5103,7 @@ def get_db_connection(read_only: bool = False):
 @login_required
 def get_cache_status_current():
     """Return latest cache/sync status for dashboard indicator"""
+    conn = None
     try:
         conn = get_db_connection(read_only=True)
         cursor = conn.cursor()
@@ -5119,6 +5120,9 @@ def get_cache_status_current():
     except Exception as e:
         logger.error(f"get_cache_status_current error: {e}")
         return jsonify({'success': True, 'status': 'idle'}), 200
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/cims/incidents/<int:incident_db_id>/tasks', methods=['GET'], endpoint='get_incident_tasks_v2')
 @login_required
@@ -5261,6 +5265,123 @@ def cims_incidents():
         return get_cims_incidents()
     else:
         return create_cims_incident()
+
+@app.route('/api/cims/fall-statistics', methods=['GET'])
+@login_required
+def get_fall_statistics():
+    """Fall Policy별 통계 조회 API"""
+    conn = None
+    try:
+        if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        conn = get_db_connection(read_only=True)
+        cursor = conn.cursor()
+        
+        from services.fall_policy_detector import fall_detector
+        
+        # Fall incidents 조회 (최근 30일) - fall_type 포함
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        cursor.execute("""
+            SELECT id, incident_id, incident_type, incident_date, site, fall_type
+            FROM cims_incidents
+            WHERE incident_type LIKE '%Fall%'
+            AND incident_date >= ?
+            ORDER BY incident_date DESC
+        """, (thirty_days_ago,))
+        
+        fall_incidents = cursor.fetchall()
+        
+        # 통계 집계
+        stats = {
+            'total_falls': len(fall_incidents),
+            'witnessed': 0,
+            'unwitnessed': 0,
+            'unknown': 0,
+            'visits_scheduled': 0,
+            'visits_saved': 0,
+            'by_site': {},
+            'recent_falls': []
+        }
+        
+        for incident in fall_incidents:
+            incident_id = incident[0]
+            incident_manad_id = incident[1]
+            incident_type = incident[2]
+            incident_date = incident[3]
+            site = incident[4]
+            fall_type = incident[5]  # DB에서 직접 조회
+            
+            # fall_type이 없으면 계산 (레거시 데이터 처리)
+            if not fall_type:
+                fall_type = fall_detector.detect_fall_type_from_incident(incident_id, cursor)
+                
+                # 계산된 fall_type을 DB에 저장
+                try:
+                    cursor.execute("""
+                        UPDATE cims_incidents
+                        SET fall_type = ?
+                        WHERE id = ?
+                    """, (fall_type, incident_id))
+                    conn.commit()
+                except:
+                    pass
+            
+            # 통계 업데이트
+            if fall_type == 'witnessed':
+                stats['witnessed'] += 1
+                stats['visits_scheduled'] += 1
+                stats['visits_saved'] += 35  # 36 - 1 = 35 visits saved
+            elif fall_type == 'unwitnessed':
+                stats['unwitnessed'] += 1
+                stats['visits_scheduled'] += 36
+            else:
+                stats['unknown'] += 1
+                stats['visits_scheduled'] += 36  # Default to unwitnessed
+            
+            # 사이트별 통계
+            if site not in stats['by_site']:
+                stats['by_site'][site] = {
+                    'total': 0,
+                    'witnessed': 0,
+                    'unwitnessed': 0,
+                    'unknown': 0
+                }
+            
+            stats['by_site'][site]['total'] += 1
+            stats['by_site'][site][fall_type] += 1
+            
+            # 최근 5개 Fall만 상세 정보 포함
+            if len(stats['recent_falls']) < 5:
+                stats['recent_falls'].append({
+                    'incident_id': incident_manad_id,
+                    'incident_type': incident_type,
+                    'fall_type': fall_type,
+                    'incident_date': incident_date,
+                    'site': site
+                })
+        
+        # 비율 계산
+        if stats['total_falls'] > 0:
+            stats['witnessed_percentage'] = round(stats['witnessed'] / stats['total_falls'] * 100, 1)
+            stats['unwitnessed_percentage'] = round(stats['unwitnessed'] / stats['total_falls'] * 100, 1)
+            stats['unknown_percentage'] = round(stats['unknown'] / stats['total_falls'] * 100, 1)
+        else:
+            stats['witnessed_percentage'] = 0
+            stats['unwitnessed_percentage'] = 0
+            stats['unknown_percentage'] = 0
+        
+        logger.info(f"📊 Fall 통계 조회: {stats['total_falls']}개 (W: {stats['witnessed']}, UW: {stats['unwitnessed']})")
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Fall 통계 조회 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error'}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/cims/schedule/<site_name>', methods=['GET'])
 @login_required
@@ -6457,26 +6578,60 @@ def get_cims_incidents():
         
         # Convert to list of dictionaries (프론트엔드 호환 필드명 사용)
         result = []
-        for incident in incidents:
-            # incident_type을 EventTypeNames 배열로 변환
-            incident_types = incident[4].split(', ') if incident[4] else []
+        
+        # Fall 유형 감지를 위한 cursor 생성
+        conn_fall = get_db_connection(read_only=True)
+        try:
+            cursor_fall = conn_fall.cursor()
             
-            result.append({
-                'id': incident[0],
-                'incident_id': incident[1],
-                'resident_id': incident[2],
-                'resident_name': incident[3],
-                'incident_type': incident[4],  # 하위 호환성
-                'EventTypeNames': incident_types,  # 프론트엔드가 기대하는 형식
-                'severity': incident[5],
-                'status': incident[6],
-                'incident_date': incident[7],
-                'location': incident[8],
-                'description': incident[9],
-                'site': incident[10],  # 하위 호환성
-                'SiteName': incident[10],  # 프론트엔드가 기대하는 형식
-                'created_at': incident[11]
-            })
+            for incident in incidents:
+                # incident_type을 EventTypeNames 배열로 변환
+                incident_types = incident[4].split(', ') if incident[4] else []
+                
+                # Fall 유형 감지 (Fall incident인 경우만)
+                # DB에 저장된 fall_type 우선 사용, 없으면 계산 후 저장
+                fall_type = None
+                if incident[4] and 'fall' in incident[4].lower():
+                    from services.fall_policy_detector import fall_detector
+                    
+                    # detect_fall_type_from_incident가 DB 우선 조회 후 
+                    # 없으면 계산하는 로직을 이미 포함하고 있음
+                    fall_type = fall_detector.detect_fall_type_from_incident(
+                        incident[0],  # incident_id
+                        cursor_fall
+                    )
+                    
+                    # 계산된 fall_type을 DB에 저장 (다음번 조회 시 빠르게)
+                    if fall_type and fall_type != 'unknown':
+                        try:
+                            cursor_fall.execute("""
+                                UPDATE cims_incidents
+                                SET fall_type = ?
+                                WHERE id = ? AND (fall_type IS NULL OR fall_type = '')
+                            """, (fall_type, incident[0]))
+                            cursor_fall.connection.commit()
+                        except:
+                            pass  # 실패해도 계속 진행
+                
+                result.append({
+                    'id': incident[0],
+                    'incident_id': incident[1],
+                    'resident_id': incident[2],
+                    'resident_name': incident[3],
+                    'incident_type': incident[4],  # 하위 호환성
+                    'EventTypeNames': incident_types,  # 프론트엔드가 기대하는 형식
+                    'severity': incident[5],
+                    'status': incident[6],
+                    'incident_date': incident[7],
+                    'location': incident[8],
+                    'description': incident[9],
+                    'site': incident[10],  # 하위 호환성
+                    'SiteName': incident[10],  # 프론트엔드가 기대하는 형식
+                    'created_at': incident[11],
+                    'fall_type': fall_type  # Fall 유형 정보 추가
+                })
+        finally:
+            conn_fall.close()
         
         logger.info(f"📤 API 응답: {len(result)}개 Open 인시던트 반환")
         return jsonify({'incidents': result, 'stale': False})
@@ -6984,6 +7139,7 @@ def get_schedule_batch(site, date):
         # Tasks가 없고 Fall incidents가 있으면 자동 생성 시도
         if len(incidents_map) > 0 and total_tasks == 0 and fall_policy:
             logger.info(f"💡 Tasks가 없습니다 - 자동 생성 시도 중...")
+            conn_gen = None
             try:
                 conn_gen = get_db_connection()
                 cursor_gen = conn_gen.cursor()
@@ -7003,12 +7159,22 @@ def get_schedule_batch(site, date):
                         logger.warning(f"⚠️ Incident {incident_data['incident_id']} task 생성 실패: {gen_err}")
                 
                 conn_gen.commit()
-                conn_gen.close()
                 
                 logger.info(f"✅ 총 {tasks_generated}개 tasks 생성 완료")
                 
             except Exception as e:
                 logger.warning(f"⚠️ Task 자동 생성 실패: {e}")
+                if conn_gen:
+                    try:
+                        conn_gen.rollback()
+                    except:
+                        pass
+            finally:
+                if conn_gen:
+                    try:
+                        conn_gen.close()
+                    except:
+                        pass
         
         return jsonify({
             'success': True,
