@@ -1,0 +1,167 @@
+================================================================================
+Unknown Fall Incidents - Detailed Report
+Generated: 2025-11-24 15:31:05
+Total: 8 incidents
+================================================================================
+
+
+================================================================================
+[1/8] Incident ID: INC-5005
+================================================================================
+Type:         Fall
+Date:         2025-11-22T17:20:51.990000
+Site:         Parafield Gardens
+Resident:     Kenneth Henderson
+Severity:     4 - No harm (near miss)
+DB ID:        218
+
+Description:
+--------------------------------------------------------------------------------
+RN on floor reported to RN in charge that resident was sitting on floor in Kurrajong corridor at 1720hrs, his wheelchair was next to him.
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[2/8] Incident ID: INC-282
+================================================================================
+Type:         Fall
+Date:         2025-11-21T08:57:20.700000
+Site:         Yankalilla
+Resident:     Robert  Lindsay
+Severity:     4 - No harm (near miss)
+DB ID:        339
+
+Description:
+--------------------------------------------------------------------------------
+Care staff informed that Rob had a fall
+Attended immediately 
+Rob was sitting on the bathroom floor facing the room
+Alert, orientated and conscious
+Denies any head struck
+He was able to stand up without any assist
+Nil injuries noted  
+
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[3/8] Incident ID: INC-466
+================================================================================
+Type:         Fall
+Date:         2025-11-20T18:20:00
+Site:         West Park
+Resident:     Eunice Taylor
+Severity:     1 - Severe (Incl. death)
+DB ID:        329
+
+Description:
+--------------------------------------------------------------------------------
+The resident was observed walking unescorted in the hallway towards her room with her four-wheel walker in front of her. RN immediately proceeded to attend to her. As the RN approached, the resident appeared to tip sideways and then slowly collapsed to the floor, landing on her right side near Room 2 and lightly striking her head. Initially, the resident was conscious; howevershe suddenly became unresponsive and unconscious. On assessment, she was not breathing, initial SPO2 reading was 76%.
+Prior to the incident, the resident had been observed by staff in the dining room. She appeared to be in good spirits, enjoying the company of another resident (Room 3), laughing, joking and folding serviettes. She had eaten her dinner and no concerns were identified during this time.
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[4/8] Incident ID: INC-4995
+================================================================================
+Type:         Fall
+Date:         2025-11-14T13:00:00
+Site:         Parafield Gardens
+Resident:     Christine Waite
+Severity:     4 - No harm (near miss)
+DB ID:        231
+
+Description:
+--------------------------------------------------------------------------------
+Care staffs reported to RN that resident had witness fall with x2 physical assists on the way for toileting, slowly guide her to sitting on the ground 
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[5/8] Incident ID: INC-450
+================================================================================
+Type:         Fall
+Date:         2025-11-08T13:45:13.147000
+Site:         West Park
+Resident:     Leonard LLOYD
+Severity:     3 - Mild
+DB ID:        321
+
+Description:
+--------------------------------------------------------------------------------
+Received a call from nursing staff around 13:18 hours that Len was on the floor.
+Attended immediately and have seen Len on the floor in supine position. As per Len, he went to the toilet to pee when he loss his balance and landed on his bottom. When asked more about the fall, he stated I don't remember anymore. He denied head strike when asked. He firmly stated No.
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[6/8] Incident ID: INC-447
+================================================================================
+Type:         Fall
+Date:         2025-11-07T10:30:28.053000
+Site:         West Park
+Resident:     David Shreeve
+Severity:     4 - No harm (near miss)
+DB ID:        316
+
+Description:
+--------------------------------------------------------------------------------
+Lifestyle Coordinator reported that David had a fall onto his knees while participating in the activity at 1005. David was able to stand up independently without staff assistance and continued playing bowls. Staff were unable to inspect his skin at the time as he remained engaged in the activity. Handover provided for a head-to-toe assessment to be completed to check for any possible skin injuries.
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[7/8] Incident ID: INC-427
+================================================================================
+Type:         Fall
+Date:         2025-10-26T19:20:27.737000
+Site:         West Park
+Resident:     Warren HENDERSON
+Severity:     Unknown
+DB ID:        105
+
+Description:
+--------------------------------------------------------------------------------
+Warren was sitting in the lounge watching a movie with other residents. According to Pat he got up from the chair and a couple of steps away was an ottoman which apparently he was aiming to sit on but missed and sat on the floor. He was still in a sitting position on the floor and Pat says he did not hit his head.
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
+
+================================================================================
+[8/8] Incident ID: INC-440
+================================================================================
+Type:         Fall
+Date:         2025-10-26T19:00:00
+Site:         West Park
+Resident:     Warren HENDERSON
+Severity:     4 - No harm (near miss)
+DB ID:        306
+
+Description:
+--------------------------------------------------------------------------------
+Warren was sitting in the lounge watching a movie with other residents. According to Pat he got up from the chair and a couple of steps away was an ottoman which apparently he was aiming to sit on but missed and sat on the floor. He was still in a sitting position on the floor and Pat says he did not hit his head.
+
+Progress Notes:
+--------------------------------------------------------------------------------
+No progress notes
+
