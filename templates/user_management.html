@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - Progress Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .settings-header {
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .settings-header h2 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 1.8em;
+        }
+        
+        .user-management-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            margin: 5px;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+        }
+        
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .users-table th,
+        .users-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .users-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .users-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .badge-admin {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .badge-site-admin {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .badge-doctor {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .location-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            margin: 2px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 3% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .alert-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .checkbox-item input {
+            width: auto;
+            margin-right: 8px;
+        }
+        
+        .required {
+            color: #dc3545;
+        }
+        
+        .filter-section {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-label {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-right: 5px;
+        }
+        
+        .filter-btn {
+            padding: 6px 12px;
+            border: 1px solid #ced4da;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn:hover {
+            background: #e9ecef;
+        }
+        
+        .filter-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .filter-stats {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- 헤더 -->
+        <div class="settings-header">
+            <h2>👥 User Management</h2>
+            <p>Manage user accounts, roles, and permissions.</p>
+            <div class="nav-buttons" style="margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="window.location.href='/admin-settings'">🔧 Admin Settings</button>
+                <button class="btn btn-primary" onclick="window.location.href='/progress-notes'">📝 Progress Notes</button>
+                <button class="btn btn-warning" onclick="window.location.href='/fcm-admin-dashboard'">🔥 FCM Dashboard</button>
+                <button class="btn btn-secondary" onclick="window.location.href='/logout'">🚪 Logout</button>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="alert-container"></div>
+
+        <!-- User Management Section -->
+        <div class="user-management-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3>👤 User List</h3>
+                <button class="btn btn-success" onclick="openAddUserModal()">➕ Add New User</button>
+            </div>
+            
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="filter-group">
+                    <span class="filter-label">🔍 Filter by Role:</span>
+                    <button class="filter-btn active" data-filter-type="role" data-filter-value="all" onclick="filterByRole('all')">All</button>
+                    <button class="filter-btn" data-filter-type="role" data-filter-value="admin" onclick="filterByRole('admin')">Admin</button>
+                    <button class="filter-btn" data-filter-type="role" data-filter-value="site_admin" onclick="filterByRole('site_admin')">Site Admin</button>
+                    <button class="filter-btn" data-filter-type="role" data-filter-value="doctor" onclick="filterByRole('doctor')">Doctor</button>
+                </div>
+                
+                <div class="filter-group" style="margin-top: 10px;">
+                    <span class="filter-label">📋 Filter by Position:</span>
+                    <button class="filter-btn active" data-filter-type="position" data-filter-value="all" onclick="filterByPosition('all')">All</button>
+                    <div id="positionFilters">
+                        <!-- Position filters will be dynamically loaded -->
+                    </div>
+                    <span class="filter-stats" id="filterStats">Showing: 0 users</span>
+                </div>
+            </div>
+            
+            <table class="users-table" id="usersTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Position</th>
+                        <th>Location</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- User Modal (Add/Edit) -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add New User</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="username">Username <span class="required">*</span></label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password <span class="required">*</span></label>
+                    <input type="password" id="password" name="password" required>
+                    <small style="color: #6c757d;">Leave blank to keep existing password (edit mode)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="first_name">First Name <span class="required">*</span></label>
+                    <input type="text" id="first_name" name="first_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name <span class="required">*</span></label>
+                    <input type="text" id="last_name" name="last_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Role <span class="required">*</span></label>
+                    <div style="display: flex; gap: 15px; margin-top: 8px;">
+                        <button type="button" class="btn btn-role" data-role="admin" onclick="selectRole('admin')">Admin</button>
+                        <button type="button" class="btn btn-role" data-role="site_admin" onclick="selectRole('site_admin')">Site Admin</button>
+                        <button type="button" class="btn btn-role" data-role="doctor" onclick="selectRole('doctor')">Doctor</button>
+                    </div>
+                    <input type="hidden" id="role" name="role" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="position">Position <span class="required">*</span></label>
+                    <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm btn-position" onclick="selectPosition('Admin')">Admin</button>
+                        <button type="button" class="btn btn-sm btn-position" onclick="selectPosition('System Administrator')">System Administrator</button>
+                        <button type="button" class="btn btn-sm btn-position" onclick="selectPosition('Site Administrator')">Site Administrator</button>
+                        <button type="button" class="btn btn-sm btn-position" onclick="selectPosition('GP')">GP</button>
+                    </div>
+                    <input type="hidden" id="position" name="position" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Location <span class="required">*</span></label>
+                    <div class="checkbox-group" id="locationGroup">
+                        <!-- Location checkboxes will be dynamically loaded -->
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="submitBtn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Confirm Delete</h3>
+                <span class="close" onclick="closeDeleteModal()">&times;</span>
+            </div>
+            
+            <p style="margin: 20px 0;">Are you sure you want to delete user <strong id="deleteUsername"></strong>?</p>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentEditingUser = null;
+        let userToDelete = null;
+        let availableLocations = [];
+        let allUsers = []; // 전체 사용자 목록 저장
+        let currentRoleFilter = 'all';
+        let currentPositionFilter = 'all';
+
+        // 페이지 로드 시 사용자 목록 불러오기
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUsers();
+            loadLocationOptions();
+        });
+
+        // 사용자 목록 불러오기
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allUsers = data.users;
+                    updatePositionFilters();
+                    applyFilters();
+                } else {
+                    showAlert('Failed to load users: ' + data.message, 'danger');
+                }
+            } catch (error) {
+                showAlert('Failed to load users: ' + error.message, 'danger');
+            }
+        }
+        
+        // Position 필터 버튼 생성
+        function updatePositionFilters() {
+            const positions = [...new Set(allUsers.map(u => u.position))].sort();
+            const container = document.getElementById('positionFilters');
+            
+            container.innerHTML = positions.map(position => 
+                `<button class="filter-btn" data-filter-type="position" data-filter-value="${position}" onclick="filterByPosition('${position}')">${position}</button>`
+            ).join('');
+        }
+        
+        // Role 필터
+        function filterByRole(role) {
+            currentRoleFilter = role;
+            
+            // 버튼 active 상태 업데이트
+            document.querySelectorAll('.filter-btn[data-filter-type="role"]').forEach(btn => {
+                if (btn.dataset.filterValue === role) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            applyFilters();
+        }
+        
+        // Position 필터
+        function filterByPosition(position) {
+            currentPositionFilter = position;
+            
+            // 버튼 active 상태 업데이트
+            document.querySelectorAll('.filter-btn[data-filter-type="position"]').forEach(btn => {
+                if (btn.dataset.filterValue === position) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            applyFilters();
+        }
+        
+        // 필터 적용
+        function applyFilters() {
+            let filteredUsers = allUsers;
+            
+            // Role 필터 적용
+            if (currentRoleFilter !== 'all') {
+                filteredUsers = filteredUsers.filter(u => u.role === currentRoleFilter);
+            }
+            
+            // Position 필터 적용
+            if (currentPositionFilter !== 'all') {
+                filteredUsers = filteredUsers.filter(u => u.position === currentPositionFilter);
+            }
+            
+            displayUsers(filteredUsers);
+            updateFilterStats(filteredUsers.length);
+        }
+        
+        // 필터 통계 업데이트
+        function updateFilterStats(count) {
+            const statsElement = document.getElementById('filterStats');
+            if (currentRoleFilter === 'all' && currentPositionFilter === 'all') {
+                statsElement.textContent = `Showing: ${count} user${count !== 1 ? 's' : ''} (Total)`;
+            } else {
+                const filters = [];
+                if (currentRoleFilter !== 'all') filters.push(`Role: ${currentRoleFilter}`);
+                if (currentPositionFilter !== 'all') filters.push(`Position: ${currentPositionFilter}`);
+                statsElement.textContent = `Showing: ${count} user${count !== 1 ? 's' : ''} (${filters.join(', ')})`;
+            }
+        }
+
+        // 사용자 목록 표시
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No users found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => {
+                const roleClass = user.role === 'admin' ? 'badge-admin' : 
+                                 user.role === 'site_admin' ? 'badge-site-admin' : 
+                                 'badge-doctor';
+                
+                const locations = Array.isArray(user.location) ? user.location : [user.location];
+                const locationHtml = locations.map(loc => `<span class="location-badge">${loc}</span>`).join('');
+                
+                return `
+                    <tr>
+                        <td><strong>${user.username}</strong></td>
+                        <td>${user.first_name} ${user.last_name}</td>
+                        <td><span class="badge ${roleClass}">${user.role}</span></td>
+                        <td>${user.position}</td>
+                        <td>${locationHtml}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="editUser('${user.username}')">✏️ Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')">🗑️ Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Location 옵션 로드
+        async function loadLocationOptions() {
+            try {
+                const response = await fetch('/api/users/options');
+                const data = await response.json();
+                
+                if (data.success) {
+                    availableLocations = data.locations;
+                    updateLocationCheckboxes();
+                }
+            } catch (error) {
+                console.error('Failed to load location options:', error);
+            }
+        }
+
+        // Location 체크박스 업데이트
+        function updateLocationCheckboxes() {
+            const container = document.getElementById('locationGroup');
+            container.innerHTML = availableLocations.map(location => `
+                <div class="checkbox-item">
+                    <input type="checkbox" id="loc_${location}" name="location" value="${location}">
+                    <label for="loc_${location}" style="margin: 0; font-weight: normal;">${location}</label>
+                </div>
+            `).join('');
+        }
+
+        // 사용자 추가 모달 열기
+        function openAddUserModal() {
+            currentEditingUser = null;
+            document.getElementById('modalTitle').textContent = 'Add New User';
+            document.getElementById('userForm').reset();
+            document.getElementById('username').readOnly = false;
+            document.getElementById('password').required = true;
+            document.getElementById('submitBtn').textContent = 'Add User';
+            
+            // Reset role and position selections
+            document.querySelectorAll('.btn-role').forEach(btn => btn.classList.remove('btn-primary'));
+            document.querySelectorAll('.btn-role').forEach(btn => btn.classList.add('btn-secondary'));
+            document.querySelectorAll('.btn-position').forEach(btn => btn.classList.remove('btn-primary'));
+            document.querySelectorAll('.btn-position').forEach(btn => btn.classList.add('btn-secondary'));
+            
+            document.getElementById('userModal').style.display = 'block';
+        }
+
+        // 사용자 편집
+        async function editUser(username) {
+            try {
+                const response = await fetch(`/api/users/${username}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentEditingUser = username;
+                    const user = data.user;
+                    
+                    document.getElementById('modalTitle').textContent = 'Edit User';
+                    document.getElementById('username').value = user.username;
+                    document.getElementById('username').readOnly = true;
+                    document.getElementById('password').value = '';
+                    document.getElementById('password').required = false;
+                    document.getElementById('first_name').value = user.first_name;
+                    document.getElementById('last_name').value = user.last_name;
+                    document.getElementById('submitBtn').textContent = 'Update User';
+                    
+                    // Set role
+                    selectRole(user.role);
+                    
+                    // Set position
+                    selectPosition(user.position);
+                    
+                    // Set locations
+                    document.querySelectorAll('input[name="location"]').forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                    const locations = Array.isArray(user.location) ? user.location : [user.location];
+                    locations.forEach(location => {
+                        const checkbox = document.getElementById(`loc_${location}`);
+                        if (checkbox) checkbox.checked = true;
+                    });
+                    
+                    document.getElementById('userModal').style.display = 'block';
+                } else {
+                    showAlert('Failed to load user: ' + data.message, 'danger');
+                }
+            } catch (error) {
+                showAlert('Failed to load user: ' + error.message, 'danger');
+            }
+        }
+
+        // Role 선택
+        function selectRole(role) {
+            document.getElementById('role').value = role;
+            document.querySelectorAll('.btn-role').forEach(btn => {
+                if (btn.dataset.role === role) {
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-primary');
+                } else {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-secondary');
+                }
+            });
+        }
+
+        // Position 선택
+        function selectPosition(position) {
+            document.getElementById('position').value = position;
+            document.querySelectorAll('.btn-position').forEach(btn => {
+                if (btn.textContent === position) {
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-primary');
+                } else {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-secondary');
+                }
+            });
+        }
+
+        // 사용자 폼 제출
+        document.getElementById('userForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const userData = {
+                username: formData.get('username'),
+                first_name: formData.get('first_name'),
+                last_name: formData.get('last_name'),
+                role: document.getElementById('role').value,
+                position: document.getElementById('position').value,
+                location: Array.from(document.querySelectorAll('input[name="location"]:checked')).map(cb => cb.value)
+            };
+            
+            const password = formData.get('password');
+            if (password) {
+                userData.password = password;
+            }
+            
+            // Validation
+            if (!userData.role) {
+                showAlert('Please select a role', 'danger');
+                return;
+            }
+            
+            if (!userData.position) {
+                showAlert('Please select a position', 'danger');
+                return;
+            }
+            
+            if (userData.location.length === 0) {
+                showAlert('Please select at least one location', 'danger');
+                return;
+            }
+            
+            try {
+                const url = currentEditingUser ? `/api/users/${currentEditingUser}` : '/api/users';
+                const method = currentEditingUser ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    closeModal();
+                    await loadUsers();
+                    // 필터 유지
+                    applyFilters();
+                } else {
+                    showAlert('Failed to save: ' + data.message, 'danger');
+                }
+            } catch (error) {
+                showAlert('Failed to save: ' + error.message, 'danger');
+            }
+        });
+
+        // 사용자 삭제
+        function deleteUser(username) {
+            userToDelete = username;
+            document.getElementById('deleteUsername').textContent = username;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+
+        // 삭제 확인
+        async function confirmDelete() {
+            if (!userToDelete) return;
+            
+            try {
+                const response = await fetch(`/api/users/${userToDelete}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    closeDeleteModal();
+                    await loadUsers();
+                    // 필터 유지
+                    applyFilters();
+                } else {
+                    showAlert('Failed to delete: ' + data.message, 'danger');
+                }
+            } catch (error) {
+                showAlert('Failed to delete: ' + error.message, 'danger');
+            }
+        }
+
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('userModal').style.display = 'none';
+            currentEditingUser = null;
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            userToDelete = null;
+        }
+
+        // 알림 표시
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alertId = 'alert-' + Date.now();
+            
+            alertContainer.innerHTML = `
+                <div id="${alertId}" class="alert alert-${type}">
+                    ${message}
+                    <button type="button" onclick="document.getElementById('${alertId}').remove()" style="float: right; background: none; border: none; font-size: 18px; cursor: pointer;">&times;</button>
+                </div>
+            `;
+            
+            // 5초 후 자동 제거
+            setTimeout(() => {
+                const alert = document.getElementById(alertId);
+                if (alert) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        // 모달 외부 클릭 시 닫기
+        window.onclick = function(event) {
+            const userModal = document.getElementById('userModal');
+            const deleteModal = document.getElementById('deleteModal');
+            
+            if (event.target === userModal) {
+                closeModal();
+            }
+            if (event.target === deleteModal) {
+                closeDeleteModal();
+            }
+        }
+    </script>
+</body>
+</html>
+

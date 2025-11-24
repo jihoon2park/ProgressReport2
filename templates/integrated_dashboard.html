@@ -1959,8 +1959,7 @@
                 // loadComplianceSummary() is deprecated - updateKPICards() handles this
                 // loadOverdueTasks() // Removed - will be re-implemented later
                 
-                // 마지막으로 Open Incidents 표시 (filteredIncidents 사용)
-                // displayOpenIncidents(filteredIncidents); // Removed - duplicate content
+                // displayStats() is already called by applyFilters() in initializeIncidentViewer()
             } catch (error) {
                 console.error('Error loading admin data:', error);
             }
@@ -2065,7 +2064,7 @@
         }
         */
 
-        // Removed - duplicate content
+        // Removed - not used (site cards are used instead)
         /*
         function displayOpenIncidents(incidents) {
             const tableBody = document.getElementById('incidents-table');
@@ -2354,6 +2353,18 @@
                     
                     console.log(`✅ Loaded ${allIncidents.length} incidents from CIMS DB`);
                     
+                    // 초기 로드 시 데이터가 없으면 동기화 진행 중 메시지 표시
+                    if (allIncidents.length === 0) {
+                        console.log('⚠️ No incidents found - initial sync may be in progress');
+                        showInfo('First time loading data. Synchronizing incidents from MANAD Plus... This may take 30-60 seconds.');
+                        
+                        // 10초 후 자동으로 다시 로드
+                        setTimeout(() => {
+                            console.log('🔄 Auto-reloading after initial sync...');
+                            loadIncidents();
+                        }, 10000);
+                    }
+                    
                     // Set global variables for other functions
                     incidents = allIncidents;
                     clients = []; // Not needed for CIMS data
@@ -2488,10 +2499,9 @@
             // Filters applied silently
             
             // 화면 갱신
-            displayStats();
+            displayStats();  // Shows site-specific incident cards
             createSiteSpecificCharts();
             updateKPICards();
-            // displayOpenIncidents(filteredIncidents);  // Removed - duplicate content
         }
         
         // Legacy function for backward compatibility
@@ -3274,6 +3284,10 @@
 
         function showError(message) {
             console.error('Error:', message);
+        }
+        
+        function showInfo(message) {
+            console.info('Info:', message);
         }
 
         function hideError() {

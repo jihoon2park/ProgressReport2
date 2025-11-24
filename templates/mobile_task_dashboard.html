@@ -1014,6 +1014,16 @@
                     throw new Error(data.error || 'Failed to load schedule');
                 }
                 
+                // Tasks가 자동 생성되었으면 5초 후 다시 로드
+                if (data.auto_generated) {
+                    console.log('💡 Tasks가 자동 생성되었습니다 - 5초 후 재로드...');
+                    showEmpty('Initializing...', 'Setting up visit schedule for the first time. Please wait...');
+                    setTimeout(() => {
+                        loadSchedule();
+                    }, 5000);
+                    return;
+                }
+                
                 // 🚀 Phase 3: 캐시 저장
                 setCachedSchedule(selectedSite, selectedDate, data);
                 
@@ -1053,12 +1063,15 @@
             console.log(`🔍 [${selectedSite}] Batch API - Incidents: ${incidents.length}, Policy: ${policy ? 'OK' : 'N/A'}`);
             
             if (incidents.length === 0) {
-                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                showEmpty('No visits scheduled', 'No Fall incidents found for this date');
                 return;
             }
             
             if (!policy) {
-                showEmpty('No visits scheduled', 'No visits scheduled for this date');
+                showEmpty('Policy Setup Required', 
+                    'No active Fall policy found. Please run <strong>Force Synchronization</strong> from Settings page to initialize the system.<br><br>' +
+                    '<a href="/admin-settings" class="btn btn-primary btn-sm mt-2">Go to Settings</a>',
+                    true);
                 return;
             }
             
@@ -1623,15 +1636,18 @@
         }
 
         // Show empty state
-        function showEmpty(message, subtitle) {
+        function showEmpty(message, subtitle, allowHtml = false) {
             hideLoading();
             const tableBody = document.getElementById('scheduleTableBody');
+            
+            const subtitleHtml = allowHtml ? subtitle : `<small style="color: #999; font-size: 1.1rem; font-weight: 600;">${subtitle}</small>`;
+            
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="9" class="text-center" style="padding: 3rem;">
                         <i class="fas fa-calendar-alt" style="font-size: 4rem; color: #ccc; display: block; margin-bottom: 1.5rem;"></i>
                         <p style="color: #666; font-size: 1.4rem; font-weight: 700;">${message}</p>
-                        <small style="color: #999; font-size: 1.1rem; font-weight: 600;">${subtitle}</small>
+                        <div style="color: #999; font-size: 1.1rem; font-weight: 600;">${subtitleHtml}</div>
                         </td>
                     </tr>
                 `;
