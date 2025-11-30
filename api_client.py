@@ -46,7 +46,50 @@ def get_api_client(site):
     return APIClient(site)
 
 def fetch_client_information(site):
-    """클라이언트 정보를 가져오고 처리하는 함수"""
+    """클라이언트 정보를 가져오고 처리하는 함수 (DB 직접 접속 또는 API)"""
+    import os
+    import sqlite3
+    
+    # DB 직접 접속 모드 확인
+    use_db_direct = False
+    try:
+        conn = sqlite3.connect('progress_report.db', timeout=10)
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            use_db_direct = result[0].lower() == 'true'
+        else:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+    except:
+        use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+    
+    # DB 직접 접속 모드 (fallback 비활성화 - 에러 발생)
+    if use_db_direct:
+        try:
+            from manad_db_connector import MANADDBConnector
+            logger.info(f"🔌 DB 직접 접속 모드: Client 정보 조회 - {site} (fallback 비활성화)")
+            connector = MANADDBConnector(site)
+            success, client_info = connector.fetch_clients()
+            
+            if success and client_info:
+                # JSON 파일로 저장 (기존 형식 유지)
+                save_client_data_to_json(site, client_info)
+                logger.info(f"✅ DB에서 클라이언트 정보 조회 성공 - {site}: {len(client_info)}명")
+                return True, client_info
+            else:
+                error_msg = f"❌ DB 직접 접속 실패: {site} - 클라이언트 정보 조회 결과가 비어있습니다. DB 연결 설정을 확인하세요."
+                logger.error(error_msg)
+                raise Exception(error_msg)
+        except Exception as db_error:
+            error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+            logger.error(error_msg)
+            raise Exception(error_msg)
+    
+    # API 모드 (기본 또는 fallback)
+    logger.info(f"🌐 API 모드: Client 정보 조회 - {site}")
     logger.info(f"클라이언트 정보 요청 시작 - 사이트: {site}")
     try:
         api_client = APIClient(site)

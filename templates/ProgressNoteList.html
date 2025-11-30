@@ -324,12 +324,13 @@
         th, td { padding: 8px 10px; border-bottom: 1px solid #e0e0e0; text-align: left; font-size: 0.98em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         th { background: #f1f5fa !important; font-weight: 600; color: #222 !important; }
         th, thead tr { background: #f1f5fa !important; }
-        th:nth-child(1) { width: 70px; }
-        th:nth-child(2) { width: 120px; }
-        th:nth-child(3) { width: 140px; }
-        th:nth-child(4) { width: 90px; }
-        th:nth-child(5) { width: 70px; }
-        th:nth-child(6) { width: 80px; }
+        /* 컬럼 너비 조정: Date/Time 축소, Event type 확대 */
+        th:nth-child(1) { width: 80px; }  /* Service wing */
+        th:nth-child(2) { width: 120px; } /* Client - 축소 */
+        th:nth-child(3) { width: 100px; } /* Date - 축소 */
+        th:nth-child(4) { width: 60px; }  /* Time - 축소 */
+        th:nth-child(5) { width: 160px; } /* Event type - 확대 */
+        th:nth-child(6) { width: 80px; }  /* Care area(s) - 기존 크기로 */
         th:nth-child(7) { width: 120px; }
         th:nth-child(8) { width: 140px; }
         th:nth-child(9) { width: 120px; }

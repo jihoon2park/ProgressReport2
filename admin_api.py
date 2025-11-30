@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from functools import wraps
 import logging
 import os
-# import sqlite3  # JSON 전용 시스템으로 변경되어 제거됨
+import sqlite3
 from datetime import datetime
 
 # API 키 관리자 import
@@ -461,4 +461,161 @@ def get_system_logs():
         return jsonify({
             'success': False,
             'message': f'시스템 로그 조회 실패: {str(e)}'
+        }), 500
+
+def get_db_connection():
+    """데이터베이스 연결"""
+    conn = sqlite3.connect('progress_report.db', timeout=60.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+    except:
+        pass
+    return conn
+
+@admin_api.route('/api/admin/data-source-mode', methods=['GET'])
+@login_required
+@admin_required
+def get_data_source_mode():
+    """데이터 소스 모드 조회 (DB 또는 API)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # system_settings에서 조회
+        cursor.execute("""
+            SELECT value FROM system_settings 
+            WHERE key = 'USE_DB_DIRECT_ACCESS'
+        """)
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        # DB에 저장된 값이 있으면 사용, 없으면 환경 변수 확인, 둘 다 없으면 'api'
+        if result and result[0]:
+            mode = result[0].lower()
+        else:
+            mode = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower()
+        
+        # 'true'/'false' 문자열을 'db'/'api'로 변환
+        if mode == 'true' or mode == 'db':
+            mode = 'db'
+        else:
+            mode = 'api'
+        
+        return jsonify({
+            'success': True,
+            'mode': mode
+        })
+        
+    except Exception as e:
+        logger.error(f"데이터 소스 모드 조회 실패: {e}")
+        # 오류 시 기본값 반환
+        mode = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower()
+        return jsonify({
+            'success': True,
+            'mode': 'db' if mode == 'true' or mode == 'db' else 'api'
+        })
+
+@admin_api.route('/api/admin/data-source-mode', methods=['POST'])
+@login_required
+@admin_required
+def set_data_source_mode():
+    """데이터 소스 모드 설정 (DB 또는 API)"""
+    try:
+        data = request.get_json()
+        mode = data.get('mode', 'api')  # 'db' or 'api'
+        
+        if mode not in ['db', 'api']:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid mode. Must be "db" or "api"'
+            }), 400
+        
+        # 'db'/'api'를 'true'/'false'로 변환하여 저장
+        value = 'true' if mode == 'db' else 'false'
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # system_settings에 저장
+        cursor.execute("""
+            INSERT OR REPLACE INTO system_settings (key, value, updated_at)
+            VALUES ('USE_DB_DIRECT_ACCESS', ?, ?)
+        """, (value, datetime.now().isoformat()))
+        
+        conn.commit()
+        conn.close()
+        
+        # 환경 변수도 업데이트 (현재 프로세스에만 적용)
+        os.environ['USE_DB_DIRECT_ACCESS'] = value
+        
+        logger.info(f"데이터 소스 모드 변경: {mode} (by {current_user.username})")
+        
+        return jsonify({
+            'success': True,
+            'mode': mode,
+            'message': f'데이터 소스 모드가 "{mode}" 모드로 변경되었습니다. 변경 사항 적용을 위해 서버 재시작을 권장합니다.'
+        })
+        
+    except Exception as e:
+        logger.error(f"데이터 소스 모드 설정 실패: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'데이터 소스 모드 설정 실패: {str(e)}'
+        }), 500
+
+@admin_api.route('/api/admin/restart-server', methods=['POST'])
+@login_required
+@admin_required
+def restart_server():
+    """서버 재시작 (배치 파일 실행)"""
+    import subprocess
+    import os
+    import sys
+    from pathlib import Path
+    
+    try:
+        logger.info(f"서버 재시작 요청: {current_user.username}")
+        
+        # 프로젝트 루트 디렉토리 찾기
+        project_root = Path(__file__).parent.absolute()
+        restart_script = project_root / 'restart_server_simple.bat'
+        
+        if not restart_script.exists():
+            return jsonify({
+                'success': False,
+                'error': '재시작 스크립트를 찾을 수 없습니다.'
+            }), 404
+        
+        # 배치 파일을 백그라운드에서 실행
+        # Windows에서는 CREATE_NEW_CONSOLE 플래그 사용
+        if sys.platform == 'win32':
+            subprocess.Popen(
+                [str(restart_script)],
+                cwd=str(project_root),
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                shell=True
+            )
+        else:
+            # Linux/Mac의 경우
+            subprocess.Popen(
+                ['bash', str(restart_script)],
+                cwd=str(project_root)
+            )
+        
+        logger.info("서버 재시작 스크립트 실행됨")
+        
+        return jsonify({
+            'success': True,
+            'message': '서버 재시작이 시작되었습니다. 잠시 후 자동으로 연결됩니다.'
+        })
+        
+    except Exception as e:
+        logger.error(f"서버 재시작 실패: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'서버 재시작 실패: {str(e)}'
         }), 500
