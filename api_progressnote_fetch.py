@@ -407,7 +407,7 @@ class ProgressNoteFetchClient:
 
 def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
     """
-    특정 사이트의 프로그레스 노트를 가져오는 편의 함수
+    특정 사이트의 프로그레스 노트를 가져오는 편의 함수 (DB 직접 접속 또는 API)
     
     Args:
         site: 사이트명
@@ -419,7 +419,70 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
     Returns:
         (성공 여부, 데이터 리스트 또는 None)
     """
+    import sqlite3
+    import os
+    
+    # DB 직접 접속 모드 확인
+    use_db_direct = False
     try:
+        conn = sqlite3.connect('progress_report.db', timeout=10)
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            use_db_direct = result[0].lower() == 'true'
+        else:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+    except:
+        use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+    
+    # DB 직접 접속 모드
+    if use_db_direct:
+        try:
+            from manad_db_connector import MANADDBConnector
+            from datetime import datetime, timedelta
+            
+            logger.info(f"🔌 DB 직접 접속 모드: Progress Notes 조회 - {site}")
+            connector = MANADDBConnector(site)
+            
+            # ROD 대시보드용 특별 처리
+            if year is not None and month is not None:
+                start_date = datetime(year, month, 1)
+                if month == 12:
+                    end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = datetime(year, month + 1, 1) - timedelta(days=1)
+            else:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=days)
+            
+            # Event Type 필터링 (ID 변환 필요시)
+            event_type_id = None
+            if event_types and len(event_types) > 0:
+                # Event Type 이름으로 ID 찾기 (간단한 버전, 실제로는 더 복잡할 수 있음)
+                logger.warning(f"Event Type 필터링은 DB 직접 접속 모드에서 아직 완전히 지원되지 않습니다: {event_types}")
+            
+            progress_success, progress_notes = connector.fetch_progress_notes(
+                start_date, end_date, limit=500, progress_note_event_type_id=event_type_id
+            )
+            
+            if not progress_success or not progress_notes:
+                error_msg = f"❌ DB 직접 접속 실패: {site} - Progress Notes 조회 결과가 비어있습니다. DB 연결 설정을 확인하세요."
+                logger.error(error_msg)
+                raise Exception(error_msg)
+            
+            return True, progress_notes
+            
+        except Exception as db_error:
+            error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+            logger.error(error_msg)
+            raise Exception(error_msg)
+    
+    # API 모드
+    try:
+        logger.info(f"🌐 API 모드: Progress Notes 조회 - {site}")
         client = ProgressNoteFetchClient(site)
         logger.info(f"Fetching progress notes for site {site} with {days} days range, event_types: {event_types}")
         

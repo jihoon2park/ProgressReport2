@@ -22,6 +22,8 @@ import sys
 import sqlite3
 from datetime import datetime, timedelta, timezone
 import time
+import threading
+import schedule
 from dotenv import load_dotenv
 import uuid
 from dataclasses import asdict
@@ -999,23 +1001,92 @@ def login():
                     else:
                         logger.warning(f"클라이언트 데이터 수집 실패 - {site}")
                     
-                    # 3-2. Progress Notes 데이터 수집 (매번)
-                    from progress_notes_json_cache import json_cache
-                    from api_progressnote_fetch import fetch_progress_notes_for_site
-                    progress_success, progress_notes = fetch_progress_notes_for_site(site, 7)
-                    if progress_success and progress_notes:
-                        json_cache.update_cache(site, progress_notes)
-                        logger.info(f"Progress Notes 데이터 수집 성공 - {site}: {len(progress_notes)}개")
-                    else:
-                        logger.warning(f"Progress Notes 데이터 수집 실패 - {site}")
+                    # 3-2. Progress Notes 데이터 수집 (DB 직접 접속 모드에서는 캐시 불필요)
+                    # DB 직접 접속 모드 확인
+                    import sqlite3
+                    import os
                     
-                    # 3-3. 일일 데이터 수집 (최초 접속시에만)
-                    from daily_data_manager import daily_data_manager
-                    daily_results = daily_data_manager.collect_daily_data_if_needed(site)
-                    if daily_results['care_area']:
-                        logger.info(f"Care Area 데이터 수집 완료 - {site}")
-                    if daily_results['event_type']:
-                        logger.info(f"Event Type 데이터 수집 완료 - {site}")
+                    use_db_direct = False
+                    try:
+                        conn = sqlite3.connect('progress_report.db', timeout=10)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+                        result = cursor.fetchone()
+                        conn.close()
+                        
+                        if result and result[0]:
+                            use_db_direct = result[0].lower() == 'true'
+                        else:
+                            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+                    except:
+                        use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+                    
+                    if use_db_direct:
+                        # DB 직접 접속 모드: 캐시 불필요 - 필요할 때마다 직접 조회
+                        logger.info(f"🔌 DB 직접 접속 모드: Progress Notes는 실시간 조회됨 (캐시 불필요) - {site}")
+                    else:
+                        # API 모드: 캐시 사용 (API 호출 비용 절감)
+                        from progress_notes_json_cache import json_cache
+                        from api_progressnote_fetch import fetch_progress_notes_for_site
+                        logger.info(f"🌐 API 모드: Progress Notes 조회 및 캐시 - {site}")
+                        progress_success, progress_notes = fetch_progress_notes_for_site(site, 7)
+                        if progress_success and progress_notes:
+                            json_cache.update_cache(site, progress_notes)
+                            logger.info(f"Progress Notes 데이터 수집 및 캐시 완료 - {site}: {len(progress_notes)}개")
+                        else:
+                            logger.warning(f"Progress Notes 데이터 수집 실패 - {site}")
+                    
+                    # 3-3. Care Area 및 Event Type 데이터 수집 (DB 직접 접속)
+                    if use_db_direct:
+                        # DB 직접 접속 모드
+                        try:
+                            from manad_db_connector import MANADDBConnector
+                            import json
+                            
+                            connector = MANADDBConnector(site)
+                            
+                            # Care Area 조회
+                            logger.info(f"🔌 DB 직접 접속 모드: Care Area 조회 - {site}")
+                            care_success, care_areas = connector.fetch_care_areas()
+                            if care_success and care_areas:
+                                # JSON 파일로 저장 (기존 형식 유지)
+                                os.makedirs('data', exist_ok=True)
+                                with open('data/carearea.json', 'w', encoding='utf-8') as f:
+                                    json.dump(care_areas, f, ensure_ascii=False, indent=4)
+                                logger.info(f"✅ DB에서 Care Area 조회 성공 - {site}: {len(care_areas)}개")
+                            else:
+                                error_msg = f"❌ DB 직접 접속 실패: {site} - Care Area 조회 결과가 비어있습니다."
+                                logger.error(error_msg)
+                                raise Exception(error_msg)
+                            
+                            # Event Type 조회
+                            logger.info(f"🔌 DB 직접 접속 모드: Event Type 조회 - {site}")
+                            event_success, event_types = connector.fetch_event_types()
+                            if event_success and event_types:
+                                # JSON 파일로 저장 (기존 형식 유지)
+                                os.makedirs('data', exist_ok=True)
+                                site_filename = f'data/eventtype_{site}.json'
+                                with open(site_filename, 'w', encoding='utf-8') as f:
+                                    json.dump(event_types, f, ensure_ascii=False, indent=4)
+                                with open('data/eventtype.json', 'w', encoding='utf-8') as f:
+                                    json.dump(event_types, f, ensure_ascii=False, indent=4)
+                                logger.info(f"✅ DB에서 Event Type 조회 성공 - {site}: {len(event_types)}개")
+                            else:
+                                error_msg = f"❌ DB 직접 접속 실패: {site} - Event Type 조회 결과가 비어있습니다."
+                                logger.error(error_msg)
+                                raise Exception(error_msg)
+                        except Exception as db_error:
+                            error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+                            logger.error(error_msg)
+                            raise Exception(error_msg)
+                    else:
+                        # API 모드
+                        from daily_data_manager import daily_data_manager
+                        daily_results = daily_data_manager.collect_daily_data_if_needed(site)
+                        if daily_results['care_area']:
+                            logger.info(f"Care Area 데이터 수집 완료 - {site}")
+                        if daily_results['event_type']:
+                            logger.info(f"Event Type 데이터 수집 완료 - {site}")
                     
                     logger.info(f"사이트별 데이터 수집 완료 - 사이트: {site}")
                     
@@ -1895,12 +1966,30 @@ def fetch_progress_notes():
                 'message': f'Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}'
             }), 400
         
-        # JSON 캐시 매니저 사용
-        from progress_notes_json_cache import json_cache
+        # DB 직접 접속 모드 확인
+        use_db_direct = False
+        try:
+            conn = sqlite3.connect('progress_report.db', timeout=10)
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result and result[0]:
+                use_db_direct = result[0].lower() == 'true'
+            else:
+                use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        except:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        
         from api_progressnote_fetch import fetch_progress_notes_for_site
         
-        # ROD 대시보드: 무조건 API에서 새로 받아오기 (캐시 무시)
-        logger.info(f"ROD 대시보드 모드 - 무조건 API에서 새로 조회: {site}")
+        # Progress Notes 조회 (DB 직접 접속 또는 API)
+        if use_db_direct:
+            logger.info(f"🔌 DB 직접 접속 모드: Progress Notes 실시간 조회 (캐시 없음) - {site}")
+        else:
+            logger.info(f"🌐 API 모드: Progress Notes 조회 - {site}")
+        
         success, notes = fetch_progress_notes_for_site(site, days)
         
         if not success or not notes:
@@ -1916,8 +2005,10 @@ def fetch_progress_notes():
                 'cache_age_hours': 0
             }
         else:
-            # JSON 캐시에 저장 (다른 페이지에서 사용할 수 있도록)
-            json_cache.update_cache(site, notes)
+            # API 모드일 때만 캐시에 저장 (DB 직접 접속 모드는 캐시 불필요)
+            if not use_db_direct:
+                from progress_notes_json_cache import json_cache
+                json_cache.update_cache(site, notes)
             
             # 페이지네이션 적용
             total_count = len(notes)
@@ -1933,7 +2024,7 @@ def fetch_progress_notes():
                 'per_page': per_page,
                 'total_count': total_count,
                 'total_pages': total_pages,
-                'cache_status': 'fresh_api_data',
+                'cache_status': 'fresh_db_data' if use_db_direct else 'fresh_api_data',
                 'last_sync': get_australian_time().isoformat(),
                 'cache_age_hours': 0
             }
@@ -5519,15 +5610,24 @@ def get_integrator_status():
 @app.route('/api/cims/sync-progress-notes', methods=['POST'])
 @login_required
 def trigger_progress_note_sync():
-    """Progress Note 동기화 수동 트리거 (Admin only)"""
+    """
+    Progress Note 동기화 수동 트리거 (Admin only)
+    
+    ⚠️ 일시적으로 비활성화됨 (2025-11-25)
+    - 나중에 DB 직접 접속으로 재구현 예정
+    """
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager']):
             return jsonify({'error': 'Access denied'}), 403
         
-        logger.info(f"Progress Note 동기화 수동 트리거 by {current_user.username}")
-        result = sync_progress_notes_from_manad_to_cims()
+        logger.info(f"Progress Note 동기화 수동 트리거 by {current_user.username} (비활성화됨)")
+        # result = sync_progress_notes_from_manad_to_cims()
         
-        return jsonify(result)
+        return jsonify({
+            'success': True,
+            'message': 'Progress Note sync temporarily disabled. Will be reimplemented with DB direct access.',
+            'matched': 0
+        })
         
     except Exception as e:
         logger.error(f"Progress Note 동기화 트리거 오류: {str(e)}")
@@ -5744,161 +5844,16 @@ def get_api_config_for_site(site_name):
 def sync_progress_notes_from_manad_to_cims():
     """
     MANAD Plus에서 Post Fall Progress Notes를 동기화하여 Task 완료 상태 업데이트
+    
+    ⚠️ 일시적으로 비활성화됨 (2025-11-25)
+    - 나중에 DB 직접 접속으로 재구현 예정
+    - 현재는 스케줄만 표시, Task 완료 체크 로직은 제거
     """
-    try:
-        from manad_plus_integrator import MANADPlusIntegrator
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Open 상태의 Fall Incident 조회 (manad_incident_id가 있는 것만)
-        cursor.execute("""
-            SELECT id, incident_id, manad_incident_id, incident_date, resident_id, resident_name, site
-            FROM cims_incidents
-            WHERE status IN ('Open', 'Overdue')
-            AND incident_type LIKE '%Fall%'
-            AND manad_incident_id IS NOT NULL
-            ORDER BY incident_date DESC
-            LIMIT 50
-        """)
-        
-        fall_incidents = cursor.fetchall()
-        logger.info(f"📝 Progress Note 동기화: {len(fall_incidents)}개 Fall Incident 확인 중...")
-        
-        total_matched = 0
-        
-        for incident in fall_incidents:
-            incident_db_id, incident_id, manad_incident_id, incident_date, resident_id, resident_name, site = incident
-            
-            try:
-                # MANADPlusIntegrator로 Progress Notes 조회
-                api_config = get_api_config_for_site(site)
-                integrator = MANADPlusIntegrator(api_config)
-                
-                # 🚀 28시간 윈도우 적용: Post Fall Progress Notes 가져오기
-                # incident_date를 datetime으로 변환
-                if isinstance(incident_date, str):
-                    fall_date = datetime.fromisoformat(incident_date.replace('Z', ''))
-                else:
-                    fall_date = incident_date
-                
-                # client_id는 resident_id (MANAD ClientId)
-                client_id = int(resident_id) if resident_id else None
-                
-                if not client_id:
-                    logger.warning(f"  ⚠️ {incident_id}: client_id가 없어 건너뜀")
-                    continue
-                
-                # 28시간 윈도우로 Post Fall Notes 조회
-                result = integrator.get_post_fall_progress_notes_optimized(
-                    client_id=client_id,
-                    fall_date=fall_date,
-                    max_hours=28  # ✅ 28시간 윈도우 적용
-                )
-                
-                if not result or not isinstance(result, dict):
-                    continue
-                
-                post_fall_notes = result.get('post_fall_notes', [])
-                
-                if not post_fall_notes:
-                    continue
-                
-                logger.info(f"  • {incident_id} ({resident_name}): {len(post_fall_notes)}개 Post Fall Note 발견")
-                
-                # 해당 Incident의 모든 Task 조회
-                cursor.execute("""
-                    SELECT id, task_id, due_date, status
-                    FROM cims_tasks
-                    WHERE incident_id = ?
-                    AND status != 'completed'
-                    ORDER BY due_date ASC
-                """, (incident_db_id,))
-                
-                tasks = cursor.fetchall()
-                
-                if not tasks:
-                    continue
-                
-                # Progress Note와 Task 매칭
-                for note in post_fall_notes:
-                    note_created = datetime.fromisoformat(note.get('CreatedDate').replace('Z', ''))
-                    note_id = note.get('Id')
-                    note_text = note.get('NotesPlainText', '')
-                    author = note.get('CreatedByName', 'Unknown')
-                    
-                    # Task의 due_date와 비교하여 가장 가까운 Task 찾기 (±30분)
-                    matched_task = None
-                    min_time_diff = float('inf')
-                    
-                    for task in tasks:
-                        task_id, task_identifier, due_date_str, task_status = task
-                        
-                        if not due_date_str:
-                            continue
-                        
-                        due_date = datetime.fromisoformat(due_date_str)
-                        time_diff = abs((note_created - due_date).total_seconds())
-                        
-                        # 30분(1800초) 이내에서 가장 가까운 Task
-                        if time_diff < 1800 and time_diff < min_time_diff:
-                            matched_task = task
-                            min_time_diff = time_diff
-                    
-                    if matched_task:
-                        task_id, task_identifier, due_date_str, task_status = matched_task
-                        
-                        # Task를 'completed'로 업데이트
-                        completed_at = note_created.isoformat()
-                        cursor.execute("""
-                            UPDATE cims_tasks
-                            SET status = 'completed',
-                                completed_at = ?,
-                                updated_at = ?
-                            WHERE id = ?
-                        """, (completed_at, completed_at, task_id))
-                        
-                        # Progress Note를 CIMS DB에 저장 (중복 체크)
-                        cursor.execute("""
-                            SELECT id FROM cims_progress_notes
-                            WHERE note_id = ?
-                        """, (f"MANAD-{note_id}",))
-                        
-                        if not cursor.fetchone():
-                            cursor.execute("""
-                                INSERT INTO cims_progress_notes (
-                                    note_id, incident_id, task_id, author_id, content, 
-                                    note_type, created_at
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                            """, (
-                                f"MANAD-{note_id}",
-                                incident_db_id,
-                                task_id,
-                                1,  # System user
-                                note_text,
-                                'Post Fall',
-                                note_created.isoformat()
-                            ))
-                        
-                        total_matched += 1
-                        logger.info(f"    ✅ Task {task_identifier} 완료 처리 (Progress Note: {note_created.strftime('%d %b %H:%M')} by {author})")
-                
-                # Incident 상태 업데이트
-                check_and_update_incident_status(incident_db_id)
-                
-            except Exception as e:
-                logger.error(f"  ❌ {incident_id} Progress Note 동기화 실패: {str(e)}")
-                continue
-        
-        conn.commit()
-        conn.close()
-        
-        logger.info(f"✅ Progress Note 동기화 완료: {total_matched}개 Task 완료 처리됨")
-        return {'success': True, 'matched': total_matched}
-        
-    except Exception as e:
-        logger.error(f"Progress Note 동기화 오류: {str(e)}")
-        return {'success': False, 'error': str(e)}
+    # TODO: 나중에 DB 직접 접속으로 Post Fall Progress Note 조회 및 Task 완료 처리 재구현
+    # - manad_db_connector에서 Post Fall Progress Note 조회 메서드 추가
+    # - Task와 매칭하여 자동 완료 처리
+    logger.info("⚠️ Progress Note 동기화 비활성화됨 (일시 중단 - DB 직접 접속으로 재구현 예정)")
+    return {'success': True, 'matched': 0, 'message': 'Progress Note sync temporarily disabled'}
 
 def ensure_fall_policy_exists():
     """
@@ -5985,6 +5940,7 @@ def ensure_fall_policy_exists():
 def auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor):
     """
     Fall incident에 대해 자동으로 task 생성
+    (CIMSService.auto_generate_fall_tasks를 래핑)
     
     Args:
         incident_db_id: CIMS DB의 incident ID (integer)
@@ -5994,97 +5950,8 @@ def auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor):
     Returns:
         생성된 task 수
     """
-    import json
-    
-    try:
-        # Get Fall policy
-        cursor.execute("""
-            SELECT id, rules_json
-            FROM cims_policies
-            WHERE is_active = 1
-        """)
-        
-        policies = cursor.fetchall()
-        fall_policy = None
-        
-        for policy_row in policies:
-            try:
-                rules = json.loads(policy_row[1])
-                association = rules.get('incident_association', {})
-                if association.get('incident_type') == 'Fall':
-                    fall_policy = {
-                        'id': policy_row[0],
-                        'rules': rules
-                    }
-                    break
-            except:
-                continue
-        
-        if not fall_policy:
-            logger.warning(f"No active Fall policy found for task generation")
-            return 0
-        
-        policy_id = fall_policy['id']
-        visit_schedule = fall_policy['rules'].get('nurse_visit_schedule', [])
-        common_tasks = fall_policy['rules'].get('common_assessment_tasks', '')
-        
-        if not visit_schedule:
-            logger.warning(f"No visit schedule in Fall policy")
-            return 0
-        
-        # Calculate visit times
-        incident_time = datetime.fromisoformat(incident_date_iso)
-        phase_start_time = incident_time
-        tasks_created = 0
-        
-        for phase_idx, phase in enumerate(visit_schedule, 1):
-            interval = int(phase.get('interval', 30))
-            interval_unit = phase.get('interval_unit', 'minutes')
-            duration = int(phase.get('duration', 2))
-            duration_unit = phase.get('duration_unit', 'hours')
-            
-            interval_minutes = interval * 60 if interval_unit == 'hours' else interval
-            duration_minutes = duration * 60 if duration_unit == 'hours' else duration * 24 * 60 if duration_unit == 'days' else duration
-            
-            num_visits = max(1, duration_minutes // interval_minutes)
-            
-            for visit_num in range(num_visits):
-                visit_time = phase_start_time + timedelta(minutes=visit_num * interval_minutes)
-                
-                task_name = f"Phase {phase_idx} Visit {visit_num + 1}: Nurse Assessment"
-                task_description = common_tasks if common_tasks else "Complete neurological observations and monitor for changes"
-                task_id = f"TASK-INC{incident_db_id}-P{phase_idx}-V{visit_num + 1}"
-                
-                cursor.execute("""
-                    INSERT INTO cims_tasks 
-                    (incident_id, policy_id, task_id, task_name, description, 
-                     assigned_role, due_date, status, priority, 
-                     documentation_required, note_type, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    incident_db_id,
-                    policy_id,
-                    task_id,
-                    task_name,
-                    task_description,
-                    'Registered Nurse',
-                    visit_time.isoformat(),
-                    'pending',
-                    'high',
-                    1,
-                    'Dynamic Form - Post Fall Assessment',
-                    datetime.now().isoformat()
-                ))
-                
-                tasks_created += 1
-            
-            phase_start_time = phase_start_time + timedelta(minutes=duration_minutes)
-        
-        return tasks_created
-        
-    except Exception as e:
-        logger.error(f"Error in auto_generate_fall_tasks: {str(e)}")
-        return 0
+    from services.cims_service import CIMSService
+    return CIMSService.auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor)
 
 def sync_incidents_from_manad_to_cims(full_sync=False):
     """
@@ -6137,12 +6004,54 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             try:
                 logger.info(f"Syncing incidents from {site_name}...")
                 
-                # MANAD API에서 실시간 데이터 가져오기
-                # 첫 동기화 시에만 클라이언트 데이터 함께 가져오기
-                incidents_data = fetch_incidents_with_client_data(
-                    site_name, start_date, end_date, 
-                    fetch_clients=is_first_sync
-                )
+                # MANAD 데이터 가져오기 (DB 직접 접속 또는 API)
+                # system_settings 테이블 우선 확인, 없으면 환경 변수 확인
+                use_db_direct = False
+                try:
+                    cursor_check = conn.cursor()
+                    cursor_check.execute("""
+                        SELECT value FROM system_settings 
+                        WHERE key = 'USE_DB_DIRECT_ACCESS'
+                    """)
+                    result = cursor_check.fetchone()
+                    if result and result[0]:
+                        use_db_direct = result[0].lower() == 'true'
+                    else:
+                        # DB에 없으면 환경 변수 확인
+                        use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+                except:
+                    # 오류 시 환경 변수만 확인
+                    use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+                
+                if use_db_direct:
+                    # DB 직접 접속 모드 (fallback 비활성화 - 에러 발생)
+                    try:
+                        from manad_db_connector import fetch_incidents_with_client_data_from_db
+                        logger.info(f"🔌 DB 직접 접속 모드: {site_name} (fallback 비활성화)")
+                        incidents_data = fetch_incidents_with_client_data_from_db(
+                            site_name, start_date, end_date, 
+                            fetch_clients=is_first_sync
+                        )
+                        # DB 조회 결과가 None이거나 빈 데이터인 경우 에러
+                        if not incidents_data or not incidents_data.get('incidents'):
+                            error_msg = f"❌ DB 직접 접속 실패: {site_name} - 조회 결과가 비어있습니다. DB 연결 설정을 확인하세요."
+                            logger.error(error_msg)
+                            raise Exception(error_msg)
+                    except Exception as db_error:
+                        error_msg = f"❌ DB 직접 접속 실패: {site_name} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+                else:
+                    # 기존 API 방식
+                    logger.info(f"🌐 API 모드: {site_name}")
+                    try:
+                        incidents_data = fetch_incidents_with_client_data(
+                            site_name, start_date, end_date, 
+                            fetch_clients=is_first_sync
+                        )
+                    except Exception as api_error:
+                        logger.error(f"❌ API 조회 실패 - {site_name}: {api_error}")
+                        continue
                 
                 if not incidents_data or 'incidents' not in incidents_data:
                     logger.warning(f"No incident data from {site_name}")
@@ -6250,6 +6159,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                         
                         if existing:
                             # 기존 인시던트 업데이트 (Open 상태만)
+                            existing_db_id = existing[0]
                             if existing[1] == 'Open':
                                 # Prepare incident type
                                 event_types = incident.get('EventTypeNames', [])
@@ -6276,6 +6186,23 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                     incident_id
                                 ))
                                 total_updated += 1
+                                
+                                # 🚀 Fall incident인 경우 타스크가 없으면 자동 생성
+                                if 'fall' in incident_type_str.lower():
+                                    # 타스크 존재 여부 확인
+                                    cursor.execute("""
+                                        SELECT COUNT(*) FROM cims_tasks 
+                                        WHERE incident_id = ?
+                                    """, (existing_db_id,))
+                                    task_count = cursor.fetchone()[0]
+                                    
+                                    if task_count == 0:
+                                        try:
+                                            tasks_created = auto_generate_fall_tasks(existing_db_id, incident_date_iso, cursor)
+                                            if tasks_created > 0:
+                                                logger.info(f"✅ Auto-generated {tasks_created} tasks for existing Fall incident {existing_db_id}")
+                                        except Exception as task_error:
+                                            logger.error(f"Failed to auto-generate tasks for existing incident {existing_db_id}: {str(task_error)}")
                         else:
                             # 새 인시던트 생성
                             cims_incident_id = f"INC-{incident_id}"
@@ -6353,6 +6280,54 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 continue
         
         logger.info(f"Incident sync completed: {total_synced} new, {total_updated} updated")
+        
+        # 🚀 백그라운드 싱크 완료 후 타스크가 없는 Fall 인시던트에 대해 타스크 생성
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 타스크가 없는 Open 상태의 Fall 인시던트 조회
+            cursor.execute("""
+                SELECT i.id, i.incident_id, i.incident_date, i.incident_type
+                FROM cims_incidents i
+                LEFT JOIN cims_tasks t ON i.id = t.incident_id
+                WHERE i.status = 'Open'
+                AND LOWER(i.incident_type) LIKE '%fall%'
+                AND t.id IS NULL
+                ORDER BY i.incident_date DESC
+                LIMIT 50
+            """)
+            
+            fall_incidents_without_tasks = cursor.fetchall()
+            
+            if fall_incidents_without_tasks:
+                logger.info(f"🔍 {len(fall_incidents_without_tasks)}개 Fall 인시던트에 타스크가 없음 - 자동 생성 시작...")
+                tasks_generated = 0
+                
+                for incident_row in fall_incidents_without_tasks:
+                    incident_db_id = incident_row[0]
+                    incident_id = incident_row[1]
+                    incident_date_iso = incident_row[2]
+                    incident_type = incident_row[3]
+                    
+                    try:
+                        num_tasks = auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor)
+                        if num_tasks > 0:
+                            tasks_generated += num_tasks
+                            logger.info(f"✅ Incident {incident_id}: {num_tasks} tasks 생성됨")
+                    except Exception as task_error:
+                        logger.warning(f"⚠️ Incident {incident_id} task 생성 실패: {task_error}")
+                
+                if tasks_generated > 0:
+                    conn.commit()
+                    logger.info(f"✅ 총 {tasks_generated}개 tasks 생성 완료")
+                else:
+                    conn.rollback()
+            
+            conn.close()
+        except Exception as task_gen_error:
+            logger.error(f"❌ 백그라운드 타스크 생성 중 오류: {task_gen_error}")
+        
         return {'success': True, 'synced': total_synced, 'updated': total_updated}
         
     except Exception as e:
@@ -6414,7 +6389,8 @@ def force_sync_all():
         
         # 3. Progress note sync
         logger.info("3️⃣  Progress note sync...")
-        pn_sync_result = sync_progress_notes_from_manad_to_cims()
+        # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
+        # pn_sync_result = sync_progress_notes_from_manad_to_cims()
         
         # 4. Update incident statuses
         logger.info("4️⃣  Updating incident statuses...")
@@ -6514,11 +6490,11 @@ def get_cims_incidents():
                     logger.info(f"🔄 백그라운드 동기화 시작: {sync_type}")
                     sync_result = sync_incidents_from_manad_to_cims(full_sync=full_sync)
                     
-                    # Progress Note 동기화도 함께 실행
-                    logger.info(f"🔄 Progress Note 동기화 시작...")
-                    pn_sync_result = sync_progress_notes_from_manad_to_cims()
+                    # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
+                    # logger.info(f"🔄 Progress Note 동기화 시작...")
+                    # pn_sync_result = sync_progress_notes_from_manad_to_cims()
                     
-                    logger.info(f"✅ 백그라운드 동기화 완료: Incidents={sync_result}, ProgressNotes={pn_sync_result}")
+                    logger.info(f"✅ 백그라운드 동기화 완료: Incidents={sync_result}")
                 except Exception as e:
                     logger.error(f"❌ 백그라운드 동기화 오류: {e}")
             
@@ -6530,51 +6506,174 @@ def get_cims_incidents():
         site_filter = request.args.get('site')
         date_filter = request.args.get('date')
         
-        # Open 상태 인시던트 조회 (필터 적용)
-        query = """
-            SELECT id, incident_id, resident_id, resident_name, incident_type, severity, status, 
-                   incident_date, location, description, site, created_at
-            FROM cims_incidents 
-            WHERE status = 'Open'
-        """
-        params = []
-        
-        if site_filter:
-            query += " AND site = ?"
-            params.append(site_filter)
-        
-        if date_filter:
-            # For visit schedule: get incidents that may have visits on the selected date
-            # This includes incidents from the past that may have ongoing visits
-            date_obj = datetime.fromisoformat(date_filter)
-            # Get incidents from 5 days before to ensure we catch all ongoing visit schedules
-            five_days_before = (date_obj - timedelta(days=5)).isoformat()
-            query += " AND incident_date >= ?"
-            params.append(five_days_before)
-        
-        query += " ORDER BY incident_date DESC LIMIT 500"
-        
-        # 조회는 읽기 전용 연결로 재수행 + 간단 재시도
+        # DB 직접 접속 모드 확인
+        use_db_direct = False
         try:
-            conn.close()
-        except Exception:
-            pass
-        conn = get_db_connection(read_only=True)
-        cursor = conn.cursor()
-        for attempt in range(5):
-            try:
-                cursor.execute(query, params)
-                break
-            except sqlite3.OperationalError as e:
-                if 'database is locked' in str(e) and attempt < 4:
-                    time.sleep(0.25 * (attempt + 1))
-                    continue
-                # 폴백: 잠금 시 빈 리스트와 stale 플래그로 응답 준비
-                logger.error("Open 인시던트 조회 오류: database is locked (fallback)")
-                return jsonify({'incidents': [], 'stale': True}), 200
+            conn_check = get_db_connection(read_only=True)
+            cursor_check = conn_check.cursor()
+            cursor_check.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+            result = cursor_check.fetchone()
+            conn_check.close()
+            
+            if result and result[0]:
+                use_db_direct = result[0].lower() == 'true'
+            else:
+                use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        except:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
         
-        incidents = cursor.fetchall()
-        conn.close()
+        incidents = []
+        
+        if use_db_direct:
+            # 🔌 DB 직접 접속 모드: MANAD DB에서 최신 인시던트 조회
+            logger.info(f"🔌 DB 직접 접속 모드: integrated_dashboard 인시던트 조회")
+            
+            try:
+                from manad_db_connector import fetch_incidents_with_client_data_from_db
+                
+                # 날짜 범위 설정 (최근 30일, 또는 필터에 따라)
+                if date_filter:
+                    date_obj = datetime.fromisoformat(date_filter)
+                    five_days_before = date_obj - timedelta(days=5)
+                    start_date = five_days_before.strftime('%Y-%m-%d')
+                else:
+                    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                end_date = datetime.now().strftime('%Y-%m-%d')
+                
+                # 사이트별로 조회
+                safe_site_servers = get_safe_site_servers()
+                sites_to_query = [site_filter] if site_filter else list(safe_site_servers.keys())
+                
+                all_manad_incidents = []
+                for site_name in sites_to_query:
+                    if site_name not in safe_site_servers:
+                        continue
+                    
+                    try:
+                        incidents_data = fetch_incidents_with_client_data_from_db(
+                            site_name, start_date, end_date, fetch_clients=False
+                        )
+                        
+                        if incidents_data and incidents_data.get('incidents'):
+                            for inc in incidents_data['incidents']:
+                                # MANAD 인시던트를 CIMS 형식으로 변환
+                                incident_date_str = inc.get('Date', inc.get('ReportedDate', ''))
+                                if incident_date_str:
+                                    try:
+                                        incident_date = datetime.fromisoformat(incident_date_str.replace('Z', '+00:00'))
+                                        incident_date_iso = incident_date.isoformat()
+                                    except:
+                                        incident_date_iso = datetime.now().isoformat()
+                                else:
+                                    incident_date_iso = datetime.now().isoformat()
+                                
+                                # CIMS DB에서 기존 인시던트 조회 (Task 정보 포함)
+                                conn_cims = get_db_connection(read_only=True)
+                                cursor_cims = conn_cims.cursor()
+                                cursor_cims.execute("""
+                                    SELECT id, incident_id, status, fall_type
+                                    FROM cims_incidents
+                                    WHERE manad_incident_id = ?
+                                """, (str(inc.get('Id', '')),))
+                                existing = cursor_cims.fetchone()
+                                conn_cims.close()
+                                
+                                # Status 결정: CIMS DB에 있으면 그 상태 사용, 없으면 Open
+                                status = existing[2] if existing else 'Open'
+                                cims_id = existing[0] if existing else None
+                                fall_type = existing[3] if existing and len(existing) > 3 else None
+                                
+                                # Open 상태만 필터링
+                                if status != 'Open':
+                                    continue
+                                
+                                # 인시던트 타입 처리
+                                event_type = inc.get('EventTypeNames', '')
+                                if isinstance(event_type, list):
+                                    incident_type = ', '.join(event_type)
+                                else:
+                                    incident_type = str(event_type) if event_type else 'Unknown'
+                                
+                                # 위치 정보
+                                room = inc.get('RoomName', '')
+                                wing = inc.get('WingName', '')
+                                dept = inc.get('DepartmentName', '')
+                                location_parts = [p for p in [room, wing, dept] if p]
+                                location = ', '.join(location_parts) if location_parts else 'Unknown'
+                                
+                                # 거주자 이름
+                                resident_name = f"{inc.get('FirstName', '')} {inc.get('LastName', '')}".strip()
+                                if not resident_name:
+                                    resident_name = 'Unknown'
+                                
+                                # CIMS 형식의 튜플로 변환 (기존 코드와 호환)
+                                incidents.append((
+                                    cims_id,  # id (CIMS DB ID, 없으면 None)
+                                    f"INC-{inc.get('Id', '')}",  # incident_id
+                                    str(inc.get('ClientId', '')),  # resident_id
+                                    resident_name,  # resident_name
+                                    incident_type,  # incident_type
+                                    inc.get('SeverityRating') or inc.get('RiskRatingName') or 'Unknown',  # severity
+                                    status,  # status
+                                    incident_date_iso,  # incident_date
+                                    location,  # location
+                                    inc.get('Description', ''),  # description
+                                    site_name,  # site
+                                    datetime.now().isoformat()  # created_at (임시)
+                                ))
+                    except Exception as site_error:
+                        logger.error(f"❌ {site_name} 인시던트 조회 실패: {site_error}")
+                        continue
+                
+                logger.info(f"✅ DB 직접 접속: {len(incidents)}개 인시던트 조회 완료")
+                
+            except Exception as db_error:
+                logger.error(f"❌ DB 직접 접속 실패: {db_error}")
+                # Fallback: CIMS DB에서 조회
+                use_db_direct = False
+        
+        if not use_db_direct:
+            # 🌐 API 모드 또는 Fallback: CIMS DB에서 조회
+            query = """
+                SELECT id, incident_id, resident_id, resident_name, incident_type, severity, status, 
+                       incident_date, location, description, site, created_at
+                FROM cims_incidents 
+                WHERE status = 'Open'
+            """
+            params = []
+            
+            if site_filter:
+                query += " AND site = ?"
+                params.append(site_filter)
+            
+            if date_filter:
+                date_obj = datetime.fromisoformat(date_filter)
+                five_days_before = (date_obj - timedelta(days=5)).isoformat()
+                query += " AND incident_date >= ?"
+                params.append(five_days_before)
+            
+            query += " ORDER BY incident_date DESC LIMIT 500"
+            
+            # 조회는 읽기 전용 연결로 재수행 + 간단 재시도
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = get_db_connection(read_only=True)
+            cursor = conn.cursor()
+            for attempt in range(5):
+                try:
+                    cursor.execute(query, params)
+                    break
+                except sqlite3.OperationalError as e:
+                    if 'database is locked' in str(e) and attempt < 4:
+                        time.sleep(0.25 * (attempt + 1))
+                        continue
+                    logger.error("Open 인시던트 조회 오류: database is locked (fallback)")
+                    return jsonify({'incidents': [], 'stale': True}), 200
+            
+            incidents = cursor.fetchall()
+            conn.close()
         
         # Convert to list of dictionaries (프론트엔드 호환 필드명 사용)
         result = []
@@ -6589,29 +6688,33 @@ def get_cims_incidents():
                 incident_types = incident[4].split(', ') if incident[4] else []
                 
                 # Fall 유형 감지 (Fall incident인 경우만)
-                # DB에 저장된 fall_type 우선 사용, 없으면 계산 후 저장
                 fall_type = None
                 if incident[4] and 'fall' in incident[4].lower():
                     from services.fall_policy_detector import fall_detector
                     
-                    # detect_fall_type_from_incident가 DB 우선 조회 후 
-                    # 없으면 계산하는 로직을 이미 포함하고 있음
-                    fall_type = fall_detector.detect_fall_type_from_incident(
-                        incident[0],  # incident_id
-                        cursor_fall
-                    )
-                    
-                    # 계산된 fall_type을 DB에 저장 (다음번 조회 시 빠르게)
-                    if fall_type and fall_type != 'unknown':
-                        try:
-                            cursor_fall.execute("""
-                                UPDATE cims_incidents
-                                SET fall_type = ?
-                                WHERE id = ? AND (fall_type IS NULL OR fall_type = '')
-                            """, (fall_type, incident[0]))
-                            cursor_fall.connection.commit()
-                        except:
-                            pass  # 실패해도 계속 진행
+                    # CIMS DB ID가 있는 경우 DB에서 조회
+                    if incident[0] is not None:  # cims_id가 있는 경우
+                        fall_type = fall_detector.detect_fall_type_from_incident(
+                            incident[0],  # incident_id (CIMS DB ID)
+                            cursor_fall
+                        )
+                        
+                        # 계산된 fall_type을 DB에 저장
+                        if fall_type and fall_type != 'unknown':
+                            try:
+                                cursor_fall.execute("""
+                                    UPDATE cims_incidents
+                                    SET fall_type = ?
+                                    WHERE id = ? AND (fall_type IS NULL OR fall_type = '')
+                                """, (fall_type, incident[0]))
+                                cursor_fall.connection.commit()
+                            except:
+                                pass
+                    else:
+                        # CIMS DB ID가 없는 경우 (DB 직접 접속 모드에서 새 인시던트)
+                        # Description에서 직접 감지
+                        description = incident[9] if len(incident) > 9 else ''
+                        fall_type = fall_detector.detect_fall_type_from_notes(description) if description else 'unknown'
                 
                 result.append({
                     'id': incident[0],
@@ -6859,57 +6962,84 @@ def check_and_update_incident_status(incident_id):
     인시던트의 모든 태스크 상태를 확인하고 인시던트 상태를 업데이트
     - 모든 태스크가 완료되면 'Closed'로 변경
     - 마지막 태스크 마감 시간이 지났는데 미완료 태스크가 있으면 'Overdue'로 변경
+    - DB 잠금 시 재시도 로직 포함
     """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 해당 인시던트의 모든 태스크 조회
-        cursor.execute("""
-            SELECT id, status, due_date
-            FROM cims_tasks
-            WHERE incident_id = ?
-            ORDER BY due_date DESC
-        """, (incident_id,))
-        tasks = cursor.fetchall()
-        
-        if not tasks:
+    import time
+    import sqlite3
+    
+    max_retries = 3
+    retry_delay = 0.5  # 0.5초부터 시작
+    
+    for attempt in range(max_retries):
+        try:
+            conn = get_db_connection()
+            conn.execute("PRAGMA busy_timeout = 5000")  # 5초 타임아웃 설정
+            cursor = conn.cursor()
+            
+            # 해당 인시던트의 모든 태스크 조회
+            cursor.execute("""
+                SELECT id, status, due_date
+                FROM cims_tasks
+                WHERE incident_id = ?
+                ORDER BY due_date DESC
+            """, (incident_id,))
+            tasks = cursor.fetchall()
+            
+            if not tasks:
+                conn.close()
+                return
+            
+            # 태스크 상태 분석
+            all_completed = all(task[1] == 'completed' for task in tasks)
+            now = datetime.now()
+            last_task_due = datetime.fromisoformat(tasks[0][2]) if tasks[0][2] else None
+            
+            # 인시던트 상태 업데이트
+            if all_completed:
+                # 모든 태스크 완료 → Closed
+                cursor.execute("""
+                    UPDATE cims_incidents
+                    SET status = 'Closed'
+                    WHERE id = ?
+                """, (incident_id,))
+                logger.info(f"✅ Incident {incident_id} closed: All tasks completed")
+            elif last_task_due and now > last_task_due and not all_completed:
+                # 마지막 태스크 마감 시간 지났는데 미완료 → Overdue
+                cursor.execute("""
+                    UPDATE cims_incidents
+                    SET status = 'Overdue'
+                    WHERE id = ?
+                """, (incident_id,))
+                logger.info(f"⏰ Incident {incident_id} marked as overdue")
+            
+            conn.commit()
             conn.close()
+            return  # 성공 시 종료
+            
+        except sqlite3.OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries - 1:
+                logger.warning(f"⏳ 인시던트 상태 업데이트 재시도 ({attempt + 1}/{max_retries}): Incident {incident_id} - DB 잠금")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # 지수 백오프
+                continue
+            else:
+                logger.error(f"인시던트 상태 업데이트 오류: Incident {incident_id} - {str(e)}")
+                return
+        except Exception as e:
+            logger.error(f"인시던트 상태 업데이트 오류: Incident {incident_id} - {str(e)}")
             return
-        
-        # 태스크 상태 분석
-        all_completed = all(task[1] == 'completed' for task in tasks)
-        now = datetime.now()
-        last_task_due = datetime.fromisoformat(tasks[0][2]) if tasks[0][2] else None
-        
-        # 인시던트 상태 업데이트
-        if all_completed:
-            # 모든 태스크 완료 → Closed
-            cursor.execute("""
-                UPDATE cims_incidents
-                SET status = 'Closed'
-                WHERE id = ?
-            """, (incident_id,))
-            logger.info(f"✅ Incident {incident_id} closed: All tasks completed")
-        elif last_task_due and now > last_task_due and not all_completed:
-            # 마지막 태스크 마감 시간 지났는데 미완료 → Overdue
-            cursor.execute("""
-                UPDATE cims_incidents
-                SET status = 'Overdue'
-                WHERE id = ?
-            """, (incident_id,))
-            logger.info(f"⏰ Incident {incident_id} marked as overdue")
-        
-        conn.commit()
-        conn.close()
-        
-    except Exception as e:
-        logger.error(f"인시던트 상태 업데이트 오류: {str(e)}")
 
 @app.route('/api/cims/dashboard-kpis')
 @login_required
 def get_dashboard_kpis():
-    """대시보드 KPI 계산 API"""
+    """
+    대시보드 KPI 계산 API (SQL 최적화 버전)
+    
+    개선사항:
+    - N+1 쿼리 문제 해결 (SQL로 한 번에 계산)
+    - Overdue Tasks: 실제 Task 개수 카운트 (Incident 개수 아님)
+    - 3단계 Incident 상태 구분: Open / In Progress / Completed
+    """
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
             return jsonify({'error': 'Access denied'}), 403
@@ -6930,102 +7060,144 @@ def get_dashboard_kpis():
         else:  # month
             start_date = now - timedelta(days=30)
         
-        # 기본 쿼리
-        incident_query = """
-            SELECT i.id, i.incident_id, i.incident_type, i.incident_date, i.status, i.site, i.severity, i.resident_name
+        # 사고 유형 필터 조건 생성
+        type_filter = ""
+        type_params = []
+        
+        if incident_type != 'all':
+            if incident_type == 'fall':
+                type_filter = "AND LOWER(i.incident_type) LIKE ?"
+                type_params.append('%fall%')
+            elif incident_type == 'wound':
+                type_filter = "AND (LOWER(i.incident_type) LIKE ? OR LOWER(i.incident_type) LIKE ?)"
+                type_params.extend(['%wound%', '%skin%'])
+            elif incident_type == 'medication':
+                type_filter = "AND LOWER(i.incident_type) LIKE ?"
+                type_params.append('%medication%')
+            elif incident_type == 'behaviour':
+                type_filter = "AND (LOWER(i.incident_type) LIKE ? OR LOWER(i.incident_type) LIKE ?)"
+                type_params.extend(['%behaviour%', '%behavior%'])
+            elif incident_type == 'other':
+                type_filter = """
+                    AND LOWER(i.incident_type) NOT LIKE '%fall%'
+                    AND LOWER(i.incident_type) NOT LIKE '%wound%'
+                    AND LOWER(i.incident_type) NOT LIKE '%skin%'
+                    AND LOWER(i.incident_type) NOT LIKE '%medication%'
+                    AND LOWER(i.incident_type) NOT LIKE '%behaviour%'
+                    AND LOWER(i.incident_type) NOT LIKE '%behavior%'
+                """
+        
+        # ==========================================
+        # 1. Incident 상태 통계 (SQL로 한 번에 계산)
+        # ==========================================
+        incident_stats_query = f"""
+            SELECT 
+                COUNT(DISTINCT i.id) as total_incidents,
+                
+                -- Open Incidents: 태스크가 없거나 한 번도 완료된 적 없음
+                COUNT(DISTINCT CASE 
+                    WHEN NOT EXISTS (
+                        SELECT 1 FROM cims_tasks t 
+                        WHERE t.incident_id = i.id 
+                        AND t.status = 'completed'
+                    ) THEN i.id 
+                END) as open_incidents,
+                
+                -- In Progress Incidents: 일부는 완료, 일부는 미완료
+                COUNT(DISTINCT CASE 
+                    WHEN EXISTS (
+                        SELECT 1 FROM cims_tasks t 
+                        WHERE t.incident_id = i.id 
+                        AND t.status = 'completed'
+                    ) 
+                    AND EXISTS (
+                        SELECT 1 FROM cims_tasks t 
+                        WHERE t.incident_id = i.id 
+                        AND t.status != 'completed'
+                    ) THEN i.id 
+                END) as in_progress_incidents,
+                
+                -- Completed Incidents: 모든 태스크 완료
+                COUNT(DISTINCT CASE 
+                    WHEN EXISTS (
+                        SELECT 1 FROM cims_tasks t WHERE t.incident_id = i.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM cims_tasks t 
+                        WHERE t.incident_id = i.id 
+                        AND t.status != 'completed'
+                    ) THEN i.id 
+                END) as closed_incidents
+                
             FROM cims_incidents i
             WHERE i.incident_date >= ?
+            {type_filter}
         """
-        params = [start_date.isoformat()]
         
-        # 사고 유형 필터
-        if incident_type != 'all':
-            incident_query += " AND i.incident_type = ?"
-            params.append(incident_type)
+        cursor.execute(incident_stats_query, [start_date.isoformat()] + type_params)
+        incident_stats = cursor.fetchone()
         
-        cursor.execute(incident_query, params)
-        incidents = cursor.fetchall()
+        # ==========================================
+        # 2. Overdue Incidents 계산 (Incident 단위)
+        # 한 Incident에 하나라도 overdue task가 있으면 +1
+        # ==========================================
+        overdue_incidents_query = f"""
+            SELECT COUNT(DISTINCT i.id) as overdue_count
+            FROM cims_incidents i
+            WHERE EXISTS (
+                SELECT 1 FROM cims_tasks t
+                WHERE t.incident_id = i.id
+                AND t.status IN ('pending', 'in_progress')
+                AND t.due_date < ?
+            )
+            AND i.incident_date >= ?
+            {type_filter}
+        """
         
-        # KPI 계산
-        total_incidents = len(incidents)
-        closed_incidents = 0
-        open_incidents = 0  # 한 번도 방문하지 않은 사고
-        overdue_tasks_count = 0
-        on_time_completions = 0
-        late_completions = 0
+        cursor.execute(overdue_incidents_query, [now.isoformat(), start_date.isoformat()] + type_params)
+        overdue_result = cursor.fetchone()
+        overdue_tasks_count = overdue_result['overdue_count'] if overdue_result else 0
         
-        for incident in incidents:
-            incident_id = incident[0]
-            incident_status = incident[4]
-            incident_date = datetime.fromisoformat(incident[3])
-            
-            # 해당 사고의 모든 태스크 조회
-            cursor.execute("""
-                SELECT id, task_id, due_date, status, completed_at
-                FROM cims_tasks
-                WHERE incident_id = ?
-                ORDER BY due_date ASC
-            """, (incident_id,))
-            tasks = cursor.fetchall()
-            
-            if not tasks:
-                # 태스크가 없으면 Open Incident로 계산
-                open_incidents += 1
-                continue
-            
-            # 태스크 상태 분석
-            all_completed = True
-            has_any_visit = False
-            has_overdue = False
-            last_task_due = None
-            
-            for task in tasks:
-                task_status = task[3]
-                due_date = datetime.fromisoformat(task[2]) if task[2] else None
-                completed_at = datetime.fromisoformat(task[4]) if task[4] else None
-                
-                if due_date:
-                    last_task_due = due_date if not last_task_due or due_date > last_task_due else last_task_due
-                
-                if task_status == 'completed':
-                    has_any_visit = True
-                    # 컴플라이언스 체크
-                    if completed_at and due_date:
-                        if completed_at <= due_date:
-                            on_time_completions += 1
-                        else:
-                            late_completions += 1
-                else:
-                    all_completed = False
-                    # Overdue 체크
-                    if due_date and now > due_date:
-                        has_overdue = True
-            
-            # 사고 상태 분류
-            if all_completed:
-                closed_incidents += 1
-            elif not has_any_visit:
-                open_incidents += 1
-            
-            # Overdue 태스크 카운트
-            if has_overdue and not all_completed:
-                # 마지막 방문 시간이 지났는데 완료되지 않음
-                if last_task_due and now > last_task_due:
-                    overdue_tasks_count += 1
+        # ==========================================
+        # 3. Compliance Rate 계산
+        # ==========================================
+        compliance_query = f"""
+            SELECT 
+                COUNT(*) as total_completions,
+                SUM(CASE 
+                    WHEN t.completed_at <= t.due_date THEN 1 
+                    ELSE 0 
+                END) as on_time_completions
+            FROM cims_tasks t
+            JOIN cims_incidents i ON t.incident_id = i.id
+            WHERE t.status = 'completed'
+            AND t.completed_at IS NOT NULL
+            AND t.due_date IS NOT NULL
+            AND i.incident_date >= ?
+            {type_filter}
+        """
         
-        conn.close()
+        cursor.execute(compliance_query, [start_date.isoformat()] + type_params)
+        compliance_result = cursor.fetchone()
         
-        # Overall Compliance Rate 계산
-        total_completions = on_time_completions + late_completions
+        total_completions = compliance_result['total_completions'] or 0
+        on_time_completions = compliance_result['on_time_completions'] or 0
+        
         if total_completions > 0:
             compliance_rate = round((on_time_completions / total_completions) * 100, 1)
         else:
             compliance_rate = 0
         
+        conn.close()
+        
+        # ==========================================
+        # 4. 응답 반환
+        # ==========================================
         return jsonify({
-            'total_incidents': total_incidents,
-            'closed_incidents': closed_incidents,
-            'open_incidents': open_incidents,
+            'total_incidents': incident_stats['total_incidents'],
+            'closed_incidents': incident_stats['closed_incidents'],
+            'open_incidents': incident_stats['open_incidents'],
+            'in_progress_incidents': incident_stats['in_progress_incidents'],  # 새로 추가
             'overdue_tasks': overdue_tasks_count,
             'compliance_rate': compliance_rate,
             'period': period,
@@ -7034,6 +7206,8 @@ def get_dashboard_kpis():
         
     except Exception as e:
         logger.error(f"Dashboard KPI 조회 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/schedule-batch/<site>/<date>')
@@ -7061,7 +7235,7 @@ def get_schedule_batch(site, date):
             SELECT 
                 i.id, i.incident_id, i.incident_type, i.incident_date,
                 i.resident_name, i.resident_id, i.description,
-                i.severity, i.status, i.location, i.site,
+                i.severity, i.status, i.location, i.site, i.fall_type,
                 t.id as task_db_id, t.task_id, t.task_name, t.due_date, 
                 t.status as task_status, t.completed_at, t.completed_by_user_id
             FROM cims_incidents i
@@ -7092,44 +7266,81 @@ def get_schedule_batch(site, date):
                     'status': row[8],
                     'location': row[9],
                     'site': row[10],
+                    'fall_type': row[11],  # Fall type 추가
                     'tasks': []
                 }
             
-            # Task가 있으면 추가
-            if row[11] is not None:  # task_db_id
+            # Task가 있으면 추가 (인덱스가 1씩 증가)
+            if row[12] is not None:  # task_db_id
                 incidents_map[incident_id]['tasks'].append({
-                    'id': row[11],
-                    'task_id': row[12],
-                    'task_name': row[13],
-                    'due_date': row[14],
-                    'status': row[15],
-                    'completed_at': row[16],
-                    'completed_by': row[17]
+                    'id': row[12],
+                    'task_id': row[13],
+                    'task_name': row[14],
+                    'due_date': row[15],
+                    'status': row[16],
+                    'completed_at': row[17],
+                    'completed_by': row[18]
                 })
         
-        # 3. Fall Policy 조회
+        # 2.5. Fall type 계산 및 업데이트 (NULL이거나 비어있는 경우)
+        from services.fall_policy_detector import fall_detector
+        
+        for incident_data in incidents_map.values():
+            if not incident_data['fall_type']:
+                # Fall type 계산 (올바른 시그니처: incident_id, cursor)
+                fall_type = fall_detector.detect_fall_type_from_incident(
+                    incident_data['id'],  # incident DB ID
+                    cursor  # DB cursor
+                )
+                
+                # DB 업데이트
+                try:
+                    cursor.execute("""
+                        UPDATE cims_incidents 
+                        SET fall_type = ? 
+                        WHERE id = ?
+                    """, (fall_type, incident_data['id']))
+                    conn.commit()
+                    
+                    # incidents_map 업데이트
+                    incident_data['fall_type'] = fall_type
+                    logger.info(f"📝 Incident {incident_data['incident_id']}: fall_type={fall_type} (calculated)")
+                except Exception as update_err:
+                    logger.warning(f"⚠️ Failed to update fall_type for incident {incident_data['incident_id']}: {update_err}")
+        
+        # 3. Fall Policy 조회 (모든 Fall policies 반환)
         cursor.execute("""
-            SELECT id, name, rules_json
+            SELECT id, policy_id, name, rules_json
             FROM cims_policies
-            WHERE is_active = 1
+            WHERE is_active = 1 AND policy_id LIKE 'FALL-%'
+            ORDER BY policy_id
         """)
         
-        policies = cursor.fetchall()
-        fall_policy = None
+        policy_rows = cursor.fetchall()
+        fall_policies = {}  # policy_code -> policy_data
         
-        for policy_row in policies:
+        for policy_row in policy_rows:
             try:
-                rules = json.loads(policy_row[2])
-                association = rules.get('incident_association', {})
-                if association.get('incident_type') == 'Fall':
-                    fall_policy = {
-                        'id': policy_row[0],
-                        'name': policy_row[1],  # 'name' 컬럼 사용
-                        'rules': rules
-                    }
-                    break
-            except:
+                policy_code = policy_row[1]  # FALL-001-UNWITNESSED or FALL-002-WITNESSED
+                rules = json.loads(policy_row[3])
+                
+                fall_policies[policy_code] = {
+                    'id': policy_row[0],
+                    'policy_id': policy_code,
+                    'name': policy_row[2],
+                    'rules': rules
+                }
+            except Exception as e:
+                logger.warning(f"Failed to parse policy {policy_row[1]}: {e}")
                 continue
+        
+        # Backwards compatibility: fall_policy는 첫 번째 policy
+        fall_policy = list(fall_policies.values())[0] if fall_policies else None
+        
+        logger.info(f"📋 Policies loaded: {list(fall_policies.keys())}")
+        for policy_id, policy_data in fall_policies.items():
+            schedule = policy_data['rules'].get('nurse_visit_schedule', [])
+            logger.info(f"  - {policy_id}: {len(schedule)} phases")
         
         conn.close()
         
@@ -7179,7 +7390,8 @@ def get_schedule_batch(site, date):
         return jsonify({
             'success': True,
             'incidents': list(incidents_map.values()),
-            'policy': fall_policy,
+            'policy': fall_policy,  # Backwards compatibility
+            'policies': fall_policies,  # All Fall policies by policy_id
             'site': site,
             'date': date,
             'cached': False,  # Server-side 캐싱 시 True로 변경
@@ -7593,6 +7805,41 @@ app.register_blueprint(progress_notes_cached_bp)
 # 앱 실행
 # ==============================
 
+def start_periodic_sync():
+    """주기적 백그라운드 동기화 스케줄러 시작 (5분마다 증분 동기화)"""
+    def periodic_sync_job():
+        """5분마다 실행되는 증분 동기화 작업"""
+        try:
+            logger.info("🔄 주기적 백그라운드 동기화 시작 (증분 동기화)")
+            sync_result = sync_incidents_from_manad_to_cims(full_sync=False)
+            
+            # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
+            # logger.info("🔄 Progress Note 동기화 시작...")
+            # pn_sync_result = sync_progress_notes_from_manad_to_cims()
+            
+            logger.info(f"✅ 주기적 백그라운드 동기화 완료: Incidents={sync_result}")
+        except Exception as e:
+            logger.error(f"❌ 주기적 백그라운드 동기화 오류: {e}")
+    
+    # 5분마다 실행
+    schedule.every(5).minutes.do(periodic_sync_job)
+    
+    def run_scheduler():
+        """스케줄러 실행 루프"""
+        logger.info("🔄 주기적 백그라운드 동기화 스케줄러 시작됨 (5분마다)")
+        while True:
+            try:
+                schedule.run_pending()
+                time.sleep(30)  # 30초마다 스케줄 확인
+            except Exception as e:
+                logger.error(f"스케줄러 실행 중 오류: {e}")
+                time.sleep(60)  # 오류 시 1분 대기
+    
+    # 백그라운드 스레드로 실행
+    sync_thread = threading.Thread(target=run_scheduler, daemon=True)
+    sync_thread.start()
+    logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨")
+
 if __name__ == '__main__':
     # CIMS Background Data Processor (선택적)
     # 기능: Dashboard KPI 캐시 생성 (10분마다) → 성능 향상
@@ -7605,6 +7852,12 @@ if __name__ == '__main__':
         except Exception as e:
             logger.warning(f"⚠️ Background Processor 시작 실패: {e}")
     # else: 개발 환경에서는 불필요한 메시지 출력 안 함
+    
+    # 주기적 백그라운드 동기화 시작 (5분마다 증분 동기화)
+    try:
+        start_periodic_sync()
+    except Exception as e:
+        logger.warning(f"⚠️ 주기적 백그라운드 동기화 시작 실패: {e}")
     
     # MANAD Plus Integrator (백그라운드 폴링 - 선택적)
     # 현재: 증분 동기화로 충분 (API 호출 시 5분마다 자동 동기화)

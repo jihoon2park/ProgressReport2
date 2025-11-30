@@ -15,9 +15,27 @@ logger = logging.getLogger(__name__)
 progress_notes_cached_bp = Blueprint('progress_notes_cached', __name__)
 
 def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int):
-    """API에서 Progress Notes 조회 후 JSON 캐시에 저장"""
+    """Progress Notes 조회 (DB 직접 접속 또는 API) - DB 직접 접속 모드에서는 캐시 불필요"""
     try:
-        from progress_notes_json_cache import json_cache
+        import sqlite3
+        import os
+        
+        # DB 직접 접속 모드 확인
+        use_db_direct = False
+        try:
+            conn = sqlite3.connect('progress_report.db', timeout=10)
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result and result[0]:
+                use_db_direct = result[0].lower() == 'true'
+            else:
+                use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        except:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        
         from api_progressnote_fetch import fetch_progress_notes_for_site
         success, notes = fetch_progress_notes_for_site(site, days)
         
@@ -34,8 +52,10 @@ def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int
                 'cache_age_hours': 0
             }
         
-        # JSON 캐시에 저장
-        json_cache.update_cache(site, notes)
+        # API 모드일 때만 캐시에 저장 (DB 직접 접속 모드는 캐시 불필요 - 매번 실시간 조회)
+        if not use_db_direct:
+            from progress_notes_json_cache import json_cache
+            json_cache.update_cache(site, notes)
         
         # 페이지네이션 적용
         total_count = len(notes)
@@ -51,13 +71,13 @@ def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int
             'per_page': per_page,
             'total_count': total_count,
             'total_pages': total_pages,
-            'cache_status': 'updated',
+            'cache_status': 'fresh_db_data' if use_db_direct else 'updated',
             'last_sync': datetime.now().isoformat(),
             'cache_age_hours': 0
         }
         
     except Exception as e:
-        logger.error(f"API에서 데이터 조회 실패: {e}")
+        logger.error(f"Progress Notes 조회 실패: {e}")
         return {
             'success': False,
             'notes': [],
@@ -101,14 +121,38 @@ def fetch_progress_notes_cached():
                 'message': f'Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}'
             }), 400
         
-        # JSON 캐시 매니저 사용
-        from progress_notes_json_cache import json_cache
+        # DB 직접 접속 모드 확인
+        import sqlite3
+        import os
         
-        if force_refresh:
-            # 강제 새로고침: 캐시 무시하고 API에서 직접 조회
-            logger.info(f"강제 새로고침 모드 - API에서 직접 조회: {site}")
+        use_db_direct = False
+        try:
+            conn = sqlite3.connect('progress_report.db', timeout=10)
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result and result[0]:
+                use_db_direct = result[0].lower() == 'true'
+            else:
+                use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        except:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        
+        # DB 직접 접속 모드: 캐시 없이 항상 실시간 조회
+        if use_db_direct:
+            logger.info(f"🔌 DB 직접 접속 모드: Progress Notes 실시간 조회 (캐시 없음) - {site}")
             result = _get_notes_from_api_and_cache(site, page, per_page, days)
         else:
+            # API 모드: JSON 캐시 사용 (API 호출 비용 절감)
+            from progress_notes_json_cache import json_cache
+            
+            if force_refresh:
+                # 강제 새로고침: 캐시 무시하고 API에서 직접 조회
+                logger.info(f"강제 새로고침 모드 - API에서 직접 조회: {site}")
+                result = _get_notes_from_api_and_cache(site, page, per_page, days)
+            else:
                 # JSON 캐시 사용
                 logger.info(f"JSON 캐시 모드 - 사이트: {site}")
                 result = json_cache.get_cached_notes(site, page, per_page)

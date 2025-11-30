@@ -1359,7 +1359,7 @@
                             <i class="fas fa-cog"></i> Policy Management
                         </a></li>
                         <li><a href="#" data-section="settings">
-                            <i class="fas fa-sync-alt"></i> Force Sync
+                            <i class="fas fa-cog"></i> Settings
                         </a></li>
                         
                         <!-- System Links -->
@@ -1430,34 +1430,122 @@
 
     <!-- Admin View -->
     <div id="admin-view" style="display: none;">
-                        <!-- KPI Cards -->
+                        <!-- KPI Cards (5개 카드 레이아웃) -->
                         <div class="row mb-4">
-                            <div class="col-md-3">
+                            <!-- Row 1: 상단 3개 카드 -->
+                            <div class="col-md-4">
                                 <div class="kpi-card text-center">
                                     <div class="kpi-number" id="compliance-rate">--</div>
                                     <div class="kpi-label">Overall Compliance Rate</div>
                                     <div class="kpi-description" id="compliance-desc">No data</div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="kpi-card text-center">
                                     <div class="kpi-number text-danger" id="overdue-tasks">--</div>
-                                    <div class="kpi-label">Overdue Tasks</div>
-                                    <div class="kpi-description" id="overdue-desc">All tasks on time</div>
+                                    <div class="kpi-label">Overdue Incidents</div>
+                                    <div class="kpi-description" id="overdue-desc">All on time</div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-info" id="total-incidents">--</div>
+                                    <div class="kpi-label">Total Incidents</div>
+                                    <div class="kpi-description" id="total-incidents-desc">This Week</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Row 2: 하단 2개 카드 (3단계 상태 구분) -->
+                        <div class="row mb-4">
+                            <div class="col-md-4">
                                 <div class="kpi-card text-center">
                                     <div class="kpi-number text-warning" id="open-incidents">--</div>
                                     <div class="kpi-label">Open Incidents</div>
                                     <div class="kpi-description" id="incidents-change">Not visited</div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="kpi-card text-center">
-                                    <div class="kpi-number text-info" id="total-incidents">--</div>
-                                    <div class="kpi-label">Total Incidents</div>
-                                    <div class="kpi-description" id="total-incidents-desc">This Week</div>
+                                    <div class="kpi-number text-primary" id="in-progress-incidents">--</div>
+                                    <div class="kpi-label">In Progress</div>
+                                    <div class="kpi-description" id="in-progress-desc">Partially completed</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="kpi-card text-center">
+                                    <div class="kpi-number text-success" id="closed-incidents">--</div>
+                                    <div class="kpi-label">Completed</div>
+                                    <div class="kpi-description" id="closed-desc">All tasks done</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fall Policy Statistics Section -->
+                        <div class="row mb-4" id="fall-statistics-section" style="display: none;">
+                            <div class="col-12">
+                                <div style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h4 style="color: #2c3e50; margin: 0;">📊 Fall Policy Statistics (Last 30 Days)</h4>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="loadFallStatistics()">
+                                            <i class="fas fa-sync-alt"></i> Refresh
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="row justify-content-center">
+                                        <!-- Total Falls -->
+                                        <div class="col-md-3">
+                                            <div class="text-center p-3" style="background: #f8f9fa; border-radius: 10px;">
+                                                <h3 class="mb-1" id="fall-stat-total" style="color: #2c3e50; font-weight: bold;">--</h3>
+                                                <small class="text-muted">Total Falls</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Witnessed -->
+                                        <div class="col-md-3">
+                                            <div class="text-center p-3" style="background: #d4edda; border-radius: 10px;">
+                                                <h3 class="mb-1" id="fall-stat-witnessed" style="color: #28a745; font-weight: bold;">--</h3>
+                                                <small class="text-success">
+                                                    <i class="fas fa-eye"></i> Witnessed
+                                                </small>
+                                                <div class="mt-1">
+                                                    <small class="badge bg-success" id="fall-stat-witnessed-pct">--</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Unwitnessed -->
+                                        <div class="col-md-3">
+                                            <div class="text-center p-3" style="background: #fff3cd; border-radius: 10px;">
+                                                <h3 class="mb-1" id="fall-stat-unwitnessed" style="color: #ffc107; font-weight: bold;">--</h3>
+                                                <small class="text-warning">
+                                                    <i class="fas fa-exclamation-triangle"></i> Unwitnessed
+                                                </small>
+                                                <div class="mt-1">
+                                                    <small class="badge bg-warning" id="fall-stat-unwitnessed-pct">--</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Unknown -->
+                                        <div class="col-md-3">
+                                            <div class="text-center p-3" style="background: #e2e3e5; border-radius: 10px;">
+                                                <h3 class="mb-1" id="fall-stat-unknown" style="color: #6c757d; font-weight: bold;">--</h3>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle"></i> Unknown
+                                                </small>
+                                                <div class="mt-1">
+                                                    <small class="badge bg-secondary" id="fall-stat-unknown-pct">--</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Site Breakdown -->
+                                    <div class="mt-3" id="fall-site-breakdown" style="display: none;">
+                                        <h6 class="text-muted mb-2">Breakdown by Site:</h6>
+                                        <div class="row" id="fall-site-stats"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1708,52 +1796,60 @@
                             <div class="row">
                                 <div class="col-12">
                                     <div class="card shadow-sm">
-                                        <div class="card-header bg-primary text-white">
-                                            <h4 class="mb-0"><i class="fas fa-sync-alt me-2"></i>Force Synchronization</h4>
+                                        <div class="card-header bg-success text-white">
+                                            <h4 class="mb-0"><i class="fas fa-database me-2"></i>데이터 소스 정보</h4>
                                         </div>
                                         <div class="card-body">
-                                            <!-- Force Sync Section -->
-                                            <div>
-                                                <h5 class="text-primary mb-3">
-                                                    <i class="fas fa-sync-alt me-2"></i>Data Synchronization
+                                            <!-- Data Source Info -->
+                                            <div class="alert alert-success mb-4">
+                                                <h5 class="text-success mb-3">
+                                                    <i class="fas fa-database me-2"></i>현재 모드: DB 직접 접속 (READ-ONLY)
                                                 </h5>
-                                                <div class="alert alert-info">
-                                                    <i class="fas fa-info-circle me-2"></i>
-                                                    <strong>Force Synchronization</strong> will perform a complete database update:
-                                                    <ul class="mb-0 mt-2">
-                                                        <li>Sync all incidents from MANAD Plus (last 30 days)</li>
-                                                        <li>Auto-generate missing tasks for Fall incidents</li>
-                                                        <li>Sync progress notes and update task completion status</li>
-                                                        <li>Update all incident statuses (Open/Overdue/Closed)</li>
-                                                    </ul>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-3">
-                                                    <button id="forceSyncBtn" class="btn btn-primary btn-lg" onclick="performForceSync()">
-                                                        <i class="fas fa-sync-alt me-2"></i>Force Synchronization
-                                                    </button>
-                                                    <div id="syncStatus" class="text-muted"></div>
-                                                </div>
-                                                <div id="syncProgress" class="mt-3" style="display: none;">
-                                                    <div class="progress" style="height: 30px;">
-                                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                             id="syncProgressBar" 
-                                                             role="progressbar" 
-                                                             style="width: 0%">0%</div>
-                                                    </div>
-                                                    <div id="syncDetails" class="mt-2 small text-muted"></div>
-                                                </div>
-                                                <div id="syncResult" class="mt-3" style="display: none;"></div>
+                                                <ul class="mb-0">
+                                                    <li><strong>Progress Notes:</strong> MANAD MSSQL 데이터베이스에서 실시간 조회</li>
+                                                    <li><strong>Incidents:</strong> API를 통해 조회 후 SQLite DB에 캐시</li>
+                                                    <li><strong>보안:</strong> 모든 DB 연결은 읽기 전용 모드 (autocommit=False + rollback)</li>
+                                                </ul>
                                             </div>
 
                                             <!-- Auto Sync Info -->
-                                            <div class="mb-4">
-                                                <h5 class="text-secondary mb-3">
-                                                    <i class="fas fa-clock me-2"></i>Automatic Synchronization
+                                            <div class="alert alert-info mb-3">
+                                                <h5 class="text-primary mb-2">
+                                                    <i class="fas fa-clock me-2"></i>자동 동기화
                                                 </h5>
-                                                <div class="alert alert-secondary">
+                                                <p class="mb-0">
                                                     <i class="fas fa-info-circle me-2"></i>
-                                                    The system automatically synchronizes data every <strong>5 minutes</strong> in the background.
-                                                    Use Force Sync only when you need immediate updates or to fix data inconsistencies.
+                                                    시스템이 백그라운드에서 <strong>5분마다</strong> 자동으로 데이터를 동기화합니다.
+                                                </p>
+                                            </div>
+
+                                            <!-- Force Sync Section -->
+                                            <div class="card border-warning">
+                                                <div class="card-header bg-warning text-dark">
+                                                    <h5 class="mb-0">
+                                                        <i class="fas fa-sync-alt me-2"></i>강제 동기화
+                                                    </h5>
+                                                </div>
+                                                <div class="card-body">
+                                                    <p class="text-muted mb-3">
+                                                        MANAD Plus API에서 최근 30일간의 Incidents를 가져와 내부 DB를 업데이트합니다.
+                                                    </p>
+                                                    <div class="d-flex align-items-center gap-3">
+                                                        <button id="forceSyncBtn" class="btn btn-warning" onclick="performForceSync()">
+                                                            <i class="fas fa-sync-alt me-2"></i>지금 동기화
+                                                        </button>
+                                                        <div id="syncStatus" class="text-muted small"></div>
+                                                    </div>
+                                                    <div id="syncProgress" class="mt-3" style="display: none;">
+                                                        <div class="progress" style="height: 25px;">
+                                                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" 
+                                                                 id="syncProgressBar" 
+                                                                 role="progressbar" 
+                                                                 style="width: 0%;">0%</div>
+                                                        </div>
+                                                        <div id="syncDetails" class="mt-2 small text-muted"></div>
+                                                    </div>
+                                                    <div id="syncResult" class="mt-3" style="display: none;"></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2331,6 +2427,63 @@
         async function initializeIncidentViewer() {
             // Auto-load incidents for all sites
             await loadIncidents();
+            // Load fall statistics
+            loadFallStatistics();
+        }
+        
+        // Load Fall Policy Statistics
+        async function loadFallStatistics() {
+            try {
+                const response = await fetch('/api/cims/fall-statistics');
+                if (response.ok) {
+                    const stats = await response.json();
+                    
+                    // Show statistics section if there are falls
+                    if (stats.total_falls > 0) {
+                        document.getElementById('fall-statistics-section').style.display = 'block';
+                        
+                        // Update main statistics
+                        document.getElementById('fall-stat-total').textContent = stats.total_falls;
+                        document.getElementById('fall-stat-witnessed').textContent = stats.witnessed;
+                        document.getElementById('fall-stat-unwitnessed').textContent = stats.unwitnessed;
+                        document.getElementById('fall-stat-unknown').textContent = stats.unknown;
+                        
+                        // Update percentages
+                        document.getElementById('fall-stat-witnessed-pct').textContent = stats.witnessed_percentage + '%';
+                        document.getElementById('fall-stat-unwitnessed-pct').textContent = stats.unwitnessed_percentage + '%';
+                        document.getElementById('fall-stat-unknown-pct').textContent = stats.unknown_percentage + '%';
+                        
+                        // Site breakdown
+                        if (Object.keys(stats.by_site).length > 0) {
+                            document.getElementById('fall-site-breakdown').style.display = 'block';
+                            const siteStatsHtml = Object.entries(stats.by_site).map(([siteName, siteData]) => {
+                                return `
+                                    <div class="col-md-2 mb-2">
+                                        <div class="p-2" style="background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                                            <div class="fw-bold" style="font-size: 0.85rem; color: #2c3e50;">${siteName}</div>
+                                            <div class="mt-1" style="font-size: 0.75rem;">
+                                                <span class="badge bg-success">${siteData.witnessed}</span>
+                                                <span class="badge bg-warning">${siteData.unwitnessed}</span>
+                                                <span class="badge bg-secondary">${siteData.unknown}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                            document.getElementById('fall-site-stats').innerHTML = siteStatsHtml;
+                        }
+                        
+                        console.log('✅ Fall statistics loaded:', stats);
+                    } else {
+                        // Hide section if no falls
+                        document.getElementById('fall-statistics-section').style.display = 'none';
+                    }
+                } else {
+                    console.error('Failed to load fall statistics');
+                }
+            } catch (error) {
+                console.error('Error loading fall statistics:', error);
+            }
         }
 
         // Auto-load incidents for all sites
@@ -2454,6 +2607,8 @@
             const now = new Date();
             let startDate;
             
+            console.log(`🔍 Applying filters: Period=${period}, IncidentType=${incidentType}`);
+            
             // Period filter
             if (period === 'today') {
                 startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -2496,12 +2651,12 @@
                 return dateMatch && typeMatch;
             });
             
-            // Filters applied silently
+            console.log(`📊 Filtered ${filteredIncidents.length} incidents from ${incidents.length} total`);
             
-            // 화면 갱신
-            displayStats();  // Shows site-specific incident cards
-            createSiteSpecificCharts();
-            updateKPICards();
+            // 화면 전체 갱신
+            displayStats();  // Shows site-specific incident cards with filtered data
+            createSiteSpecificCharts();  // Updates all charts with filtered data
+            updateKPICards();  // Updates KPI cards with backend data (period-aware)
         }
         
         // Legacy function for backward compatibility
@@ -2538,31 +2693,21 @@
                     }
                 }
                 
-                // Update Overdue Tasks
+                // Update Overdue Incidents (Incident 단위 카운트)
                 const overdueTasksEl = document.getElementById('overdue-tasks');
                 const overdueDescEl = document.getElementById('overdue-desc');
                 if (overdueTasksEl && overdueDescEl) {
                     overdueTasksEl.textContent = kpiData.overdue_tasks;
                     if (kpiData.overdue_tasks === 0) {
-                        overdueDescEl.textContent = 'All tasks on time';
+                        overdueDescEl.textContent = 'All on time';
                         overdueDescEl.className = 'kpi-description text-success';
                     } else {
-                        overdueDescEl.textContent = `${kpiData.overdue_tasks} incident${kpiData.overdue_tasks > 1 ? 's' : ''} overdue`;
+                        overdueDescEl.textContent = `${kpiData.overdue_tasks} incident${kpiData.overdue_tasks > 1 ? 's' : ''} with overdue tasks`;
                         overdueDescEl.className = 'kpi-description text-danger';
                     }
                 }
                 
-                // Update Open Incidents (never visited)
-                const openIncidentsEl = document.getElementById('open-incidents');
-                const incidentsChangeEl = document.getElementById('incidents-change');
-                if (openIncidentsEl && incidentsChangeEl) {
-                    openIncidentsEl.textContent = kpiData.open_incidents;
-                    const periodText = currentPeriod === 'today' ? 'Today' : 
-                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
-                    incidentsChangeEl.textContent = `${periodText}: ${kpiData.open_incidents} not visited`;
-                }
-                
-                // Update Total Incidents (renamed from Total Tasks)
+                // Update Total Incidents
                 const totalIncidentsEl = document.getElementById('total-incidents');
                 const totalIncidentsDescEl = document.getElementById('total-incidents-desc');
                 if (totalIncidentsEl && totalIncidentsDescEl) {
@@ -2572,13 +2717,45 @@
                     totalIncidentsDescEl.textContent = `${periodText}: ${kpiData.total_incidents}`;
                 }
                 
+                // Update Open Incidents (한 번도 방문 안함)
+                const openIncidentsEl = document.getElementById('open-incidents');
+                const incidentsChangeEl = document.getElementById('incidents-change');
+                if (openIncidentsEl && incidentsChangeEl) {
+                    openIncidentsEl.textContent = kpiData.open_incidents;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    incidentsChangeEl.textContent = `${periodText}: ${kpiData.open_incidents} not visited`;
+                }
+                
+                // Update In Progress Incidents (일부 완료)
+                const inProgressEl = document.getElementById('in-progress-incidents');
+                const inProgressDescEl = document.getElementById('in-progress-desc');
+                if (inProgressEl && inProgressDescEl) {
+                    inProgressEl.textContent = kpiData.in_progress_incidents || 0;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    inProgressDescEl.textContent = `${periodText}: Partially completed`;
+                }
+                
+                // Update Closed/Completed Incidents (모두 완료)
+                const closedIncidentsEl = document.getElementById('closed-incidents');
+                const closedDescEl = document.getElementById('closed-desc');
+                if (closedIncidentsEl && closedDescEl) {
+                    closedIncidentsEl.textContent = kpiData.closed_incidents || 0;
+                    const periodText = currentPeriod === 'today' ? 'Today' : 
+                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
+                    closedDescEl.textContent = `${periodText}: All tasks done`;
+                }
+                
             } catch (error) {
                 console.error('Error updating KPI cards:', error);
                 // Show error state in KPI cards
                 document.getElementById('compliance-rate').textContent = '--';
                 document.getElementById('overdue-tasks').textContent = '--';
-                document.getElementById('open-incidents').textContent = '--';
                 document.getElementById('total-incidents').textContent = '--';
+                document.getElementById('open-incidents').textContent = '--';
+                document.getElementById('in-progress-incidents').textContent = '--';
+                document.getElementById('closed-incidents').textContent = '--';
             }
         }
         
@@ -2646,6 +2823,18 @@
                                          severity.includes('Moderate') || severity.includes('Medium') || severity.includes('2 -') || severity.includes('3 -') ? 'warning' : 
                                          severity.includes('Severe') || severity.includes('High') || severity.includes('4 -') || severity.includes('5 -') ? 'danger' : 'secondary';
                     
+                    // Fall type badge
+                    let fallTypeBadge = '';
+                    if (incidentType.toLowerCase().includes('fall') && inc.fall_type) {
+                        if (inc.fall_type === 'witnessed') {
+                            fallTypeBadge = '<span class="badge bg-success ms-1" style="font-size: 0.7rem;"><i class="fas fa-eye"></i> Witnessed</span>';
+                        } else if (inc.fall_type === 'unwitnessed') {
+                            fallTypeBadge = '<span class="badge bg-warning ms-1" style="font-size: 0.7rem;"><i class="fas fa-exclamation-triangle"></i> Unwitnessed</span>';
+                        } else if (inc.fall_type === 'unknown') {
+                            fallTypeBadge = '<span class="badge bg-secondary ms-1" style="font-size: 0.7rem;"><i class="fas fa-question-circle"></i> Unknown</span>';
+                        }
+                    }
+                    
                     // Alternating row colors for better distinction
                     const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
                     
@@ -2659,6 +2848,7 @@
                                 <div>
                                     <div style="margin-bottom: 2px;">
                                         <strong style="color: #1976d2; font-size: 0.9rem;">${incidentType}</strong>
+                                        ${fallTypeBadge}
                                         <span style="color: #666; font-size: 0.85rem;"> — ${residentName}</span>
                                     </div>
                                     <small class="text-muted" style="font-size: 0.75rem;">
@@ -3586,14 +3776,19 @@
             const details = document.getElementById('syncDetails');
             const result = document.getElementById('syncResult');
             
+            if (!btn || !status || !progress || !progressBar || !details || !result) {
+                console.error('❌ Force Sync UI elements not found');
+                return;
+            }
+            
             // Disable button
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Synchronizing...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>동기화 중...';
             
             // Show progress
             progress.style.display = 'block';
             result.style.display = 'none';
-            status.textContent = 'Starting synchronization...';
+            status.textContent = '동기화 시작 중...';
             
             // Animate progress bar
             let progressValue = 0;
@@ -3607,7 +3802,7 @@
             }, 200);
             
             try {
-                details.textContent = '1️⃣ Syncing incidents from MANAD Plus (30 days)...';
+                details.textContent = '📥 MANAD Plus에서 최근 30일 Incidents 가져오는 중...';
                 
                 const response = await fetch('/api/cims/force-sync', {
                     method: 'POST',
@@ -3624,24 +3819,25 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        details.textContent = 'Sync completed successfully!';
+                        details.textContent = '✅ 동기화 완료!';
                         status.textContent = '';
                         
                         result.className = 'alert alert-success';
                         result.innerHTML = `
-                            <h5><i class="fas fa-check-circle me-2"></i>Synchronization Complete!</h5>
-                            <ul class="mb-0">
-                                <li><strong>${data.details.incidents_synced || 0}</strong> new incidents synced</li>
-                                <li><strong>${data.details.incidents_updated || 0}</strong> existing incidents updated</li>
-                                <li><strong>${data.details.tasks_generated || 0}</strong> tasks auto-generated for ${data.details.incidents_with_new_tasks || 0} Fall incidents</li>
-                                <li><strong>${data.details.statuses_updated || 0}</strong> incident statuses updated</li>
+                            <h6 class="mb-2"><i class="fas fa-check-circle me-2"></i>동기화 완료!</h6>
+                            <ul class="mb-0 small">
+                                <li><strong>${data.details.incidents_synced || 0}</strong>개 신규 Incidents 추가</li>
+                                <li><strong>${data.details.incidents_updated || 0}</strong>개 기존 Incidents 업데이트</li>
+                                <li><strong>${data.details.tasks_generated || 0}</strong>개 Tasks 자동 생성 (Fall Incidents)</li>
+                                <li><strong>${data.details.statuses_updated || 0}</strong>개 Incidents 상태 업데이트</li>
                             </ul>
                         `;
                         result.style.display = 'block';
                         
                         // Refresh dashboard after 2 seconds
                         setTimeout(() => {
-                            loadIncidents();
+                            console.log('🔄 Reloading dashboard data...');
+                            loadIncidents();  // Reload incidents data
                         }, 2000);
                     } else {
                         throw new Error(data.error || 'Sync failed');
@@ -3652,21 +3848,21 @@
                 
             } catch (error) {
                 clearInterval(progressInterval);
-                console.error('Force sync error:', error);
+                console.error('❌ Force sync error:', error);
                 
-                details.textContent = 'Sync failed!';
+                details.textContent = '❌ 동기화 실패!';
                 status.textContent = '';
                 
                 result.className = 'alert alert-danger';
                 result.innerHTML = `
-                    <h5><i class="fas fa-exclamation-circle me-2"></i>Synchronization Failed</h5>
-                    <p class="mb-0">Error: ${error.message}</p>
+                    <h6 class="mb-2"><i class="fas fa-exclamation-circle me-2"></i>동기화 실패</h6>
+                    <p class="mb-0 small">오류: ${error.message}</p>
                 `;
                 result.style.display = 'block';
             } finally {
                 // Re-enable button
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Force Synchronization';
+                btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>지금 동기화';
                 
                 // Hide progress after 3 seconds
                 setTimeout(() => {
@@ -3805,13 +4001,25 @@
                                 const description = (inc.description || inc.Description || '').substring(0, 100);
                                 const incidentId = inc.incident_id || inc.Id;
                                 
+                                // Fall type badge for modal
+                                let fallTypeBadge = '';
+                                if (incidentType.toLowerCase().includes('fall') && inc.fall_type) {
+                                    if (inc.fall_type === 'witnessed') {
+                                        fallTypeBadge = '<br><span class="badge bg-success mt-1" style="font-size: 0.75rem;"><i class="fas fa-eye"></i> Witnessed</span>';
+                                    } else if (inc.fall_type === 'unwitnessed') {
+                                        fallTypeBadge = '<br><span class="badge bg-warning mt-1" style="font-size: 0.75rem;"><i class="fas fa-exclamation-triangle"></i> Unwitnessed</span>';
+                                    } else if (inc.fall_type === 'unknown') {
+                                        fallTypeBadge = '<br><span class="badge bg-secondary mt-1" style="font-size: 0.75rem;"><i class="fas fa-question-circle"></i> Unknown</span>';
+                                    }
+                                }
+                                
                                 return `
                                     <tr style="cursor: pointer;" onclick="window.location.href='/incident-viewer?site=${encodeURIComponent(siteName)}&incident=${incidentId}'">
                                         <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${index + 1}</td>
                                         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 600; color: #007bff;">${incidentId}</td>
                                         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; white-space: nowrap;">${dateStr}</td>
                                         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 600;">${residentName}</td>
-                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${incidentType}</td>
+                                        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${incidentType}${fallTypeBadge}</td>
                                         <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">
                                             <span class="badge bg-${severityClass}">${severity}</span>
                                         </td>

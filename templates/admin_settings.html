@@ -32,58 +32,6 @@
             font-size: 1.5em;
         }
         
-        .api-key-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .api-key-card {
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 15px;
-            background: #f8f9fa;
-        }
-        
-        .api-key-card.active {
-            border-color: #28a745;
-            background: #d4edda;
-        }
-        
-        .api-key-card.inactive {
-            border-color: #dc3545;
-            background: #f8d7da;
-        }
-        
-        .site-name {
-            font-weight: bold;
-            font-size: 1.1em;
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        
-        .server-info {
-            color: #6c757d;
-            font-size: 0.9em;
-            margin-bottom: 10px;
-        }
-        
-        .api-key-display {
-            font-family: monospace;
-            background: #e9ecef;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            word-break: break-all;
-        }
-        
-        .api-key-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
         .btn {
             padding: 6px 12px;
             border: none;
@@ -401,26 +349,6 @@
         <!-- Alert Messages -->
         <div id="alert-container"></div>
 
-        <!-- API Key Management Section -->
-        <div class="settings-section">
-            <div class="settings-header">
-                <h3>🔑 API Key Management</h3>
-                <p>Manage API keys for the 5 default sites. Only editing and testing are available.</p>
-            </div>
-            
-            <div class="api-key-actions" style="margin-bottom: 20px;">
-                <button class="btn btn-primary" onclick="refreshApiKeys()">🔄 Refresh</button>
-                <button class="btn btn-warning" onclick="testAllConnections()">🧪 Test All Connections</button>
-            </div>
-            
-            <div id="api-keys-container" class="api-key-grid">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Loading API key information...</p>
-                </div>
-            </div>
-        </div>
-
         <!-- User Management Section -->
         <div class="settings-section">
             <div class="settings-header">
@@ -445,37 +373,18 @@
                 <p>Manage system-wide settings.</p>
             </div>
             
-            <!-- Force Synchronization -->
-            <div class="form-group" style="border: 2px solid #007bff; border-radius: 8px; padding: 20px; background: #f0f8ff; margin-bottom: 25px;">
-                <h4 style="color: #007bff; margin-top: 0;">🔄 Data Synchronization</h4>
-                <div class="alert alert-info" style="margin-bottom: 15px;">
-                    <strong>Force Synchronization</strong> will perform a complete database update:
-                    <ul style="margin: 10px 0 0 20px;">
-                        <li>Sync all incidents from MANAD Plus (last 30 days)</li>
-                        <li>Auto-generate missing tasks for Fall incidents</li>
-                        <li>Sync progress notes and update task completion status</li>
-                        <li>Update all incident statuses (Open/Overdue/Closed)</li>
-                    </ul>
-                </div>
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <button id="forceSyncBtn" class="btn btn-primary" style="font-size: 1.1em; padding: 12px 24px;" onclick="performForceSync()">
-                        <span style="font-size: 1.2em;">🔄</span> Force Synchronization
-                    </button>
-                    <div id="syncStatus" style="color: #6c757d; font-style: italic;"></div>
-                </div>
-                <div id="syncProgress" style="display: none; margin-top: 15px;">
-                    <div class="progress" style="height: 30px; background: #e9ecef; border-radius: 5px; overflow: hidden;">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             id="syncProgressBar" 
-                             role="progressbar" 
-                             style="width: 0%; background: linear-gradient(90deg, #007bff, #0056b3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">0%</div>
-                    </div>
-                    <div id="syncDetails" style="margin-top: 10px; font-size: 0.9em; color: #6c757d;"></div>
-                </div>
-                <div id="syncResult" style="display: none; margin-top: 15px;"></div>
-                <div class="alert alert-secondary" style="margin-top: 15px; margin-bottom: 0;">
-                    <small><strong>ℹ️ Note:</strong> The system automatically synchronizes data every <strong>5 minutes</strong> in the background. Use Force Sync only when you need immediate updates or to fix data inconsistencies.</small>
-                </div>
+            <!-- Data Source Info (READ-ONLY) -->
+            <div class="alert alert-success" style="margin-bottom: 25px;">
+                <h4 style="margin-top: 0;">🔌 데이터 소스 모드</h4>
+                <p style="margin-bottom: 10px;"><strong>현재 모드: DB 직접 접속 (READ-ONLY)</strong></p>
+                <ul style="margin: 0 0 0 20px;">
+                    <li><strong>Progress Notes:</strong> MANAD MSSQL 데이터베이스에서 실시간 조회</li>
+                    <li><strong>Incidents:</strong> API를 통해 조회 후 SQLite DB에 캐시</li>
+                    <li><strong>보안:</strong> 모든 DB 연결은 읽기 전용 모드 (autocommit=False + rollback)</li>
+                </ul>
+                <small style="display: block; margin-top: 10px; color: #155724;">
+                    💡 데이터는 자동으로 백그라운드에서 5분마다 동기화됩니다
+                </small>
             </div>
             
             <div class="form-group">
@@ -538,221 +447,11 @@
         </div>
     </div>
 
-    <!-- API Key Edit Modal -->
-    <div id="apiKeyModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">Edit API Key</h3>
-                <span class="close" onclick="closeModal()">&times;</span>
-            </div>
-            
-            <form id="apiKeyForm">
-                <div class="form-group">
-                    <label for="siteName">Site Name *</label>
-                    <input type="text" id="siteName" name="siteName" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label for="apiUsername">API Username *</label>
-                    <input type="text" id="apiUsername" name="apiUsername" value="ManadAPI" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="apiKey">API Key *</label>
-                    <input type="password" id="apiKey" name="apiKey" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="serverIp">Server IP *</label>
-                    <input type="text" id="serverIp" name="serverIp" placeholder="192.168.1.11" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="serverPort">Server Port</label>
-                    <input type="number" id="serverPort" name="serverPort" value="8080" min="1" max="65535">
-                </div>
-                
-                <div class="form-group">
-                    <label for="notes">Notes</label>
-                    <input type="text" id="notes" name="notes" placeholder="Optional">
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script>
-        let currentEditingSite = null;
-
-        // 페이지 로드 시 API 키 목록 불러오기
+        // 페이지 로드 시 시스템 상태 확인
         document.addEventListener('DOMContentLoaded', function() {
-            loadApiKeys();
             checkSystemStatus();
         });
-
-        // API 키 목록 불러오기
-        async function loadApiKeys() {
-            try {
-                const response = await fetch('/api/admin/api-keys');
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayApiKeys(data.api_keys);
-                } else {
-                    showAlert('Failed to load API keys: ' + data.message, 'danger');
-                }
-            } catch (error) {
-                showAlert('Failed to load API keys: ' + error.message, 'danger');
-            }
-        }
-
-        // API 키 목록 표시
-        function displayApiKeys(apiKeys) {
-            const container = document.getElementById('api-keys-container');
-            
-            if (apiKeys.length === 0) {
-                container.innerHTML = '<p>No registered API keys.</p>';
-                return;
-            }
-            
-            container.innerHTML = apiKeys.map(apiKey => `
-                <div class="api-key-card ${apiKey.is_active ? 'active' : 'inactive'}">
-                    <div class="site-name">
-                        <span class="status-indicator ${apiKey.is_active ? 'status-active' : 'status-inactive'}"></span>
-                        ${apiKey.site_name}
-                    </div>
-                    <div class="server-info">
-                        🌐 ${apiKey.server_ip}:${apiKey.server_port}
-                    </div>
-                    <div class="api-key-display">
-                        ${apiKey.api_key.substring(0, 20)}...
-                    </div>
-                    <div class="api-key-actions">
-                        <button class="btn btn-primary btn-sm" onclick="editApiKey('${apiKey.site_name}')">✏️ Edit</button>
-                        <button class="btn btn-warning btn-sm" onclick="testConnection('${apiKey.site_name}')">🧪 Test</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-
-        // API 키 편집 모달 열기
-        async function editApiKey(siteName) {
-            try {
-                const response = await fetch(`/api/admin/api-keys/${siteName}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    currentEditingSite = siteName;
-                    document.getElementById('modalTitle').textContent = 'Edit API Key';
-                    document.getElementById('siteName').value = data.api_key.site_name;
-                    document.getElementById('apiUsername').value = data.api_key.api_username;
-                    document.getElementById('apiKey').value = data.api_key.api_key;
-                    document.getElementById('serverIp').value = data.api_key.server_ip;
-                    document.getElementById('serverPort').value = data.api_key.server_port;
-                    document.getElementById('notes').value = data.api_key.notes || '';
-                    document.getElementById('apiKeyModal').style.display = 'block';
-                } else {
-                    showAlert('Failed to load API key information: ' + data.message, 'danger');
-                }
-            } catch (error) {
-                showAlert('Failed to load API key information: ' + error.message, 'danger');
-            }
-        }
-
-        // 모달 닫기
-        function closeModal() {
-            document.getElementById('apiKeyModal').style.display = 'none';
-            currentEditingSite = null;
-        }
-
-        // API 키 폼 제출
-        document.getElementById('apiKeyForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
-            const apiKeyData = Object.fromEntries(formData.entries());
-            
-            try {
-                const url = currentEditingSite ? 
-                    `/api/admin/api-keys/${currentEditingSite}` : 
-                    '/api/admin/api-keys';
-                const method = currentEditingSite ? 'PUT' : 'POST';
-                
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(apiKeyData)
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert(data.message, 'success');
-                    closeModal();
-                    loadApiKeys();
-                } else {
-                    showAlert('Failed to save: ' + data.message, 'danger');
-                }
-            } catch (error) {
-                showAlert('Failed to save: ' + error.message, 'danger');
-            }
-        });
-
-
-        // 연결 테스트
-        async function testConnection(siteName) {
-            try {
-                showAlert(`Testing ${siteName} connection...`, 'info');
-                
-                const response = await fetch(`/api/admin/api-keys/${siteName}/test`, {
-                    method: 'POST'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert(`${siteName} connection test successful: ${data.message}`, 'success');
-                } else {
-                    showAlert(`${siteName} connection test failed: ${data.message}`, 'danger');
-                }
-            } catch (error) {
-                showAlert(`${siteName} connection test failed: ${error.message}`, 'danger');
-            }
-        }
-
-        // 모든 연결 테스트
-        async function testAllConnections() {
-            try {
-                showAlert('Testing all API connections...', 'info');
-                
-                const response = await fetch('/api/admin/api-keys/test-all', {
-                    method: 'POST'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert(`Test completed: ${data.message}`, 'success');
-                    loadApiKeys();
-                } else {
-                    showAlert('Test failed: ' + data.message, 'danger');
-                }
-            } catch (error) {
-                showAlert('Test failed: ' + error.message, 'danger');
-            }
-        }
-
-        // 새로고침
-        function refreshApiKeys() {
-            loadApiKeys();
-        }
 
         // 운영 서버 로그 모달 표시
         function showProductionLogs() {
@@ -830,105 +529,6 @@
                 console.error('System status check failed:', error);
             }
         }
-
-
-        // Force Synchronization
-        async function performForceSync() {
-            const btn = document.getElementById('forceSyncBtn');
-            const status = document.getElementById('syncStatus');
-            const progress = document.getElementById('syncProgress');
-            const progressBar = document.getElementById('syncProgressBar');
-            const details = document.getElementById('syncDetails');
-            const result = document.getElementById('syncResult');
-            
-            // Disable button
-            btn.disabled = true;
-            btn.innerHTML = '<span style="font-size: 1.2em;">⏳</span> Synchronizing...';
-            
-            // Show progress
-            progress.style.display = 'block';
-            result.style.display = 'none';
-            status.textContent = 'Starting synchronization...';
-            
-            // Animate progress bar
-            let progressValue = 0;
-            const progressInterval = setInterval(() => {
-                progressValue += 2;
-                if (progressValue >= 90) {
-                    clearInterval(progressInterval);
-                }
-                progressBar.style.width = progressValue + '%';
-                progressBar.textContent = progressValue + '%';
-            }, 200);
-            
-            try {
-                details.textContent = '1️⃣ Syncing incidents from MANAD Plus (30 days)...';
-                
-                const response = await fetch('/api/cims/force-sync', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                clearInterval(progressInterval);
-                progressBar.style.width = '100%';
-                progressBar.textContent = '100%';
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        details.textContent = '✅ Sync completed successfully!';
-                        status.textContent = '';
-                        
-                        result.className = 'alert alert-success';
-                        result.innerHTML = `
-                            <h4 style="margin-top: 0;"><span style="font-size: 1.2em;">✅</span> Synchronization Complete!</h4>
-                            <ul style="margin-bottom: 0;">
-                                <li><strong>${data.details.incidents_synced || 0}</strong> new incidents synced from MANAD Plus</li>
-                                <li><strong>${data.details.incidents_updated || 0}</strong> existing incidents updated</li>
-                                <li><strong>${data.details.tasks_generated || 0}</strong> tasks auto-generated for <strong>${data.details.incidents_with_new_tasks || 0}</strong> Fall incidents</li>
-                                <li><strong>${data.details.statuses_updated || 0}</strong> incident statuses updated</li>
-                            </ul>
-                        `;
-                        result.style.display = 'block';
-                        
-                        showAlert('✅ Force Sync completed successfully!', 'success');
-                    } else {
-                        throw new Error(data.error || 'Sync failed');
-                    }
-                } else {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-            } catch (error) {
-                clearInterval(progressInterval);
-                console.error('Force sync error:', error);
-                
-                details.textContent = '❌ Sync failed!';
-                status.textContent = '';
-                
-                result.className = 'alert alert-danger';
-                result.innerHTML = `
-                    <h4 style="margin-top: 0;"><span style="font-size: 1.2em;">❌</span> Synchronization Failed</h4>
-                    <p style="margin-bottom: 0;">Error: ${error.message}</p>
-                `;
-                result.style.display = 'block';
-                
-                showAlert('❌ Force Sync failed: ' + error.message, 'danger');
-            } finally {
-                // Re-enable button
-                btn.disabled = false;
-                btn.innerHTML = '<span style="font-size: 1.2em;">🔄</span> Force Synchronization';
-                
-                // Hide progress after 3 seconds
-                setTimeout(() => {
-                    progress.style.display = 'none';
-                }, 3000);
-            }
-        }
-
         // 알림 표시
         function showAlert(message, type) {
             const alertContainer = document.getElementById('alert-container');
@@ -948,14 +548,6 @@
                     alert.remove();
                 }
             }, 5000);
-        }
-
-        // 모달 외부 클릭 시 닫기
-        window.onclick = function(event) {
-            const modal = document.getElementById('apiKeyModal');
-            if (event.target === modal) {
-                closeModal();
-            }
         }
     </script>
 </body>

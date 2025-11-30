@@ -1058,26 +1058,35 @@
             const visitCount = document.getElementById('visitCount');
             
             const incidents = data.incidents || [];
-            const policy = data.policy;
+            const policies = data.policies || {};  // All policies by policy_id
+            const policy = data.policy;  // Fallback for backwards compatibility
             
-            console.log(`🔍 [${selectedSite}] Batch API - Incidents: ${incidents.length}, Policy: ${policy ? 'OK' : 'N/A'}`);
+            console.log(`🔍 [${selectedSite}] Batch API - Incidents: ${incidents.length}, Policies: ${Object.keys(policies).length}`);
+            console.log('📋 Available policies:', Object.keys(policies));
+            console.log('📋 Incidents with fall_type:', incidents.map(inc => ({id: inc.incident_id, fall_type: inc.fall_type})));
             
             if (incidents.length === 0) {
                 showEmpty('No visits scheduled', 'No Fall incidents found for this date');
                 return;
             }
             
-            if (!policy) {
-                showEmpty('Policy Setup Required', 
-                    'No active Fall policy found. Please run <strong>Force Synchronization</strong> from Settings page to initialize the system.<br><br>' +
-                    '<a href="/admin-settings" class="btn btn-primary btn-sm mt-2">Go to Settings</a>',
-                    true);
-                return;
+            // Policies 확인 및 경고
+            if (Object.keys(policies).length === 0) {
+                console.error('❌ No policies found in API response!');
+                console.error('API response data:', data);
+                
+                if (!policy) {
+                    showEmpty('Policy Setup Required', 
+                        'No active Fall policy found. Please run <strong>Force Synchronization</strong> from Settings page to initialize the system.<br><br>' +
+                        '<a href="/admin-settings" class="btn btn-primary btn-sm mt-2">Go to Settings</a>',
+                        true);
+                    return;
+                } else {
+                    console.warn('⚠️ Using fallback policy (legacy mode)');
+                }
+            } else {
+                console.log('✅ Policies loaded successfully:', Object.keys(policies));
             }
-            
-            const policyRules = policy.rules;
-            const visitSchedule = policyRules.nurse_visit_schedule || [];
-            const commonTasks = policyRules.common_assessment_tasks || '';
             
             // incidentTasksMap 구성 (Batch API는 이미 tasks 포함)
             const incidentTasksMap = {};
@@ -1089,19 +1098,57 @@
             const allVisits = [];
             
             incidents.forEach(incident => {
+                // 각 incident의 fall_type에 따라 적절한 policy 선택
+                let selectedPolicy = null;
+                let selectedPolicyId = null;
+                
+                console.log(`🔍 Processing incident ${incident.incident_id}: fall_type="${incident.fall_type}"`);
+                
+                if (incident.fall_type === 'witnessed') {
+                    selectedPolicyId = 'FALL-002-WITNESSED';
+                } else {
+                    // unwitnessed, unknown, or null -> use unwitnessed policy (safer)
+                    selectedPolicyId = 'FALL-001-UNWITNESSED';
+                }
+                
+                console.log(`  → Selected policy ID: ${selectedPolicyId}`);
+                console.log(`  → Available policies:`, Object.keys(policies));
+                
+                selectedPolicy = policies[selectedPolicyId];
+                
+                // Fallback to legacy policy if new policies not available
+                if (!selectedPolicy) {
+                    console.warn(`  ⚠️ Policy ${selectedPolicyId} not found in policies object, using fallback policy`);
+                    selectedPolicy = policy;
+                }
+                
+                if (!selectedPolicy) {
+                    console.error(`  ❌ No policy found for incident ${incident.incident_id} (fall_type: ${incident.fall_type})`);
+                    return;
+                }
+                
+                const policyRules = selectedPolicy.rules;
+                const visitSchedule = policyRules.nurse_visit_schedule || [];
+                const commonTasks = policyRules.common_assessment_tasks || '';
+                
+                console.log(`  ✅ Using policy ${selectedPolicyId} (${visitSchedule.length} phases, ${visitSchedule.map(p => `${p.interval}${p.interval_unit} for ${p.duration}${p.duration_unit}`).join(', ')})`);
+                
                 const incidentTime = new Date(incident.incident_date);
                 let phaseStartTime = new Date(incidentTime);
                 
                 // Process each phase sequentially
                 visitSchedule.forEach((phase, phaseIndex) => {
                     const interval = parseInt(phase.interval) || 30;
-                    const intervalUnit = phase.interval_unit || 'minutes';
+                    const intervalUnit = (phase.interval_unit || 'minutes').toLowerCase();
                     const duration = parseInt(phase.duration) || 2;
-                    const durationUnit = phase.duration_unit || 'hours';
+                    // duration_unit이 빈 문자열이면 'minutes'로 처리 (Witnessed Fall policy의 경우)
+                    const durationUnit = (phase.duration_unit || 'minutes').toLowerCase();
                     
                     // Convert to minutes
-                    const intervalMinutes = intervalUnit === 'hours' ? interval * 60 : interval;
-                    const durationMinutes = durationUnit === 'hours' ? duration * 60 : duration;
+                    const intervalMinutes = intervalUnit === 'hours' ? interval * 60 : 
+                                          intervalUnit === 'days' ? interval * 24 * 60 : interval;
+                    const durationMinutes = durationUnit === 'hours' ? duration * 60 : 
+                                          durationUnit === 'days' ? duration * 24 * 60 : duration;
                     
                     // Number of visits in this phase
                     const numberOfVisits = Math.ceil(durationMinutes / intervalMinutes);
@@ -1134,6 +1181,7 @@
                             incidentType: incident.incident_type,
                             incidentDate: incident.incident_date,
                             description: incident.description || '',
+                            fall_type: incident.fall_type || null,  // Fall type 추가
                             visitTime: visitTime,
                             phaseIndex: phaseIndex + 1,
                             tasks: commonTasks,  // Full tasks for modal
@@ -1235,10 +1283,44 @@
                 roomCell.textContent = visit.location;
                 row.appendChild(roomCell);
                 
-                // Type cell
+                // Type cell with Fall type badge
                 const typeCell = document.createElement('td');
                 typeCell.className = 'type-cell';
-                typeCell.textContent = visit.incidentType;
+                
+                // Create type text
+                const typeText = document.createTextNode(visit.incidentType);
+                typeCell.appendChild(typeText);
+                
+                // Add Fall type badge if available
+                if (visit.incidentType.toLowerCase().includes('fall') && visit.fall_type) {
+                    const badgeDiv = document.createElement('div');
+                    badgeDiv.style.marginTop = '0.3rem';
+                    
+                    const badge = document.createElement('span');
+                    badge.style.fontSize = '0.75rem';
+                    badge.style.padding = '0.2rem 0.5rem';
+                    badge.style.borderRadius = '8px';
+                    badge.style.fontWeight = '600';
+                    badge.style.display = 'inline-block';
+                    
+                    if (visit.fall_type === 'witnessed') {
+                        badge.style.background = '#d4edda';
+                        badge.style.color = '#155724';
+                        badge.innerHTML = '<i class="fas fa-eye"></i> Witnessed';
+                    } else if (visit.fall_type === 'unwitnessed') {
+                        badge.style.background = '#fff3cd';
+                        badge.style.color = '#856404';
+                        badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Unwitnessed';
+                    } else if (visit.fall_type === 'unknown') {
+                        badge.style.background = '#e2e3e5';
+                        badge.style.color = '#383d41';
+                        badge.innerHTML = '<i class="fas fa-question-circle"></i> Unknown';
+                    }
+                    
+                    badgeDiv.appendChild(badge);
+                    typeCell.appendChild(badgeDiv);
+                }
+                
                 row.appendChild(typeCell);
                 
                 // Occurred cell
@@ -1284,6 +1366,7 @@
                         occurred: occurredDate,
                         location: visit.location,
                         incidentType: visit.incidentType,
+                        fall_type: visit.fall_type,  // Fall type 추가
                         description: visit.description,
                         tasks: visit.tasks
                     });
@@ -1797,7 +1880,28 @@
             document.getElementById('modalPatientName').textContent = incidentData.residentName;
             document.getElementById('modalOccurred').textContent = incidentData.occurred;
             document.getElementById('modalLocation').textContent = incidentData.location;
-            document.getElementById('modalType').textContent = incidentData.incidentType;
+            
+            // Incident Type with Fall type badge
+            let typeHtml = incidentData.incidentType;
+            if (incidentData.incidentType.toLowerCase().includes('fall') && incidentData.fall_type) {
+                let badgeStyle = '';
+                let badgeText = '';
+                
+                if (incidentData.fall_type === 'witnessed') {
+                    badgeStyle = 'background: #d4edda; color: #155724; padding: 0.3rem 0.6rem; border-radius: 8px; font-size: 0.85rem; margin-left: 0.5rem; font-weight: 600;';
+                    badgeText = '<i class="fas fa-eye"></i> Witnessed';
+                } else if (incidentData.fall_type === 'unwitnessed') {
+                    badgeStyle = 'background: #fff3cd; color: #856404; padding: 0.3rem 0.6rem; border-radius: 8px; font-size: 0.85rem; margin-left: 0.5rem; font-weight: 600;';
+                    badgeText = '<i class="fas fa-exclamation-triangle"></i> Unwitnessed';
+                } else if (incidentData.fall_type === 'unknown') {
+                    badgeStyle = 'background: #e2e3e5; color: #383d41; padding: 0.3rem 0.6rem; border-radius: 8px; font-size: 0.85rem; margin-left: 0.5rem; font-weight: 600;';
+                    badgeText = '<i class="fas fa-question-circle"></i> Unknown';
+                }
+                
+                typeHtml += `<span style="${badgeStyle}">${badgeText}</span>`;
+            }
+            
+            document.getElementById('modalType').innerHTML = typeHtml;
             document.getElementById('modalDescription').textContent = incidentData.description;
             document.getElementById('modalTasks').innerHTML = incidentData.tasks.replace(/\n/g, '<br>');
             
