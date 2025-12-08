@@ -12,10 +12,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 class APIKeyManagerJSON:
-    """JSON 파일 기반 API 키 매니저"""
+    """JSON 파일 기반 API 키 매니저 (site_config.json 통합)"""
     
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
+        # 새로운 통합 설정 파일 (권장)
+        self.site_config_file = os.path.join(data_dir, "api_keys", "site_config.json")
+        # 기존 API 키 파일 (폴백용)
         self.api_keys_file = os.path.join(data_dir, "api_keys", "api_keys.json")
         self._ensure_directories()
     
@@ -24,13 +27,38 @@ class APIKeyManagerJSON:
         os.makedirs(os.path.join(self.data_dir, "api_keys"), exist_ok=True)
     
     def _load_api_keys(self) -> List[Dict[str, Any]]:
-        """API 키 목록 로드"""
+        """API 키 목록 로드 (site_config.json 우선, 폴백으로 api_keys.json)"""
         try:
-            if not os.path.exists(self.api_keys_file):
-                return []
+            # 1. site_config.json 시도 (통합 설정)
+            if os.path.exists(self.site_config_file):
+                with open(self.site_config_file, 'r', encoding='utf-8') as f:
+                    site_configs = json.load(f)
+                    # site_config 형식을 api_keys 형식으로 변환
+                    api_keys = []
+                    for config in site_configs:
+                        api_info = config.get('api', {})
+                        api_key_entry = {
+                            'id': config.get('id'),
+                            'site_name': config.get('site_name'),
+                            'api_username': api_info.get('api_username', 'ManadAPI'),
+                            'api_key': api_info.get('api_key', ''),
+                            'server_ip': api_info.get('server_ip', ''),
+                            'server_port': api_info.get('server_port', '8080'),
+                            'server_url': f"http://{api_info.get('server_ip', '')}:{api_info.get('server_port', '8080')}",
+                            'is_active': config.get('is_active', True),
+                            'notes': config.get('notes', ''),
+                            'created_at': config.get('created_at', ''),
+                            'updated_at': config.get('updated_at', '')
+                        }
+                        api_keys.append(api_key_entry)
+                    return api_keys
             
-            with open(self.api_keys_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            # 2. 폴백: api_keys.json
+            if os.path.exists(self.api_keys_file):
+                with open(self.api_keys_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            
+            return []
         except Exception as e:
             logger.error(f"API 키 로드 실패: {e}")
             return []

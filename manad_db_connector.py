@@ -21,8 +21,49 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import os
+import json
 
 logger = logging.getLogger(__name__)
+
+# ============================================
+# Site Config JSON 로더
+# ============================================
+_site_config_cache = None
+_site_config_file = os.path.join(os.path.dirname(__file__), "data", "api_keys", "site_config.json")
+
+def _load_site_config() -> List[Dict[str, Any]]:
+    """site_config.json에서 사이트 설정 로드 (캐시 사용)"""
+    global _site_config_cache
+    
+    if _site_config_cache is not None:
+        return _site_config_cache
+    
+    try:
+        if os.path.exists(_site_config_file):
+            with open(_site_config_file, 'r', encoding='utf-8') as f:
+                _site_config_cache = json.load(f)
+                logger.info(f"✅ site_config.json 로드 완료: {len(_site_config_cache)}개 사이트")
+                return _site_config_cache
+        else:
+            logger.warning(f"⚠️ site_config.json 파일이 없습니다: {_site_config_file}")
+            return []
+    except Exception as e:
+        logger.error(f"❌ site_config.json 로드 오류: {e}")
+        return []
+
+def get_site_db_config(site_name: str) -> Optional[Dict[str, Any]]:
+    """특정 사이트의 DB 설정 반환"""
+    configs = _load_site_config()
+    
+    for config in configs:
+        if config.get('site_name') == site_name:
+            return config.get('database')
+    
+    return None
+
+def get_all_site_configs() -> List[Dict[str, Any]]:
+    """모든 사이트 설정 반환"""
+    return _load_site_config()
 
 # MSSQL 연결을 위한 라이브러리 (pyodbc 또는 pymssql)
 def _install_driver_package(driver_name='pyodbc'):
@@ -115,28 +156,50 @@ class MANADDBConnector:
         self._connection_pool = {}
     
     def _get_connection_string(self, site: str) -> Optional[str]:
-        """사이트별 MSSQL 연결 문자열 생성"""
-        # 환경 변수에서 DB 연결 정보 가져오기
-        # 예: MANAD_DB_SERVER_PARAFIELD_GARDENS, MANAD_DB_NAME, MANAD_DB_USER, MANAD_DB_PASSWORD
+        """사이트별 MSSQL 연결 문자열 생성
         
-        site_key = site.upper().replace(' ', '_').replace('-', '_')
+        설정 우선순위:
+        1. site_config.json (권장)
+        2. 환경 변수 (폴백)
+        """
+        # 1. site_config.json에서 DB 설정 시도
+        db_config = get_site_db_config(site)
         
-        server = os.environ.get(f'MANAD_DB_SERVER_{site_key}')
-        database = os.environ.get(f'MANAD_DB_NAME_{site_key}') or os.environ.get('MANAD_DB_NAME')
+        if db_config:
+            server = db_config.get('server')
+            database = db_config.get('database')
+            use_windows_auth = db_config.get('use_windows_auth', True)
+            username = db_config.get('username')
+            password = db_config.get('password')
+            
+            if server and database:
+                logger.info(f"📄 site_config.json에서 DB 설정 로드: {site}")
+            else:
+                logger.warning(f"⚠️ site_config.json에 {site}의 DB 정보가 불완전합니다.")
+                db_config = None  # 폴백으로 진행
         
-        # Windows Authentication 지원
-        use_windows_auth = os.environ.get(f'MANAD_DB_USE_WINDOWS_AUTH_{site_key}', '').lower() == 'true'
-        use_windows_auth = use_windows_auth or os.environ.get('MANAD_DB_USE_WINDOWS_AUTH', 'false').lower() == 'true'
-        
-        if not server or not database:
-            logger.warning(f"⚠️ {site}의 DB 서버/데이터베이스 정보가 설정되지 않았습니다.")
-            return None
-        
-        # Windows Authentication 사용 여부 확인
-        if not use_windows_auth:
+        # 2. 환경 변수에서 DB 연결 정보 가져오기 (폴백)
+        if not db_config:
+            site_key = site.upper().replace(' ', '_').replace('-', '_')
+            
+            server = os.environ.get(f'MANAD_DB_SERVER_{site_key}')
+            database = os.environ.get(f'MANAD_DB_NAME_{site_key}') or os.environ.get('MANAD_DB_NAME')
+            
+            # Windows Authentication 지원
+            use_windows_auth = os.environ.get(f'MANAD_DB_USE_WINDOWS_AUTH_{site_key}', '').lower() == 'true'
+            use_windows_auth = use_windows_auth or os.environ.get('MANAD_DB_USE_WINDOWS_AUTH', 'false').lower() == 'true'
+            
+            if not server or not database:
+                logger.warning(f"⚠️ {site}의 DB 서버/데이터베이스 정보가 설정되지 않았습니다. (site_config.json 또는 환경변수 확인 필요)")
+                return None
+            
             username = os.environ.get(f'MANAD_DB_USER_{site_key}') or os.environ.get('MANAD_DB_USER')
             password = os.environ.get(f'MANAD_DB_PASSWORD_{site_key}') or os.environ.get('MANAD_DB_PASSWORD')
             
+            logger.info(f"📄 환경변수에서 DB 설정 로드 (폴백): {site}")
+        
+        # Windows Authentication 사용 여부 확인
+        if not use_windows_auth:
             if not username or not password:
                 logger.warning(f"⚠️ {site}의 DB 사용자/비밀번호 정보가 설정되지 않았습니다.")
                 return None
@@ -296,43 +359,52 @@ class MANADDBConnector:
                 cursor = conn.cursor()
                 
                 # MANAD DB의 실제 구조에 맞춘 쿼리
-                # 테이블 구조: Event -> Person (e.PersonId = p.Id), Event -> Person (e.ReportedById = pr.Id)
-                # 실제 컬럼명: EventDetail (Description), DateReported (ReportedDate), Actions (ActionTaken)
+                # AdverseEvent 테이블: 실제 Incident 데이터가 저장된 테이블
+                # StatusEnumId: 0=Open, 1=In Progress(?), 2=Closed
                 query = """
                     SELECT 
-                        e.Id,
-                        e.PersonId AS ClientId,
-                        e.Date,
-                        e.DateReported AS ReportedDate,
-                        e.EventDetail AS Description,
-                        ISNULL(esr.Description, '') AS SeverityRating,
-                        ISNULL(err.Description, '') AS RiskRatingName,
+                        ae.Id,
+                        ae.ClientId,
+                        ae.Date,
+                        ae.ReportedDate,
+                        ae.Description,
+                        ISNULL(aesr.Description, '') AS SeverityRating,
+                        ISNULL(aerr.Description, '') AS RiskRatingName,
+                        ae.StatusEnumId,
                         CASE 
-                            WHEN e.StatusEnumId = 0 THEN 'Open'
-                            WHEN e.StatusEnumId = 1 THEN 'Closed'
-                            ELSE 'Unknown'
+                            WHEN ae.StatusEnumId = 0 THEN 'Open'
+                            WHEN ae.StatusEnumId = 2 THEN 'Closed'
+                            ELSE 'In Progress'
                         END AS Status,
-                        e.Actions AS ActionTaken,
-                        ISNULL(e.Ma4ReportedBy, ISNULL(pr_reported.FirstName + ' ' + pr_reported.LastName, '')) AS ReportedByName,
-                        ISNULL(loc.Name, '') AS RoomName,
-                        ISNULL(wing.Name, '') AS WingName,
-                        ISNULL(dept.Description, '') AS DepartmentName,
+                        ae.ActionTaken,
+                        ISNULL(pr_reported.FirstName + ' ' + pr_reported.LastName, '') AS ReportedByName,
+                        '' AS RoomName,
+                        '' AS WingName,
+                        '' AS DepartmentName,
                         ISNULL(p_client.FirstName, '') AS FirstName,
                         ISNULL(p_client.LastName, '') AS LastName,
-                        -- Event Types (EventTypeId 직접 사용)
-                        ISNULL(et.Description, '') AS EventTypeNames
-                    FROM Event e
-                    LEFT JOIN Person p_client ON e.PersonId = p_client.Id
-                    LEFT JOIN EventSeverityRating esr ON e.EventSeverityRatingId = esr.Id
-                    LEFT JOIN EventRiskRating err ON e.EventRiskRatingId = err.Id
-                    LEFT JOIN Person pr_reported ON e.ReportedById = pr_reported.Id
-                    LEFT JOIN Location loc ON e.LocationId = loc.Id
-                    LEFT JOIN Wing wing ON e.WingId = wing.Id
-                    LEFT JOIN Department dept ON e.DepartmentId = dept.Id
-                    LEFT JOIN EventType et ON e.EventTypeId = et.Id
-                    WHERE e.Date >= ? AND e.Date <= ?
-                    AND e.IsDeleted = 0
-                    ORDER BY e.Date DESC
+                        ae.IsWitnessed,
+                        ae.IsReviewClosed,
+                        ae.IsAmbulanceCalled,
+                        ae.IsAdmittedToHospital,
+                        ae.IsMajorInjury,
+                        ae.ReviewedDate,
+                        -- Event Types (AdverseEvent_AdverseEventType 연결 테이블 사용)
+                        ISNULL(
+                            (SELECT TOP 1 aet.Description 
+                             FROM AdverseEvent_AdverseEventType ae_aet 
+                             JOIN AdverseEventType aet ON ae_aet.AdverseEventTypeId = aet.Id 
+                             WHERE ae_aet.AdverseEventId = ae.Id), 
+                            ''
+                        ) AS EventTypeName
+                    FROM AdverseEvent ae
+                    LEFT JOIN Person p_client ON ae.ClientId = p_client.Id
+                    LEFT JOIN AdverseEventSeverityRating aesr ON ae.AdverseEventSeverityRatingId = aesr.Id
+                    LEFT JOIN AdverseEventRiskRating aerr ON ae.AdverseEventRiskRatingId = aerr.Id
+                    LEFT JOIN Person pr_reported ON ae.ReportedById = pr_reported.Id
+                    WHERE ae.Date >= ? AND ae.Date <= ?
+                    AND ae.IsDeleted = 0
+                    ORDER BY ae.Date DESC
                 """
                 
                 # 날짜 파라미터 변환
@@ -426,10 +498,11 @@ class MANADDBConnector:
     
     def _format_incident_for_api(self, db_row: Dict) -> Dict[str, Any]:
         """DB 결과를 API 형식으로 변환"""
-        # EventTypeNames 파싱
+        # EventTypeName 파싱 (단일 또는 복수)
         event_types = []
-        if db_row.get('EventTypeNames'):
-            event_types = [et.strip() for et in str(db_row['EventTypeNames']).split(',')]
+        event_type_name = db_row.get('EventTypeName') or db_row.get('EventTypeNames')
+        if event_type_name:
+            event_types = [et.strip() for et in str(event_type_name).split(',') if et.strip()]
         
         # API 응답 형식과 일치시키기
         return {
@@ -440,6 +513,7 @@ class MANADDBConnector:
             'Description': db_row.get('Description', ''),
             'SeverityRating': db_row.get('SeverityRating'),
             'RiskRatingName': db_row.get('RiskRatingName'),
+            'StatusEnumId': db_row.get('StatusEnumId'),
             'Status': db_row.get('Status', 'Open'),
             'ActionTaken': db_row.get('ActionTaken', ''),
             'ReportedByName': db_row.get('ReportedByName', ''),
@@ -448,7 +522,14 @@ class MANADDBConnector:
             'DepartmentName': db_row.get('DepartmentName', ''),
             'FirstName': db_row.get('FirstName', ''),
             'LastName': db_row.get('LastName', ''),
-            'EventTypeNames': event_types
+            'EventTypeNames': event_types,
+            'EventTypeName': event_type_name or '',
+            'IsWitnessed': bool(db_row.get('IsWitnessed', False)),
+            'IsReviewClosed': bool(db_row.get('IsReviewClosed', False)),
+            'IsAmbulanceCalled': bool(db_row.get('IsAmbulanceCalled', False)),
+            'IsAdmittedToHospital': bool(db_row.get('IsAdmittedToHospital', False)),
+            'IsMajorInjury': bool(db_row.get('IsMajorInjury', False)),
+            'ReviewedDate': db_row.get('ReviewedDate').isoformat() if db_row.get('ReviewedDate') else None
         }
     
     def _format_client_for_api(self, db_row: Dict) -> Dict[str, Any]:

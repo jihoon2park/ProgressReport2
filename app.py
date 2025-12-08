@@ -1125,6 +1125,12 @@ def login():
                     }
                     usage_logger.log_access(success_user_info)
                     
+                    # landing_page가 설정된 사용자는 해당 페이지로 이동
+                    landing_page = user_info.get('landing_page')
+                    if landing_page:
+                        logger.info(f"로그인 성공 - {username} 사용자, landing_page 설정됨: {landing_page}")
+                        return redirect(landing_page)
+                    
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
                     logger.info(f"로그인 사용자명 확인: {username} -> {username_upper}")
@@ -1413,6 +1419,260 @@ def rod_dashboard():
                          site=site, 
                          sites=sites_info,
                          current_user=current_user)
+
+
+# ==================== Edenfield Dashboard ====================
+@app.route('/edenfield-dashboard')
+@login_required
+def edenfield_dashboard():
+    """
+    Edenfield Dashboard - 경영진용 종합 대시보드
+    5개 사이트 전체 현황을 한눈에 보여줌
+    """
+    try:
+        sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla']
+        return render_template('edenfield_dashboard.html', 
+                             sites=sites,
+                             current_user=current_user)
+    except Exception as e:
+        logger.error(f"Edenfield Dashboard 오류: {e}")
+        return render_template('error.html', error=str(e)), 500
+
+
+@app.route('/api/edenfield/stats')
+@login_required
+def get_edenfield_stats():
+    """
+    Edenfield 전체 통계 API
+    - 5개 사이트 통합 데이터
+    - Resident, Incident, Progress Note 통계
+    - 기간 필터: today, week, month (기본값)
+    """
+    try:
+        # 기간 파라미터 처리
+        period = request.args.get('period', 'month')
+        
+        if period == 'today':
+            days = 0  # 오늘만
+            date_filter = "CAST(GETDATE() AS DATE)"
+        elif period == 'week':
+            days = 7
+            date_filter = "DATEADD(day, -7, GETDATE())"
+        else:  # month (기본값)
+            days = 30
+            date_filter = "DATEADD(day, -30, GETDATE())"
+        
+        sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla']
+        all_stats = []
+        
+        for site_name in sites:
+            try:
+                from manad_db_connector import MANADDBConnector
+                connector = MANADDBConnector(site_name)
+                
+                with connector.get_connection() as conn:
+                    cursor = conn.cursor()
+                    
+                    site_stats = {'site': site_name}
+                    
+                    # 1. Client 수 (현재 입주자만 - ClientService.EndDate가 NULL인 활성 Client)
+                    cursor.execute("""
+                        SELECT COUNT(DISTINCT c.Id) 
+                        FROM Client c
+                        INNER JOIN ClientService cs ON c.MainClientServiceId = cs.Id
+                        WHERE c.IsDeleted = 0 
+                        AND cs.IsDeleted = 0
+                        AND cs.EndDate IS NULL
+                    """)
+                    site_stats['total_persons'] = cursor.fetchone()[0]
+                    
+                    # 2. AdverseEvent (Incident) 통계 - 선택된 기간 내
+                    # StatusEnumId: 0=Open, 1=InProgress, 2=Closed
+                    if period == 'today':
+                        cursor.execute("""
+                            SELECT 
+                                COUNT(*) as total,
+                                SUM(CASE WHEN StatusEnumId = 0 THEN 1 ELSE 0 END) as open_count,
+                                SUM(CASE WHEN StatusEnumId = 2 THEN 1 ELSE 0 END) as closed_count,
+                                SUM(CASE WHEN IsAmbulanceCalled = 1 THEN 1 ELSE 0 END) as ambulance,
+                                SUM(CASE WHEN IsAdmittedToHospital = 1 THEN 1 ELSE 0 END) as hospital
+                            FROM AdverseEvent
+                            WHERE IsDeleted = 0
+                            AND CAST(Date AS DATE) = CAST(GETDATE() AS DATE)
+                        """)
+                    else:
+                        cursor.execute(f"""
+                            SELECT 
+                                COUNT(*) as total,
+                                SUM(CASE WHEN StatusEnumId = 0 THEN 1 ELSE 0 END) as open_count,
+                                SUM(CASE WHEN StatusEnumId = 2 THEN 1 ELSE 0 END) as closed_count,
+                                SUM(CASE WHEN IsAmbulanceCalled = 1 THEN 1 ELSE 0 END) as ambulance,
+                                SUM(CASE WHEN IsAdmittedToHospital = 1 THEN 1 ELSE 0 END) as hospital
+                            FROM AdverseEvent
+                            WHERE IsDeleted = 0
+                            AND Date >= {date_filter}
+                        """)
+                    row = cursor.fetchone()
+                    site_stats['incidents'] = {
+                        'total': row[0] or 0,
+                        'open': row[1] or 0,
+                        'closed': row[2] or 0,
+                        'ambulance': row[3] or 0,
+                        'hospital': row[4] or 0
+                    }
+                    site_stats['incidents_30days'] = row[0] or 0  # 선택된 기간 내 incident
+                    
+                    # 3. Fall 사고 수 - 선택된 기간 내
+                    if period == 'today':
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM AdverseEvent ae
+                            JOIN AdverseEvent_AdverseEventType aet ON ae.Id = aet.AdverseEventId
+                            JOIN AdverseEventType at ON aet.AdverseEventTypeId = at.Id
+                            WHERE ae.IsDeleted = 0 AND at.Description LIKE '%Fall%'
+                            AND CAST(ae.Date AS DATE) = CAST(GETDATE() AS DATE)
+                        """)
+                    else:
+                        cursor.execute(f"""
+                            SELECT COUNT(*) FROM AdverseEvent ae
+                            JOIN AdverseEvent_AdverseEventType aet ON ae.Id = aet.AdverseEventId
+                            JOIN AdverseEventType at ON aet.AdverseEventTypeId = at.Id
+                            WHERE ae.IsDeleted = 0 AND at.Description LIKE '%Fall%'
+                            AND ae.Date >= {date_filter}
+                        """)
+                    site_stats['fall_count'] = cursor.fetchone()[0]
+                    
+                    # 3-1. Skin & Wound 사고 수 - 선택된 기간 내
+                    if period == 'today':
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM AdverseEvent ae
+                            JOIN AdverseEvent_AdverseEventType aet ON ae.Id = aet.AdverseEventId
+                            JOIN AdverseEventType at ON aet.AdverseEventTypeId = at.Id
+                            WHERE ae.IsDeleted = 0 AND (at.Description LIKE '%Skin%' OR at.Description LIKE '%Wound%')
+                            AND CAST(ae.Date AS DATE) = CAST(GETDATE() AS DATE)
+                        """)
+                    else:
+                        cursor.execute(f"""
+                            SELECT COUNT(*) FROM AdverseEvent ae
+                            JOIN AdverseEvent_AdverseEventType aet ON ae.Id = aet.AdverseEventId
+                            JOIN AdverseEventType at ON aet.AdverseEventTypeId = at.Id
+                            WHERE ae.IsDeleted = 0 AND (at.Description LIKE '%Skin%' OR at.Description LIKE '%Wound%')
+                            AND ae.Date >= {date_filter}
+                        """)
+                    site_stats['skin_wound_count'] = cursor.fetchone()[0]
+                    
+                    # 4. Progress Note 수 - 선택된 기간 내
+                    if period == 'today':
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM ProgressNote 
+                            WHERE IsDeleted = 0 
+                            AND CAST(Date AS DATE) = CAST(GETDATE() AS DATE)
+                        """)
+                    else:
+                        cursor.execute(f"""
+                            SELECT COUNT(*) FROM ProgressNote 
+                            WHERE IsDeleted = 0 
+                            AND Date >= {date_filter}
+                        """)
+                    site_stats['progress_notes_30days'] = cursor.fetchone()[0]
+                    
+                    # 5. Activity 수 - 선택된 기간 내
+                    if period == 'today':
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM ActivityEvent 
+                            WHERE IsDeleted = 0 
+                            AND CAST(StartDate AS DATE) = CAST(GETDATE() AS DATE)
+                        """)
+                    else:
+                        cursor.execute(f"""
+                            SELECT COUNT(*) FROM ActivityEvent 
+                            WHERE IsDeleted = 0 
+                            AND StartDate >= {date_filter}
+                        """)
+                    site_stats['activities_30days'] = cursor.fetchone()[0]
+                    
+                    # 6. Activity 종류별 분포 (상위 5개)
+                    if period == 'today':
+                        cursor.execute("""
+                            SELECT TOP 5 a.Description, COUNT(ae.Id) as cnt
+                            FROM ActivityEvent ae
+                            INNER JOIN Activity a ON ae.ActivityId = a.Id
+                            WHERE ae.IsDeleted = 0
+                            AND CAST(ae.StartDate AS DATE) = CAST(GETDATE() AS DATE)
+                            GROUP BY a.Description
+                            ORDER BY cnt DESC
+                        """)
+                    else:
+                        cursor.execute(f"""
+                            SELECT TOP 5 a.Description, COUNT(ae.Id) as cnt
+                            FROM ActivityEvent ae
+                            INNER JOIN Activity a ON ae.ActivityId = a.Id
+                            WHERE ae.IsDeleted = 0
+                            AND ae.StartDate >= {date_filter}
+                            GROUP BY a.Description
+                            ORDER BY cnt DESC
+                        """)
+                    site_stats['activity_types'] = [{'name': row[0], 'count': row[1]} for row in cursor.fetchall()]
+                    
+                    all_stats.append(site_stats)
+                    
+            except Exception as site_error:
+                logger.warning(f"Site {site_name} 통계 조회 실패: {site_error}")
+                all_stats.append({
+                    'site': site_name,
+                    'error': str(site_error),
+                    'total_persons': 0,
+                    'incidents': {'total': 0, 'open': 0, 'closed': 0, 'ambulance': 0, 'hospital': 0},
+                    'incidents_30days': 0,
+                    'fall_count': 0,
+                    'skin_wound_count': 0,
+                    'progress_notes_30days': 0,
+                    'activities_30days': 0,
+                    'activity_types': []
+                })
+        
+        # 전체 합계 계산
+        totals = {
+            'total_persons': sum(s.get('total_persons', 0) for s in all_stats),
+            'total_incidents': sum(s.get('incidents', {}).get('total', 0) for s in all_stats),
+            'open_incidents': sum(s.get('incidents', {}).get('open', 0) for s in all_stats),
+            'closed_incidents': sum(s.get('incidents', {}).get('closed', 0) for s in all_stats),
+            'ambulance_calls': sum(s.get('incidents', {}).get('ambulance', 0) for s in all_stats),
+            'hospital_admissions': sum(s.get('incidents', {}).get('hospital', 0) for s in all_stats),
+            'incidents_30days': sum(s.get('incidents_30days', 0) for s in all_stats),
+            'fall_count': sum(s.get('fall_count', 0) for s in all_stats),
+            'skin_wound_count': sum(s.get('skin_wound_count', 0) for s in all_stats),
+            'progress_notes_30days': sum(s.get('progress_notes_30days', 0) for s in all_stats),
+            'activities_30days': sum(s.get('activities_30days', 0) for s in all_stats)
+        }
+        
+        # Activity 종류별 전체 합계
+        activity_totals = {}
+        for site in all_stats:
+            for at in site.get('activity_types', []):
+                name = at['name']
+                if name in activity_totals:
+                    activity_totals[name] += at['count']
+                else:
+                    activity_totals[name] = at['count']
+        totals['activity_types'] = sorted(
+            [{'name': k, 'count': v} for k, v in activity_totals.items()],
+            key=lambda x: x['count'],
+            reverse=True
+        )[:10]  # 상위 10개
+        
+        return jsonify({
+            'success': True,
+            'period': period,
+            'sites': all_stats,
+            'totals': totals
+        })
+        
+    except Exception as e:
+        logger.error(f"Edenfield Stats 오류: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/progress-notes')
 @login_required
@@ -3926,7 +4186,8 @@ def add_user_api():
             last_name=data['last_name'],
             role=data['role'],
             position=data['position'],
-            location=data['location']
+            location=data['location'],
+            landing_page=data.get('landing_page')
         )
         
         if success:
@@ -3957,7 +4218,8 @@ def update_user_api(username):
             role=data.get('role'),
             position=data.get('position'),
             location=data.get('location'),
-            password=data.get('password')
+            password=data.get('password'),
+            landing_page=data.get('landing_page')
         )
         
         if success:
@@ -6045,11 +6307,16 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                             site_name, start_date, end_date, 
                             fetch_clients=is_first_sync
                         )
-                        # DB 조회 결과가 None이거나 빈 데이터인 경우 에러
-                        if not incidents_data or not incidents_data.get('incidents'):
-                            error_msg = f"❌ DB 직접 접속 실패: {site_name} - 조회 결과가 비어있습니다. DB 연결 설정을 확인하세요."
+                        # DB 조회 결과가 None인 경우에만 에러 (빈 리스트는 정상)
+                        if incidents_data is None:
+                            error_msg = f"❌ DB 직접 접속 실패: {site_name} - DB 연결에 실패했습니다."
                             logger.error(error_msg)
                             raise Exception(error_msg)
+                        
+                        # Incident가 0개인 경우는 정상 (해당 기간에 Incident가 없을 수 있음)
+                        incident_count = len(incidents_data.get('incidents', []))
+                        if incident_count == 0:
+                            logger.info(f"📭 {site_name}: 최근 {(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days}일간 Incident 없음 (정상)")
                     except Exception as db_error:
                         error_msg = f"❌ DB 직접 접속 실패: {site_name} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
                         logger.error(error_msg)
@@ -6237,16 +6504,18 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                     incident_id, manad_incident_id, resident_id, resident_name, 
                                     incident_type, severity, status, incident_date, 
                                     location, description, initial_actions_taken, 
-                                    reported_by, reported_by_name, site, created_at
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    reported_by, reported_by_name, site, created_at,
+                                    risk_rating, is_review_closed, is_ambulance_called,
+                                    is_admitted_to_hospital, is_major_injury, reviewed_date, status_enum_id
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, (
                                 cims_incident_id,
                                 incident_id,
                                 str(resident_id),
                                 resident_name,
                                 incident_type if incident_type else 'Unknown',
-                                incident.get('SeverityRating') or incident.get('RiskRatingName') or 'Unknown',  # Default to 'Unknown' if both are None
-                                incident.get('Status', 'Open'),  # Use status from API
+                                incident.get('SeverityRating') or 'Unknown',
+                                incident.get('Status', 'Open'),
                                 incident_date_iso,
                                 location,
                                 incident.get('Description', ''),
@@ -6254,7 +6523,14 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                 0,  # System user ID for MANAD-synced incidents
                                 incident.get('ReportedByName', ''),
                                 site_name,
-                                datetime.now().isoformat()
+                                datetime.now().isoformat(),
+                                incident.get('RiskRatingName', ''),
+                                1 if incident.get('IsReviewClosed') else 0,
+                                1 if incident.get('IsAmbulanceCalled') else 0,
+                                1 if incident.get('IsAdmittedToHospital') else 0,
+                                1 if incident.get('IsMajorInjury') else 0,
+                                incident.get('ReviewedDate'),
+                                incident.get('StatusEnumId')
                             ))
                             total_synced += 1
                             
@@ -7101,46 +7377,21 @@ def get_dashboard_kpis():
                 """
         
         # ==========================================
-        # 1. Incident 상태 통계 (SQL로 한 번에 계산)
+        # 1. Incident 상태 통계 (status_enum_id 기반)
+        # StatusEnumId: 0=Open, 1=InProgress, 2=Closed
         # ==========================================
         incident_stats_query = f"""
             SELECT 
-                COUNT(DISTINCT i.id) as total_incidents,
+                COUNT(*) as total_incidents,
                 
-                -- Open Incidents: 태스크가 없거나 한 번도 완료된 적 없음
-                COUNT(DISTINCT CASE 
-                    WHEN NOT EXISTS (
-                        SELECT 1 FROM cims_tasks t 
-                        WHERE t.incident_id = i.id 
-                        AND t.status = 'completed'
-                    ) THEN i.id 
-                END) as open_incidents,
+                -- Open Incidents: status_enum_id = 0
+                SUM(CASE WHEN status_enum_id = 0 THEN 1 ELSE 0 END) as open_incidents,
                 
-                -- In Progress Incidents: 일부는 완료, 일부는 미완료
-                COUNT(DISTINCT CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM cims_tasks t 
-                        WHERE t.incident_id = i.id 
-                        AND t.status = 'completed'
-                    ) 
-                    AND EXISTS (
-                        SELECT 1 FROM cims_tasks t 
-                        WHERE t.incident_id = i.id 
-                        AND t.status != 'completed'
-                    ) THEN i.id 
-                END) as in_progress_incidents,
+                -- In Progress Incidents: status_enum_id = 1
+                SUM(CASE WHEN status_enum_id = 1 THEN 1 ELSE 0 END) as in_progress_incidents,
                 
-                -- Completed Incidents: 모든 태스크 완료
-                COUNT(DISTINCT CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM cims_tasks t WHERE t.incident_id = i.id
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM cims_tasks t 
-                        WHERE t.incident_id = i.id 
-                        AND t.status != 'completed'
-                    ) THEN i.id 
-                END) as closed_incidents
+                -- Closed Incidents: status_enum_id = 2
+                SUM(CASE WHEN status_enum_id = 2 THEN 1 ELSE 0 END) as closed_incidents
                 
             FROM cims_incidents i
             WHERE i.incident_date >= ?
@@ -7151,53 +7402,28 @@ def get_dashboard_kpis():
         incident_stats = cursor.fetchone()
         
         # ==========================================
-        # 2. Overdue Incidents 계산 (Incident 단위)
-        # 한 Incident에 하나라도 overdue task가 있으면 +1
+        # 2. Fall 카운트
         # ==========================================
-        overdue_incidents_query = f"""
-            SELECT COUNT(DISTINCT i.id) as overdue_count
+        fall_query = f"""
+            SELECT COUNT(*) as fall_count
             FROM cims_incidents i
-            WHERE EXISTS (
-                SELECT 1 FROM cims_tasks t
-                WHERE t.incident_id = i.id
-                AND t.status IN ('pending', 'in_progress')
-                AND t.due_date < ?
-            )
-            AND i.incident_date >= ?
+            WHERE i.incident_date >= ?
+            AND LOWER(i.incident_type) LIKE '%fall%'
             {type_filter}
         """
         
-        cursor.execute(overdue_incidents_query, [now.isoformat(), start_date.isoformat()] + type_params)
-        overdue_result = cursor.fetchone()
-        overdue_tasks_count = overdue_result['overdue_count'] if overdue_result else 0
+        cursor.execute(fall_query, [start_date.isoformat()] + type_params)
+        fall_result = cursor.fetchone()
+        fall_count = fall_result['fall_count'] if fall_result else 0
         
         # ==========================================
-        # 3. Compliance Rate 계산
+        # 3. Compliance Rate 계산 (Closed / Total * 100)
         # ==========================================
-        compliance_query = f"""
-            SELECT 
-                COUNT(*) as total_completions,
-                SUM(CASE 
-                    WHEN t.completed_at <= t.due_date THEN 1 
-                    ELSE 0 
-                END) as on_time_completions
-            FROM cims_tasks t
-            JOIN cims_incidents i ON t.incident_id = i.id
-            WHERE t.status = 'completed'
-            AND t.completed_at IS NOT NULL
-            AND t.due_date IS NOT NULL
-            AND i.incident_date >= ?
-            {type_filter}
-        """
+        total_incidents = incident_stats['total_incidents'] or 0
+        closed_incidents = incident_stats['closed_incidents'] or 0
         
-        cursor.execute(compliance_query, [start_date.isoformat()] + type_params)
-        compliance_result = cursor.fetchone()
-        
-        total_completions = compliance_result['total_completions'] or 0
-        on_time_completions = compliance_result['on_time_completions'] or 0
-        
-        if total_completions > 0:
-            compliance_rate = round((on_time_completions / total_completions) * 100, 1)
+        if total_incidents > 0:
+            compliance_rate = round((closed_incidents / total_incidents) * 100, 1)
         else:
             compliance_rate = 0
         
@@ -7207,11 +7433,11 @@ def get_dashboard_kpis():
         # 4. 응답 반환
         # ==========================================
         return jsonify({
-            'total_incidents': incident_stats['total_incidents'],
-            'closed_incidents': incident_stats['closed_incidents'],
-            'open_incidents': incident_stats['open_incidents'],
-            'in_progress_incidents': incident_stats['in_progress_incidents'],  # 새로 추가
-            'overdue_tasks': overdue_tasks_count,
+            'total_incidents': incident_stats['total_incidents'] or 0,
+            'closed_incidents': incident_stats['closed_incidents'] or 0,
+            'open_incidents': incident_stats['open_incidents'] or 0,
+            'in_progress_incidents': incident_stats['in_progress_incidents'] or 0,
+            'fall_count': fall_count,
             'compliance_rate': compliance_rate,
             'period': period,
             'incident_type': incident_type
@@ -7222,6 +7448,206 @@ def get_dashboard_kpis():
         import traceback
         logger.error(traceback.format_exc())
         return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/cims/dashboard-stats')
+@login_required
+def get_dashboard_stats():
+    """
+    Dashboard 통계 API - 차트용 데이터
+    
+    반환 데이터:
+    - 전체 사이트 통계: 이벤트 유형, Risk Rating, Severity Rating 분포
+    - 사이트별 통계: Open/Closed, Reviewed 현황
+    - 추가 KPI: Ambulance, Hospital, Major Injury 등
+    """
+    try:
+        if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        period = request.args.get('period', 'week')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 기간 필터
+        now = datetime.now()
+        if period == 'today':
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == 'week':
+            start_date = now - timedelta(days=7)
+        else:  # month
+            start_date = now - timedelta(days=30)
+        
+        # ==========================================
+        # 1. 이벤트 유형 분포 (Event Type Distribution)
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN LOWER(incident_type) LIKE '%fall%' THEN 'Fall'
+                    WHEN LOWER(incident_type) LIKE '%wound%' OR LOWER(incident_type) LIKE '%skin%' THEN 'Wound/Skin'
+                    WHEN LOWER(incident_type) LIKE '%medication%' THEN 'Medication'
+                    WHEN LOWER(incident_type) LIKE '%behaviour%' OR LOWER(incident_type) LIKE '%behavior%' THEN 'Behaviour'
+                    WHEN LOWER(incident_type) LIKE '%danger%' THEN 'Danger'
+                    ELSE 'Other'
+                END as event_category,
+                COUNT(*) as count
+            FROM cims_incidents
+            WHERE incident_date >= ?
+            GROUP BY 
+                CASE 
+                    WHEN LOWER(incident_type) LIKE '%fall%' THEN 'Fall'
+                    WHEN LOWER(incident_type) LIKE '%wound%' OR LOWER(incident_type) LIKE '%skin%' THEN 'Wound/Skin'
+                    WHEN LOWER(incident_type) LIKE '%medication%' THEN 'Medication'
+                    WHEN LOWER(incident_type) LIKE '%behaviour%' OR LOWER(incident_type) LIKE '%behavior%' THEN 'Behaviour'
+                    WHEN LOWER(incident_type) LIKE '%danger%' THEN 'Danger'
+                    ELSE 'Other'
+                END
+            ORDER BY count DESC
+        """, [start_date.isoformat()])
+        
+        event_type_distribution = [{'name': row['event_category'], 'value': row['count']} for row in cursor.fetchall()]
+        
+        # ==========================================
+        # 2. Risk Rating 분포
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                COALESCE(NULLIF(risk_rating, ''), 'Not Set') as risk,
+                COUNT(*) as count
+            FROM cims_incidents
+            WHERE incident_date >= ?
+            GROUP BY COALESCE(NULLIF(risk_rating, ''), 'Not Set')
+            ORDER BY count DESC
+        """, [start_date.isoformat()])
+        
+        risk_distribution = [{'name': row['risk'], 'value': row['count']} for row in cursor.fetchall()]
+        
+        # ==========================================
+        # 3. Severity Rating 분포
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                COALESCE(NULLIF(severity, ''), 'Not Set') as severity_level,
+                COUNT(*) as count
+            FROM cims_incidents
+            WHERE incident_date >= ?
+            GROUP BY COALESCE(NULLIF(severity, ''), 'Not Set')
+            ORDER BY count DESC
+        """, [start_date.isoformat()])
+        
+        severity_distribution = [{'name': row['severity_level'], 'value': row['count']} for row in cursor.fetchall()]
+        
+        # ==========================================
+        # 4. 사이트별 Open/Closed 통계
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                site,
+                SUM(CASE WHEN status = 'Open' OR status_enum_id = 0 THEN 1 ELSE 0 END) as open_count,
+                SUM(CASE WHEN status = 'Closed' OR status_enum_id = 2 THEN 1 ELSE 0 END) as closed_count,
+                SUM(CASE WHEN status = 'In Progress' OR status_enum_id = 1 THEN 1 ELSE 0 END) as in_progress_count,
+                COUNT(*) as total
+            FROM cims_incidents
+            WHERE incident_date >= ?
+            GROUP BY site
+            ORDER BY total DESC
+        """, [start_date.isoformat()])
+        
+        site_status_stats = []
+        for row in cursor.fetchall():
+            site_status_stats.append({
+                'site': row['site'],
+                'open': row['open_count'],
+                'closed': row['closed_count'],
+                'in_progress': row['in_progress_count'],
+                'total': row['total']
+            })
+        
+        # ==========================================
+        # 5. 사이트별 Review 통계
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                site,
+                SUM(CASE WHEN is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed,
+                SUM(CASE WHEN is_review_closed = 0 OR is_review_closed IS NULL THEN 1 ELSE 0 END) as not_reviewed,
+                COUNT(*) as total
+            FROM cims_incidents
+            WHERE incident_date >= ?
+            GROUP BY site
+            ORDER BY total DESC
+        """, [start_date.isoformat()])
+        
+        site_review_stats = []
+        for row in cursor.fetchall():
+            site_review_stats.append({
+                'site': row['site'],
+                'reviewed': row['reviewed'],
+                'not_reviewed': row['not_reviewed'],
+                'total': row['total']
+            })
+        
+        # ==========================================
+        # 6. 추가 KPI 통계
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN is_ambulance_called = 1 THEN 1 ELSE 0 END) as ambulance_called,
+                SUM(CASE WHEN is_admitted_to_hospital = 1 THEN 1 ELSE 0 END) as hospital_admitted,
+                SUM(CASE WHEN is_major_injury = 1 THEN 1 ELSE 0 END) as major_injuries,
+                SUM(CASE WHEN is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed_count,
+                SUM(CASE WHEN is_review_closed = 0 OR is_review_closed IS NULL THEN 1 ELSE 0 END) as pending_review,
+                COUNT(*) as total
+            FROM cims_incidents
+            WHERE incident_date >= ?
+        """, [start_date.isoformat()])
+        
+        additional_kpis = cursor.fetchone()
+        
+        # ==========================================
+        # 7. Fall 전용 통계 (Witnessed vs Unwitnessed)
+        # ==========================================
+        cursor.execute("""
+            SELECT 
+                fall_type,
+                COUNT(*) as count
+            FROM cims_incidents
+            WHERE incident_date >= ?
+            AND LOWER(incident_type) LIKE '%fall%'
+            GROUP BY fall_type
+        """, [start_date.isoformat()])
+        
+        fall_stats = [{'type': row['fall_type'] or 'unknown', 'count': row['count']} for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'period': period,
+            'event_type_distribution': event_type_distribution,
+            'risk_distribution': risk_distribution,
+            'severity_distribution': severity_distribution,
+            'site_status_stats': site_status_stats,
+            'site_review_stats': site_review_stats,
+            'additional_kpis': {
+                'ambulance_called': additional_kpis['ambulance_called'] or 0,
+                'hospital_admitted': additional_kpis['hospital_admitted'] or 0,
+                'major_injuries': additional_kpis['major_injuries'] or 0,
+                'reviewed_count': additional_kpis['reviewed_count'] or 0,
+                'pending_review': additional_kpis['pending_review'] or 0,
+                'total': additional_kpis['total'] or 0
+            },
+            'fall_stats': fall_stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Dashboard Stats 조회 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Internal server error'}), 500
+
 
 @app.route('/api/cims/schedule-batch/<site>/<date>')
 @login_required
@@ -7820,6 +8246,24 @@ app.register_blueprint(progress_notes_cached_bp)
 
 def start_periodic_sync():
     """주기적 백그라운드 동기화 스케줄러 시작 (5분마다 증분 동기화)"""
+    
+    def initial_sync_job():
+        """서버 시작 시 초기 동기화 (전체 30일)"""
+        try:
+            # 5초 대기 후 초기 동기화 시작 (서버 완전 시작 대기)
+            time.sleep(5)
+            
+            logger.info("=" * 60)
+            logger.info("🚀 서버 시작 - 초기 데이터 동기화 시작 (최근 30일)")
+            logger.info("=" * 60)
+            
+            sync_result = sync_incidents_from_manad_to_cims(full_sync=True)
+            
+            logger.info(f"✅ 초기 데이터 동기화 완료: {sync_result}")
+            logger.info("=" * 60)
+        except Exception as e:
+            logger.error(f"❌ 초기 데이터 동기화 오류: {e}")
+    
     def periodic_sync_job():
         """5분마다 실행되는 증분 동기화 작업"""
         try:
@@ -7834,7 +8278,12 @@ def start_periodic_sync():
         except Exception as e:
             logger.error(f"❌ 주기적 백그라운드 동기화 오류: {e}")
     
-    # 5분마다 실행
+    # 서버 시작 시 초기 동기화 (백그라운드에서)
+    initial_thread = threading.Thread(target=initial_sync_job, daemon=True)
+    initial_thread.start()
+    logger.info("🚀 초기 데이터 동기화 스레드 시작됨 (5초 후 실행)")
+    
+    # 5분마다 증분 동기화 실행
     schedule.every(5).minutes.do(periodic_sync_job)
     
     def run_scheduler():
@@ -7851,7 +8300,7 @@ def start_periodic_sync():
     # 백그라운드 스레드로 실행
     sync_thread = threading.Thread(target=run_scheduler, daemon=True)
     sync_thread.start()
-    logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨")
+    logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨 (5분마다)")
 
 if __name__ == '__main__':
     # CIMS Background Data Processor (선택적)
