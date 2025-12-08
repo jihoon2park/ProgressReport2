@@ -1171,8 +1171,25 @@ def login():
                         
                 except Exception as e:
                     logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
-                    flash('Error occurred while saving data.', 'error')
-                    return redirect(url_for('home'))
+                    # 데이터 수집 실패해도 로그인은 허용
+                    try:
+                        user = User(username, user_info)
+                        user_role = user_info.get('role', 'USER').upper()
+                        login_user(user, remember=False)
+                        session.permanent = False
+                        set_session_permanent(user_role)
+                        session['_created'] = get_australian_time().isoformat()
+                        session['user_role'] = user_role
+                        session['site'] = site
+                        session['allowed_sites'] = allowed_sites
+                        logger.info(f"데이터 수집 오류 후에도 로그인 처리 완료: site={site}, allowed_sites={allowed_sites}")
+                        flash('Login successful! (Some data may not be available)', 'warning')
+                        # 일반 사용자는 progress_notes로 리다이렉트
+                        return redirect(url_for('progress_notes', site=site))
+                    except Exception as login_error:
+                        logger.error(f"로그인 처리 중 오류: {str(login_error)}")
+                        flash('Login failed due to system error.', 'error')
+                        return redirect(url_for('home'))
             except Exception as e:
                 logger.error(f"API 호출 중 오류 발생: {str(e)}")
                 # API 오류 시에도 로그인 허용
@@ -1243,8 +1260,7 @@ def login():
                 except Exception as login_error:
                     logger.error(f"로그인 처리 중 오류: {str(login_error)}")
                     flash('Login failed due to system error.', 'error')
-                
-            return redirect(url_for('home'))
+                    return redirect(url_for('home'))
         else:
             flash('{Invalid authentication information}', 'error')
             return redirect(url_for('home'))

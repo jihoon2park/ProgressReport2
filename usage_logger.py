@@ -15,12 +15,17 @@ class UsageLogger:
     
     def setup_logging(self):
         """로깅 설정"""
+        # logs 디렉토리 생성 (스크립트 위치 기준)
+        script_dir = Path(__file__).parent
+        logs_dir = script_dir / 'logs'
+        logs_dir.mkdir(exist_ok=True)
+        
         log_format = '%(asctime)s - %(levelname)s - %(message)s'
         logging.basicConfig(
             level=logging.INFO,
             format=log_format,
             handlers=[
-                logging.FileHandler('logs/usage_system.log', encoding='utf-8'),
+                logging.FileHandler(str(logs_dir / 'usage_system.log'), encoding='utf-8'),
                 logging.StreamHandler()
             ]
         )

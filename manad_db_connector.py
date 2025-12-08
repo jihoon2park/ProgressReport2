@@ -57,7 +57,25 @@ def get_site_db_config(site_name: str) -> Optional[Dict[str, Any]]:
     
     for config in configs:
         if config.get('site_name') == site_name:
-            return config.get('database')
+            db_config = config.get('database', {}).copy()
+            # 서버 이름이 호스트명인 경우 IP 주소로 변환 시도
+            server = db_config.get('server', '')
+            if server and '\\' in server:
+                # 서버 이름 형식: SQLSVR04\SQLEXPRESS 또는 192.168.1.1\SQLEXPRESS
+                parts = server.split('\\')
+                hostname_or_ip = parts[0]
+                instance = parts[1] if len(parts) > 1 else ''
+                
+                # IP 주소가 아닌 경우 (호스트명인 경우) API 설정에서 IP 가져오기
+                if not hostname_or_ip.replace('.', '').isdigit():
+                    api_config = config.get('api', {})
+                    server_ip = api_config.get('server_ip')
+                    if server_ip:
+                        # IP 주소로 변환
+                        db_config['server'] = f"{server_ip}\\{instance}" if instance else server_ip
+                        logger.debug(f"🔧 서버 이름 변환: {server} -> {db_config['server']}")
+            
+            return db_config
     
     return None
 
@@ -206,12 +224,35 @@ class MANADDBConnector:
         
         # pyodbc 연결 문자열
         if DRIVER_AVAILABLE == 'pyodbc':
-            # Windows
-            if os.name == 'nt':
-                driver = os.environ.get('MANAD_DB_DRIVER', '{ODBC Driver 17 for SQL Server}')
-            else:
-                # Linux/Mac
-                driver = os.environ.get('MANAD_DB_DRIVER', 'ODBC Driver 17 for SQL Server')
+            # 사용 가능한 드라이버 확인
+            try:
+                import pyodbc
+                available_drivers = pyodbc.drivers()
+                # 우선순위: ODBC Driver 17/18 > SQL Server Native Client > SQL Server
+                preferred_drivers = [
+                    '{ODBC Driver 17 for SQL Server}',
+                    '{ODBC Driver 18 for SQL Server}',
+                    'ODBC Driver 17 for SQL Server',
+                    'ODBC Driver 18 for SQL Server',
+                    'SQL Server Native Client 11.0',
+                    'SQL Server'
+                ]
+                driver = None
+                for preferred in preferred_drivers:
+                    if preferred in available_drivers:
+                        driver = preferred
+                        break
+                
+                if not driver:
+                    # 환경 변수에서 지정된 드라이버 사용
+                    driver = os.environ.get('MANAD_DB_DRIVER', '{ODBC Driver 17 for SQL Server}')
+                    logger.warning(f"⚠️ 기본 드라이버 사용: {driver} (시스템에 설치되지 않았을 수 있음)")
+                else:
+                    logger.debug(f"✅ 사용할 드라이버: {driver}")
+            except Exception as e:
+                # 폴백: 환경 변수 또는 기본값
+                driver = os.environ.get('MANAD_DB_DRIVER', 'SQL Server')
+                logger.warning(f"⚠️ 드라이버 확인 실패, 기본값 사용: {driver} ({e})")
             
             # Windows Authentication 사용
             if use_windows_auth:
@@ -238,6 +279,7 @@ class MANADDBConnector:
                     f"ApplicationIntent=ReadOnly;"  # 읽기 전용 모드
                 )
                 logger.info(f"✅ SQL Server Authentication 사용 (READ-ONLY): {site} ({server})")
+                logger.debug(f"   연결 정보: UID={username}, DATABASE={database}")
             
             return conn_str
         
