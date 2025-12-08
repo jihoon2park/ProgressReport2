@@ -187,6 +187,15 @@ USERS_DB = {
         "role": "doctor",
         "position": "GP",
         "location": ["West Park"]
+    },
+    "operation": {
+        "password_hash": hash_password("password123"),
+        "first_name": "Operation",
+        "last_name": "User",
+        "role": "admin",
+        "position": "Operations Manager",
+        "location": ["All"],
+        "landing_page": "/edenfield-dashboard"
     }
 }
 
@@ -229,12 +238,12 @@ def get_username_by_lowercase(username):
             return key
     return None
 
-def add_user(username, password, first_name, last_name, role, position, location):
+def add_user(username, password, first_name, last_name, role, position, location, landing_page=None):
     """새로운 사용자 추가"""
     if get_user(username):
         return False, "User already exists"
     
-    USERS_DB[username] = {
+    user_data = {
         "password_hash": hash_password(password),
         "first_name": first_name,
         "last_name": last_name,
@@ -242,9 +251,14 @@ def add_user(username, password, first_name, last_name, role, position, location
         "position": position,
         "location": location
     }
+    
+    if landing_page:
+        user_data["landing_page"] = landing_page
+    
+    USERS_DB[username] = user_data
     return True, "User added successfully"
 
-def update_user(username, first_name=None, last_name=None, role=None, position=None, location=None, password=None):
+def update_user(username, first_name=None, last_name=None, role=None, position=None, location=None, password=None, landing_page=None):
     """사용자 정보 수정"""
     actual_username = get_username_by_lowercase(username)
     if not actual_username:
@@ -262,6 +276,11 @@ def update_user(username, first_name=None, last_name=None, role=None, position=N
         USERS_DB[actual_username]["location"] = location
     if password is not None:
         USERS_DB[actual_username]["password_hash"] = hash_password(password)
+    if landing_page is not None:
+        if landing_page:
+            USERS_DB[actual_username]["landing_page"] = landing_page
+        elif "landing_page" in USERS_DB[actual_username]:
+            del USERS_DB[actual_username]["landing_page"]
     
     return True, "User updated successfully"
 

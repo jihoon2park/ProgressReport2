@@ -448,6 +448,7 @@
         {% endif %}
         {% if current_user.can_complete_tasks() or current_user.is_admin() %}
         <button class="btn-cims" onclick="window.location.href='/integrated_dashboard'" style="background-color: #28a745; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🛡️ CIMS Dashboard</button>
+        <button class="btn-edenfield" onclick="window.location.href='/edenfield-dashboard'" style="background: linear-gradient(135deg, #1a1a2e, #0f3460); color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🏢 Edenfield</button>
         {% endif %}
         {% if current_user.role in ['admin', 'site_admin'] %}
         <button class="btn-admin-settings" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🔧 Settings</button>
