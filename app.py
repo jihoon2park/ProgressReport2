@@ -1171,8 +1171,25 @@ def login():
                         
                 except Exception as e:
                     logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
-                    flash('Error occurred while saving data.', 'error')
-                    return redirect(url_for('home'))
+                    # 데이터 수집 실패해도 로그인은 허용
+                    try:
+                        user = User(username, user_info)
+                        user_role = user_info.get('role', 'USER').upper()
+                        login_user(user, remember=False)
+                        session.permanent = False
+                        set_session_permanent(user_role)
+                        session['_created'] = get_australian_time().isoformat()
+                        session['user_role'] = user_role
+                        session['site'] = site
+                        session['allowed_sites'] = allowed_sites
+                        logger.info(f"데이터 수집 오류 후에도 로그인 처리 완료: site={site}, allowed_sites={allowed_sites}")
+                        flash('Login successful! (Some data may not be available)', 'warning')
+                        # 일반 사용자는 progress_notes로 리다이렉트
+                        return redirect(url_for('progress_notes', site=site))
+                    except Exception as login_error:
+                        logger.error(f"로그인 처리 중 오류: {str(login_error)}")
+                        flash('Login failed due to system error.', 'error')
+                        return redirect(url_for('home'))
             except Exception as e:
                 logger.error(f"API 호출 중 오류 발생: {str(e)}")
                 # API 오류 시에도 로그인 허용
@@ -1243,8 +1260,7 @@ def login():
                 except Exception as login_error:
                     logger.error(f"로그인 처리 중 오류: {str(login_error)}")
                     flash('Login failed due to system error.', 'error')
-                
-            return redirect(url_for('home'))
+                    return redirect(url_for('home'))
         else:
             flash('{Invalid authentication information}', 'error')
             return redirect(url_for('home'))
@@ -5439,10 +5455,14 @@ policy_engine = PolicyEngine()
 # CIMS용 데이터베이스 연결 함수
 def get_db_connection(read_only: bool = False):
     """CIMS용 데이터베이스 연결"""
+    # 절대 경로 사용하여 working directory 문제 방지
+    import os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'progress_report.db')
+    
     if read_only:
-        conn = sqlite3.connect('file:progress_report.db?mode=ro', timeout=60.0, uri=True)
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', timeout=60.0, uri=True)
     else:
-        conn = sqlite3.connect('progress_report.db', timeout=60.0)
+        conn = sqlite3.connect(db_path, timeout=60.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL")
@@ -5458,7 +5478,8 @@ def get_cache_status_current():
     """Return latest cache/sync status for dashboard indicator"""
     conn = None
     try:
-        conn = get_db_connection(read_only=True)
+        # read_only 대신 일반 연결 사용 (WAL 모드 호환성)
+        conn = get_db_connection(read_only=False)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT status, last_processed
@@ -5467,11 +5488,19 @@ def get_cache_status_current():
             LIMIT 1
         """)
         row = cursor.fetchone()
+        conn.close()
         status = row[0] if row else 'idle'
         last = row[1] if row else None
         return jsonify({'success': True, 'status': status, 'last_processed': last})
     except Exception as e:
-        logger.error(f"get_cache_status_current error: {e}")
+        # 테이블이 없거나 접근할 수 없을 때 조용히 처리 (경고만 기록)
+        # 이 API는 UI 인디케이터용이므로 실패해도 앱 기능에 영향 없음
+        if 'no such table' in str(e):
+            # 테이블이 없는 경우 첫 실행이므로 debug 레벨로 처리
+            logger.debug(f"cims_cache_management table not found (first run?): {e}")
+        else:
+            # 다른 에러는 warning으로 기록
+            logger.warning(f"get_cache_status_current error: {e}")
         return jsonify({'success': True, 'status': 'idle'}), 200
     finally:
         if conn:

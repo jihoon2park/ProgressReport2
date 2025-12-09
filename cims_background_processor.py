@@ -19,7 +19,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class CIMSBackgroundProcessor:
-    def __init__(self, db_path: str = 'progress_report.db'):
+    def __init__(self, db_path: str = None):
+        # 절대 경로 사용하여 working directory 문제 방지
+        import os
+        if db_path is None:
+            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'progress_report.db')
+        elif not os.path.isabs(db_path):
+            # 상대 경로인 경우 스크립트 위치 기준으로 변환
+            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), db_path)
         self.db_path = db_path
         self.running = False
         self.thread = None
