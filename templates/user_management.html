@@ -356,6 +356,7 @@
                         <th>Role</th>
                         <th>Position</th>
                         <th>Location</th>
+                        <th>Landing Page</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -424,6 +425,20 @@
                     <div class="checkbox-group" id="locationGroup">
                         <!-- Location checkboxes will be dynamically loaded -->
                     </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="landing_page">Landing Page (로그인 후 이동 페이지)</label>
+                    <select id="landing_page" name="landing_page" style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                        <option value="">Default (Role-based)</option>
+                        <option value="/edenfield-dashboard">🏢 Edenfield Dashboard</option>
+                        <option value="/integrated_dashboard">🛡️ CIMS Dashboard</option>
+                        <option value="/progress-notes">📝 Progress Notes</option>
+                        <option value="/incident-viewer">🚨 Incident Viewer</option>
+                        <option value="/rod_dashboard">📊 ROD Dashboard</option>
+                        <option value="/mobile_dashboard">📱 Mobile Dashboard</option>
+                    </select>
+                    <small style="color: #6c757d;">선택하지 않으면 역할에 따라 기본 페이지로 이동합니다</small>
                 </div>
                 
                 <div class="modal-footer">
@@ -561,7 +576,7 @@
             const tbody = document.getElementById('usersTableBody');
             
             if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No users found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No users found.</td></tr>';
                 return;
             }
             
@@ -573,6 +588,16 @@
                 const locations = Array.isArray(user.location) ? user.location : [user.location];
                 const locationHtml = locations.map(loc => `<span class="location-badge">${loc}</span>`).join('');
                 
+                const landingPageLabels = {
+                    '/edenfield-dashboard': '🏢 Edenfield',
+                    '/integrated_dashboard': '🛡️ CIMS',
+                    '/progress-notes': '📝 Notes',
+                    '/incident-viewer': '🚨 Incidents',
+                    '/rod_dashboard': '📊 ROD',
+                    '/mobile_dashboard': '📱 Mobile'
+                };
+                const landingPage = user.landing_page ? landingPageLabels[user.landing_page] || user.landing_page : '<span style="color:#999;">Default</span>';
+                
                 return `
                     <tr>
                         <td><strong>${user.username}</strong></td>
@@ -580,6 +605,7 @@
                         <td><span class="badge ${roleClass}">${user.role}</span></td>
                         <td>${user.position}</td>
                         <td>${locationHtml}</td>
+                        <td>${landingPage}</td>
                         <td>
                             <button class="btn btn-sm btn-warning" onclick="editUser('${user.username}')">✏️ Edit</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')">🗑️ Delete</button>
@@ -668,6 +694,9 @@
                         if (checkbox) checkbox.checked = true;
                     });
                     
+                    // Set landing page
+                    document.getElementById('landing_page').value = user.landing_page || '';
+                    
                     document.getElementById('userModal').style.display = 'block';
                 } else {
                     showAlert('Failed to load user: ' + data.message, 'danger');
@@ -710,13 +739,15 @@
             e.preventDefault();
             
             const formData = new FormData(e.target);
+            const landingPage = document.getElementById('landing_page').value;
             const userData = {
                 username: formData.get('username'),
                 first_name: formData.get('first_name'),
                 last_name: formData.get('last_name'),
                 role: document.getElementById('role').value,
                 position: document.getElementById('position').value,
-                location: Array.from(document.querySelectorAll('input[name="location"]:checked')).map(cb => cb.value)
+                location: Array.from(document.querySelectorAll('input[name="location"]:checked')).map(cb => cb.value),
+                landing_page: landingPage || null
             };
             
             const password = formData.get('password');
