@@ -2,7 +2,9 @@
 
 ## 🏥 Overview
 
-The Progress Report System is a comprehensive healthcare management platform designed for aged care facilities. It provides real-time progress note management, incident tracking (CIMS), policy management, and FCM (Firebase Cloud Messaging) notifications with a hybrid data access architecture supporting both direct database access and API integration.
+The Progress Report System is a comprehensive healthcare management platform designed for aged care facilities. It provides real-time progress note management, incident tracking (CIMS), policy management, and FCM (Firebase Cloud Messaging) notifications. 
+
+**The system primarily uses direct SQL Server database access** for real-time data retrieval from MANAD Plus, with API integration available as a backup/fallback option when direct database access is unavailable.
 
 ## 🚀 Technology Stack
 
@@ -37,19 +39,24 @@ The Progress Report System is a comprehensive healthcare management platform des
 
 ### Data Access Modes
 
-The system supports two data access modes:
+The system uses **Direct Database Access** as the primary method, with API as a backup/fallback option.
 
-#### 1. **Direct Database Access Mode** (Recommended)
+#### 1. **Direct Database Access Mode** (Primary/Default)
+- **Primary method** for data retrieval
 - Direct connection to MANAD Plus SQL Server databases
 - Real-time data retrieval without API overhead
 - No API keys required
+- Better performance and data accuracy
 - Configured via `USE_DB_DIRECT_ACCESS=true` in `system_settings` table
+- Uses `manad_db_connector.py` for READ-ONLY database access
 
-#### 2. **API Mode** (Fallback)
+#### 2. **API Mode** (Backup/Fallback Only)
+- **Backup method** when direct DB access is unavailable
 - RESTful API integration with MANAD Plus
 - API key authentication required
 - Configured via `USE_DB_DIRECT_ACCESS=false`
 - API keys stored in `data/api_keys/api_keys.json`
+- Used only when DB direct access fails or is disabled
 
 ### Core Components
 
@@ -65,31 +72,37 @@ Flask Application (app.py)
 
 #### 2. **Data Management Layer**
 ```
-Hybrid Data Architecture:
-├── SQLite Database (Primary)
-│   ├── Users & Authentication
-│   ├── Client Data Cache
-│   ├── Progress Notes Cache
-│   ├── CIMS Incidents
-│   ├── FCM Tokens
-│   └── System Settings
-├── MANAD Plus SQL Server (Direct Access)
-│   ├── Progress Notes
+Primary Data Architecture:
+├── MANAD Plus SQL Server (Direct Access - Primary)
+│   ├── Progress Notes (Real-time)
 │   ├── Adverse Events (Incidents)
 │   ├── Client Information
 │   └── Activity Events
+│   └── READ-ONLY access via manad_db_connector.py
+├── SQLite Database (Local Cache & System Data)
+│   ├── Users & Authentication
+│   ├── Client Data Cache
+│   ├── Progress Notes Cache (Backup)
+│   ├── CIMS Incidents (Synced)
+│   ├── FCM Tokens
+│   └── System Settings
 └── JSON Files (Configuration)
-    ├── API Keys
-    └── Site Configuration
+    ├── API Keys (Backup mode only)
+    └── Site Configuration (DB connection settings)
 ```
 
 #### 3. **Caching System**
 ```
-Multi-Level Caching:
-├── Level 1: IndexedDB (Client-side)
-├── Level 2: SQLite Cache (Server-side)
-├── Level 3: Direct DB Access (Real-time)
-└── Hybrid Strategy (Recent from DB, Older from Cache)
+Caching Strategy (DB Direct Access Mode):
+├── Level 1: Direct SQL Server Access (Real-time, Primary)
+│   └── Always fresh data, no cache needed
+├── Level 2: SQLite Cache (Backup/Sync data)
+│   └── Used for CIMS incident synchronization
+└── Level 3: IndexedDB (Client-side, optional)
+    └── Browser-side caching for offline support
+
+Note: In DB Direct Access mode, caching is minimal as data is always real-time.
+API mode (backup) uses traditional caching strategies.
 ```
 
 ## 📊 Database Schema
@@ -224,18 +237,23 @@ python init_database.py
 
 6. **Configure Data Access Mode**
 
-   **Option A: Direct Database Access (Recommended)**
+   **Direct Database Access (Default/Primary)**
    ```python
-   # Set in system_settings table
+   # Set in system_settings table (default is DB direct access)
    USE_DB_DIRECT_ACCESS = true
    ```
+   - This is the **primary and recommended** method
+   - No API keys required
+   - Real-time data from SQL Server
 
-   **Option B: API Mode**
+   **API Mode (Backup Only)**
    ```python
-   # Set in system_settings table
+   # Set in system_settings table (only if DB access unavailable)
    USE_DB_DIRECT_ACCESS = false
    # Configure API keys in data/api_keys/api_keys.json
    ```
+   - Use only when direct DB access is not possible
+   - Requires API keys configuration
 
 7. **Configure Site Database Connections**
 
@@ -358,17 +376,19 @@ python init_database.py
 
 ## 🔄 Data Synchronization
 
-### Direct Database Access Mode
+### Direct Database Access Mode (Primary)
 1. **Real-time Data** - Direct queries to MANAD Plus SQL Server
-2. **No Caching Required** - Always fresh data
-3. **Background Sync** - Periodic synchronization to local cache
-4. **Automatic Fallback** - Falls back to API mode if DB connection fails
+2. **No Caching Required** - Always fresh data from source
+3. **Background Sync** - Periodic synchronization of incidents to local SQLite (CIMS)
+4. **READ-ONLY Access** - All connections are read-only for data safety
+5. **Performance** - Faster than API, no network latency
 
-### API Mode (Fallback)
-1. **Recent Data** (last 24 hours) - Fetched from external API
-2. **Older Data** (24+ hours) - Served from SQLite cache
-3. **Background Sync** - Daily at 3 AM
-4. **Manual Refresh** - On-demand cache updates
+### API Mode (Backup/Fallback)
+1. **Used Only When Needed** - When DB direct access is unavailable
+2. **Recent Data** (last 24 hours) - Fetched from external API
+3. **Older Data** (24+ hours) - Served from SQLite cache
+4. **Background Sync** - Daily at 3 AM
+5. **Manual Refresh** - On-demand cache updates
 
 ### Cache Management
 - **Automatic expiration** after 24 hours (API mode)
@@ -418,10 +438,10 @@ ProgressReport/
 ```
 
 ### Key Modules
-- **`manad_db_connector.py`** - Direct SQL Server database access
-- **`api_progressnote_fetch.py`** - Progress notes retrieval (DB or API)
-- **`progress_notes_cache_manager.py`** - Hybrid caching logic
-- **`api_key_manager_json.py`** - JSON-based API key management
+- **`manad_db_connector.py`** - **Primary**: Direct SQL Server database access (READ-ONLY)
+- **`api_progressnote_fetch.py`** - Progress notes retrieval (DB primary, API backup)
+- **`progress_notes_cache_manager.py`** - Caching logic (mainly for API mode)
+- **`api_key_manager_json.py`** - JSON-based API key management (backup mode only)
 - **`fcm_token_manager_sqlite.py`** - FCM token management
 - **`cims_background_processor.py`** - Background incident synchronization
 - **`cims_policy_engine.py`** - Policy-based task generation
@@ -542,17 +562,22 @@ gunicorn -c gunicorn.conf.py app:app
 ## 🔑 Configuration
 
 ### Data Access Mode
-The system can operate in two modes:
+The system uses **Direct Database Access as the primary method**, with API as backup only.
 
-1. **Direct Database Access** (Recommended)
+1. **Direct Database Access** (Primary/Default)
+   - **This is the default and recommended method**
    - Set `USE_DB_DIRECT_ACCESS=true` in `system_settings` table
    - No API keys required
    - Real-time data from SQL Server
+   - READ-ONLY access for safety
+   - Better performance and accuracy
 
-2. **API Mode**
+2. **API Mode** (Backup/Fallback Only)
+   - **Use only when DB direct access is unavailable**
    - Set `USE_DB_DIRECT_ACCESS=false` in `system_settings` table
    - API keys required in `data/api_keys/api_keys.json`
    - Uses RESTful API with caching
+   - Slower than direct DB access
 
 ### Site Configuration
 Site database connections are configured in `data/api_keys/site_config.json`:
