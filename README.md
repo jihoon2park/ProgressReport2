@@ -2,7 +2,7 @@
 
 ## 🏥 Overview
 
-The Progress Report System is a comprehensive healthcare management platform designed for aged care facilities. It provides real-time progress note management, incident tracking, policy management, and FCM (Firebase Cloud Messaging) notifications with a hybrid caching architecture for optimal performance.
+The Progress Report System is a comprehensive healthcare management platform designed for aged care facilities. It provides real-time progress note management, incident tracking (CIMS), policy management, and FCM (Firebase Cloud Messaging) notifications with a hybrid data access architecture supporting both direct database access and API integration.
 
 ## 🚀 Technology Stack
 
@@ -11,12 +11,14 @@ The Progress Report System is a comprehensive healthcare management platform des
 - **Flask-Login 0.6.3** - User session management
 - **Flask-SQLAlchemy 3.1.1** - Database ORM
 - **SQLite** - Primary database with hybrid caching
-- **Python 3.x** - Core programming language
+- **Python 3.11+** - Core programming language
+- **pyodbc** - SQL Server database connectivity
 - **IIS + wfastcgi** - Production web server (Windows)
 
 ### Frontend Technologies
 - **HTML5/CSS3** - User interface
 - **JavaScript (ES6+)** - Client-side functionality
+- **Chart.js** - Data visualization
 - **IndexedDB** - Client-side data caching
 - **Responsive Design** - Mobile-friendly interface
 
@@ -24,29 +26,41 @@ The Progress Report System is a comprehensive healthcare management platform des
 - **Firebase Admin SDK 6.4.0** - Push notifications
 - **RESTful APIs** - External data integration
 - **Requests 2.32.3** - HTTP client for API calls
+- **MANAD Plus Integration** - Direct SQL Server database access
 
 ### Additional Libraries
 - **wfastcgi** - WSGI interface for IIS (Windows production)
-- **Cryptography 44.0.2** - API key encryption
 - **Schedule 1.2.0** - Background task scheduling
 - **Python-dotenv 1.1.0** - Environment configuration
 
-
-
 ## 🏗️ System Architecture
+
+### Data Access Modes
+
+The system supports two data access modes:
+
+#### 1. **Direct Database Access Mode** (Recommended)
+- Direct connection to MANAD Plus SQL Server databases
+- Real-time data retrieval without API overhead
+- No API keys required
+- Configured via `USE_DB_DIRECT_ACCESS=true` in `system_settings` table
+
+#### 2. **API Mode** (Fallback)
+- RESTful API integration with MANAD Plus
+- API key authentication required
+- Configured via `USE_DB_DIRECT_ACCESS=false`
+- API keys stored in `data/api_keys/api_keys.json`
 
 ### Core Components
 
 #### 1. **Web Application Layer**
 ```
-IIS (Internet Information Services)
-├── wfastcgi (WSGI Interface)
-│   └── app.py (Main Flask Application)
-│       ├── Authentication & Authorization
-│       ├── Route Management
-│       ├── Session Handling
-│       └── API Endpoints
-└── Application Pool Management
+Flask Application (app.py)
+├── Authentication & Authorization
+├── Route Management
+├── Session Handling
+├── API Endpoints
+└── Background Processors
 ```
 
 #### 2. **Data Management Layer**
@@ -56,10 +70,17 @@ Hybrid Data Architecture:
 │   ├── Users & Authentication
 │   ├── Client Data Cache
 │   ├── Progress Notes Cache
+│   ├── CIMS Incidents
 │   ├── FCM Tokens
-│   └── System Logs
-├── JSON Files (Backup/Fallback)
-└── External APIs (Real-time Data)
+│   └── System Settings
+├── MANAD Plus SQL Server (Direct Access)
+│   ├── Progress Notes
+│   ├── Adverse Events (Incidents)
+│   ├── Client Information
+│   └── Activity Events
+└── JSON Files (Configuration)
+    ├── API Keys
+    └── Site Configuration
 ```
 
 #### 3. **Caching System**
@@ -67,17 +88,8 @@ Hybrid Data Architecture:
 Multi-Level Caching:
 ├── Level 1: IndexedDB (Client-side)
 ├── Level 2: SQLite Cache (Server-side)
-├── Level 3: External API (Real-time)
-└── Hybrid Strategy (Recent from API, Older from Cache)
-```
-
-#### 4. **Notification System**
-```
-FCM Integration:
-├── Token Management
-├── Push Notifications
-├── Escalation Policies
-└── Device Registration
+├── Level 3: Direct DB Access (Real-time)
+└── Hybrid Strategy (Recent from DB, Older from Cache)
 ```
 
 ## 📊 Database Schema
@@ -88,15 +100,14 @@ FCM Integration:
 - **access_logs** - User activity tracking
 - **progress_note_logs** - Progress note audit trail
 - **clients_cache** - Client data cache
-- **care_areas** - Care area definitions
-- **event_types** - Event type classifications
-- **progress_notes_cache** - Progress notes cache
-- **api_keys** - Encrypted API credentials
+- **cims_incidents** - Incident records synced from MANAD Plus
+- **cims_tasks** - Policy-based tasks for incidents
+- **system_settings** - System configuration (e.g., USE_DB_DIRECT_ACCESS)
+- **api_keys** - API credentials (when using API mode)
 
 ### Performance Optimizations
-- **11 Strategic Indexes** for fast queries
+- **Strategic Indexes** for fast queries
 - **Composite Indexes** for complex searches
-- **Covering Indexes** to minimize I/O
 - **Query Optimization** for sub-10ms response times
 
 ## 🎯 Key Features
@@ -107,103 +118,172 @@ FCM Integration:
 - Pagination with 50/100 items per page
 - Advanced search and filtering
 - Client-side IndexedDB caching
+- Direct database access or API integration
 
-### 2. **Incident Management**
-- Real-time incident tracking
+### 2. **Incident Management (CIMS)**
+- Real-time incident tracking from MANAD Plus
 - Policy-based escalation (15min → 30min → 1hr → 6hr)
 - FCM notification integration
 - Admin dashboard for incident oversight
+- Automatic task generation based on policies
+- Status tracking (Open, In Progress, Closed)
 
-### 3. **Policy Management**
+### 3. **Dashboard Systems**
+
+#### **Edenfield Dashboard**
+- Company-wide statistics overview
+- Site-by-site breakdown (5 sites)
+- Resident counts and activity tracking
+- Incident status overview
+- Progress notes and activity types
+- Period filtering (Today, This Week, This Month)
+
+#### **Integrated Dashboard (CIMS)**
+- Real-time incident KPIs
+- Open/In Progress/Closed incident counts
+- Falls tracking
+- Site analysis with charts
+- Event type distribution
+- Risk and severity rating analysis
+
+#### **ROD Dashboard**
+- Residence of Day management
+- Monthly and yearly views
+- Activity tracking
+
+### 4. **Policy Management**
 - Web-based policy editing
 - Escalation timeline configuration
 - Recipient management via FCM tokens
 - Real-time policy updates
+- Automatic task generation
 
-### 4. **FCM Admin Dashboard**
+### 5. **FCM Admin Dashboard**
 - Device token management
 - Push notification testing
 - Client synchronization status
 - Token registration/removal
 
-### 5. **User Management**
-- Role-based access control (Admin, Site Admin, Doctor, Physiotherapist)
+### 6. **User Management**
+- Role-based access control (Admin, Site Admin, Doctor, Physiotherapist, Operations)
 - Multi-site support
 - Session management
+- Custom landing pages per user
 - Activity logging
 
-### 6. **Performance Features**
-- **100-500x Performance Improvement** over JSON-based system
-- **Sub-10ms Query Response** times
-- **Hybrid Caching** for optimal data freshness
-- **Background Synchronization** every 3 AM
-- **Real-time Cache Refresh** capabilities
+### 7. **Data Access Configuration**
+- **Direct DB Access Mode**: Fast, real-time data from SQL Server
+- **API Mode**: RESTful API integration with authentication
+- Automatic fallback between modes
+- Configuration via database or environment variables
 
 ## 🔧 Installation & Setup
 
 ### Prerequisites
-- **Windows Server** (IIS 8.0+)
-- **Python 3.8+**
+- **Windows Server** (IIS 8.0+) or **Linux Server**
+- **Python 3.11+**
 - **SQLite 3.x**
-- **IIS with FastCGI module**
-- **wfastcgi** package
+- **SQL Server** (for MANAD Plus direct access)
+- **ODBC Driver 17 for SQL Server** (for Windows)
+- **IIS with FastCGI module** (Windows production)
+- **wfastcgi** package (Windows production)
 - Modern web browser with IndexedDB support
 
 ### Installation Steps
 
 1. **Clone Repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/jihoon2park/ProgressReport2.git
 cd ProgressReport
 ```
 
-2. **Install Dependencies**
+2. **Create Virtual Environment**
+```bash
+python -m venv venv
+```
+
+3. **Activate Virtual Environment**
+```bash
+# Windows
+venv\Scripts\activate
+
+# Linux/Mac
+source venv/bin/activate
+```
+
+4. **Install Dependencies**
 ```bash
 pip install -r requirements.txt
+pip install pyodbc  # Additional dependency for SQL Server
 ```
 
-3. **Environment Configuration**
-```bash
-# Create .env file
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-4. **Database Initialization**
+5. **Database Initialization**
 ```bash
 python init_database.py
 ```
 
-5. **Run Application**
-```bash
-# Development
-python app.py
+6. **Configure Data Access Mode**
 
-# Production (IIS + wfastcgi)
-# Deploy using deploy_iis.bat script
-# IIS will handle the application through wfastcgi
-```
+   **Option A: Direct Database Access (Recommended)**
+   ```python
+   # Set in system_settings table
+   USE_DB_DIRECT_ACCESS = true
+   ```
+
+   **Option B: API Mode**
+   ```python
+   # Set in system_settings table
+   USE_DB_DIRECT_ACCESS = false
+   # Configure API keys in data/api_keys/api_keys.json
+   ```
+
+7. **Configure Site Database Connections**
+
+   For direct database access, configure site databases in `data/api_keys/site_config.json`:
+   ```json
+   [
+     {
+       "site_name": "Parafield Gardens",
+       "database": {
+         "server": "efsvr02\\sqlexpress",
+         "database": "ManadPlus_Edenfield",
+         "use_windows_auth": true
+       }
+     }
+   ]
+   ```
+
+8. **Run Application**
+
+   **Development:**
+   ```bash
+   python app.py
+   ```
+
+   **Production (Windows IIS):**
+   ```bash
+   # Deploy using deploy_iis.bat script
+   deploy_iis.bat
+   ```
+
+   **Production (Linux):**
+   ```bash
+   gunicorn -c gunicorn.conf.py app:app
+   ```
 
 ## 🚀 Performance Metrics
 
-### Before vs After Migration
-| Operation | JSON System | SQLite System | Improvement |
-|-----------|-------------|---------------|-------------|
-| User Login | 100ms | 20ms | **5x faster** |
-| Client Search | 500ms | 50ms | **10x faster** |
-| Dropdown Loading | 200ms | 20ms | **10x faster** |
-| Progress Note Save | 300ms | 30ms | **10x faster** |
-| Log Query | 1000ms | 100ms | **10x faster** |
-
 ### Current Performance
-- **Average Query Time**: 0.65ms
+- **Average Query Time**: <10ms
 - **Cache Hit Rate**: 95%+
-- **Database Size**: 0.24MB (optimized)
+- **Database Size**: Optimized
 - **Concurrent Users**: 50+ (tested)
+- **Direct DB Access**: Real-time data retrieval
 
 ## 📱 User Interface
 
 ### Main Pages
+
 1. **Progress Note List** (`/progress-notes`)
    - Paginated progress notes display
    - Real-time search and filtering
@@ -216,20 +296,44 @@ python app.py
    - Rich text editor for notes
    - Auto-save functionality
 
-3. **Incident Viewer** (`/incident-viewer`)
+3. **Edenfield Dashboard** (`/edenfield-dashboard`)
+   - Company-wide statistics
+   - Site-by-site breakdown
+   - Period filtering (Today/Week/Month)
+   - Activity type analysis
+
+4. **Integrated Dashboard** (`/integrated_dashboard`)
+   - CIMS incident KPIs
+   - Real-time incident tracking
+   - Site analysis charts
+   - Event type distribution
+
+5. **ROD Dashboard** (`/rod-dashboard`)
+   - Residence of Day management
+   - Monthly/yearly views
+   - Activity tracking
+
+6. **Incident Viewer** (`/incident-viewer`)
    - Real-time incident monitoring
    - Policy management interface
    - Escalation timeline visualization
 
-4. **FCM Admin Dashboard** (`/fcm-admin-dashboard`)
+7. **FCM Admin Dashboard** (`/fcm-admin-dashboard`)
    - Device token management
    - Notification testing
    - Client sync status
 
-5. **Admin Settings** (`/admin-settings`)
+8. **Admin Settings** (`/admin-settings`)
    - API key management
    - System configuration
+   - Data source mode switching
    - Log viewer access
+
+9. **User Management** (`/user-management`)
+   - User creation and editing
+   - Role assignment
+   - Custom landing page configuration
+   - Multi-site access control
 
 ## 🔐 Security Features
 
@@ -238,12 +342,13 @@ python app.py
 - **Role-based access control** (RBAC)
 - **Password hashing** with secure algorithms
 - **Session timeout** protection
+- **Custom landing pages** per user
 
 ### Data Security
-- **API key encryption** using Fernet
+- **API key management** (JSON-based)
 - **SQL injection prevention** via parameterized queries
 - **XSS protection** with input sanitization
-- **CSRF protection** with Flask-WTF
+- **Read-only database connections** for direct access
 
 ### Audit & Logging
 - **Comprehensive access logging**
@@ -253,14 +358,20 @@ python app.py
 
 ## 🔄 Data Synchronization
 
-### Hybrid Caching Strategy
+### Direct Database Access Mode
+1. **Real-time Data** - Direct queries to MANAD Plus SQL Server
+2. **No Caching Required** - Always fresh data
+3. **Background Sync** - Periodic synchronization to local cache
+4. **Automatic Fallback** - Falls back to API mode if DB connection fails
+
+### API Mode (Fallback)
 1. **Recent Data** (last 24 hours) - Fetched from external API
 2. **Older Data** (24+ hours) - Served from SQLite cache
 3. **Background Sync** - Daily at 3 AM
 4. **Manual Refresh** - On-demand cache updates
 
 ### Cache Management
-- **Automatic expiration** after 24 hours
+- **Automatic expiration** after 24 hours (API mode)
 - **Manual refresh** via UI buttons
 - **Fallback to cache** if API fails
 - **Real-time status** indicators
@@ -271,6 +382,7 @@ python app.py
 - **Performance metrics** tracking
 - **Cache hit/miss ratios**
 - **API response times**
+- **Database query performance**
 - **User activity analytics**
 
 ### Log Analysis
@@ -284,25 +396,36 @@ python app.py
 ### Code Structure
 ```
 ProgressReport/
-├── app.py                 # Main Flask application
-├── models.py              # Database models
-├── config.py              # Configuration management
-├── api_*.py              # API integration modules
-├── fcm_*.py              # Firebase integration
-├── templates/            # HTML templates
-├── static/               # CSS, JS, images
-├── logs/                 # Application logs
-└── data/                 # JSON backup files
+├── app.py                      # Main Flask application
+├── models.py                    # Database models
+├── config.py                    # Configuration management
+├── config_users.py             # User management
+├── config_env.py               # Environment configuration
+├── manad_db_connector.py       # Direct DB access
+├── api_*.py                    # API integration modules
+├── fcm_*.py                    # Firebase integration
+├── cims_*.py                   # CIMS system modules
+├── templates/                  # HTML templates
+│   ├── edenfield_dashboard.html
+│   ├── integrated_dashboard.html
+│   ├── ProgressNoteList.html
+│   └── ...
+├── static/                     # CSS, JS, images
+├── data/                       # Configuration files
+│   └── api_keys/              # API keys and site config
+├── logs/                       # Application logs
+└── venv/                       # Virtual environment
 ```
 
 ### Key Modules
+- **`manad_db_connector.py`** - Direct SQL Server database access
+- **`api_progressnote_fetch.py`** - Progress notes retrieval (DB or API)
 - **`progress_notes_cache_manager.py`** - Hybrid caching logic
-- **`unified_data_sync_manager.py`** - Data synchronization
-- **`api_key_manager.py`** - Encrypted API key management
+- **`api_key_manager_json.py`** - JSON-based API key management
 - **`fcm_token_manager_sqlite.py`** - FCM token management
+- **`cims_background_processor.py`** - Background incident synchronization
+- **`cims_policy_engine.py`** - Policy-based task generation
 - **`alarm_manager.py`** - Notification system
-- **`web.config`** - IIS configuration (Windows production)
-- **`deploy_iis.bat`** - Windows IIS deployment script
 
 ### Testing
 - **Unit tests** for core functionality
@@ -334,6 +457,18 @@ wfastcgi-enable
 # 4. Configure web.config for your environment
 ```
 
+### Linux Deployment (Gunicorn)
+```bash
+# 1. Install Gunicorn
+pip install gunicorn
+
+# 2. Run with Gunicorn
+gunicorn -c gunicorn.conf.py app:app
+
+# 3. Use systemd for service management
+# See INTERNAL_DEPLOYMENT.md for details
+```
+
 ### Scaling Considerations
 - **IIS Application Pool** scaling via multiple worker processes
 - **Database optimization** with connection pooling
@@ -345,6 +480,9 @@ wfastcgi-enable
 ### Documentation Files
 - **`API_USAGE.md`** - API integration guide
 - **`FCM_USAGE.md`** - Firebase setup guide
+- **`CIMS_README.md`** - CIMS system documentation
+- **`DB_DIRECT_ACCESS_GUIDE.md`** - Direct database access setup
+- **`ENV_SETUP_GUIDE.md`** - Environment configuration
 - **`PERFORMANCE_DEBUGGING_GUIDE.md`** - Performance optimization
 - **`SESSION_TIMEOUT_GUIDE.md`** - Session management
 - **`WINDOWS_TO_INTERNAL.md`** - Windows to Linux deployment guide
@@ -355,6 +493,7 @@ wfastcgi-enable
 - **Performance debugging** utilities
 - **Cache status** monitoring
 - **Error reporting** system
+- **Database connection** diagnostics
 
 ## 🎯 Future Enhancements
 
@@ -371,17 +510,14 @@ wfastcgi-enable
 - **Database sharding** for large datasets
 - **CDN integration** for global access
 - **Microservices** architecture migration
-- **Linux migration** for Gunicorn deployment (optional)
 
 ---
 
 ## 📊 System Statistics
 
-- **Total Users**: 14 (4 roles)
-- **Client Records**: 267 across 5 sites
-- **Care Areas**: 194 active
-- **Event Types**: 134 active
-- **Database Size**: 0.24MB
+- **Total Users**: Multiple roles (Admin, Site Admin, Doctor, Physiotherapist, Operations)
+- **Sites**: 5 (Parafield Gardens, Nerrilda, Ramsay, West Park, Yankalilla)
+- **Database**: SQLite + SQL Server (MANAD Plus)
 - **Response Time**: <10ms average
 - **Uptime**: 99.9% (production)
 
@@ -390,11 +526,11 @@ wfastcgi-enable
 ## 🏢 Production Environment
 
 ### Current Deployment
-- **Platform**: Windows Server with IIS
-- **WSGI Interface**: wfastcgi
-- **Web Server**: Internet Information Services (IIS)
+- **Platform**: Windows Server with IIS (Primary) / Linux with Gunicorn (Alternative)
+- **WSGI Interface**: wfastcgi (Windows) / Gunicorn (Linux)
+- **Web Server**: Internet Information Services (IIS) or Nginx
 - **Application Pool**: IIS-managed worker processes
-- **Database**: SQLite with hybrid caching
+- **Database**: SQLite (local) + SQL Server (MANAD Plus direct access)
 
 ### Alternative Deployments
 - **Linux + Gunicorn**: For high-performance scenarios
@@ -403,4 +539,27 @@ wfastcgi-enable
 
 ---
 
-*This system represents a complete transformation from a JSON-based system to a high-performance, scalable healthcare management platform with enterprise-grade features and security, optimized for Windows IIS production environments.*
+## 🔑 Configuration
+
+### Data Access Mode
+The system can operate in two modes:
+
+1. **Direct Database Access** (Recommended)
+   - Set `USE_DB_DIRECT_ACCESS=true` in `system_settings` table
+   - No API keys required
+   - Real-time data from SQL Server
+
+2. **API Mode**
+   - Set `USE_DB_DIRECT_ACCESS=false` in `system_settings` table
+   - API keys required in `data/api_keys/api_keys.json`
+   - Uses RESTful API with caching
+
+### Site Configuration
+Site database connections are configured in `data/api_keys/site_config.json`:
+- Database server addresses
+- Authentication method (Windows Auth or SQL Auth)
+- Database names
+
+---
+
+*This system represents a comprehensive healthcare management platform with enterprise-grade features, supporting both direct database access and API integration for optimal flexibility and performance.*
