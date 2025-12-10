@@ -5369,7 +5369,13 @@ def get_fall_statistics():
         conn = get_db_connection(read_only=True)
         cursor = conn.cursor()
         
-        from services.fall_policy_detector import fall_detector
+        # Fall detector 임포트 (안전하게)
+        fall_detector = None
+        try:
+            from services.fall_policy_detector import fall_detector
+        except ImportError as e:
+            logger.warning(f"fall_policy_detector 모듈을 임포트할 수 없습니다: {e}")
+            fall_detector = None
         
         # Fall incidents 조회 (최근 30일) - fall_type 포함
         thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
@@ -5400,23 +5406,32 @@ def get_fall_statistics():
             incident_manad_id = incident[1]
             incident_type = incident[2]
             incident_date = incident[3]
-            site = incident[4]
+            site = incident[4] or 'Unknown'
             fall_type = incident[5]  # DB에서 직접 조회
             
             # fall_type이 없으면 계산 (레거시 데이터 처리)
-            if not fall_type:
-                fall_type = fall_detector.detect_fall_type_from_incident(incident_id, cursor)
-                
-                # 계산된 fall_type을 DB에 저장
+            if not fall_type and fall_detector:
                 try:
-                    cursor.execute("""
-                        UPDATE cims_incidents
-                        SET fall_type = ?
-                        WHERE id = ?
-                    """, (fall_type, incident_id))
-                    conn.commit()
-                except:
-                    pass
+                    fall_type = fall_detector.detect_fall_type_from_incident(incident_id, cursor)
+                    
+                    # 계산된 fall_type을 DB에 저장
+                    if fall_type:
+                        try:
+                            cursor.execute("""
+                                UPDATE cims_incidents
+                                SET fall_type = ?
+                                WHERE id = ?
+                            """, (fall_type, incident_id))
+                            conn.commit()
+                        except Exception as update_error:
+                            logger.warning(f"Failed to update fall_type for incident {incident_id}: {update_error}")
+                except Exception as detect_error:
+                    logger.warning(f"Failed to detect fall_type for incident {incident_id}: {detect_error}")
+                    fall_type = None
+            
+            # fall_type 검증 및 기본값 설정
+            if fall_type not in ['witnessed', 'unwitnessed', 'unknown']:
+                fall_type = 'unknown'
             
             # 통계 업데이트
             if fall_type == 'witnessed':
@@ -5426,7 +5441,7 @@ def get_fall_statistics():
             elif fall_type == 'unwitnessed':
                 stats['unwitnessed'] += 1
                 stats['visits_scheduled'] += 36
-            else:
+            else:  # unknown
                 stats['unknown'] += 1
                 stats['visits_scheduled'] += 36  # Default to unwitnessed
             
@@ -5440,7 +5455,7 @@ def get_fall_statistics():
                 }
             
             stats['by_site'][site]['total'] += 1
-            stats['by_site'][site][fall_type] += 1
+            stats['by_site'][site][fall_type] += 1  # 이제 안전하게 접근 가능
             
             # 최근 5개 Fall만 상세 정보 포함
             if len(stats['recent_falls']) < 5:
@@ -5468,8 +5483,13 @@ def get_fall_statistics():
     except Exception as e:
         logger.error(f"Fall 통계 조회 오류: {str(e)}")
         import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'Internal server error'}), 500
+        error_trace = traceback.format_exc()
+        logger.error(f"Fall 통계 조회 상세 오류:\n{error_trace}")
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e),
+            'traceback': error_trace if app.debug else None
+        }), 500
     finally:
         if conn:
             conn.close()
