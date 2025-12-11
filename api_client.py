@@ -46,7 +46,18 @@ def get_api_client(site):
     return APIClient(site)
 
 def fetch_client_information(site):
-    """클라이언트 정보를 가져오고 처리하는 함수 (DB 직접 접속 또는 API)"""
+    """
+    거주자(Client) 정보를 가져오는 통합 함수
+    
+    DB 직접 접속 모드에서는 매번 최신 데이터를 DB에서 직접 조회합니다.
+    캐시를 사용하지 않으며, 항상 최신 데이터를 반환합니다.
+    
+    Args:
+        site: 사이트 이름 (예: 'Parafield Gardens')
+        
+    Returns:
+        (성공 여부, 클라이언트 리스트)
+    """
     import os
     import sqlite3
     
@@ -66,45 +77,42 @@ def fetch_client_information(site):
     except:
         use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
     
-    # DB 직접 접속 모드 (fallback 비활성화 - 에러 발생)
+    # DB 직접 접속 모드 (권장 - 매번 최신 데이터 조회)
     if use_db_direct:
         try:
             from manad_db_connector import MANADDBConnector
-            logger.info(f"🔌 DB 직접 접속 모드: Client 정보 조회 - {site} (fallback 비활성화)")
+            logger.info(f"🔌 DB 직접 접속: 거주자 정보 조회 - {site} (최신 데이터)")
             connector = MANADDBConnector(site)
             success, client_info = connector.fetch_clients()
             
             if success and client_info:
-                # JSON 파일로 저장 (기존 형식 유지)
+                # JSON 파일로 저장 (참고용, 읽기는 하지 않음)
                 save_client_data_to_json(site, client_info)
-                logger.info(f"✅ DB에서 클라이언트 정보 조회 성공 - {site}: {len(client_info)}명")
+                logger.info(f"✅ 거주자 정보 조회 성공 - {site}: {len(client_info)}명")
                 return True, client_info
             else:
-                error_msg = f"❌ DB 직접 접속 실패: {site} - 클라이언트 정보 조회 결과가 비어있습니다. DB 연결 설정을 확인하세요."
+                error_msg = f"❌ DB 직접 접속 실패: {site} - 거주자 정보 조회 결과가 비어있습니다."
                 logger.error(error_msg)
                 raise Exception(error_msg)
         except Exception as db_error:
-            error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+            error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}"
             logger.error(error_msg)
             raise Exception(error_msg)
     
-    # API 모드 (기본 또는 fallback)
-    logger.info(f"🌐 API 모드: Client 정보 조회 - {site}")
-    logger.info(f"클라이언트 정보 요청 시작 - 사이트: {site}")
+    # API 모드 (fallback)
+    logger.info(f"🌐 API 모드: 거주자 정보 조회 - {site}")
     try:
         api_client = APIClient(site)
         client_info = api_client.get_client_information()
         
-        # JSON 파일로 저장
+        # JSON 파일로 저장 (참고용)
         if client_info:
             save_client_data_to_json(site, client_info)
-            logger.info(f"클라이언트 정보 가져오기 및 저장 성공 - 사이트: {site}")
-        else:
-            logger.warning(f"클라이언트 정보가 비어있음 - 사이트: {site}")
+            logger.info(f"✅ 거주자 정보 조회 성공 - {site}: {len(client_info) if isinstance(client_info, list) else 'N/A'}명")
         
         return True, client_info
     except requests.RequestException as e:
-        logger.error(f"클라이언트 정보 가져오기 실패 - 사이트: {site}, 에러: {str(e)}")
+        logger.error(f"❌ 거주자 정보 조회 실패 - {site}: {str(e)}")
         return False, None
 
 def save_client_data_to_json(site, client_data):

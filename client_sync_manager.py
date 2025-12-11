@@ -15,12 +15,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import logging
 
-# 기존 앱의 함수들 import
+# api_client에서 통합 함수 import
 try:
-    from app import fetch_client_information, SITE_SERVERS
-    from api_client import get_api_client
+    from api_client import fetch_client_information
 except ImportError:
-    print("Warning: app.py 모듈을 찾을 수 없습니다. 일부 기능이 제한될 수 있습니다.")
+    print("Warning: api_client 모듈을 찾을 수 없습니다. 일부 기능이 제한될 수 있습니다.")
 
 logger = logging.getLogger(__name__)
 
@@ -96,216 +95,81 @@ class ClientSyncManager:
             return None
     
     def refresh_site_clients(self, site: str) -> Dict[str, Any]:
-        """특정 사이트의 클라이언트 데이터 새로고침"""
+        """
+        특정 사이트의 거주자 데이터 새로고침 (단순화)
+        
+        DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로,
+        별도의 캐시 업데이트는 불필요합니다.
+        """
         result = {
             'success': False,
             'site': site,
             'message': '',
-            'changes': {
-                'added': 0,
-                'updated': 0,
-                'removed': 0,
-                'total': 0
-            }
+            'client_count': 0
         }
         
         try:
-            logger.info(f"{site} 클라이언트 데이터 새로고침 시작")
+            logger.info(f"{site} 거주자 데이터 조회 시작")
             
-            # API에서 최신 데이터 가져오기
+            # DB에서 최신 데이터 가져오기 (캐시 없이 직접 조회)
             api_success, latest_clients = fetch_client_information(site)
             
             if not api_success:
-                result['message'] = f"{site} API에서 데이터를 가져올 수 없습니다"
+                result['message'] = f"{site} 거주자 데이터를 가져올 수 없습니다"
                 return result
             
-            # SQLite 캐시 업데이트
-            changes = self.update_sqlite_cache(site, latest_clients)
-            result['changes'] = changes
+            client_count = len(latest_clients) if latest_clients else 0
+            result['client_count'] = client_count
             result['success'] = True
-            result['message'] = f"{site} 클라이언트 데이터 업데이트 완료"
+            result['message'] = f"{site} 거주자 데이터 조회 완료: {client_count}명"
             
-            logger.info(f"{site} 동기화 완료: 신규 {changes['added']}명, 업데이트 {changes['updated']}명, 제거 {changes['removed']}명")
+            logger.info(f"{site} 거주자 데이터 조회 완료: {client_count}명")
             
         except Exception as e:
-            result['message'] = f"{site} 동기화 실패: {str(e)}"
-            logger.error(f"{site} 동기화 실패: {e}")
+            result['message'] = f"{site} 거주자 데이터 조회 실패: {str(e)}"
+            logger.error(f"{site} 거주자 데이터 조회 실패: {e}")
         
         return result
     
-    def update_sqlite_cache(self, site: str, latest_clients: List[Dict]) -> Dict[str, int]:
-        """SQLite 캐시 업데이트 및 변경사항 추적"""
-        changes = {'added': 0, 'updated': 0, 'removed': 0, 'total': len(latest_clients)}
-        
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-        
-        try:
-            # 기존 클라이언트 목록 가져오기
-            cursor.execute('''
-                SELECT person_id, client_name, room_number, last_synced 
-                FROM clients_cache 
-                WHERE site = ? AND is_active = 1
-            ''', (site,))
-            
-            existing_clients = {row['person_id']: dict(row) for row in cursor.fetchall()}
-            
-            # 새 클라이언트 처리
-            current_person_ids = set()
-            
-            for client in latest_clients:
-                person_id = (client.get('PersonId') or 
-                           client.get('MainClientServiceId') or 
-                           client.get('ClientRecordId'))
-                
-                if not person_id:
-                    continue
-                
-                current_person_ids.add(person_id)
-                
-                client_name = (client.get('ClientName') or 
-                             f"{client.get('FirstName', '')} {client.get('Surname', '')}".strip() or
-                             client.get('PreferredName', 'Unknown'))
-                
-                if person_id in existing_clients:
-                    # 기존 클라이언트 업데이트
-                    cursor.execute('''
-                        UPDATE clients_cache 
-                        SET client_name = ?, preferred_name = ?, title = ?, first_name = ?,
-                            middle_name = ?, surname = ?, gender = ?, birth_date = ?,
-                            admission_date = ?, room_name = ?, room_number = ?, wing_name = ?,
-                            location_id = ?, location_name = ?, main_client_service_id = ?,
-                            original_person_id = ?, client_record_id = ?, last_synced = ?
-                        WHERE person_id = ? AND site = ?
-                    ''', (
-                        client_name,
-                        client.get('PreferredName'),
-                        client.get('Title'),
-                        client.get('FirstName'),
-                        client.get('MiddleName'),
-                        client.get('Surname') or client.get('LastName'),
-                        client.get('Gender') or client.get('GenderDesc'),
-                        client.get('BirthDate'),
-                        client.get('AdmissionDate'),
-                        client.get('RoomName'),
-                        client.get('RoomNumber'),
-                        client.get('WingName'),
-                        client.get('LocationId'),
-                        client.get('LocationName'),
-                        client.get('MainClientServiceId'),
-                        client.get('OriginalPersonId'),
-                        client.get('ClientRecordId'),
-                        datetime.now().isoformat(),
-                        person_id,
-                        site
-                    ))
-                    changes['updated'] += 1
-                else:
-                    # 새 클라이언트 추가
-                    cursor.execute('''
-                        INSERT INTO clients_cache 
-                        (person_id, client_name, preferred_name, title, first_name, 
-                         middle_name, surname, gender, birth_date, admission_date,
-                         room_name, room_number, wing_name, location_id, location_name,
-                         main_client_service_id, original_person_id, client_record_id, 
-                         site, last_synced, is_active)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        person_id,
-                        client_name,
-                        client.get('PreferredName'),
-                        client.get('Title'),
-                        client.get('FirstName'),
-                        client.get('MiddleName'),
-                        client.get('Surname') or client.get('LastName'),
-                        client.get('Gender') or client.get('GenderDesc'),
-                        client.get('BirthDate'),
-                        client.get('AdmissionDate'),
-                        client.get('RoomName'),
-                        client.get('RoomNumber'),
-                        client.get('WingName'),
-                        client.get('LocationId'),
-                        client.get('LocationName'),
-                        client.get('MainClientServiceId'),
-                        client.get('OriginalPersonId'),
-                        client.get('ClientRecordId'),
-                        site,
-                        datetime.now().isoformat(),
-                        True
-                    ))
-                    changes['added'] += 1
-            
-            # 제거된 클라이언트 처리 (비활성화)
-            removed_person_ids = set(existing_clients.keys()) - current_person_ids
-            for person_id in removed_person_ids:
-                cursor.execute('''
-                    UPDATE clients_cache 
-                    SET is_active = 0, last_synced = ?
-                    WHERE person_id = ? AND site = ?
-                ''', (datetime.now().isoformat(), person_id, site))
-                changes['removed'] += 1
-            
-            # 동기화 상태 업데이트
-            cursor.execute('''
-                UPDATE sync_status 
-                SET last_sync_time = ?, sync_status = 'success', records_synced = ?
-                WHERE data_type = 'clients' AND site = ?
-            ''', (datetime.now().isoformat(), len(latest_clients), site))
-            
-            conn.commit()
-            
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-        
-        return changes
+    # update_sqlite_cache 메서드 제거됨
+    # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 업데이트 불필요
     
     def refresh_all_sites(self) -> Dict[str, Any]:
-        """모든 사이트의 클라이언트 데이터 새로고침"""
+        """모든 사이트의 거주자 데이터 새로고침"""
         results = {}
-        total_changes = {'added': 0, 'updated': 0, 'removed': 0, 'total': 0}
+        total_clients = 0
         
         for site in self.sites:
             result = self.refresh_site_clients(site)
             results[site] = result
             
             if result['success']:
-                for key in total_changes:
-                    total_changes[key] += result['changes'][key]
+                total_clients += result['client_count']
         
         return {
             'results': results,
-            'summary': total_changes,
+            'total_clients': total_clients,
             'success_count': sum(1 for r in results.values() if r['success']),
             'total_sites': len(self.sites)
         }
     
     def get_clients_with_auto_refresh(self, site: str) -> List[Dict]:
-        """캐시가 만료되면 자동으로 새로고침하여 클라이언트 반환"""
+        """
+        거주자 데이터 가져오기 (단순화)
         
-        # 캐시 만료 확인
-        if self.is_cache_expired(site):
-            logger.info(f"{site} 캐시 만료, 자동 새로고침 실행")
-            self.refresh_site_clients(site)
-        
-        # SQLite에서 데이터 반환
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
+        DB 직접 접속 모드에서는 매번 최신 데이터를 직접 조회합니다.
+        캐시를 사용하지 않습니다.
+        """
+        from api_client import fetch_client_information
         
         try:
-            cursor.execute('''
-                SELECT * FROM clients_cache 
-                WHERE site = ? AND is_active = 1
-                ORDER BY client_name
-            ''', (site,))
-            
-            clients = [dict(row) for row in cursor.fetchall()]
-            return clients
-            
-        finally:
-            conn.close()
+            success, clients = fetch_client_information(site)
+            if success and clients:
+                return clients if isinstance(clients, list) else []
+            return []
+        except Exception as e:
+            logger.error(f"{site} 거주자 데이터 조회 실패: {e}")
+            return []
     
     def get_sync_status_summary(self) -> Dict[str, Any]:
         """동기화 상태 요약"""
@@ -342,15 +206,14 @@ class ClientSyncManager:
         """백그라운드 동기화 시작"""
         def daily_sync_job():
             """매일 새벽 3시 동기화 작업"""
-            logger.info("매일 새벽 3시 자동 동기화 시작")
+            logger.info("매일 새벽 3시 거주자 데이터 확인 시작")
             results = self.refresh_all_sites()
             
             success_count = results['success_count']
             total_sites = results['total_sites']
-            total_changes = results['summary']
+            total_clients = results['total_clients']
             
-            logger.info(f"매일 자동 동기화 완료: {success_count}/{total_sites} 사이트 성공")
-            logger.info(f"변경사항: 신규 {total_changes['added']}명, 업데이트 {total_changes['updated']}명, 제거 {total_changes['removed']}명")
+            logger.info(f"매일 자동 확인 완료: {success_count}/{total_sites} 사이트 성공, 총 {total_clients}명")
         
         # 스케줄 설정 - 매일 새벽 3시만
         schedule.every().day.at("03:00").do(daily_sync_job)

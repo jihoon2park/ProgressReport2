@@ -502,23 +502,48 @@ class MANADDBConnector:
                 
                 # MANAD DB의 실제 Client 테이블 구조에 맞춘 쿼리
                 # Client -> Person JOIN 필요 (이름 정보는 Person 테이블에)
-                query = """
+                # 활성 거주자만 조회 (Edenfield Dashboard와 동일한 로직 사용)
+                # MainClientServiceId를 통해 활성 서비스 확인 (EndDate가 NULL인 것만)
+                query_with_service = """
+                    SELECT DISTINCT
+                        c.Id,
+                        ISNULL(p.FirstName, '') AS FirstName,
+                        ISNULL(p.LastName, '') AS LastName,
+                        ISNULL(p.PreferredName, '') AS PreferredName,
+                        '' AS RoomNumber,
+                        CASE WHEN c.IsDeleted = 0 THEN 1 ELSE 0 END AS IsActive
+                    FROM Client c
+                    INNER JOIN ClientService cs ON c.MainClientServiceId = cs.Id
+                    LEFT JOIN Person p ON c.PersonId = p.Id
+                    WHERE c.IsDeleted = 0 
+                        AND cs.IsDeleted = 0
+                        AND cs.EndDate IS NULL
+                    ORDER BY ISNULL(p.LastName, ''), ISNULL(p.FirstName, '')
+                """
+                
+                query_simple = """
                     SELECT 
                         c.Id,
                         ISNULL(p.FirstName, '') AS FirstName,
                         ISNULL(p.LastName, '') AS LastName,
                         ISNULL(p.PreferredName, '') AS PreferredName,
-                        '' AS RoomNumber,  -- RoomNumber는 다른 테이블에 있을 수 있음
+                        '' AS RoomNumber,
                         CASE WHEN c.IsDeleted = 0 THEN 1 ELSE 0 END AS IsActive
                     FROM Client c
                     LEFT JOIN Person p ON c.PersonId = p.Id
                     WHERE c.IsDeleted = 0
-                    ORDER BY p.LastName, p.FirstName
+                    ORDER BY ISNULL(p.LastName, ''), ISNULL(p.FirstName, '')
                 """
                 
                 logger.info(f"🔍 Client 조회: {self.site}")
                 
-                cursor.execute(query)
+                # 먼저 ClientService를 포함한 쿼리 시도
+                try:
+                    cursor.execute(query_with_service)
+                except Exception as e:
+                    # ClientService 테이블이 없거나 에러 발생 시 단순 쿼리 사용
+                    logger.warning(f"ClientService 필터링 쿼리 실패, 단순 쿼리 사용: {e}")
+                    cursor.execute(query_simple)
                 
                 columns = [column[0] for column in cursor.description]
                 clients = []

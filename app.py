@@ -291,10 +291,8 @@ def process_client_information(client_info):
         logger.error(f"클라이언트 정보 처리 중 오류 발생: {str(e)}")
         return []
 
-def fetch_client_information(site):
-    """클라이언트 정보를 가져오고 처리 (비활성화 - DB 사용)"""
-    logger.info(f"클라이언트 정보 조회 건너뜀 - DB에서 조회됨 (사이트: {site})")
-    return True, None  # DB에서 조회하므로 API 호출 불필요
+# fetch_client_information 함수는 api_client.py에서 통합 관리
+# 이 함수는 제거되었습니다. api_client.fetch_client_information을 사용하세요.
 
 def fetch_care_area_information(site):
     """Care Area 정보를 가져오고 처리 (비활성화 - DB 사용)"""
@@ -6069,7 +6067,10 @@ def generate_real_schedule(site_name):
 
 def _cache_clients_to_db(clients: list, site_name: str, cursor) -> None:
     """
-    클라이언트 데이터를 clients_cache 테이블에 저장
+    [사용 중지] 클라이언트 데이터를 clients_cache 테이블에 저장
+    
+    DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 불필요.
+    이 함수는 더 이상 사용되지 않습니다.
     
     Args:
         clients: MANAD API에서 받은 클라이언트 리스트
@@ -6387,44 +6388,12 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 """, (site_name,))
                 last_client_sync = cursor_temp.fetchone()[0]
                 
-                should_cache_clients = is_first_sync
-                if not should_cache_clients and last_client_sync:
-                    try:
-                        last_client_sync_dt = datetime.fromisoformat(last_client_sync)
-                        hours_since = (datetime.now() - last_client_sync_dt).total_seconds() / 3600
-                        should_cache_clients = hours_since >= 24  # 하루 경과
-                    except:
-                        should_cache_clients = True
-                else:
-                    should_cache_clients = True
-                
-                if should_cache_clients and clients:
-                    logger.info(f"💾 클라이언트 캐시 업데이트: {site_name} ({len(clients)}명)")
-                    _cache_clients_to_db(clients, site_name, cursor_temp)
-                    conn_temp.commit()
-                
                 # 클라이언트 데이터를 딕셔너리로 변환 (빠른 검색용)
-                # 1. 먼저 API에서 받은 데이터 사용 (최신)
+                # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 불필요
                 clients_dict = {client.get('id', client.get('Id', '')): client for client in clients}
                 
-                # 2. API에 없는 경우 로컬 캐시에서 보완
-                cursor_temp.execute("""
-                    SELECT client_record_id, first_name, surname 
-                    FROM clients_cache 
-                    WHERE site = ? AND is_active = 1
-                """, (site_name,))
-                cached_clients = cursor_temp.fetchall()
-                for cached in cached_clients:
-                    client_id, first_name, surname = cached
-                    if client_id not in clients_dict:
-                        clients_dict[client_id] = {
-                            'Id': client_id,
-                            'FirstName': first_name,
-                            'LastName': surname
-                        }
-                
                 conn_temp.close()
-                logger.info(f"📋 클라이언트 매핑 완료: {len(clients_dict)}명")
+                logger.info(f"📋 클라이언트 매핑 완료: {len(clients_dict)}명 (최신 데이터)")
                 
                 conn = get_db_connection()
                 cursor = conn.cursor()

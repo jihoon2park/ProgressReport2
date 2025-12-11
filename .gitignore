@@ -84,3 +84,4 @@ progress_report.db-shm
 progress_report.db-wal
 /__pycache__
 /__pycache__
+/__pycache__
