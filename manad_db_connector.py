@@ -505,16 +505,26 @@ class MANADDBConnector:
                 # 활성 거주자만 조회 (Edenfield Dashboard와 동일한 로직 사용)
                 # MainClientServiceId를 통해 활성 서비스 확인 (EndDate가 NULL인 것만)
                 query_with_service = """
-                    SELECT DISTINCT
+                    SELECT 
                         c.Id,
                         ISNULL(p.FirstName, '') AS FirstName,
+                        ISNULL(p.MiddleName, '') AS MiddleName,
                         ISNULL(p.LastName, '') AS LastName,
                         ISNULL(p.PreferredName, '') AS PreferredName,
-                        '' AS RoomNumber,
+                        p.BirthDate AS BirthDate,
+                        ISNULL(w.Name, '') AS WingName,
+                        ISNULL(cs.WingId, 0) AS WingId,
+                        ISNULL(cs.LocationId, 0) AS LocationId,
+                        ISNULL(loc.Name, '') AS LocationName,
+                        cs.StartDate AS AdmissionDate,
+                        cs.EndDate AS DepartureDate,
+                        CASE WHEN cs.EndDate IS NULL THEN 'Permanent' ELSE 'Temporary' END AS CareType,
                         CASE WHEN c.IsDeleted = 0 THEN 1 ELSE 0 END AS IsActive
                     FROM Client c
                     INNER JOIN ClientService cs ON c.MainClientServiceId = cs.Id
                     LEFT JOIN Person p ON c.PersonId = p.Id
+                    LEFT JOIN Wing w ON cs.WingId = w.Id
+                    LEFT JOIN Location loc ON cs.LocationId = loc.Id
                     WHERE c.IsDeleted = 0 
                         AND cs.IsDeleted = 0
                         AND cs.EndDate IS NULL
@@ -525,13 +535,26 @@ class MANADDBConnector:
                     SELECT 
                         c.Id,
                         ISNULL(p.FirstName, '') AS FirstName,
+                        ISNULL(p.MiddleName, '') AS MiddleName,
                         ISNULL(p.LastName, '') AS LastName,
                         ISNULL(p.PreferredName, '') AS PreferredName,
-                        '' AS RoomNumber,
+                        p.BirthDate AS BirthDate,
+                        ISNULL(w.Name, '') AS WingName,
+                        ISNULL(cs.WingId, 0) AS WingId,
+                        ISNULL(cs.LocationId, 0) AS LocationId,
+                        ISNULL(loc.Name, '') AS LocationName,
+                        cs.StartDate AS AdmissionDate,
+                        NULL AS DepartureDate,
+                        'Permanent' AS CareType,
                         CASE WHEN c.IsDeleted = 0 THEN 1 ELSE 0 END AS IsActive
                     FROM Client c
+                    INNER JOIN ClientService cs ON c.MainClientServiceId = cs.Id
                     LEFT JOIN Person p ON c.PersonId = p.Id
-                    WHERE c.IsDeleted = 0
+                    LEFT JOIN Wing w ON cs.WingId = w.Id
+                    LEFT JOIN Location loc ON cs.LocationId = loc.Id
+                    WHERE c.IsDeleted = 0 
+                        AND cs.IsDeleted = 0
+                        AND cs.EndDate IS NULL
                     ORDER BY ISNULL(p.LastName, ''), ISNULL(p.FirstName, '')
                 """
                 
@@ -601,12 +624,23 @@ class MANADDBConnector:
     
     def _format_client_for_api(self, db_row: Dict) -> Dict[str, Any]:
         """DB 결과를 API 형식으로 변환"""
+        birth_date = db_row.get('BirthDate')
+        admission_date = db_row.get('AdmissionDate')
+        departure_date = db_row.get('DepartureDate')
+        
         return {
             'Id': db_row.get('Id'),
             'FirstName': db_row.get('FirstName', ''),
+            'MiddleName': db_row.get('MiddleName', ''),
             'LastName': db_row.get('LastName', ''),
             'PreferredName': db_row.get('PreferredName', ''),
-            'RoomNumber': db_row.get('RoomNumber', ''),
+            'BirthDate': birth_date.isoformat() if birth_date and hasattr(birth_date, 'isoformat') else (str(birth_date) if birth_date else None),
+            'WingName': db_row.get('WingName', ''),
+            'LocationId': db_row.get('LocationId', 0),
+            'LocationName': db_row.get('LocationName', ''),
+            'AdmissionDate': admission_date.isoformat() if admission_date and hasattr(admission_date, 'isoformat') else (str(admission_date) if admission_date else None),
+            'DepartureDate': departure_date.isoformat() if departure_date and hasattr(departure_date, 'isoformat') else (str(departure_date) if departure_date else None),
+            'CareType': db_row.get('CareType', 'Permanent'),
             'IsActive': bool(db_row.get('IsActive', False))
         }
     

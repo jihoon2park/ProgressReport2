@@ -1882,18 +1882,77 @@ def get_clients_for_site(site):
                 client_id = client.get('Id') or client.get('PersonId') or client.get('ClientId')
                 
                 if client_id:
+                    # BirthDate 처리
+                    birth_date = client.get('BirthDate')
+                    birth_date_str = None
+                    age = None
+                    if birth_date:
+                        if isinstance(birth_date, str):
+                            birth_date_str = birth_date
+                        else:
+                            birth_date_str = birth_date.isoformat() if hasattr(birth_date, 'isoformat') else str(birth_date)
+                        
+                        # Age 계산
+                        try:
+                            from datetime import datetime
+                            if isinstance(birth_date, str):
+                                birth_dt = datetime.fromisoformat(birth_date.split('T')[0])
+                            else:
+                                birth_dt = birth_date if isinstance(birth_date, datetime) else datetime.fromisoformat(str(birth_date).split('T')[0])
+                            today = datetime.now()
+                            age = today.year - birth_dt.year - ((today.month, today.day) < (birth_dt.month, birth_dt.day))
+                        except:
+                            pass
+                    
+                    # AdmissionDate 처리
+                    admission_date = client.get('AdmissionDate')
+                    admission_date_str = None
+                    admission_duration = None
+                    if admission_date:
+                        if isinstance(admission_date, str):
+                            admission_date_str = admission_date
+                        else:
+                            admission_date_str = admission_date.isoformat() if hasattr(admission_date, 'isoformat') else str(admission_date)
+                        
+                        # Admission duration 계산
+                        try:
+                            from datetime import datetime, timedelta
+                            if isinstance(admission_date, str):
+                                adm_dt = datetime.fromisoformat(admission_date.split('T')[0])
+                            else:
+                                adm_dt = admission_date if isinstance(admission_date, datetime) else datetime.fromisoformat(str(admission_date).split('T')[0])
+                            today = datetime.now()
+                            delta = today - adm_dt
+                            years = delta.days // 365
+                            months = (delta.days % 365) // 30
+                            days = delta.days % 30
+                            if years > 0:
+                                admission_duration = f"{years} year{'s' if years > 1 else ''} {months} month{'s' if months > 1 else ''} {days} day{'s' if days > 1 else ''}"
+                            elif months > 0:
+                                admission_duration = f"{months} month{'s' if months > 1 else ''} {days} day{'s' if days > 1 else ''}"
+                            else:
+                                admission_duration = f"{days} day{'s' if days > 1 else ''}"
+                        except:
+                            pass
+                    
                     clients.append({
                         'PersonId': client_id,  # Client ID를 PersonId로 사용 (드롭다운에서 사용)
                         'ClientName': client_name,
                         'FirstName': first_name,
+                        'MiddleName': client.get('MiddleName', ''),
                         'LastName': last_name,
                         'Surname': last_name,  # LastName을 Surname으로도 제공
                         'PreferredName': client.get('PreferredName', ''),
-                        'WingName': client.get('WingName', ''),  # 없을 수 있음
-                        'RoomName': client.get('RoomName', '') or client.get('RoomNumber', ''),  # RoomNumber도 확인
-                        'Gender': client.get('Gender', ''),  # 없을 수 있음
-                        'BirthDate': client.get('BirthDate', ''),  # 없을 수 있음
-                        'MainClientServiceId': client.get('MainClientServiceId', ''),  # 없을 수 있음
+                        'BirthDate': birth_date_str,
+                        'Age': age,
+                        'WingName': client.get('WingName', ''),
+                        'RoomName': client.get('RoomName', '') or client.get('RoomNumber', ''),
+                        'RoomNumber': client.get('RoomNumber', ''),
+                        'LocationName': client.get('LocationName', ''),
+                        'AdmissionDate': admission_date_str,
+                        'AdmissionDuration': admission_duration,
+                        'CareType': client.get('CareType', 'Permanent'),
+                        'MainClientServiceId': client.get('MainClientServiceId', ''),
                         'IsActive': client.get('IsActive', True)
                     })
         

@@ -239,7 +239,7 @@ function initializeClientHandling() {
         const urlParams = new URLSearchParams(window.location.search);
         let site = urlParams.get('site');
         
-        // If site is not in URL, try to get from template variable or default
+        // If site is not in URL, try to get from template variable
         if (!site) {
             const siteElement = document.querySelector('.site-name');
             if (siteElement) {
@@ -247,8 +247,25 @@ function initializeClientHandling() {
             }
         }
         
-        if (!site) {
-            site = 'Parafield Gardens';
+        // If still not found, try to get from parent window (if in iframe)
+        if (!site && window.parent !== window) {
+            try {
+                if (window.parent.currentSite) {
+                    site = window.parent.currentSite;
+                }
+            } catch (e) {
+                console.warn('Cannot access parent window:', e);
+            }
+        }
+        
+        // Validate site
+        const validSites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
+        if (!site || !validSites.includes(site)) {
+            console.error('Invalid or missing site parameter for client details. Site:', site);
+            if (DOM.clientDetailsDiv) {
+                DOM.clientDetailsDiv.innerHTML = '<p>Error: Site information not available</p>';
+            }
+            return;
         }
 
         // Use site-specific API endpoint
@@ -315,14 +332,53 @@ function displayClientDetails(client) {
     const preferredName = client.PreferredName ? 
         '(' + client.PreferredName + ')' : '';
     
+    // Birth Date 포맷팅 (Age 포함)
+    let birthDateDisplay = 'N/A';
+    if (client.BirthDate) {
+        try {
+            const birthDate = new Date(client.BirthDate);
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = birthDate.getDate();
+            const month = months[birthDate.getMonth()];
+            const year = birthDate.getFullYear();
+            const age = client.Age || (new Date().getFullYear() - year);
+            birthDateDisplay = `${day.toString().padStart(2, '0')} ${month} ${year} (Age ${age})`;
+        } catch (e) {
+            birthDateDisplay = client.BirthDate;
+        }
+    }
+    
+    // Admission Date 포맷팅 (Duration 포함)
+    let admissionDisplay = 'N/A';
+    if (client.AdmissionDate) {
+        try {
+            const admDate = new Date(client.AdmissionDate);
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = admDate.getDate();
+            const month = months[admDate.getMonth()];
+            const year = admDate.getFullYear();
+            const duration = client.AdmissionDuration || '';
+            admissionDisplay = `${day.toString().padStart(2, '0')} ${month} ${year}${duration ? ' (' + duration + ')' : ''}`;
+        } catch (e) {
+            admissionDisplay = client.AdmissionDate;
+        }
+    }
+    
+    // Helper function to format field display
+    function formatField(label, value, defaultValue = '') {
+        const displayValue = value || defaultValue;
+        return displayValue ? `<p><strong>${label}:</strong> ${displayValue}</p>` : '';
+    }
+    
     const detailsHTML = 
-        '<div class="client-details">' +
-            '<h3>' + clientName + ' ' + preferredName + '</h3>' +
-            '<p>Gender: ' + (client.Gender || client.gender || 'Not specified') + '</p>' +
-            '<p>ID: ' + client.PersonId + '</p>' +
-            '<p>Birth Date: ' + (client.BirthDate ? new Date(client.BirthDate).toLocaleDateString() : 'N/A') + '</p>' +
-            '<p>Wing: ' + (client.WingName || 'N/A') + '</p>' +
-            '<p>Room: ' + (client.RoomName || 'N/A') + '</p>' +
+        '<div class="client-details" style="line-height: 1.8;">' +
+            '<h3 style="margin-bottom: 15px; color: #2c3e50;">' + clientName + ' ' + preferredName + '</h3>' +
+            formatField('DOB', birthDateDisplay, 'N/A') +
+            formatField('ID', client.PersonId) +
+            formatField('Location', client.LocationName || (window.currentSite ? `Edenfield Family Care - ${window.currentSite}` : 'Unknown Site')) +
+            formatField('Wing', client.WingName, 'N/A') +
+            formatField('Admission / Departure', admissionDisplay, 'N/A') +
+            formatField('Care type', client.CareType, 'Permanent') +
         '</div>';
 
     DOM.clientDetailsDiv.innerHTML = detailsHTML;
@@ -336,7 +392,7 @@ function loadClientList() {
     const urlParams = new URLSearchParams(window.location.search);
     let site = urlParams.get('site');
     
-    // If site is not in URL, try to get from template variable or default
+    // If site is not in URL, try to get from template variable
     if (!site) {
         // Check if site is available from template (set by server)
         const siteElement = document.querySelector('.site-name');
@@ -345,12 +401,33 @@ function loadClientList() {
         }
     }
     
-    // Default site if still not found
-    if (!site) {
-        site = 'Parafield Gardens';
+    // If still not found, try to get from parent window (if in iframe)
+    if (!site && window.parent !== window) {
+        try {
+            // Try to get site from parent window's currentSite
+            if (window.parent.currentSite) {
+                site = window.parent.currentSite;
+            }
+        } catch (e) {
+            // Cross-origin or other error, ignore
+            console.warn('Cannot access parent window:', e);
+        }
     }
     
-    console.log('Loading client list for site:', site);
+    // Validate site - must be one of the known sites
+    const validSites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla'];
+    if (!site || !validSites.includes(site)) {
+        console.error('Invalid or missing site parameter. URL:', window.location.href, 'Site:', site);
+        // Don't use default, show error instead
+        DOM.client.innerHTML = '<option value="">(none)</option>';
+        const option = document.createElement('option');
+        option.textContent = 'Error: Site information not available';
+        option.disabled = true;
+        DOM.client.appendChild(option);
+        return;
+    }
+    
+    console.log('Loading client list for site:', site, 'URL:', window.location.href);
     
     // Use site-specific API endpoint
     fetch(`/api/clients/${encodeURIComponent(site)}`)
