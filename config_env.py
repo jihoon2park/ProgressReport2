@@ -32,7 +32,7 @@ def get_flask_config():
     config = {
         'SECRET_KEY': get_config_value('SECRET_KEY', 'fallback-secret-key'),
         'DEBUG': get_config_value('FLASK_DEBUG', 'False').lower() == 'true',
-        'HOST': get_config_value('HOST', '127.0.0.1'),
+        'HOST': get_config_value('HOST', '0.0.0.0'),  # 기본값을 0.0.0.0으로 변경 (네트워크 접속 허용)
         'PORT': int(get_config_value('PORT', '5000')),
         'ENVIRONMENT': environment,
         

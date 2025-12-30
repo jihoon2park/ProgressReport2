@@ -235,7 +235,24 @@ function initializeClientHandling() {
             return;
         }
 
-        fetch('/data/Client_list.json')
+        // Get site from URL parameter or from template variable
+        const urlParams = new URLSearchParams(window.location.search);
+        let site = urlParams.get('site');
+        
+        // If site is not in URL, try to get from template variable or default
+        if (!site) {
+            const siteElement = document.querySelector('.site-name');
+            if (siteElement) {
+                site = siteElement.textContent.trim();
+            }
+        }
+        
+        if (!site) {
+            site = 'Parafield Gardens';
+        }
+
+        // Use site-specific API endpoint
+        fetch(`/api/clients/${encodeURIComponent(site)}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -301,17 +318,38 @@ function displayClientDetails(client) {
 function loadClientList() {
     if (!DOM.client) return;
     
-    fetch('/data/Client_list.json')
+    // Get site from URL parameter or from template variable
+    const urlParams = new URLSearchParams(window.location.search);
+    let site = urlParams.get('site');
+    
+    // If site is not in URL, try to get from template variable or default
+    if (!site) {
+        // Check if site is available from template (set by server)
+        const siteElement = document.querySelector('.site-name');
+        if (siteElement) {
+            site = siteElement.textContent.trim();
+        }
+    }
+    
+    // Default site if still not found
+    if (!site) {
+        site = 'Parafield Gardens';
+    }
+    
+    console.log('Loading client list for site:', site);
+    
+    // Use site-specific API endpoint
+    fetch(`/api/clients/${encodeURIComponent(site)}`)
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
             }
             return response.json();
         })
         .then(data => {
             DOM.client.innerHTML = '<option value="">(none)</option>';
             
-            if (Array.isArray(data)) {
+            if (Array.isArray(data) && data.length > 0) {
                 data.sort((a, b) => {
                     const nameA = a.ClientName || '';
                     const nameB = b.ClientName || '';
@@ -324,13 +362,21 @@ function loadClientList() {
                     option.textContent = client.ClientName + ' (ID: ' + client.PersonId + ')';
                     DOM.client.appendChild(option);
                 });
+                
+                console.log(`✅ Loaded ${data.length} clients for site: ${site}`);
+            } else {
+                console.warn(`No clients found for site: ${site}`);
+                const option = document.createElement('option');
+                option.textContent = 'No clients available';
+                option.disabled = true;
+                DOM.client.appendChild(option);
             }
         })
         .catch(error => {
             console.error('Error loading clients:', error);
             DOM.client.innerHTML = '<option value="">(none)</option>';
             const option = document.createElement('option');
-            option.textContent = 'Error loading client list';
+            option.textContent = 'Error loading client list: ' + error.message;
             option.disabled = true;
             DOM.client.appendChild(option);
         });

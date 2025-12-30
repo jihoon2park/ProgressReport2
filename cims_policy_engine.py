@@ -581,12 +581,13 @@ class PolicyEngine:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 기본 쿼리
+            # 기본 쿼리 (Closed Incident의 Task는 제외)
             query = """
                 SELECT t.*, i.incident_id as incident_number, i.resident_name, i.incident_type, i.severity
                 FROM cims_tasks t
                 JOIN cims_incidents i ON t.incident_id = i.id
                 WHERE (t.assigned_user_id = ? OR t.assigned_role = ? OR t.assigned_role LIKE ?)
+                AND i.status != 'Closed'
             """
             params = [user_id, role, f"%{role}%"]
             

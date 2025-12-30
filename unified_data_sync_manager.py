@@ -34,9 +34,9 @@ except ImportError:
     APIEventType = None
 
 try:
-    from api_incident import fetch_incidents_with_client_data
+    from manad_db_connector import fetch_incidents_with_client_data_from_db
 except ImportError:
-    fetch_incidents_with_client_data = None
+    fetch_incidents_with_client_data_from_db = None
 
 logger = logging.getLogger(__name__)
 
@@ -218,13 +218,13 @@ class UnifiedDataSyncManager:
             return {'success': False, 'message': str(e)}
     
     def sync_incidents_data(self) -> Dict[str, Any]:
-        """인시던트 데이터 동기화"""
-        logger.info("🔄 인시던트 데이터 동기화 시작")
+        """인시던트 데이터 동기화 (DB 직접 접속)"""
+        logger.info("🔄 인시던트 데이터 동기화 시작 (DB 직접 접속)")
         results = {'success': 0, 'failed': 0, 'total_incidents': 0}
         
-        if fetch_incidents_with_client_data is None:
-            logger.warning("⚠️ fetch_incidents_with_client_data 함수를 찾을 수 없습니다. 인시던트 동기화를 건너뜁니다.")
-            return {'success': False, 'message': 'fetch_incidents_with_client_data 함수 없음'}
+        if fetch_incidents_with_client_data_from_db is None:
+            logger.warning("⚠️ fetch_incidents_with_client_data_from_db 함수를 찾을 수 없습니다. 인시던트 동기화를 건너뜁니다.")
+            return {'success': False, 'message': 'fetch_incidents_with_client_data_from_db 함수 없음'}
         
         # 최근 30일간의 인시던트 데이터 동기화
         end_date = datetime.now()
@@ -232,18 +232,19 @@ class UnifiedDataSyncManager:
         
         for site in self.sites:
             try:
-                logger.info(f"  📍 {site} 인시던트 동기화 중...")
+                logger.info(f"  📍 {site} 인시던트 동기화 중... (DB 직접 접속)")
                 
-                # API에서 인시던트 데이터 가져오기
-                incident_data = fetch_incidents_with_client_data(
+                # DB에서 직접 인시던트 데이터 가져오기
+                incident_data = fetch_incidents_with_client_data_from_db(
                     site, 
                     start_date.strftime('%Y-%m-%d'), 
-                    end_date.strftime('%Y-%m-%d')
+                    end_date.strftime('%Y-%m-%d'),
+                    fetch_clients=False
                 )
                 
                 if not incident_data or 'incidents' not in incident_data:
                     logger.error(f"  ❌ {site} 인시던트 데이터를 가져올 수 없습니다")
-                    self.update_sync_status('incidents', site, 'failed', 0, 'API 호출 실패')
+                    self.update_sync_status('incidents', site, 'failed', 0, 'DB 조회 실패')
                     results['failed'] += 1
                     continue
                 

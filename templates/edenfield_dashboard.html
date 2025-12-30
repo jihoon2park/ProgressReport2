@@ -650,9 +650,17 @@
             // Skin & Wound 총계 업데이트
             document.getElementById('totalSkinWound').textContent = totals.skin_wound_count.toLocaleString();
             
-            // Activity Types 차트 업데이트
-            if (totals.activity_types && totals.activity_types.length > 0) {
+            // Activity Types 차트 업데이트 (데이터가 없어도 업데이트)
+            if (totals.activity_types) {
                 createActivityTypesChart(totals.activity_types);
+            } else {
+                // 데이터가 없을 때 기존 차트 제거하고 빈 차트 표시
+                if (chartInstances['activityTypes']) {
+                    chartInstances['activityTypes'].destroy();
+                    delete chartInstances['activityTypes'];
+                }
+                // 빈 차트 생성
+                createActivityTypesChart([]);
             }
         }
         
@@ -663,8 +671,13 @@
                 chartInstances['activityTypes'].destroy();
             }
             
-            const labels = activityTypes.map(a => a.name);
-            const data = activityTypes.map(a => a.count);
+            // 데이터가 없을 때 빈 배열 처리
+            const labels = activityTypes && activityTypes.length > 0 
+                ? activityTypes.map(a => a.name) 
+                : ['No data'];
+            const data = activityTypes && activityTypes.length > 0 
+                ? activityTypes.map(a => a.count) 
+                : [0];
             const colors = [
                 '#e94560', '#0f3460', '#00d9a5', '#ffc107', '#17a2b8',
                 '#9b59b6', '#3498db', '#e74c3c', '#2ecc71', '#f39c12'

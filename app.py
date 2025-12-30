@@ -1604,7 +1604,7 @@ def get_edenfield_stats():
                         """)
                     site_stats['activities_30days'] = cursor.fetchone()[0]
                     
-                    # 6. Activity 종류별 분포 (상위 5개)
+                    # 6. Activity 종류별 분포 (상위 5개) - 선택된 기간 내
                     if period == 'today':
                         cursor.execute("""
                             SELECT TOP 5 a.Description, COUNT(ae.Id) as cnt
@@ -1615,13 +1615,23 @@ def get_edenfield_stats():
                             GROUP BY a.Description
                             ORDER BY cnt DESC
                         """)
-                    else:
-                        cursor.execute(f"""
+                    elif period == 'week':
+                        cursor.execute("""
                             SELECT TOP 5 a.Description, COUNT(ae.Id) as cnt
                             FROM ActivityEvent ae
                             INNER JOIN Activity a ON ae.ActivityId = a.Id
                             WHERE ae.IsDeleted = 0
-                            AND ae.StartDate >= {date_filter}
+                            AND ae.StartDate >= DATEADD(day, -7, GETDATE())
+                            GROUP BY a.Description
+                            ORDER BY cnt DESC
+                        """)
+                    else:  # month
+                        cursor.execute("""
+                            SELECT TOP 5 a.Description, COUNT(ae.Id) as cnt
+                            FROM ActivityEvent ae
+                            INNER JOIN Activity a ON ae.ActivityId = a.Id
+                            WHERE ae.IsDeleted = 0
+                            AND ae.StartDate >= DATEADD(day, -30, GETDATE())
                             GROUP BY a.Description
                             ORDER BY cnt DESC
                         """)
@@ -1845,6 +1855,54 @@ def get_client_list():
         return send_from_directory(data_dir, 'Client_list.json')
     except FileNotFoundError:
         return jsonify([]), 404
+
+@app.route('/api/clients/<site>')
+@login_required
+def get_clients_for_site(site):
+    """특정 사이트의 클라이언트 목록 반환"""
+    try:
+        from api_client import fetch_client_information
+        
+        success, client_data = fetch_client_information(site)
+        
+        if not success or not client_data:
+            logger.warning(f"클라이언트 데이터를 가져올 수 없습니다: {site}")
+            return jsonify([]), 404
+        
+        # 클라이언트 데이터 형식 변환 (API 형식에 맞게)
+        clients = []
+        if isinstance(client_data, list):
+            for client in client_data:
+                # ClientName 생성 (FirstName + LastName)
+                first_name = client.get('FirstName', '')
+                last_name = client.get('LastName', '')
+                client_name = f"{first_name} {last_name}".strip() if first_name or last_name else 'Unknown'
+                
+                # PersonId/ClientId 가져오기 (Id 필드가 Client ID)
+                client_id = client.get('Id') or client.get('PersonId') or client.get('ClientId')
+                
+                if client_id:
+                    clients.append({
+                        'PersonId': client_id,  # Client ID를 PersonId로 사용 (드롭다운에서 사용)
+                        'ClientName': client_name,
+                        'FirstName': first_name,
+                        'LastName': last_name,
+                        'Surname': last_name,  # LastName을 Surname으로도 제공
+                        'PreferredName': client.get('PreferredName', ''),
+                        'WingName': client.get('WingName', ''),  # 없을 수 있음
+                        'RoomName': client.get('RoomName', '') or client.get('RoomNumber', ''),  # RoomNumber도 확인
+                        'Gender': client.get('Gender', ''),  # 없을 수 있음
+                        'BirthDate': client.get('BirthDate', ''),  # 없을 수 있음
+                        'MainClientServiceId': client.get('MainClientServiceId', ''),  # 없을 수 있음
+                        'IsActive': client.get('IsActive', True)
+                    })
+        
+        logger.info(f"✅ 클라이언트 목록 반환: {site} - {len(clients)}명")
+        return jsonify(clients)
+        
+    except Exception as e:
+        logger.error(f"클라이언트 목록 조회 오류 ({site}): {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/data/carearea.json')
 @login_required
@@ -2629,10 +2687,11 @@ def fetch_incidents():
         logger.info(f"Target server for {site}: {server_ip}")
         
         try:
-            # Incident 데이터와 클라이언트 데이터 가져오기
-            from api_incident import fetch_incidents_with_client_data
+            # Incident 데이터와 클라이언트 데이터 가져오기 (DB 직접 접속)
+            from manad_db_connector import fetch_incidents_with_client_data_from_db
             
-            incidents_data = fetch_incidents_with_client_data(site, start_date, end_date)
+            logger.info(f"🔌 DB 직접 접속 모드: {site}")
+            incidents_data = fetch_incidents_with_client_data_from_db(site, start_date, end_date, fetch_clients=True)
             
             if incidents_data:
                 logger.info(f"Incidents fetched successfully for {site}: {len(incidents_data.get('incidents', []))} incidents, {len(incidents_data.get('clients', []))} clients")
@@ -6267,14 +6326,12 @@ def auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor):
 
 def sync_incidents_from_manad_to_cims(full_sync=False):
     """
-    MANAD API에서 최신 인시던트를 가져와 CIMS DB에 동기화
+    MANAD DB에서 최신 인시던트를 가져와 CIMS DB에 동기화 (DB 직접 접속)
     
     Args:
         full_sync: True면 전체 동기화 (30일), False면 증분 동기화 (마지막 동기화 이후)
     """
     try:
-        from api_incident import fetch_incidents_with_client_data
-        
         safe_site_servers = get_safe_site_servers()
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -6316,59 +6373,28 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             try:
                 logger.info(f"Syncing incidents from {site_name}...")
                 
-                # MANAD 데이터 가져오기 (DB 직접 접속 또는 API)
-                # system_settings 테이블 우선 확인, 없으면 환경 변수 확인
-                use_db_direct = False
+                # MANAD 데이터 가져오기 (항상 DB 직접 접속 사용)
                 try:
-                    cursor_check = conn.cursor()
-                    cursor_check.execute("""
-                        SELECT value FROM system_settings 
-                        WHERE key = 'USE_DB_DIRECT_ACCESS'
-                    """)
-                    result = cursor_check.fetchone()
-                    if result and result[0]:
-                        use_db_direct = result[0].lower() == 'true'
-                    else:
-                        # DB에 없으면 환경 변수 확인
-                        use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
-                except:
-                    # 오류 시 환경 변수만 확인
-                    use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
-                
-                if use_db_direct:
-                    # DB 직접 접속 모드 (fallback 비활성화 - 에러 발생)
-                    try:
-                        from manad_db_connector import fetch_incidents_with_client_data_from_db
-                        logger.info(f"🔌 DB 직접 접속 모드: {site_name} (fallback 비활성화)")
-                        incidents_data = fetch_incidents_with_client_data_from_db(
-                            site_name, start_date, end_date, 
-                            fetch_clients=is_first_sync
-                        )
-                        # DB 조회 결과가 None인 경우에만 에러 (빈 리스트는 정상)
-                        if incidents_data is None:
-                            error_msg = f"❌ DB 직접 접속 실패: {site_name} - DB 연결에 실패했습니다."
-                            logger.error(error_msg)
-                            raise Exception(error_msg)
-                        
-                        # Incident가 0개인 경우는 정상 (해당 기간에 Incident가 없을 수 있음)
-                        incident_count = len(incidents_data.get('incidents', []))
-                        if incident_count == 0:
-                            logger.info(f"📭 {site_name}: 최근 {(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days}일간 Incident 없음 (정상)")
-                    except Exception as db_error:
-                        error_msg = f"❌ DB 직접 접속 실패: {site_name} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+                    from manad_db_connector import fetch_incidents_with_client_data_from_db
+                    logger.info(f"🔌 DB 직접 접속 모드: {site_name}")
+                    incidents_data = fetch_incidents_with_client_data_from_db(
+                        site_name, start_date, end_date, 
+                        fetch_clients=is_first_sync
+                    )
+                    # DB 조회 결과가 None인 경우에만 에러 (빈 리스트는 정상)
+                    if incidents_data is None:
+                        error_msg = f"❌ DB 직접 접속 실패: {site_name} - DB 연결에 실패했습니다."
                         logger.error(error_msg)
                         raise Exception(error_msg)
-                else:
-                    # 기존 API 방식
-                    logger.info(f"🌐 API 모드: {site_name}")
-                    try:
-                        incidents_data = fetch_incidents_with_client_data(
-                            site_name, start_date, end_date, 
-                            fetch_clients=is_first_sync
-                        )
-                    except Exception as api_error:
-                        logger.error(f"❌ API 조회 실패 - {site_name}: {api_error}")
-                        continue
+                    
+                    # Incident가 0개인 경우는 정상 (해당 기간에 Incident가 없을 수 있음)
+                    incident_count = len(incidents_data.get('incidents', []))
+                    if incident_count == 0:
+                        logger.info(f"📭 {site_name}: 최근 {(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days}일간 Incident 없음 (정상)")
+                except Exception as db_error:
+                    error_msg = f"❌ DB 직접 접속 실패: {site_name} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
                 
                 if not incidents_data or 'incidents' not in incidents_data:
                     logger.warning(f"No incident data from {site_name}")
@@ -6377,22 +6403,10 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 incidents = incidents_data.get('incidents', [])
                 clients = incidents_data.get('clients', [])
                 
-                # 클라이언트 데이터 캐싱 (첫 동기화 또는 하루 경과 시)
-                conn_temp = get_db_connection()
-                cursor_temp = conn_temp.cursor()
-                
-                # 마지막 클라이언트 캐시 시간 확인
-                cursor_temp.execute("""
-                    SELECT MAX(last_synced) FROM clients_cache 
-                    WHERE site = ?
-                """, (site_name,))
-                last_client_sync = cursor_temp.fetchone()[0]
-                
                 # 클라이언트 데이터를 딕셔너리로 변환 (빠른 검색용)
                 # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 불필요
                 clients_dict = {client.get('id', client.get('Id', '')): client for client in clients}
                 
-                conn_temp.close()
                 logger.info(f"📋 클라이언트 매핑 완료: {len(clients_dict)}명 (최신 데이터)")
                 
                 conn = get_db_connection()
@@ -6443,13 +6457,66 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                         existing = cursor.fetchone()
                         
                         if existing:
-                            # 기존 인시던트 업데이트 (Open 상태만)
+                            # 기존 인시던트 업데이트
                             existing_db_id = existing[0]
-                            if existing[1] == 'Open':
-                                # Prepare incident type
-                                event_types = incident.get('EventTypeNames', [])
-                                incident_type_str = ', '.join(event_types) if isinstance(event_types, list) else str(event_types)
+                            existing_status = existing[1]
+                            
+                            # MANAD에서 가져온 인시던트 상태 확인
+                            manad_status = incident.get('Status', 'Open')
+                            is_closed = manad_status.lower() in ['closed', 'close'] or incident.get('StatusEnumId') == 2
+                            
+                            # Prepare incident type
+                            event_types = incident.get('EventTypeNames', [])
+                            incident_type_str = ', '.join(event_types) if isinstance(event_types, list) else str(event_types)
+                            
+                            # Incident 상태가 Closed로 변경되는 경우
+                            if is_closed and existing_status != 'Closed':
+                                # Incident 상태를 Closed로 업데이트
+                                cursor.execute("""
+                                    UPDATE cims_incidents
+                                    SET incident_type = ?,
+                                        severity = ?,
+                                        description = ?,
+                                        initial_actions_taken = ?,
+                                        reported_by_name = ?,
+                                        resident_name = ?,
+                                        incident_date = ?,
+                                        status = 'Closed',
+                                        updated_at = ?
+                                    WHERE manad_incident_id = ?
+                                """, (
+                                    incident_type_str if incident_type_str else 'Unknown',
+                                    incident.get('SeverityRating') or incident.get('RiskRatingName') or 'Unknown',
+                                    incident.get('Description', ''),
+                                    incident.get('ActionTaken', ''),
+                                    incident.get('ReportedByName', ''),
+                                    resident_name,
+                                    incident_date_iso,
+                                    datetime.now().isoformat(),
+                                    incident_id
+                                ))
                                 
+                                # 모든 Task를 Completed로 변경
+                                cursor.execute("""
+                                    UPDATE cims_tasks
+                                    SET status = 'completed',
+                                        completed_at = ?,
+                                        updated_at = ?
+                                    WHERE incident_id = ? AND status != 'completed'
+                                """, (
+                                    datetime.now().isoformat(),
+                                    datetime.now().isoformat(),
+                                    existing_db_id
+                                ))
+                                
+                                tasks_closed = cursor.rowcount
+                                if tasks_closed > 0:
+                                    logger.info(f"✅ Incident {existing_db_id} Closed: {tasks_closed} tasks automatically closed")
+                                
+                                total_updated += 1
+                            
+                            # Open 상태인 경우만 업데이트 및 Task 생성
+                            elif existing_status == 'Open' and not is_closed:
                                 cursor.execute("""
                                     UPDATE cims_incidents
                                     SET incident_type = ?,
@@ -6462,7 +6529,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                     WHERE manad_incident_id = ?
                                 """, (
                                     incident_type_str if incident_type_str else 'Unknown',
-                                    incident.get('SeverityRating') or incident.get('RiskRatingName') or 'Unknown',  # Default to 'Unknown' if both are None
+                                    incident.get('SeverityRating') or incident.get('RiskRatingName') or 'Unknown',
                                     incident.get('Description', ''),
                                     incident.get('ActionTaken', ''),
                                     incident.get('ReportedByName', ''),
