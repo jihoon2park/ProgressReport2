@@ -181,20 +181,62 @@ function mapNoteToRow(note) {
     const clientServiceIdStr = String(note.ClientServiceId);
     let clientInfo = clientMap[clientServiceIdStr];
     
-    // Extract client name
+    // Extract client name - 표시 형식: "성, 이름" (LastName, FirstName)
     let clientName = '';
+    
+    // Helper function to format name as "LastName, FirstName"
+    function formatClientNameAsLastNameFirst(obj) {
+        const lastName = (obj.LastName || '').trim();
+        const firstName = (obj.FirstName || '').trim();
+        const title = (obj.Title || '').trim();
+        
+        if (lastName && firstName) {
+            // "LastName, FirstName" 형식
+            return title ? `${lastName}, ${title} ${firstName}` : `${lastName}, ${firstName}`;
+        } else if (lastName) {
+            return lastName;
+        } else if (firstName) {
+            return firstName;
+        }
+        return '';
+    }
+    
     if (clientInfo) {
-        clientName = [clientInfo.Title, clientInfo.FirstName, clientInfo.LastName].filter(Boolean).join(' ');
+        clientName = formatClientNameAsLastNameFirst(clientInfo);
     } else if (note.Client) {
-        clientName = [note.Client.Title, note.Client.FirstName, note.Client.LastName].filter(Boolean).join(' ');
+        clientName = formatClientNameAsLastNameFirst(note.Client);
     } else if (note.ClientName) {
-        clientName = note.ClientName;
+        // ClientName이 이미 있는 경우, "FirstName LastName" 형식일 수 있으므로 파싱 시도
+        const nameParts = note.ClientName.trim().split(/\s+/);
+        if (nameParts.length >= 2) {
+            // 마지막 부분이 성(LastName), 나머지가 이름(FirstName)으로 가정
+            const lastName = nameParts[nameParts.length - 1];
+            const firstName = nameParts.slice(0, -1).join(' ');
+            clientName = `${lastName}, ${firstName}`;
+        } else {
+            clientName = note.ClientName;
+        }
     } else if (note.Client && note.Client.Name) {
-        clientName = note.Client.Name;
+        // Client.Name이 있는 경우도 파싱 시도
+        const nameParts = note.Client.Name.trim().split(/\s+/);
+        if (nameParts.length >= 2) {
+            const lastName = nameParts[nameParts.length - 1];
+            const firstName = nameParts.slice(0, -1).join(' ');
+            clientName = `${lastName}, ${firstName}`;
+        } else {
+            clientName = note.Client.Name;
+        }
     } else if (note.ClientInfo && note.ClientInfo.Name) {
-        clientName = note.ClientInfo.Name;
+        const nameParts = note.ClientInfo.Name.trim().split(/\s+/);
+        if (nameParts.length >= 2) {
+            const lastName = nameParts[nameParts.length - 1];
+            const firstName = nameParts.slice(0, -1).join(' ');
+            clientName = `${lastName}, ${firstName}`;
+        } else {
+            clientName = note.ClientInfo.Name;
+        }
     } else if (note.ClientInfo && note.ClientInfo.FirstName) {
-        clientName = [note.ClientInfo.Title, note.ClientInfo.FirstName, note.ClientInfo.LastName].filter(Boolean).join(' ');
+        clientName = formatClientNameAsLastNameFirst(note.ClientInfo);
     }
     
     // Extract service wing (location) - use WingName (use LocationName if client mapping fails)

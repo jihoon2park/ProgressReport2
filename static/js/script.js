@@ -298,15 +298,29 @@ function displayClientDetails(client) {
         return;
     }
 
+    // 표시 형식: "성, 이름" (LastName, FirstName) 순서로 명시적으로 구성
+    const firstName = (client.FirstName || '').trim();
+    const lastName = (client.LastName || '').trim();
+    let clientName = '';
+    if (lastName && firstName) {
+        clientName = `${lastName}, ${firstName}`;
+    } else if (lastName) {
+        clientName = lastName;
+    } else if (firstName) {
+        clientName = firstName;
+    } else {
+        clientName = client.ClientName || 'Unknown';
+    }
+    
     const preferredName = client.PreferredName ? 
         '(' + client.PreferredName + ')' : '';
     
     const detailsHTML = 
         '<div class="client-details">' +
-            '<h3>' + client.ClientName + ' ' + preferredName + '</h3>' +
+            '<h3>' + clientName + ' ' + preferredName + '</h3>' +
             '<p>Gender: ' + (client.Gender || client.gender || 'Not specified') + '</p>' +
             '<p>ID: ' + client.PersonId + '</p>' +
-            '<p>Birth Date: ' + new Date(client.BirthDate).toLocaleDateString() + '</p>' +
+            '<p>Birth Date: ' + (client.BirthDate ? new Date(client.BirthDate).toLocaleDateString() : 'N/A') + '</p>' +
             '<p>Wing: ' + (client.WingName || 'N/A') + '</p>' +
             '<p>Room: ' + (client.RoomName || 'N/A') + '</p>' +
         '</div>';
@@ -350,16 +364,40 @@ function loadClientList() {
             DOM.client.innerHTML = '<option value="">(none)</option>';
             
             if (Array.isArray(data) && data.length > 0) {
+                // 성(LastName) 기준으로 정렬 (성, 이름 순서)
                 data.sort((a, b) => {
-                    const nameA = a.ClientName || '';
-                    const nameB = b.ClientName || '';
-                    return nameA.localeCompare(nameB);
+                    const lastNameA = (a.LastName || '').trim();
+                    const lastNameB = (b.LastName || '').trim();
+                    
+                    // LastName으로 먼저 비교
+                    const lastNameCompare = lastNameA.localeCompare(lastNameB);
+                    if (lastNameCompare !== 0) {
+                        return lastNameCompare;
+                    }
+                    
+                    // LastName이 같으면 FirstName으로 비교
+                    const firstNameA = (a.FirstName || '').trim();
+                    const firstNameB = (b.FirstName || '').trim();
+                    return firstNameA.localeCompare(firstNameB);
                 });
                 
                 data.forEach(client => {
                     const option = document.createElement('option');
                     option.value = client.PersonId;
-                    option.textContent = client.ClientName + ' (ID: ' + client.PersonId + ')';
+                    // 표시 형식: "성, 이름 (ID: ...)" - LastName, FirstName 순서로 명시적으로 구성
+                    const firstName = (client.FirstName || '').trim();
+                    const lastName = (client.LastName || '').trim();
+                    let displayName = '';
+                    if (lastName && firstName) {
+                        displayName = `${lastName}, ${firstName}`;
+                    } else if (lastName) {
+                        displayName = lastName;
+                    } else if (firstName) {
+                        displayName = firstName;
+                    } else {
+                        displayName = client.ClientName || 'Unknown';
+                    }
+                    option.textContent = displayName + ' (ID: ' + client.PersonId + ')';
                     DOM.client.appendChild(option);
                 });
                 
