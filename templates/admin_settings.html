@@ -169,7 +169,7 @@
             background-color: #dc3545;
         }
 
-        /* 운영 서버 로그 모달 스타일 */
+        /* Production server log modal styles */
         .log-tabs {
             display: flex;
             margin-bottom: 15px;
@@ -333,7 +333,7 @@
 </head>
 <body>
     <div class="admin-container">
-        <!-- 헤더 -->
+        <!-- Header -->
         <div class="settings-header">
             <h2>🔧 Admin Settings</h2>
             <p>Manage API keys and system settings. (Admin only)</p>
@@ -375,15 +375,15 @@
             
             <!-- Data Source Info (READ-ONLY) -->
             <div class="alert alert-success" style="margin-bottom: 25px;">
-                <h4 style="margin-top: 0;">🔌 데이터 소스 모드</h4>
-                <p style="margin-bottom: 10px;"><strong>현재 모드: DB 직접 접속 (READ-ONLY)</strong></p>
+                <h4 style="margin-top: 0;">🔌 Data Source Mode</h4>
+                <p style="margin-bottom: 10px;"><strong>Current Mode: Direct DB Access (READ-ONLY)</strong></p>
                 <ul style="margin: 0 0 0 20px;">
-                    <li><strong>Progress Notes:</strong> MANAD MSSQL 데이터베이스에서 실시간 조회</li>
-                    <li><strong>Incidents:</strong> API를 통해 조회 후 SQLite DB에 캐시</li>
-                    <li><strong>보안:</strong> 모든 DB 연결은 읽기 전용 모드 (autocommit=False + rollback)</li>
+                    <li><strong>Progress Notes:</strong> Real-time query from MANAD MSSQL database</li>
+                    <li><strong>Incidents:</strong> Cached in SQLite DB after query via API</li>
+                    <li><strong>Security:</strong> All DB connections are read-only mode (autocommit=False + rollback)</li>
                 </ul>
                 <small style="display: block; margin-top: 10px; color: #155724;">
-                    💡 데이터는 자동으로 백그라운드에서 5분마다 동기화됩니다
+                    💡 Data is automatically synced in the background every 5 minutes
                 </small>
             </div>
             
@@ -448,39 +448,39 @@
     </div>
 
     <script>
-        // 페이지 로드 시 시스템 상태 확인
+        // Check system status on page load
         document.addEventListener('DOMContentLoaded', function() {
             checkSystemStatus();
         });
 
-        // 운영 서버 로그 모달 표시
+        // Show production server log modal
         function showProductionLogs() {
             document.getElementById('productionLogsModal').style.display = 'block';
-            loadLog('app'); // 기본적으로 app 로그 로드
+            loadLog('app'); // Load app log by default
         }
 
-        // 운영 서버 로그 모달 닫기
+        // Close production server log modal
         function closeProductionLogsModal() {
             document.getElementById('productionLogsModal').style.display = 'none';
         }
 
-        // 로그 탭 전환
+        // Switch log tab
         function showLogTab(logType) {
-            // 모든 탭 버튼 비활성화
+            // Deactivate all tab buttons
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            // 모든 로그 콘텐츠 숨기기
+            // Hide all log content
             document.querySelectorAll('.log-content').forEach(content => content.style.display = 'none');
             
-            // 선택된 탭 활성화
+            // Activate selected tab
             event.target.classList.add('active');
-            // 선택된 로그 콘텐츠 표시
+            // Show selected log content
             document.getElementById(logType + '-log-content').style.display = 'block';
             
-            // 해당 로그 로드
+            // Load the log
             loadLog(logType);
         }
 
-        // 로그 로드
+        // Load log
         async function loadLog(logType) {
             const infoElement = document.getElementById(logType + '-log-info');
             const textElement = document.getElementById(logType + '-log-text');
@@ -505,12 +505,12 @@
             }
         }
 
-        // 로그 새로고침
+        // Refresh log
         function refreshLog(logType) {
             loadLog(logType);
         }
 
-        // 시스템 상태 확인
+        // Check system status
         async function checkSystemStatus() {
             try {
                 const response = await fetch('/api/admin/system-status');
@@ -529,7 +529,7 @@
                 console.error('System status check failed:', error);
             }
         }
-        // 알림 표시
+        // Show alert
         function showAlert(message, type) {
             const alertContainer = document.getElementById('alert-container');
             const alertId = 'alert-' + Date.now();
@@ -541,7 +541,7 @@
                 </div>
             `;
             
-            // 5초 후 자동 제거
+            // Auto-remove after 5 seconds
             setTimeout(() => {
                 const alert = document.getElementById(alertId);
                 if (alert) {

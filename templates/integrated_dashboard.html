@@ -2189,11 +2189,15 @@
                 // Load incident data first (set filteredIncidents)
                 await initializeIncidentViewer();
                 
+                // Apply filters to update KPI cards and display
+                applyFilters();
+                
+                // Load dashboard stats (charts)
+                loadDashboardStats();
+                
                 // Then load remaining data
                 // loadComplianceSummary() is deprecated - updateKPICards() handles this
                 // loadOverdueTasks() // Removed - will be re-implemented later
-                
-                // displayStats() is already called by applyFilters() in initializeIncidentViewer()
             } catch (error) {
                 console.error('Error loading admin data:', error);
             }
@@ -2805,24 +2809,69 @@
         // Update KPI cards with filtered data
         async function updateKPICards() {
             try {
+                // Ensure currentPeriod and currentIncidentType are set
+                if (!currentPeriod) {
+                    const periodSelect = document.getElementById('globalPeriodSelect');
+                    currentPeriod = periodSelect ? periodSelect.value : 'week';
+                }
+                if (!currentIncidentType) {
+                    const incidentTypeRadio = document.querySelector('input[name="incidentType"]:checked');
+                    currentIncidentType = incidentTypeRadio ? incidentTypeRadio.value : 'all';
+                }
+                
+                console.log(`📊 Fetching KPI data: period=${currentPeriod}, incident_type=${currentIncidentType}`);
+                
                 // Get KPI data from backend
-                const response = await fetch(`/api/cims/dashboard-kpis?period=${currentPeriod}&incident_type=${currentIncidentType}`);
+                const response = await fetch(`/api/cims/dashboard-kpis?period=${currentPeriod}&incident_type=${currentIncidentType}`, {
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
                 if (!response.ok) {
-                    throw new Error('Failed to fetch KPI data');
+                    let errorMessage = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                        console.error('❌ KPI API Error:', errorData);
+                    } catch (e) {
+                        const errorText = await response.text();
+                        console.error('❌ KPI API Error (text):', response.status, errorText);
+                        errorMessage = errorText || errorMessage;
+                    }
+                    
+                    // Show user-friendly error message
+                    console.error(`Failed to fetch KPI data: ${errorMessage}`);
+                    
+                    // If it's a permission error, show specific message
+                    if (response.status === 403) {
+                        console.error('⚠️ Access denied. Please check your user role and permissions.');
+                    }
+                    
+                    throw new Error(`Failed to fetch KPI data: ${errorMessage}`);
                 }
                 
                 const kpiData = await response.json();
-                console.log('📊 KPI Data:', kpiData);
+                
+                // Check if response contains error
+                if (kpiData.error) {
+                    console.error('❌ KPI API returned error:', kpiData.error);
+                    throw new Error(kpiData.error);
+                }
+                
+                console.log('📊 KPI Data received:', kpiData);
                 
                 // Update Overall Compliance Rate
                 const complianceRateEl = document.getElementById('compliance-rate');
                 const complianceDescEl = document.getElementById('compliance-desc');
                 if (complianceRateEl && complianceDescEl) {
-                    complianceRateEl.textContent = `${kpiData.compliance_rate}%`;
-                    if (kpiData.compliance_rate >= 90) {
+                    const complianceRate = kpiData.compliance_rate || 0;
+                    complianceRateEl.textContent = `${complianceRate}%`;
+                    if (complianceRate >= 90) {
                         complianceDescEl.textContent = 'Excellent compliance';
                         complianceDescEl.className = 'kpi-description text-success';
-                    } else if (kpiData.compliance_rate >= 70) {
+                    } else if (complianceRate >= 70) {
                         complianceDescEl.textContent = 'Good compliance';
                         complianceDescEl.className = 'kpi-description text-warning';
                     } else {
@@ -2836,20 +2885,20 @@
                 const totalIncidentsEl = document.getElementById('total-incidents');
                 const totalIncidentsDescEl = document.getElementById('total-incidents-desc');
                 if (totalIncidentsEl && totalIncidentsDescEl) {
-                    totalIncidentsEl.textContent = kpiData.total_incidents;
+                    const totalIncidents = kpiData.total_incidents || 0;
+                    totalIncidentsEl.textContent = totalIncidents;
                     const periodText = currentPeriod === 'today' ? 'Today' : 
                                       currentPeriod === 'week' ? 'This Week' : 'This Month';
-                    totalIncidentsDescEl.textContent = `${periodText}: ${kpiData.total_incidents}`;
+                    totalIncidentsDescEl.textContent = periodText;
                 }
                 
                 // Update Open Incidents
                 const openIncidentsEl = document.getElementById('open-incidents');
                 const incidentsChangeEl = document.getElementById('incidents-change');
                 if (openIncidentsEl && incidentsChangeEl) {
-                    openIncidentsEl.textContent = kpiData.open_incidents;
-                    const periodText = currentPeriod === 'today' ? 'Today' : 
-                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
-                    incidentsChangeEl.textContent = `${periodText}: ${kpiData.open_incidents} not visited`;
+                    const openIncidents = kpiData.open_incidents || 0;
+                    openIncidentsEl.textContent = openIncidents;
+                    incidentsChangeEl.textContent = 'Not yet closed';
                 }
                 
                 // Update In Progress Incidents (partially completed)
@@ -2866,19 +2915,25 @@
                 const closedIncidentsEl = document.getElementById('closed-incidents');
                 const closedDescEl = document.getElementById('closed-desc');
                 if (closedIncidentsEl && closedDescEl) {
-                    closedIncidentsEl.textContent = kpiData.closed_incidents || 0;
-                    const periodText = currentPeriod === 'today' ? 'Today' : 
-                                      currentPeriod === 'week' ? 'This Week' : 'This Month';
-                    closedDescEl.textContent = `${periodText}: All tasks done`;
+                    const closedIncidents = kpiData.closed_incidents || 0;
+                    closedIncidentsEl.textContent = closedIncidents;
+                    closedDescEl.textContent = 'Completed';
                 }
                 
+                console.log('✅ KPI cards updated successfully');
+                
             } catch (error) {
-                console.error('Error updating KPI cards:', error);
+                console.error('❌ Error updating KPI cards:', error);
                 // Show error state in KPI cards
-                document.getElementById('compliance-rate').textContent = '--';
-                document.getElementById('total-incidents').textContent = '--';
-                document.getElementById('open-incidents').textContent = '--';
-                document.getElementById('closed-incidents').textContent = '--';
+                const complianceRateEl = document.getElementById('compliance-rate');
+                const totalIncidentsEl = document.getElementById('total-incidents');
+                const openIncidentsEl = document.getElementById('open-incidents');
+                const closedIncidentsEl = document.getElementById('closed-incidents');
+                
+                if (complianceRateEl) complianceRateEl.textContent = '--';
+                if (totalIncidentsEl) totalIncidentsEl.textContent = '--';
+                if (openIncidentsEl) openIncidentsEl.textContent = '--';
+                if (closedIncidentsEl) closedIncidentsEl.textContent = '--';
             }
         }
         

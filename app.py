@@ -4223,13 +4223,13 @@ def cleanup_fcm_tokens():
 @app.route('/admin-settings')
 @login_required
 def admin_settings():
-    """Admin 설정 페이지 (ADMIN 전용)"""
-    # 관리자 권한 확인
+    """Admin Settings page (Admin only)"""
+    # Check admin permissions
     if current_user.role not in ['admin', 'site_admin']:
         flash('Access denied. This page is for admin users only.', 'error')
         return redirect(url_for('home'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -7541,12 +7541,21 @@ def get_dashboard_kpis():
     - 3단계 Incident 상태 구분: Open / In Progress / Completed
     """
     try:
-        if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
-            return jsonify({'error': 'Access denied'}), 403
+        # Check permissions
+        user_role = current_user.role if current_user.is_authenticated else None
+        is_admin = current_user.is_admin() if current_user.is_authenticated else False
+        
+        logger.info(f"Dashboard KPI request - User: {current_user.username if current_user.is_authenticated else 'Anonymous'}, Role: {user_role}, Is Admin: {is_admin}")
+        
+        if not (is_admin or user_role in ['clinical_manager', 'doctor']):
+            logger.warning(f"Access denied for user {current_user.username if current_user.is_authenticated else 'Anonymous'} with role {user_role}")
+            return jsonify({'error': 'Access denied', 'user_role': user_role}), 403
         
         # 필터 파라미터
         period = request.args.get('period', 'week')  # today, week, month
         incident_type = request.args.get('incident_type', 'all')  # all, Fall, Wound/Skin, etc.
+        
+        logger.info(f"Fetching KPI data: period={period}, incident_type={incident_type}")
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -7559,6 +7568,9 @@ def get_dashboard_kpis():
             start_date = now - timedelta(days=7)
         else:  # month
             start_date = now - timedelta(days=30)
+        
+        # SQLite에서 사용할 날짜 문자열 (ISO 형식)
+        start_date_str = start_date.isoformat()
         
         # 사고 유형 필터 조건 생성
         type_filter = ""
@@ -7590,6 +7602,7 @@ def get_dashboard_kpis():
         # ==========================================
         # 1. Incident 상태 통계 (status_enum_id 기반)
         # StatusEnumId: 0=Open, 1=InProgress, 2=Closed
+        # SQLite에서 날짜 비교는 문자열 비교이므로 ISO 형식 사용
         # ==========================================
         incident_stats_query = f"""
             SELECT 
@@ -7605,11 +7618,18 @@ def get_dashboard_kpis():
                 SUM(CASE WHEN status_enum_id = 2 THEN 1 ELSE 0 END) as closed_incidents
                 
             FROM cims_incidents i
-            WHERE i.incident_date >= ?
+            WHERE i.incident_date IS NOT NULL 
+            AND i.incident_date >= ?
             {type_filter}
         """
         
-        cursor.execute(incident_stats_query, [start_date.isoformat()] + type_params)
+        try:
+            cursor.execute(incident_stats_query, [start_date_str] + type_params)
+        except Exception as query_error:
+            logger.error(f"SQL Query Error: {str(query_error)}")
+            logger.error(f"Query: {incident_stats_query}")
+            logger.error(f"Params: {[start_date_str] + type_params}")
+            raise
         incident_stats = cursor.fetchone()
         
         # ==========================================
@@ -7623,7 +7643,13 @@ def get_dashboard_kpis():
             {type_filter}
         """
         
-        cursor.execute(fall_query, [start_date.isoformat()] + type_params)
+        try:
+            cursor.execute(fall_query, [start_date_str] + type_params)
+        except Exception as query_error:
+            logger.error(f"Fall Query Error: {str(query_error)}")
+            logger.error(f"Query: {fall_query}")
+            logger.error(f"Params: {[start_date_str] + type_params}")
+            raise
         fall_result = cursor.fetchone()
         fall_count = fall_result['fall_count'] if fall_result else 0
         
@@ -7657,8 +7683,13 @@ def get_dashboard_kpis():
     except Exception as e:
         logger.error(f"Dashboard KPI 조회 오류: {str(e)}")
         import traceback
-        logger.error(traceback.format_exc())
-        return jsonify({'error': 'Internal server error'}), 500
+        error_trace = traceback.format_exc()
+        logger.error(error_trace)
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e),
+            'trace': error_trace if app.config.get('DEBUG', False) else None
+        }), 500
 
 
 @app.route('/api/cims/dashboard-stats')
@@ -7690,6 +7721,9 @@ def get_dashboard_stats():
         else:  # month
             start_date = now - timedelta(days=30)
         
+        # SQLite에서 사용할 날짜 문자열 (ISO 형식)
+        start_date_str = start_date.isoformat()
+        
         # ==========================================
         # 1. 이벤트 유형 분포 (Event Type Distribution)
         # ==========================================
@@ -7705,7 +7739,8 @@ def get_dashboard_stats():
                 END as event_category,
                 COUNT(*) as count
             FROM cims_incidents
-            WHERE incident_date >= ?
+            WHERE incident_date IS NOT NULL 
+            AND incident_date >= ?
             GROUP BY 
                 CASE 
                     WHEN LOWER(incident_type) LIKE '%fall%' THEN 'Fall'
@@ -7716,7 +7751,7 @@ def get_dashboard_stats():
                     ELSE 'Other'
                 END
             ORDER BY count DESC
-        """, [start_date.isoformat()])
+        """, [start_date_str])
         
         event_type_distribution = [{'name': row['event_category'], 'value': row['count']} for row in cursor.fetchall()]
         
@@ -7731,7 +7766,7 @@ def get_dashboard_stats():
             WHERE incident_date >= ?
             GROUP BY COALESCE(NULLIF(risk_rating, ''), 'Not Set')
             ORDER BY count DESC
-        """, [start_date.isoformat()])
+        """, [start_date_str])
         
         risk_distribution = [{'name': row['risk'], 'value': row['count']} for row in cursor.fetchall()]
         
@@ -7743,10 +7778,11 @@ def get_dashboard_stats():
                 COALESCE(NULLIF(severity, ''), 'Not Set') as severity_level,
                 COUNT(*) as count
             FROM cims_incidents
-            WHERE incident_date >= ?
+            WHERE incident_date IS NOT NULL 
+            AND incident_date >= ?
             GROUP BY COALESCE(NULLIF(severity, ''), 'Not Set')
             ORDER BY count DESC
-        """, [start_date.isoformat()])
+        """, [start_date_str])
         
         severity_distribution = [{'name': row['severity_level'], 'value': row['count']} for row in cursor.fetchall()]
         
@@ -7761,10 +7797,11 @@ def get_dashboard_stats():
                 SUM(CASE WHEN status = 'In Progress' OR status_enum_id = 1 THEN 1 ELSE 0 END) as in_progress_count,
                 COUNT(*) as total
             FROM cims_incidents
-            WHERE incident_date >= ?
+            WHERE incident_date IS NOT NULL 
+            AND incident_date >= ?
             GROUP BY site
             ORDER BY total DESC
-        """, [start_date.isoformat()])
+        """, [start_date_str])
         
         site_status_stats = []
         for row in cursor.fetchall():
@@ -7788,10 +7825,11 @@ def get_dashboard_stats():
                 SUM(CASE WHEN status_enum_id != 2 AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as not_reviewed,
                 COUNT(*) as total
             FROM cims_incidents
-            WHERE incident_date >= ?
+            WHERE incident_date IS NOT NULL 
+            AND incident_date >= ?
             GROUP BY site
             ORDER BY total DESC
-        """, [start_date.isoformat()])
+        """, [start_date_str])
         
         site_review_stats = []
         for row in cursor.fetchall():
@@ -7816,8 +7854,9 @@ def get_dashboard_stats():
                 SUM(CASE WHEN status_enum_id != 2 AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as pending_review,
                 COUNT(*) as total
             FROM cims_incidents
-            WHERE incident_date >= ?
-        """, [start_date.isoformat()])
+            WHERE incident_date IS NOT NULL 
+            AND incident_date >= ?
+        """, [start_date_str])
         
         additional_kpis = cursor.fetchone()
         
@@ -7829,10 +7868,11 @@ def get_dashboard_stats():
                 fall_type,
                 COUNT(*) as count
             FROM cims_incidents
-            WHERE incident_date >= ?
+            WHERE incident_date IS NOT NULL 
+            AND incident_date >= ?
             AND LOWER(incident_type) LIKE '%fall%'
             GROUP BY fall_type
-        """, [start_date.isoformat()])
+        """, [start_date_str])
         
         fall_stats = [{'type': row['fall_type'] or 'unknown', 'count': row['count']} for row in cursor.fetchall()]
         
