@@ -153,8 +153,11 @@ class MemoryMonitor:
     def stop_monitoring(self):
         """메모리 모니터링 중지"""
         self.monitoring = False
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=5)
+        if self.monitor_thread and self.monitor_thread.is_alive():
+            try:
+                self.monitor_thread.join(timeout=5)
+            except Exception as e:
+                logger.warning(f"메모리 모니터링 스레드 종료 중 오류 (무시 가능): {e}")
         logger.info("메모리 모니터링 중지됨")
     
     def _monitor_loop(self):

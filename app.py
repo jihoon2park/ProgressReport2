@@ -5697,10 +5697,38 @@ def get_cache_status_current():
             LIMIT 1
         """)
         row = cursor.fetchone()
-        conn.close()
+        
+        # 마지막 동기화 시간 조회
+        cursor.execute("""
+            SELECT value FROM system_settings 
+            WHERE key = 'last_incident_sync_time'
+        """)
+        last_sync_result = cursor.fetchone()
+        last_sync_time = last_sync_result[0] if last_sync_result else None
+        
+        # 데이터 중 가장 최신 인시던트 날짜 조회
+        cursor.execute("""
+            SELECT MAX(incident_date) as latest_date
+            FROM cims_incidents
+            WHERE incident_date IS NOT NULL AND incident_date != ''
+        """)
+        latest_incident_result = cursor.fetchone()
+        latest_incident_date = latest_incident_result[0] if latest_incident_result and latest_incident_result[0] else None
+        
         status = row[0] if row else 'idle'
         last = row[1] if row else None
-        return jsonify({'success': True, 'status': status, 'last_processed': last})
+        
+        # Log for debugging
+        logger.debug(f"Sync status: status={status}, last_sync_time={last_sync_time}, latest_incident_date={latest_incident_date}")
+        
+        conn.close()
+        return jsonify({
+            'success': True, 
+            'status': status, 
+            'last_processed': last,
+            'last_sync_time': last_sync_time,
+            'latest_incident_date': latest_incident_date
+        })
     except Exception as e:
         # 테이블이 없거나 접근할 수 없을 때 조용히 처리 (경고만 기록)
         # 이 API는 UI 인디케이터용이므로 실패해도 앱 기능에 영향 없음
@@ -5710,7 +5738,48 @@ def get_cache_status_current():
         else:
             # 다른 에러는 warning으로 기록
             logger.warning(f"get_cache_status_current error: {e}")
-        return jsonify({'success': True, 'status': 'idle'}), 200
+        
+        # 에러 발생 시에도 last_sync_time과 latest_incident_date를 조회 시도
+        try:
+            if conn:
+                conn.close()
+            conn = get_db_connection(read_only=True)
+            cursor = conn.cursor()
+            
+            # 마지막 동기화 시간 조회
+            cursor.execute("""
+                SELECT value FROM system_settings 
+                WHERE key = 'last_incident_sync_time'
+            """)
+            last_sync_result = cursor.fetchone()
+            last_sync_time = last_sync_result[0] if last_sync_result else None
+            
+            # 데이터 중 가장 최신 인시던트 날짜 조회
+            cursor.execute("""
+                SELECT MAX(incident_date) as latest_date
+                FROM cims_incidents
+                WHERE incident_date IS NOT NULL AND incident_date != ''
+            """)
+            latest_incident_result = cursor.fetchone()
+            latest_incident_date = latest_incident_result[0] if latest_incident_result and latest_incident_result[0] else None
+            
+            conn.close()
+            return jsonify({
+                'success': True, 
+                'status': 'idle',
+                'last_sync_time': last_sync_time,
+                'latest_incident_date': latest_incident_date
+            }), 200
+        except Exception as e2:
+            logger.warning(f"Error fetching sync times in exception handler: {e2}")
+            if conn:
+                conn.close()
+            return jsonify({
+                'success': True, 
+                'status': 'idle',
+                'last_sync_time': None,
+                'latest_incident_date': None
+            }), 200
     finally:
         if conn:
             conn.close()
@@ -5910,23 +5979,14 @@ def get_fall_statistics():
             fall_type = incident[5]  # DB에서 직접 조회
             
             # fall_type이 없으면 계산 (레거시 데이터 처리)
+            # 주의: 읽기 전용 모드이므로 DB에 저장하지 않고 메모리에서만 사용
             if not fall_type and fall_detector:
                 try:
                     fall_type = fall_detector.detect_fall_type_from_incident(incident_id, cursor)
-                    
-                    # 계산된 fall_type을 DB에 저장
-                    if fall_type:
-                        try:
-                            cursor.execute("""
-                                UPDATE cims_incidents
-                                SET fall_type = ?
-                                WHERE id = ?
-                            """, (fall_type, incident_id))
-                            conn.commit()
-                        except Exception as update_error:
-                            logger.warning(f"Failed to update fall_type for incident {incident_id}: {update_error}")
+                    # 읽기 전용 모드이므로 DB에 저장하지 않음 (메모리에서만 사용)
+                    # DB 업데이트는 동기화 프로세스에서 처리됨
                 except Exception as detect_error:
-                    logger.warning(f"Failed to detect fall_type for incident {incident_id}: {detect_error}")
+                    logger.debug(f"Failed to detect fall_type for incident {incident_id}: {detect_error}")
                     fall_type = None
             
             # fall_type 검증 및 기본값 설정
@@ -6948,7 +7008,7 @@ def force_sync_all():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def get_cims_incidents():
-    """Open 상태 인시던트 목록 조회 (자동 동기화 포함)"""
+    """인시던트 목록 조회 (모든 상태 포함, 자동 동기화 포함)"""
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
             return jsonify({'error': 'Access denied'}), 403
@@ -7019,26 +7079,32 @@ def get_cims_incidents():
         site_filter = request.args.get('site')
         date_filter = request.args.get('date')
         
-        # DB 직접 접속 모드 확인
-        use_db_direct = False
-        try:
-            conn_check = get_db_connection(read_only=True)
-            cursor_check = conn_check.cursor()
-            cursor_check.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
-            result = cursor_check.fetchone()
-            conn_check.close()
-            
-            if result and result[0]:
-                use_db_direct = result[0].lower() == 'true'
-            else:
-                use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
-        except:
-            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        # 🔧 수정: KPI와 일치시키기 위해 항상 CIMS SQLite DB에서 조회
+        # MANAD DB 직접 접속은 동기화에만 사용하고, 조회는 CIMS DB 사용
+        # 이렇게 하면 인시던트 로드와 KPI가 동일한 데이터 소스를 사용합니다
+        # 원래는 DB 설정을 확인하지만, KPI와 일치시키기 위해 강제로 CIMS DB 사용
+        use_db_direct = False  # 강제로 CIMS DB 사용 (KPI와 일치)
+        
+        # 주석 처리: 원래 DB 직접 접속 모드 확인 로직 (현재는 사용하지 않음)
+        # try:
+        #     conn_check = get_db_connection(read_only=True)
+        #     cursor_check = conn_check.cursor()
+        #     cursor_check.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+        #     result = cursor_check.fetchone()
+        #     conn_check.close()
+        #     
+        #     if result and result[0]:
+        #         use_db_direct = result[0].lower() == 'true'
+        #     else:
+        #         use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        # except:
+        #     use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
         
         incidents = []
         
         if use_db_direct:
             # 🔌 DB 직접 접속 모드: MANAD DB에서 최신 인시던트 조회
+            # ⚠️ 주의: 이 모드는 KPI와 데이터 소스가 달라서 불일치 발생 가능
             logger.info(f"🔌 DB 직접 접속 모드: integrated_dashboard 인시던트 조회")
             
             try:
@@ -7096,9 +7162,8 @@ def get_cims_incidents():
                                 cims_id = existing[0] if existing else None
                                 fall_type = existing[3] if existing and len(existing) > 3 else None
                                 
-                                # Open 상태만 필터링
-                                if status != 'Open':
-                                    continue
+                                # 모든 상태 포함 (KPI와 일치시키기 위해)
+                                # Open, Closed, In Progress, Overdue 모두 표시
                                 
                                 # 인시던트 타입 처리
                                 event_type = inc.get('EventTypeNames', '')
@@ -7146,12 +7211,15 @@ def get_cims_incidents():
                 use_db_direct = False
         
         if not use_db_direct:
-            # 🌐 API 모드 또는 Fallback: CIMS DB에서 조회
+            # ✅ CIMS DB에서 조회 (KPI와 동일한 데이터 소스 사용)
+            # 모든 상태 포함 (KPI와 일치시키기 위해)
+            # 날짜 필터는 제거 (클라이언트에서 필터링)
+            # KPI와 일치시키기 위해 동일한 데이터 소스 사용
             query = """
                 SELECT id, incident_id, resident_id, resident_name, incident_type, severity, status, 
                        incident_date, location, description, site, created_at
                 FROM cims_incidents 
-                WHERE status = 'Open'
+                WHERE status IS NOT NULL
             """
             params = []
             
@@ -7159,13 +7227,9 @@ def get_cims_incidents():
                 query += " AND site = ?"
                 params.append(site_filter)
             
-            if date_filter:
-                date_obj = datetime.fromisoformat(date_filter)
-                five_days_before = (date_obj - timedelta(days=5)).isoformat()
-                query += " AND incident_date >= ?"
-                params.append(five_days_before)
+            # 날짜 필터 제거: 클라이언트에서 필터링 (KPI와 일치)
             
-            query += " ORDER BY incident_date DESC LIMIT 500"
+            query += " ORDER BY incident_date DESC LIMIT 1000"
             
             # 조회는 읽기 전용 연결로 재수행 + 간단 재시도
             try:
@@ -7249,7 +7313,7 @@ def get_cims_incidents():
         finally:
             conn_fall.close()
         
-        logger.info(f"📤 API 응답: {len(result)}개 Open 인시던트 반환")
+        logger.info(f"📤 API 응답: {len(result)}개 인시던트 반환 (모든 상태 포함)")
         return jsonify({'incidents': result, 'stale': False})
         
     except Exception as e:
@@ -7671,12 +7735,12 @@ def get_dashboard_kpis():
         
         try:
             logger.info(f"Executing KPI query with start_date: {start_date_str}, type_filter: {type_filter}, type_params: {type_params}")
-            logger.info(f"Full query: {incident_stats_query}")
+            # Full query 로그 제거 (소스코드가 로그에 출력되는 문제 방지)
             cursor.execute(incident_stats_query, [start_date_str] + type_params)
         except Exception as query_error:
             logger.error(f"SQL Query Error: {str(query_error)}")
-            logger.error(f"Query: {incident_stats_query}")
-            logger.error(f"Params: {[start_date_str] + type_params}")
+            # SQL 쿼리 전체 로그 제거 (소스코드가 로그에 출력되는 문제 방지)
+            logger.error(f"Query params: start_date={start_date_str}, type_params={type_params}")
             raise
         incident_stats = cursor.fetchone()
         
@@ -7702,18 +7766,23 @@ def get_dashboard_kpis():
         if calculated_total != actual_total:
             logger.warning(f"⚠️ Status sum mismatch: calculated={calculated_total}, actual={actual_total}, difference={actual_total - calculated_total}")
         
-        # 실제 데이터 샘플 확인 (디버깅용)
+        # 실제 데이터 샘플 확인 (디버깅용) - 최근 7일 상태 분포
         try:
             cursor.execute("""
-                SELECT status, incident_date, COUNT(*) as cnt
+                SELECT status, COUNT(*) as cnt
                 FROM cims_incidents
                 WHERE incident_date IS NOT NULL 
                 AND incident_date >= ?
                 GROUP BY status
-                LIMIT 10
+                ORDER BY cnt DESC
             """, [start_date_str])
             status_samples = cursor.fetchall()
-            logger.info(f"Status distribution sample: {status_samples}")
+            status_distribution = {dict(row)['status']: dict(row)['cnt'] for row in status_samples}
+            logger.info(f"Status distribution for period {period}: {status_distribution}")
+            
+            # 검증: 상태별 합계
+            status_sum = sum(status_distribution.values())
+            logger.info(f"Status sum: {status_sum}, Total from query: {incident_stats_dict.get('total_incidents', 0)}")
         except Exception as e:
             logger.warning(f"Could not fetch status samples: {e}")
         
@@ -7734,8 +7803,8 @@ def get_dashboard_kpis():
             cursor.execute(fall_query, [start_date_str] + type_params)
         except Exception as query_error:
             logger.error(f"Fall Query Error: {str(query_error)}")
-            logger.error(f"Query: {fall_query}")
-            logger.error(f"Params: {[start_date_str] + type_params}")
+            # SQL 쿼리 전체 로그 제거 (소스코드가 로그에 출력되는 문제 방지)
+            logger.error(f"Query params: start_date={start_date_str}, type_params={type_params}")
             raise
         fall_result = cursor.fetchone()
         fall_count = dict(fall_result).get('fall_count', 0) if fall_result else 0
