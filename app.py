@@ -7600,22 +7600,22 @@ def get_dashboard_kpis():
                 """
         
         # ==========================================
-        # 1. Incident 상태 통계 (status_enum_id 기반)
-        # StatusEnumId: 0=Open, 1=InProgress, 2=Closed
+        # 1. Incident 상태 통계 (status 필드 기반)
+        # status 필드를 사용하여 상태 분류
         # SQLite에서 날짜 비교는 문자열 비교이므로 ISO 형식 사용
         # ==========================================
         incident_stats_query = f"""
             SELECT 
                 COUNT(*) as total_incidents,
                 
-                -- Open Incidents: status_enum_id = 0
-                SUM(CASE WHEN status_enum_id = 0 THEN 1 ELSE 0 END) as open_incidents,
+                -- Open Incidents: status = 'Open' or contains 'Open'
+                SUM(CASE WHEN LOWER(status) = 'open' OR LOWER(status) LIKE '%open%' THEN 1 ELSE 0 END) as open_incidents,
                 
-                -- In Progress Incidents: status_enum_id = 1
-                SUM(CASE WHEN status_enum_id = 1 THEN 1 ELSE 0 END) as in_progress_incidents,
+                -- In Progress Incidents: status contains 'progress' or 'in progress'
+                SUM(CASE WHEN LOWER(status) LIKE '%progress%' OR LOWER(status) LIKE '%in progress%' THEN 1 ELSE 0 END) as in_progress_incidents,
                 
-                -- Closed Incidents: status_enum_id = 2
-                SUM(CASE WHEN status_enum_id = 2 THEN 1 ELSE 0 END) as closed_incidents
+                -- Closed Incidents: status = 'Closed' or contains 'Closed'
+                SUM(CASE WHEN LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%' THEN 1 ELSE 0 END) as closed_incidents
                 
             FROM cims_incidents i
             WHERE i.incident_date IS NOT NULL 
@@ -7792,9 +7792,9 @@ def get_dashboard_stats():
         cursor.execute("""
             SELECT 
                 site,
-                SUM(CASE WHEN status = 'Open' OR status_enum_id = 0 THEN 1 ELSE 0 END) as open_count,
-                SUM(CASE WHEN status = 'Closed' OR status_enum_id = 2 THEN 1 ELSE 0 END) as closed_count,
-                SUM(CASE WHEN status = 'In Progress' OR status_enum_id = 1 THEN 1 ELSE 0 END) as in_progress_count,
+                SUM(CASE WHEN LOWER(status) = 'open' OR LOWER(status) LIKE '%open%' THEN 1 ELSE 0 END) as open_count,
+                SUM(CASE WHEN LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%' THEN 1 ELSE 0 END) as closed_count,
+                SUM(CASE WHEN LOWER(status) LIKE '%progress%' OR LOWER(status) LIKE '%in progress%' THEN 1 ELSE 0 END) as in_progress_count,
                 COUNT(*) as total
             FROM cims_incidents
             WHERE incident_date IS NOT NULL 
@@ -7819,10 +7819,10 @@ def get_dashboard_stats():
         cursor.execute("""
             SELECT 
                 site,
-                -- Reviewed: Closed incidents (status_enum_id = 2) are considered reviewed
+                -- Reviewed: Closed incidents are considered reviewed
                 -- because all reviews must be completed before closure
-                SUM(CASE WHEN status_enum_id = 2 OR is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed,
-                SUM(CASE WHEN status_enum_id != 2 AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as not_reviewed,
+                SUM(CASE WHEN (LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%') OR is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed,
+                SUM(CASE WHEN NOT (LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%') AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as not_reviewed,
                 COUNT(*) as total
             FROM cims_incidents
             WHERE incident_date IS NOT NULL 
@@ -7848,10 +7848,10 @@ def get_dashboard_stats():
                 SUM(CASE WHEN is_ambulance_called = 1 THEN 1 ELSE 0 END) as ambulance_called,
                 SUM(CASE WHEN is_admitted_to_hospital = 1 THEN 1 ELSE 0 END) as hospital_admitted,
                 SUM(CASE WHEN is_major_injury = 1 THEN 1 ELSE 0 END) as major_injuries,
-                -- Reviewed: Closed incidents (status_enum_id = 2) are considered reviewed
+                -- Reviewed: Closed incidents are considered reviewed
                 -- because all reviews must be completed before closure
-                SUM(CASE WHEN status_enum_id = 2 OR is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed_count,
-                SUM(CASE WHEN status_enum_id != 2 AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as pending_review,
+                SUM(CASE WHEN (LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%') OR is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed_count,
+                SUM(CASE WHEN NOT (LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%') AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as pending_review,
                 COUNT(*) as total
             FROM cims_incidents
             WHERE incident_date IS NOT NULL 
