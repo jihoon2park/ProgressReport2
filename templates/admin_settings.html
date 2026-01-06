@@ -404,6 +404,32 @@
             </div>
         </div>
 
+        <!-- CIMS Database Management Section -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h3>🗄️ CIMS Database Management</h3>
+                <p>Reset and manage CIMS database. This will delete all incident, task, and related data, then perform a fresh sync from MANAD DB.</p>
+            </div>
+            
+            <div class="alert alert-info" style="margin-bottom: 20px;">
+                <strong>⚠️ Warning:</strong> This action will:
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>Delete all data from CIMS tables (incidents, tasks, policies, audit logs, etc.)</li>
+                    <li>Check for unnecessary columns and data</li>
+                    <li>Clear sync timestamps</li>
+                    <li>Perform a fresh full sync from MANAD DB</li>
+                </ul>
+                <strong style="color: #dc3545;">This action cannot be undone!</strong>
+            </div>
+            
+            <div class="form-group">
+                <button class="btn btn-danger" onclick="confirmResetCimsDatabase()" id="resetCimsBtn">
+                    🗑️ Reset CIMS Database
+                </button>
+                <div id="resetCimsStatus" style="margin-top: 10px; display: none;"></div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Production Server Logs Modal -->
@@ -548,6 +574,102 @@
                     alert.remove();
                 }
             }, 5000);
+        }
+
+        // Confirm and reset CIMS database
+        function confirmResetCimsDatabase() {
+            const confirmed = confirm(
+                '⚠️ WARNING: This will delete ALL CIMS database data!\n\n' +
+                'This includes:\n' +
+                '- All incidents\n' +
+                '- All tasks\n' +
+                '- All audit logs\n' +
+                '- All cache data\n\n' +
+                'After deletion, a fresh sync will be performed from MANAD DB.\n\n' +
+                'This action CANNOT be undone!\n\n' +
+                'Are you absolutely sure you want to proceed?'
+            );
+            
+            if (confirmed) {
+                const doubleConfirm = confirm(
+                    '⚠️ FINAL CONFIRMATION\n\n' +
+                    'You are about to PERMANENTLY DELETE all CIMS data.\n\n' +
+                    'Type "RESET" in the next prompt to confirm, or click Cancel to abort.'
+                );
+                
+                if (doubleConfirm) {
+                    const userInput = prompt('Type "RESET" (all caps) to confirm:');
+                    if (userInput === 'RESET') {
+                        resetCimsDatabase();
+                    } else {
+                        showAlert('Reset cancelled. Database was not modified.', 'info');
+                    }
+                }
+            }
+        }
+
+        // Reset CIMS database
+        async function resetCimsDatabase() {
+            const btn = document.getElementById('resetCimsBtn');
+            const statusDiv = document.getElementById('resetCimsStatus');
+            
+            btn.disabled = true;
+            btn.textContent = '🔄 Resetting...';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="alert alert-info">🔄 Resetting CIMS database... This may take a few minutes.</div>';
+            
+            try {
+                const response = await fetch('/api/cims/reset-database', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    let detailsHtml = '<div class="alert alert-success"><strong>✅ CIMS Database Reset Completed!</strong><br><br>';
+                    
+                    if (data.details.tables_cleared && data.details.tables_cleared.length > 0) {
+                        detailsHtml += '<strong>Tables Cleared:</strong><ul>';
+                        data.details.tables_cleared.forEach(table => {
+                            const rowCount = data.details.rows_deleted[table] || 0;
+                            detailsHtml += `<li>${table}: ${rowCount} rows deleted</li>`;
+                        });
+                        detailsHtml += '</ul>';
+                    }
+                    
+                    if (data.details.columns_checked) {
+                        detailsHtml += `<strong>Columns Checked:</strong> ${data.details.columns_checked.total_columns} total columns`;
+                        if (data.details.columns_checked.unexpected_columns && data.details.columns_checked.unexpected_columns.length > 0) {
+                            detailsHtml += `<br>⚠️ Unexpected columns: ${data.details.columns_checked.unexpected_columns.join(', ')}`;
+                        }
+                        detailsHtml += '<br>';
+                    }
+                    
+                    if (data.details.sync_result) {
+                        if (data.details.sync_result.error) {
+                            detailsHtml += `<br>⚠️ Sync error: ${data.details.sync_result.error}`;
+                        } else {
+                            detailsHtml += '<br>✅ Initial sync completed successfully';
+                        }
+                    }
+                    
+                    detailsHtml += '</div>';
+                    statusDiv.innerHTML = detailsHtml;
+                    showAlert('CIMS database reset completed successfully!', 'success');
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger"><strong>❌ Error:</strong> ${data.error || data.message}</div>`;
+                    showAlert('CIMS database reset failed: ' + (data.error || data.message), 'danger');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="alert alert-danger"><strong>❌ Error:</strong> ${error.message}</div>`;
+                showAlert('CIMS database reset failed: ' + error.message, 'danger');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🗑️ Reset CIMS Database';
+            }
         }
     </script>
 </body>
