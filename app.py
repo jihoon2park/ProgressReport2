@@ -7596,7 +7596,8 @@ def get_dashboard_kpis():
                 FROM cims_incidents
             """)
             total_check = cursor.fetchone()
-            logger.info(f"Total incidents in DB: all={total_check.get('total_all', 0)}, with_date={total_check.get('total_with_date', 0)}, with_status={total_check.get('total_with_status', 0)}")
+            total_check_dict = dict(total_check) if total_check else {}
+            logger.info(f"Total incidents in DB: all={total_check_dict.get('total_all', 0)}, with_date={total_check_dict.get('total_with_date', 0)}, with_status={total_check_dict.get('total_with_status', 0)}")
             
             # 날짜 샘플 확인
             cursor.execute("""
@@ -7646,14 +7647,20 @@ def get_dashboard_kpis():
             SELECT 
                 COUNT(*) as total_incidents,
                 
-                -- Open Incidents: status = 'Open' or contains 'Open'
-                SUM(CASE WHEN LOWER(status) = 'open' OR LOWER(status) LIKE '%open%' THEN 1 ELSE 0 END) as open_incidents,
+                -- Open Incidents: status = 'Open' or contains 'Open', or 'Overdue' (overdue is also open)
+                SUM(CASE WHEN LOWER(status) = 'open' OR LOWER(status) LIKE '%open%' OR LOWER(status) = 'overdue' OR LOWER(status) LIKE '%overdue%' THEN 1 ELSE 0 END) as open_incidents,
                 
                 -- In Progress Incidents: status contains 'progress' or 'in progress'
                 SUM(CASE WHEN LOWER(status) LIKE '%progress%' OR LOWER(status) LIKE '%in progress%' THEN 1 ELSE 0 END) as in_progress_incidents,
                 
                 -- Closed Incidents: status = 'Closed' or contains 'Closed'
-                SUM(CASE WHEN LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%' THEN 1 ELSE 0 END) as closed_incidents
+                SUM(CASE WHEN LOWER(status) = 'closed' OR LOWER(status) LIKE '%closed%' THEN 1 ELSE 0 END) as closed_incidents,
+                
+                -- Other/Unknown statuses (for debugging)
+                SUM(CASE WHEN status IS NULL OR status = '' OR 
+                    (LOWER(status) NOT LIKE '%open%' AND LOWER(status) NOT LIKE '%closed%' 
+                     AND LOWER(status) NOT LIKE '%progress%' AND LOWER(status) NOT LIKE '%overdue%') 
+                    THEN 1 ELSE 0 END) as other_status_incidents
                 
             FROM cims_incidents i
             WHERE i.incident_date IS NOT NULL 
@@ -7683,7 +7690,17 @@ def get_dashboard_kpis():
         logger.info(f"KPI Query Result: total={incident_stats_dict.get('total_incidents', 0)}, "
                    f"open={incident_stats_dict.get('open_incidents', 0)}, "
                    f"in_progress={incident_stats_dict.get('in_progress_incidents', 0)}, "
-                   f"closed={incident_stats_dict.get('closed_incidents', 0)}")
+                   f"closed={incident_stats_dict.get('closed_incidents', 0)}, "
+                   f"other={incident_stats_dict.get('other_status_incidents', 0)}")
+        
+        # 검증: 합계 확인
+        calculated_total = (incident_stats_dict.get('open_incidents', 0) + 
+                           incident_stats_dict.get('in_progress_incidents', 0) + 
+                           incident_stats_dict.get('closed_incidents', 0) + 
+                           incident_stats_dict.get('other_status_incidents', 0))
+        actual_total = incident_stats_dict.get('total_incidents', 0)
+        if calculated_total != actual_total:
+            logger.warning(f"⚠️ Status sum mismatch: calculated={calculated_total}, actual={actual_total}, difference={actual_total - calculated_total}")
         
         # 실제 데이터 샘플 확인 (디버깅용)
         try:
