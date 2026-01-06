@@ -840,87 +840,87 @@ def health_check():
 
 @app.route('/')
 def home():
-    """홈 페이지"""
+    """Home page"""
     if current_user.is_authenticated:
-        logger.info(f"홈 페이지 접근 - 사용자: {current_user.username}, 인증: {current_user.is_authenticated}")
+        logger.info(f"Home page access - User: {current_user.username}, Authenticated: {current_user.is_authenticated}")
         
-        # 세션에서 allowed_sites와 site 정보 확인
+        # Check allowed_sites and site information from session
         allowed_sites = session.get('allowed_sites', [])
         site = session.get('site', 'Parafield Gardens')
         
-        logger.info(f"홈 페이지 세션 정보 - allowed_sites: {allowed_sites} (타입: {type(allowed_sites)}), site: {site}")
-        logger.info(f"홈 페이지 세션 전체 내용: {dict(session)}")
+        logger.info(f"Home page session info - allowed_sites: {allowed_sites} (type: {type(allowed_sites)}), site: {site}")
+        logger.info(f"Home page full session content: {dict(session)}")
         
-        # allowed_sites가 비어있으면 기본값으로 설정
+        # Set default if allowed_sites is empty
         if not allowed_sites:
             safe_site_servers = get_safe_site_servers()
             allowed_sites = list(safe_site_servers.keys())
             session['allowed_sites'] = allowed_sites
-            logger.warning(f"홈 페이지에서 allowed_sites가 비어있음, 기본 사이트 목록으로 설정: {allowed_sites}")
+            logger.warning(f"Home page: allowed_sites is empty, setting default site list: {allowed_sites}")
         
-        # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
+        # ROD users redirect to dedicated dashboard (case-insensitive)
         username_upper = current_user.username.upper()
-        logger.info(f"사용자명 확인: {current_user.username} -> {username_upper}")
+        logger.info(f"Username check: {current_user.username} -> {username_upper}")
         if username_upper == 'ROD':
-            logger.info(f"ROD 사용자 감지 - rod_dashboard로 리다이렉트")
+            logger.info(f"ROD user detected - redirecting to rod_dashboard")
             return redirect(url_for('rod_dashboard'))
         elif username_upper == 'YKROD':
-            logger.info(f"YKROD 사용자 감지 - Yankalilla ROD 대시보드로 리다이렉트")
+            logger.info(f"YKROD user detected - redirecting to Yankalilla ROD dashboard")
             return redirect(url_for('rod_dashboard', site='Yankalilla'))
         elif username_upper == 'PGROD':
-            logger.info(f"PGROD 사용자 감지 - 다중 사이트 접근 가능, Parafield Gardens로 기본 리다이렉트")
+            logger.info(f"PGROD user detected - multi-site access, default redirect to Parafield Gardens")
             session['site'] = 'Parafield Gardens'
             session['allowed_sites'] = ['Ramsay', 'Nerrilda', 'Parafield Gardens']
             return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
         elif username_upper == 'WPROD':
-            logger.info(f"WPROD 사용자 감지 - West Park ROD 대시보드로 리다이렉트")
+            logger.info(f"WPROD user detected - redirecting to West Park ROD dashboard")
             return redirect(url_for('rod_dashboard', site='West Park'))
         elif username_upper == 'RSROD':
-            logger.info(f"RSROD 사용자 감지 - 다중 사이트 접근 가능, Ramsay로 기본 리다이렉트")
+            logger.info(f"RSROD user detected - multi-site access, default redirect to Ramsay")
             session['site'] = 'Ramsay'
             session['allowed_sites'] = ['Ramsay', 'Nerrilda']
             return redirect(url_for('rod_dashboard', site='Ramsay'))
         elif username_upper == 'NROD':
-            logger.info(f"NROD 사용자 감지 - Nerrilda ROD 대시보드로 리다이렉트")
+            logger.info(f"NROD user detected - redirecting to Nerrilda ROD dashboard")
             return redirect(url_for('rod_dashboard', site='Nerrilda'))
         
-        # PG_admin 사용자인 경우 incident_viewer로 이동
+        # PG_admin users redirect to incident_viewer
         if current_user.role == 'site_admin':
-            logger.info(f"PG_admin 사용자 감지 - incident_viewer로 리다이렉트")
+            logger.info(f"PG_admin user detected - redirecting to incident_viewer")
             return redirect(url_for('incident_viewer', site=site))
         
-        # 일반 사용자는 progress_notes로 리다이렉트하되, 세션 정보 확인
-        logger.info(f"일반 사용자 - progress_notes로 리다이렉트 (site={site}, allowed_sites={allowed_sites})")
+        # Regular users redirect to progress_notes, checking session info
+        logger.info(f"Regular user - redirecting to progress_notes (site={site}, allowed_sites={allowed_sites})")
         return redirect(url_for('progress_notes', site=site))
     
-    # 폴백 로그인 페이지
+    # Fallback login page
     safe_site_servers = get_safe_site_servers()
     return render_template('LoginPage.html', sites=safe_site_servers.keys())
 
 @app.route('/login', methods=['GET'])
 def login_page():
-    """로그인 페이지"""
+    """Login page"""
     try:
-        # 안전한 사이트 서버 정보 사용
+        # Get safe site server information
         safe_site_servers = get_safe_site_servers()
         sites = list(safe_site_servers.keys())
-        logger.info(f"로그인 페이지 렌더링 - 사이트 목록: {sites}")
+        logger.info(f"Login page rendering - Site list: {sites}")
         return render_template('LoginPage.html', sites=sites)
     except Exception as e:
-        logger.error(f"로그인 페이지 렌더링 실패: {e}")
-        # 최종 폴백
+        logger.error(f"Login page rendering failed: {e}")
+        # Final fallback
         fallback_sites = list(get_fallback_site_servers().keys())
         return render_template('LoginPage.html', sites=fallback_sites)
 
 @app.route('/login', methods=['POST'])
 def login():
-    """로그인 처리"""
+    """Login processing"""
     try:
         username = request.form.get('username')
         password = request.form.get('password')
         site = request.form.get('site')
         
-        logger.info(f"로그인 시도 - 사용자: {username}, 사이트: {site}")
+        logger.info(f"Login attempt - User: {username}, Site: {site}")
         
         # 접속 로그 기록
         user_info = {
@@ -940,35 +940,35 @@ def login():
         auth_success, user_info = authenticate_user(username, password)
         
         if auth_success:
-            logger.info("인증 성공")
+            logger.info("Authentication successful")
             
             try:
-                # location 정책 적용
+                # Apply location policy
                 user_location = user_info.get('location', [])
                 user_role = user_info.get('role', 'USER').upper()
-                logger.info(f"사용자 location 정보: {user_location}, 타입: {type(user_location)}, 역할: {user_role}")
+                logger.info(f"User location info: {user_location}, type: {type(user_location)}, role: {user_role}")
                 
-                # ADMIN 사용자는 항상 모든 사이트 접근 허용
+                # ADMIN users always have access to all sites
                 if user_role == 'ADMIN':
                     safe_site_servers = get_safe_site_servers()
                     allowed_sites = list(safe_site_servers.keys())
-                    logger.info(f"ADMIN 사용자 - 모든 사이트 허용: {allowed_sites}")
-                # location이 All이거나 2개 이상이면 모든 사이트 허용
+                    logger.info(f"ADMIN user - all sites allowed: {allowed_sites}")
+                # If location is All or has 2 or more, allow all sites
                 elif (isinstance(user_location, list) and (len(user_location) > 1 or (len(user_location) == 1 and user_location[0].lower() == 'all'))) or (isinstance(user_location, str) and user_location.lower() == 'all'):
                     safe_site_servers = get_safe_site_servers()
                     allowed_sites = list(safe_site_servers.keys())
-                    logger.info(f"모든 사이트 허용: {allowed_sites}")
+                    logger.info(f"All sites allowed: {allowed_sites}")
                 else:
-                    # location이 1개면 해당 사이트만 허용
+                    # If location is 1, allow only that site
                     allowed_sites = user_location if isinstance(user_location, list) else [user_location]
-                    # site 값을 무조건 allowed_sites[0]로 강제 설정
+                    # Force site value to allowed_sites[0]
                     if allowed_sites:
                         site = allowed_sites[0]
-                        logger.info(f"단일 사이트 허용: {allowed_sites}, 선택된 사이트: {site}")
+                        logger.info(f"Single site allowed: {allowed_sites}, selected site: {site}")
                     else:
-                        # allowed_sites가 비어있으면 기본값으로 설정
+                        # Set default if allowed_sites is empty
                         allowed_sites = [site]
-                        logger.warning(f"allowed_sites가 비어있음, 기본값으로 설정: {allowed_sites}")
+                        logger.warning(f"allowed_sites is empty, setting default: {allowed_sites}")
 
                 if site not in allowed_sites:
                     flash(f'You are not allowed to access {site}.', 'error')
@@ -1168,8 +1168,8 @@ def login():
                         return redirect(url_for('progress_notes', site=site))
                         
                 except Exception as e:
-                    logger.error(f"데이터 저장 중 오류 발생: {str(e)}")
-                    # 데이터 수집 실패해도 로그인은 허용
+                    logger.error(f"Error saving data: {str(e)}")
+                    # Allow login even if data collection fails
                     try:
                         user = User(username, user_info)
                         user_role = user_info.get('role', 'USER').upper()
@@ -1180,12 +1180,12 @@ def login():
                         session['user_role'] = user_role
                         session['site'] = site
                         session['allowed_sites'] = allowed_sites
-                        logger.info(f"데이터 수집 오류 후에도 로그인 처리 완료: site={site}, allowed_sites={allowed_sites}")
+                        logger.info(f"Login processing completed despite data collection error: site={site}, allowed_sites={allowed_sites}")
                         flash('Login successful! (Some data may not be available)', 'warning')
-                        # 일반 사용자는 progress_notes로 리다이렉트
+                        # Regular users redirect to progress_notes
                         return redirect(url_for('progress_notes', site=site))
                     except Exception as login_error:
-                        logger.error(f"로그인 처리 중 오류: {str(login_error)}")
+                        logger.error(f"Error during login processing: {str(login_error)}")
                         flash('Login failed due to system error.', 'error')
                         return redirect(url_for('home'))
             except Exception as e:
@@ -2340,6 +2340,7 @@ def fetch_progress_notes():
         event_types = data.get('event_types', [])  # 이벤트 타입 필터
         year = data.get('year')  # 년도
         month = data.get('month')  # 월
+        client_service_id = data.get('client_service_id')  # 클라이언트 서비스 ID 필터
         
         if not site:
             logger.error("Site parameter is missing in request")
@@ -2347,6 +2348,10 @@ def fetch_progress_notes():
         
         logger.info(f"프로그레스 노트 가져오기 요청 - 사이트: {site}, 일수: {days}, 페이지: {page}, 페이지당: {per_page}")
         logger.info(f"Request data: {data}")
+        if client_service_id:
+            logger.info(f"🔍 [FILTER] 클라이언트 필터 적용: client_service_id={client_service_id} (타입: {type(client_service_id)})")
+        else:
+            logger.info(f"🔍 [FILTER] 클라이언트 필터 없음 - 모든 클라이언트 조회")
         
         # 사이트 서버 설정 확인
         safe_site_servers = get_safe_site_servers()
@@ -2381,7 +2386,9 @@ def fetch_progress_notes():
         else:
             logger.info(f"🌐 API 모드: Progress Notes 조회 - {site}")
         
-        success, notes = fetch_progress_notes_for_site(site, days)
+        logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site 호출 - site={site}, days={days}, client_service_id={client_service_id}")
+        success, notes = fetch_progress_notes_for_site(site, days, event_types=event_types, year=year, month=month, client_service_id=client_service_id)
+        logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site 결과 - success={success}, notes_count={len(notes) if notes else 0}")
         
         if not success or not notes:
             result = {
@@ -5588,6 +5595,79 @@ def get_db_connection(read_only: bool = False):
         pass
     return conn
 
+def optional_login_required(f):
+    """개발 환경에서는 인증 없이 접근 가능, 운영 환경에서는 로그인 필요"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 개발 환경에서는 인증 없이 접근 가능
+        if app.config.get('DEBUG', False):
+            return f(*args, **kwargs)
+        # 운영 환경에서는 로그인 필요
+        if not current_user.is_authenticated:
+            return jsonify({
+                'success': False,
+                'is_expired': True,
+                'message': 'Authentication required'
+            }), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/api/memory/status', methods=['GET'])
+@optional_login_required
+def get_memory_status():
+    """메모리 사용량 상태 반환 (개발 환경에서는 인증 없이 접근 가능)"""
+    try:
+        monitor = get_memory_monitor()
+        summary = monitor.get_summary()
+        return jsonify({
+            'success': True,
+            'data': summary
+        })
+    except Exception as e:
+        logger.error(f"메모리 상태 조회 오류: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/memory/history', methods=['GET'])
+@optional_login_required
+def get_memory_history():
+    """메모리 사용량 히스토리 반환 (개발 환경에서는 인증 없이 접근 가능)"""
+    try:
+        monitor = get_memory_monitor()
+        limit = request.args.get('limit', 50, type=int)
+        history = monitor.get_memory_history(limit=limit)
+        return jsonify({
+            'success': True,
+            'data': history
+        })
+    except Exception as e:
+        logger.error(f"메모리 히스토리 조회 오류: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/memory/gc', methods=['POST'])
+@optional_login_required
+def force_garbage_collection():
+    """가비지 컬렉션 강제 실행 (개발 환경에서는 인증 없이 접근 가능)"""
+    try:
+        monitor = get_memory_monitor()
+        result = monitor.force_gc()
+        return jsonify({
+            'success': True,
+            'data': result,
+            'message': f'{result["freed_mb"]}MB 메모리 해제됨'
+        })
+    except Exception as e:
+        logger.error(f"가비지 컬렉션 실행 오류: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 @app.route('/api/cache/status-current', methods=['GET'])
 @login_required
 def get_cache_status_current():
@@ -7702,8 +7782,10 @@ def get_dashboard_stats():
         cursor.execute("""
             SELECT 
                 site,
-                SUM(CASE WHEN is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed,
-                SUM(CASE WHEN is_review_closed = 0 OR is_review_closed IS NULL THEN 1 ELSE 0 END) as not_reviewed,
+                -- Reviewed: Closed incidents (status_enum_id = 2) are considered reviewed
+                -- because all reviews must be completed before closure
+                SUM(CASE WHEN status_enum_id = 2 OR is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed,
+                SUM(CASE WHEN status_enum_id != 2 AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as not_reviewed,
                 COUNT(*) as total
             FROM cims_incidents
             WHERE incident_date >= ?
@@ -7728,8 +7810,10 @@ def get_dashboard_stats():
                 SUM(CASE WHEN is_ambulance_called = 1 THEN 1 ELSE 0 END) as ambulance_called,
                 SUM(CASE WHEN is_admitted_to_hospital = 1 THEN 1 ELSE 0 END) as hospital_admitted,
                 SUM(CASE WHEN is_major_injury = 1 THEN 1 ELSE 0 END) as major_injuries,
-                SUM(CASE WHEN is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed_count,
-                SUM(CASE WHEN is_review_closed = 0 OR is_review_closed IS NULL THEN 1 ELSE 0 END) as pending_review,
+                -- Reviewed: Closed incidents (status_enum_id = 2) are considered reviewed
+                -- because all reviews must be completed before closure
+                SUM(CASE WHEN status_enum_id = 2 OR is_review_closed = 1 THEN 1 ELSE 0 END) as reviewed_count,
+                SUM(CASE WHEN status_enum_id != 2 AND (is_review_closed = 0 OR is_review_closed IS NULL) THEN 1 ELSE 0 END) as pending_review,
                 COUNT(*) as total
             FROM cims_incidents
             WHERE incident_date >= ?
@@ -8057,6 +8141,7 @@ def get_upcoming_tasks():
 from cims_api_endpoints import cims_api
 from cims_cache_api import cache_api
 from cims_background_processor import start_background_processing, stop_background_processing
+from memory_monitor import get_memory_monitor, start_memory_monitoring, stop_memory_monitoring
 app.register_blueprint(cims_api)
 app.register_blueprint(cache_api)
 
@@ -8446,6 +8531,13 @@ if __name__ == '__main__':
             logger.warning(f"⚠️ Background Processor 시작 실패: {e}")
     # else: 개발 환경에서는 불필요한 메시지 출력 안 함
     
+    # 메모리 모니터링 시작 (개발 환경에서 메모리 누수 감지)
+    try:
+        start_memory_monitoring()
+        logger.info("✅ 메모리 모니터링 시작됨")
+    except Exception as e:
+        logger.warning(f"⚠️ 메모리 모니터링 시작 실패: {e}")
+    
     # 주기적 백그라운드 동기화 시작 (5분마다 증분 동기화)
     try:
         start_periodic_sync()
@@ -8464,6 +8556,13 @@ if __name__ == '__main__':
             port=flask_config['PORT']
         )
     finally:
+        # Stop memory monitoring
+        try:
+            stop_memory_monitoring()
+            logger.info("메모리 모니터링 중지됨")
+        except Exception as e:
+            logger.error(f"메모리 모니터링 중지 오류: {e}")
+        
         # Stop background processor when app shuts down (only if it was started)
         if flask_config.get('ENABLE_BACKGROUND_PROCESSOR', False):
             try:

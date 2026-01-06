@@ -405,7 +405,7 @@ class ProgressNoteFetchClient:
             logger.error(f"Error finding event type ID for '{event_type_name}': {str(e)}")
             return None
 
-def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None, client_service_id: int = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
     """
     특정 사이트의 프로그레스 노트를 가져오는 편의 함수 (DB 직접 접속 또는 API)
     
@@ -415,6 +415,7 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
         event_types: 필터링할 이벤트 타입 리스트
         year: 년도 (ROD 대시보드용)
         month: 월 (ROD 대시보드용)
+        client_service_id: 특정 클라이언트 서비스 ID로 필터링
         
     Returns:
         (성공 여부, 데이터 리스트 또는 None)
@@ -464,9 +465,12 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
                 # Event Type 이름으로 ID 찾기 (간단한 버전, 실제로는 더 복잡할 수 있음)
                 logger.warning(f"Event Type 필터링은 DB 직접 접속 모드에서 아직 완전히 지원되지 않습니다: {event_types}")
             
+            logger.info(f"🔍 [FILTER] connector.fetch_progress_notes 호출 - client_service_id={client_service_id}")
+            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit=500, event_type_id={event_type_id}, client_service_id={client_service_id}")
             progress_success, progress_notes = connector.fetch_progress_notes(
-                start_date, end_date, limit=500, progress_note_event_type_id=event_type_id
+                start_date, end_date, limit=500, progress_note_event_type_id=event_type_id, client_service_id=client_service_id
             )
+            logger.info(f"🔍 [FILTER] connector.fetch_progress_notes 결과 - success={progress_success}, notes_count={len(progress_notes) if progress_notes else 0}")
             
             if not progress_success or not progress_notes:
                 error_msg = f"❌ DB 직접 접속 실패: {site} - Progress Notes 조회 결과가 비어있습니다. DB 연결 설정을 확인하세요."
@@ -505,6 +509,8 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
             return client.fetch_rod_progress_notes(year, month, event_types)
         else:
             # 일반적인 프로그레스 노트 요청
+            # Note: API 모드에서는 client_service_id 필터링을 지원하지 않음
+            # 클라이언트 필터링은 클라이언트 측에서 수행됨
             if event_types:
                 # 이벤트 타입별로 필터링하여 가져오기
                 logger.info(f"General request with event type filtering: {event_types}")
@@ -512,6 +518,8 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
             else:
                 # 일반 프로그레스 노트 요청: 모든 노트 가져오기
                 logger.info("No event types specified, fetching all progress notes")
+                if client_service_id:
+                    logger.warning(f"Client service ID filter ({client_service_id}) is not supported in API mode. Filtering will be done client-side.")
         return client.fetch_recent_progress_notes(days)
     except Exception as e:
         logger.error(f"Error creating client for site {site}: {str(e)}")

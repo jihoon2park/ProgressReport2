@@ -8,6 +8,73 @@ window.scriptLoaded = true;
 // DOM Elements object to store references
 const DOM = {};
 
+// Global fetch interceptor for 401 responses (session expiration)
+// Track session expiration state to prevent duplicate handling
+let sessionExpiredHandled = false;
+
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+    // Get the URL from arguments (could be string or Request object)
+    const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+    
+    // Skip interception for logout and login pages to prevent infinite loops
+    if (url.includes('/logout') || url === '/' || url.includes('/login')) {
+        return originalFetch.apply(this, args);
+    }
+    
+    // Skip if session expiration already handled
+    if (sessionExpiredHandled) {
+        return originalFetch.apply(this, args);
+    }
+    
+    return originalFetch.apply(this, args)
+        .then(response => {
+            // Check for 401 (Unauthorized) - session expired
+            if (response.status === 401) {
+                // Prevent duplicate handling
+                if (sessionExpiredHandled) {
+                    return response;
+                }
+                
+                sessionExpiredHandled = true;
+                console.log('🔒 [SESSION] 세션 만료 감지 (401 Unauthorized)');
+                
+                const isInIframe = window.parent !== window;
+                
+                // If we're in an iframe (popup mode), notify parent window
+                if (isInIframe) {
+                    console.log('🔒 [SESSION] iframe에서 세션 만료 - 부모 창에 메시지 전달');
+                    window.parent.postMessage({
+                        type: 'SESSION_EXPIRED',
+                        action: 'close_and_logout'
+                    }, '*');
+                    // Also redirect iframe itself to login page
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 100);
+                } else {
+                    // Not in iframe - handle session timeout directly
+                    setTimeout(() => {
+                        if (typeof handleSessionTimeout === 'function') {
+                            handleSessionTimeout();
+                        } else {
+                            window.location.href = '/';
+                        }
+                    }, 0);
+                }
+                
+                // Return a rejected promise to prevent further processing
+                return Promise.reject(new Error('Session expired'));
+            }
+            
+            return response;
+        })
+        .catch(error => {
+            // Re-throw the error so calling code can handle it
+            throw error;
+        });
+};
+
 // Session timeout related variables
 let sessionTimeoutId = null;
 let sessionWarningId = null;
@@ -56,11 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Start session timeout monitoring (중복 실행 방지)
     if (!window.sessionMonitoringStarted) {
-        console.log('Starting session monitoring...');
         startSessionTimeoutMonitoring();
         window.sessionMonitoringStarted = true;
-    } else {
-        console.log('Session monitoring already started, skipping...');
     }
     
     // User activity detection (session extension) - always run
@@ -718,7 +782,23 @@ function saveProgressNoteToServer(formData) {
         },
         body: JSON.stringify(formData)
     })
-    .then(response => response.json())
+    .then(response => {
+        // Check for session expiration (401)
+        if (response.status === 401) {
+            console.log('세션 만료 감지 - 팝업에서 처리');
+            // If in iframe, notify parent window
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'SESSION_EXPIRED',
+                    action: 'close_and_logout'
+                }, '*');
+            } else {
+                handleSessionTimeout();
+            }
+            return Promise.reject('Session expired');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             console.log('Progress note saved successfully:', data.data);
@@ -1065,11 +1145,10 @@ function refreshUserSession() {
 function startSessionTimeoutMonitoring() {
     // 이미 모니터링이 시작되었으면 중복 실행 방지
     if (sessionCheckInterval) {
-        console.log('세션 모니터링이 이미 실행 중입니다.');
         return;
     }
     
-    console.log('세션 타임아웃 모니터링 시작');
+    console.log('🔒 [SESSION] 세션 타임아웃 모니터링 시작');
     
     // 기존 인터벌이 있다면 정리
     if (window.sessionCheckInterval) {
@@ -1077,7 +1156,7 @@ function startSessionTimeoutMonitoring() {
         window.sessionCheckInterval = null;
     }
     
-    // 60초마다 세션 상태 확인 (성능 개선을 위해 간격 더 증가)
+    // 60초마다 세션 상태 확인
     sessionCheckInterval = setInterval(checkSessionStatus, 60000);
     window.sessionCheckInterval = sessionCheckInterval;
     
@@ -1091,12 +1170,13 @@ function checkSessionStatus() {
         .then(response => {
             if (response.status === 401) {
                 // 세션 만료: 자동 세션 연장 시도 후 실패하면 로그아웃
-                console.log('세션 만료 감지 - 자동 연장 시도');
+                console.log('🔒 [SESSION] 세션 만료 감지 - 자동 연장 시도');
                 return extendSessionSilently().then(() => {
                     // 연장 성공 시 다시 상태 확인
                     return fetch('/api/session-status');
                 }).catch(() => {
                     // 연장 실패 시 로그아웃
+                    console.log('🔒 [SESSION] 세션 연장 실패 - 로그아웃 처리');
                     handleSessionTimeout();
                     return Promise.reject('Session expired');
                 });
@@ -1110,11 +1190,11 @@ function checkSessionStatus() {
             if (data.success) {
                 const remainingSeconds = data.remaining_seconds;
                 const remainingMinutes = Math.floor(remainingSeconds / 60);
+                const displaySeconds = remainingSeconds % 60;
                 
-                // 1분 이하로 남았을 때만 로그 출력 (성능 개선)
+                // 1분 이하로 남았을 때만 로그 출력
                 if (remainingSeconds <= 60) {
-                    console.log(`[${new Date().toISOString()}] session remaining time: ${remainingMinutes}min ${remainingSeconds % 60}sec`);
-                    console.log(`⚠️ 세션 만료 임박: ${remainingSeconds}초 남음`);
+                    console.warn(`🔒 [SESSION] ⚠️ 세션 만료 임박: ${remainingMinutes}분 ${displaySeconds}초 남음 (${remainingSeconds}초)`);
                 }
                 
                 // 1분 남았을 때 경고 (성능 개선을 위해 비활성화)
@@ -1143,13 +1223,16 @@ function checkSessionStatus() {
                 
                 // 세션 만료 시 로그아웃
                 if (remainingSeconds <= 0) {
+                    console.log('🔒 [SESSION] 세션 만료됨 - 로그아웃 처리');
                     handleSessionTimeout();
                 }
             }
         })
         .catch(error => {
-            if (error === 'Session expired') return;
-            console.error('session status check error:', error);    
+            if (error === 'Session expired') {
+                return;
+            }
+            console.error('🔒 [SESSION] 세션 상태 확인 오류:', error);
             // 네트워크 오류 시에도 세션 타임아웃 처리
             handleSessionTimeout();
         });
@@ -1337,9 +1420,7 @@ async function clearDatabaseAndLogout() {
     try {
         // IndexedDB 초기화
         if (window.progressNoteDB) {
-            console.log('Clearing IndexedDB before logout...');
             await window.progressNoteDB.clearAll();
-            console.log('IndexedDB cleared successfully');
         }
         
         // 서버에 DB 초기화 요청
@@ -1349,18 +1430,18 @@ async function clearDatabaseAndLogout() {
                 'Content-Type': 'application/json',
             }
         });
-        console.log('Server database cleared successfully');
     } catch (error) {
-        console.error('Error clearing database:', error);
+        console.error('🔒 [SESSION] DB 초기화 오류:', error);
     }
     
     // 로그아웃 처리 후 로그인 페이지로 이동
     try {
         await fetch('/logout');
     } catch (error) {
-        console.error('Error during logout:', error);
+        console.error('🔒 [SESSION] 로그아웃 오류:', error);
     }
     
+    console.log('🔒 [SESSION] 로그인 페이지로 이동');
     window.location.href = '/';
 }
 
@@ -1384,7 +1465,7 @@ function removeSessionWarning() {
 
 // 세션 타임아웃 처리
 function handleSessionTimeout() {
-    console.log('세션 타임아웃 - 로그아웃 처리');
+    console.log('🔒 [SESSION] 세션 타임아웃 - 로그아웃 처리');
     
     // 모니터링 중지
     if (sessionCheckInterval) {
@@ -1395,7 +1476,21 @@ function handleSessionTimeout() {
     // 경고 제거
     removeSessionWarning();
     
-    // 타임아웃 모달 표시
+    // If we're in an iframe (popup mode), notify parent window to close popup and logout
+    if (window.parent !== window) {
+        console.log('🔒 [SESSION] iframe에서 세션 만료 - 부모 창에 메시지 전달');
+        window.parent.postMessage({
+            type: 'SESSION_EXPIRED',
+            action: 'close_and_logout'
+        }, '*');
+        // Also redirect iframe itself to login page
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 100);
+        return; // Don't show modal in iframe
+    }
+    
+    // 타임아웃 모달 표시 (부모 창에서만)
     const timeoutModal = document.createElement('div');
     timeoutModal.innerHTML = `
         <div class="session-warning-overlay">
@@ -1459,7 +1554,7 @@ function setupActivityDetection() {
             activityTimeout = setTimeout(() => {
                 // 현재 세션 상태를 확인하여 1분 이하로 남았을 때만 자동 연장
                 checkSessionStatusForAutoExtension();
-            }, 240000); // 4분 (5분 세션에서 1분 남았을 때)
+            }, 240000); // 4분 (10분 세션에서 1분 남았을 때)
         });
     });
 }
@@ -1470,7 +1565,7 @@ function checkSessionStatusForAutoExtension() {
         .then(response => {
             if (response.status === 401) {
                 // 세션 만료: 자동 세션 연장 시도
-                console.log('자동 연장 중 세션 만료 감지 - 연장 시도');
+                console.log('🔒 [SESSION] 자동 연장 중 세션 만료 감지 - 연장 시도');
                 return extendSessionSilently().then(() => {
                     // 연장 성공 시 다시 상태 확인
                     return fetch('/api/session-status');
@@ -1491,18 +1586,15 @@ function checkSessionStatusForAutoExtension() {
                 
                 // 1분 이하로 남았을 때만 자동 연장
                 if (remainingSeconds <= 60 && remainingSeconds > 0) {
-                    // 성능 개선을 위해 로그 제거
-                    // console.log(`자동 세션 연장 시도 (남은 시간: ${remainingSeconds}초)`);
                     extendSessionSilently();
-                } else {
-                    // 성능 개선을 위해 로그 제거
-                    // console.log(`자동 세션 연장 건너뜀 (남은 시간: ${remainingSeconds}초)`);
                 }
             }
         })
         .catch(error => {
-            if (error === 'Session expired') return;
-            console.error('자동 세션 연장 확인 오류:', error);
+            if (error === 'Session expired') {
+                return;
+            }
+            console.error('🔒 [SESSION] 자동 세션 연장 확인 오류:', error);
         });
 }
 

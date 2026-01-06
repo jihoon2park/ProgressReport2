@@ -458,6 +458,13 @@
 </div>
 <div class="container">
     <div class="left-panel">
+        <!-- Client Filter -->
+        <div class="client-filter-container" style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+            <label for="clientFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Filter by Client:</label>
+            <select id="clientFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 250px; background-color: white;">
+                <option value="">All Clients</option>
+            </select>
+        </div>
         <table id="notesTable">
             <thead>
             <tr>
@@ -536,10 +543,28 @@
     window.currentSite = '{{ site }}';
     console.log('Site from server:', window.currentSite);
     
+    // Initialize session expiration flag
+    window.sessionExpiredHandled = false;
+    
             // Function to open popup
     function openProgressNotePopup() {
+        // Check if session was expired
+        if (window.sessionExpiredHandled) {
+            console.log('🔒 [SESSION] 세션이 만료되어 팝업을 열 수 없습니다.');
+            window.location.href = '/';
+            return;
+        }
+        
         const popup = document.getElementById('progressNotePopup');
         const frame = document.getElementById('progressNoteFrame');
+        
+        if (!popup || !frame) {
+            console.error('🔒 [SESSION] 팝업 또는 프레임 요소를 찾을 수 없습니다.');
+            return;
+        }
+        
+        // Clear iframe src first to ensure clean state
+        frame.src = '';
         
         // Set iframe src with current site information
         frame.src = `/index?site=${encodeURIComponent(window.currentSite)}`;
@@ -552,6 +577,10 @@
     function closeProgressNotePopup() {
         const popup = document.getElementById('progressNotePopup');
         const frame = document.getElementById('progressNoteFrame');
+        
+        if (!popup || !frame) {
+            return;
+        }
         
         // Clear iframe src when closing popup to prevent unnecessary requests
         frame.src = '';
@@ -596,6 +625,20 @@
                 // Close popup only
                 closeProgressNotePopup();
             }
+        } else if (event.data && event.data.type === 'SESSION_EXPIRED') {
+            // Session expired in iframe - close popup and redirect to login
+            console.log('🔒 [SESSION] 세션 만료 감지 - 팝업 닫기 및 로그인 페이지로 이동');
+            
+            // Close popup immediately
+            closeProgressNotePopup();
+            
+            // Set flag to prevent duplicate handling
+            if (typeof window !== 'undefined') {
+                window.sessionExpiredHandled = true;
+            }
+            
+            // Immediately redirect to login page (logout will happen on server side)
+            window.location.href = '/';
         }
     });
     
@@ -605,6 +648,8 @@
 </script>
 <script src="/static/js/progressNoteDB.js"></script>
 <script src="/static/js/progressNoteList.js"></script>
+<!-- Session monitoring script - must be loaded for session timeout handling -->
+<script src="/static/js/script.js"></script>
 
 
 </body>

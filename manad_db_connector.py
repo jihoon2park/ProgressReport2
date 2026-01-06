@@ -507,6 +507,7 @@ class MANADDBConnector:
                 query_with_service = """
                     SELECT 
                         c.Id,
+                        c.MainClientServiceId,
                         ISNULL(p.FirstName, '') AS FirstName,
                         ISNULL(p.MiddleName, '') AS MiddleName,
                         ISNULL(p.LastName, '') AS LastName,
@@ -534,6 +535,7 @@ class MANADDBConnector:
                 query_simple = """
                     SELECT 
                         c.Id,
+                        c.MainClientServiceId,
                         ISNULL(p.FirstName, '') AS FirstName,
                         ISNULL(p.MiddleName, '') AS MiddleName,
                         ISNULL(p.LastName, '') AS LastName,
@@ -641,6 +643,7 @@ class MANADDBConnector:
             'AdmissionDate': admission_date.isoformat() if admission_date and hasattr(admission_date, 'isoformat') else (str(admission_date) if admission_date else None),
             'DepartureDate': departure_date.isoformat() if departure_date and hasattr(departure_date, 'isoformat') else (str(departure_date) if departure_date else None),
             'CareType': db_row.get('CareType', 'Permanent'),
+            'MainClientServiceId': db_row.get('MainClientServiceId'),  # 필터링에 필요한 MainClientServiceId 추가
             'IsActive': bool(db_row.get('IsActive', False))
         }
     
@@ -648,7 +651,8 @@ class MANADDBConnector:
                              start_date: Optional[datetime] = None,
                              end_date: Optional[datetime] = None,
                              limit: int = 500,
-                             progress_note_event_type_id: Optional[int] = None) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
+                             progress_note_event_type_id: Optional[int] = None,
+                             client_service_id: Optional[int] = None) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
         Progress Notes 데이터를 DB에서 직접 조회
         
@@ -657,6 +661,7 @@ class MANADDBConnector:
             end_date: 종료 날짜 (datetime, 기본값: 현재)
             limit: 최대 조회 개수
             progress_note_event_type_id: 특정 이벤트 타입 ID로 필터링
+            client_service_id: 특정 클라이언트 서비스 ID로 필터링
             
         Returns:
             (성공 여부, Progress Notes 리스트) - API 응답 형식과 동일
@@ -679,6 +684,9 @@ class MANADDBConnector:
                 start_date = datetime.now() - timedelta(days=14)
             if end_date is None:
                 end_date = datetime.now()
+            
+            logger.info(f"🔍 [FILTER] fetch_progress_notes 시작 - site={self.site}, client_service_id={client_service_id}, limit={limit}")
+            logger.info(f"🔍 [FILTER] Date range: {start_date.date()} ~ {end_date.date()}")
             
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -729,28 +737,39 @@ class MANADDBConnector:
                 # Event Type 필터링
                 if progress_note_event_type_id is not None:
                     query += " AND pn.ProgressNoteEventTypeId = ?"
+                    logger.info(f"🔍 [FILTER] Event Type 필터 추가: {progress_note_event_type_id}")
+                
+                # Client Service ID 필터링
+                if client_service_id is not None:
+                    query += " AND pn.ClientServiceId = ?"
+                    logger.info(f"🔍 [FILTER] Client Service ID 필터 추가: {client_service_id} (타입: {type(client_service_id)})")
+                else:
+                    logger.info(f"🔍 [FILTER] Client Service ID 필터 없음 - 모든 클라이언트 조회")
                 
                 query += " ORDER BY pn.Date DESC"
                 
                 params = [limit, start_date, end_date]
                 if progress_note_event_type_id is not None:
                     params.append(progress_note_event_type_id)
+                if client_service_id is not None:
+                    params.append(client_service_id)
                 
+                logger.info(f"🔍 [FILTER] SQL 쿼리 실행 준비 완료")
+                logger.info(f"🔍 [FILTER] Query params: limit={limit}, start_date={start_date}, end_date={end_date}, client_service_id={client_service_id}")
                 logger.info(f"🔍 Progress Notes 조회: {self.site} ({start_date.date()} ~ {end_date.date()})")
+                logger.info(f"🔍 [FILTER] SQL 쿼리 실행 시작...")
                 
                 cursor.execute(query, params)
-                
-                columns = [column[0] for column in cursor.description]
-                progress_notes = []
-                
-                # ProgressNote 기본 정보 조회
-                cursor.execute(query, params)
+                logger.info(f"🔍 [FILTER] SQL 쿼리 실행 완료")
                 
                 columns = [column[0] for column in cursor.description]
                 progress_notes = []
                 progress_note_ids = []
                 
+                logger.info(f"🔍 [FILTER] 쿼리 결과 컬럼 수: {len(columns)}")
+                logger.info(f"🔍 [FILTER] fetchall() 호출 시작...")
                 rows = cursor.fetchall()
+                logger.info(f"🔍 [FILTER] fetchall() 결과: {len(rows)}개 행 반환")
                 for row in rows:
                     note_dict = dict(zip(columns, row))
                     progress_note_ids.append(note_dict['Id'])
@@ -846,10 +865,17 @@ class MANADDBConnector:
                     progress_notes.append(formatted_note)
                 
                 logger.info(f"✅ {len(progress_notes)}개 Progress Notes 조회 완료: {self.site}")
+                if client_service_id:
+                    logger.info(f"🔍 [FILTER] 클라이언트 필터링 결과: client_service_id={client_service_id}로 {len(progress_notes)}개 노트 조회됨")
+                    if len(progress_notes) > 0:
+                        sample_note = progress_notes[0]
+                        logger.info(f"🔍 [FILTER] 첫 번째 노트 샘플: Id={sample_note.get('Id')}, ClientServiceId={sample_note.get('ClientServiceId')}")
                 
                 return True, progress_notes
                 
         except Exception as e:
+            logger.error(f"🔍 [FILTER] Progress Notes 조회 중 오류 발생: {e}")
+            logger.error(f"🔍 [FILTER] client_service_id={client_service_id}, start_date={start_date}, end_date={end_date}")
             logger.error(f"❌ Progress Notes 조회 오류 ({self.site}): {e}")
             import traceback
             logger.error(traceback.format_exc())

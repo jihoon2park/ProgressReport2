@@ -1,12 +1,30 @@
 // Progress Note list page JS (dynamic site support)
+console.log('[progressNoteList.js] ========== SCRIPT LOADED ==========');
+console.log('[progressNoteList.js] Script file loaded at:', new Date().toISOString());
 
 // Use global progressNoteDB instance (without variable declaration)
 
 // Current site setting (received from server or URL parameter or default value)
 const currentSite = window.currentSite || new URLSearchParams(window.location.search).get('site') || 'Ramsay';
+console.log('[progressNoteList.js] Current site determined:', currentSite);
+console.log('[progressNoteList.js] window.currentSite:', window.currentSite);
+console.log('[progressNoteList.js] URL params:', new URLSearchParams(window.location.search).get('site'));
+
+// Immediate check for progressNoteDB
+if (typeof window.progressNoteDB !== 'undefined') {
+    console.log('[progressNoteList.js] progressNoteDB is already available');
+} else {
+    console.warn('[progressNoteList.js] progressNoteDB is not yet available (will check again on DOMContentLoaded)');
+}
 
 // Global client mapping object
 let clientMap = {};
+
+// Global client list for filter dropdown
+let clientList = [];
+
+// Selected client filter (PersonId)
+let selectedClientId = null;
 
 // Performance monitoring variables
 let performanceMetrics = {
@@ -100,42 +118,168 @@ function enableRefreshButton() {
 // Load client information
 async function loadClientMap() {
     try {
-        const response = await fetch(`/data/${currentSite.toLowerCase().replace(' ', '_')}_client.json`);
+        console.log('[loadClientMap] Starting to load client map for site:', currentSite);
+        const url = `/data/${currentSite.toLowerCase().replace(' ', '_')}_client.json`;
+        console.log('[loadClientMap] Fetching from:', url);
+        
+        const response = await fetch(url);
         
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[loadClientMap] HTTP error:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: url,
+                errorText: errorText
+            });
             throw new Error(`Failed to load client information: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('[loadClientMap] Received data:', {
+            isArray: Array.isArray(data),
+            hasClients: !!data.Clients,
+            hasClientInfo: !!data.client_info,
+            dataType: typeof data
+        });
         
         // MainClientServiceId → clientInfo mapping (unified with string keys)
         clientMap = {};
+        let mappedCount = 0;
         
         if (Array.isArray(data)) {
+            console.log('[loadClientMap] Processing array data, length:', data.length);
             data.forEach((client) => {
                 if (client.MainClientServiceId) {
                     // Convert to string to use as key
                     clientMap[String(client.MainClientServiceId)] = client;
+                    mappedCount++;
                 }
             });
         } else if (data.Clients && Array.isArray(data.Clients)) {
+            console.log('[loadClientMap] Processing data.Clients array, length:', data.Clients.length);
             data.Clients.forEach((client) => {
                 if (client.MainClientServiceId) {
                     // Convert to string to use as key
                     clientMap[String(client.MainClientServiceId)] = client;
+                    mappedCount++;
                 }
             });
         } else if (data.client_info && Array.isArray(data.client_info)) {
+            console.log('[loadClientMap] Processing data.client_info array, length:', data.client_info.length);
             data.client_info.forEach((client) => {
                 if (client.MainClientServiceId) {
                     // Convert to string to use as key
                     clientMap[String(client.MainClientServiceId)] = client;
+                    mappedCount++;
                 }
             });
+        } else {
+            console.warn('[loadClientMap] Unknown data structure:', Object.keys(data));
+        }
+        
+        console.log('[loadClientMap] Client map created successfully:', {
+            totalMapped: mappedCount,
+            mapSize: Object.keys(clientMap).length
+        });
+        
+    } catch (e) {
+        console.error('[loadClientMap] Error loading client information:', {
+            error: e,
+            message: e.message,
+            stack: e.stack,
+            site: currentSite
+        });
+        clientMap = {}; // Reset to empty map on error
+    }
+}
+
+// Load client list for filter dropdown
+async function loadClientListForFilter() {
+    try {
+        console.log(`Loading client list for filter - site: ${currentSite}`);
+        const url = `/api/clients/${encodeURIComponent(currentSite)}`;
+        console.log(`Fetching from: ${url}`);
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Failed to load client list: ${response.status} ${response.statusText}`, errorText);
+            throw new Error(`Failed to load client list: ${response.status} ${response.statusText}`);
+        }
+        
+        const clients = await response.json();
+        console.log(`Received ${clients ? clients.length : 0} clients from API`);
+        
+        if (!Array.isArray(clients)) {
+            console.error('Client list is not an array:', clients);
+            throw new Error('Client list is not an array');
+        }
+        
+        if (clients.length === 0) {
+            console.warn('No clients returned from API');
+        }
+        
+        // Sort clients by LastName, FirstName
+        clientList = clients.sort((a, b) => {
+            const aLastName = (a.LastName || '').trim();
+            const bLastName = (b.LastName || '').trim();
+            const aFirstName = (a.FirstName || '').trim();
+            const bFirstName = (b.FirstName || '').trim();
+            
+            if (aLastName !== bLastName) {
+                return aLastName.localeCompare(bLastName);
+            }
+            return aFirstName.localeCompare(bFirstName);
+        });
+        
+        console.log(`Sorted ${clientList.length} clients`);
+        
+        // Populate filter dropdown
+        const filterSelect = document.getElementById('clientFilter');
+        if (filterSelect) {
+            console.log('Found clientFilter element, populating dropdown');
+            // Clear existing options except "All Clients"
+            filterSelect.innerHTML = '<option value="">All Clients</option>';
+            
+            // Add client options
+            clientList.forEach((client, index) => {
+                const lastName = (client.LastName || '').trim();
+                const firstName = (client.FirstName || '').trim();
+                const displayName = lastName && firstName 
+                    ? `${lastName}, ${firstName}` 
+                    : lastName || firstName || `Client ${client.PersonId}`;
+                
+                const option = document.createElement('option');
+                option.value = client.PersonId;
+                option.textContent = `${displayName} (ID: ${client.PersonId})`;
+                filterSelect.appendChild(option);
+                
+                if (index < 3) {
+                    console.log(`Added client option: ${displayName} (PersonId: ${client.PersonId}, MainClientServiceId: ${client.MainClientServiceId})`);
+                }
+            });
+            
+            console.log(`Populated filter dropdown with ${clientList.length} clients`);
+        } else {
+            console.error('clientFilter element not found in DOM');
         }
         
     } catch (e) {
-        console.error('Error loading client information:', e);
+        console.error('[loadClientListForFilter] Error loading client list for filter:', {
+            error: e,
+            message: e.message,
+            stack: e.stack,
+            site: currentSite,
+            url: url
+        });
+        // Show error in filter dropdown
+        const filterSelect = document.getElementById('clientFilter');
+        if (filterSelect) {
+            filterSelect.innerHTML = '<option value="">Error loading clients</option>';
+        }
+        clientList = []; // Reset to empty array on error
     }
 }
 
@@ -287,27 +431,60 @@ function formatNoteDetail(note) {
 
 // Table rendering
 async function renderNotesTable() {
-    const measure = window.performanceMonitor.startMeasure('renderNotesTable');
-    const startTime = Date.now();
+    console.log('[renderNotesTable] ========== STARTING TABLE RENDERING ==========');
+    console.log('[renderNotesTable] Starting table rendering');
     
-    await window.progressNoteDB.init();
-    const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: 10000, sortBy: 'eventDate', sortOrder: 'desc' });
-    
-    logPerformance(`Rendering table with ${notes.length} notes for site: ${currentSite}`, { 
-        notesCount: notes.length,
-        loadTime: Date.now() - startTime 
-    });
-    
-    // 최신 데이터 로깅 (디버깅용)
-    if (notes.length > 0) {
-        console.log('Latest 5 notes from IndexedDB:');
-        notes.slice(0, 5).forEach((note, index) => {
-            console.log(`  ${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
-        });
+    // Check if progressNoteDB is available
+    if (typeof window.progressNoteDB === 'undefined') {
+        console.error('[renderNotesTable] CRITICAL ERROR: progressNoteDB is not defined!');
+        const tbody = document.querySelector('#notesTable tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error: progressNoteDB is not available</td></tr>';
+        }
+        return;
     }
     
-    // 최신 데이터 로깅 (성능 개선을 위해 간소화)
-    if (notes.length > 0) {
+    const measure = window.performanceMonitor ? window.performanceMonitor.startMeasure('renderNotesTable') : null;
+    const startTime = Date.now();
+    
+    try {
+        console.log('[renderNotesTable] Initializing IndexedDB...');
+        await window.progressNoteDB.init();
+        console.log('[renderNotesTable] IndexedDB initialized successfully');
+        
+        // If client filter is active, get all notes (already filtered from server)
+        // Otherwise, get limited notes from IndexedDB
+        const limit = selectedClientId ? 10000 : 10000;  // Always get enough data
+        console.log(`[renderNotesTable] Fetching notes from IndexedDB - site: ${currentSite}, limit: ${limit}, selectedClientId: ${selectedClientId}`);
+        const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: limit, sortBy: 'eventDate', sortOrder: 'desc' });
+        
+        console.log(`[renderNotesTable] Retrieved ${notes ? notes.length : 0} notes from IndexedDB`);
+        if (notes && notes.length > 0) {
+            console.log(`[renderNotesTable] Sample notes from IndexedDB (first 3):`);
+            notes.slice(0, 3).forEach((note, idx) => {
+                console.log(`  ${idx + 1}. Id: ${note.Id}, ClientServiceId: ${note.ClientServiceId}, EventDate: ${note.EventDate}`);
+            });
+        } else {
+            console.warn(`[renderNotesTable] No notes retrieved from IndexedDB for site: ${currentSite}`);
+        }
+        
+        logPerformance(`Rendering table with ${notes.length} notes for site: ${currentSite}`, { 
+            notesCount: notes.length,
+            loadTime: Date.now() - startTime 
+        });
+        
+        // 최신 데이터 로깅 (디버깅용)
+        if (notes && notes.length > 0) {
+            console.log('[renderNotesTable] Latest 5 notes from IndexedDB:');
+            notes.slice(0, 5).forEach((note, index) => {
+                console.log(`  ${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
+            });
+        } else {
+            console.warn('[renderNotesTable] No notes found in IndexedDB');
+        }
+        
+        // 최신 데이터 로깅 (성능 개선을 위해 간소화)
+        if (notes && notes.length > 0) {
         // 성능 개선을 위해 상세 로깅 제거
         // logPerformance('Latest 5 notes in table:', {
         //     notes: notes.slice(0, 5).map((note, index) => ({
@@ -319,67 +496,124 @@ async function renderNotesTable() {
         // });
     }
     
-    // 전역 변수에 모든 노트 데이터 저장 (필터링용)
-    window.allNotes = notes.map(note => mapNoteToRow(note));
-    
-    const tbody = document.querySelector('#notesTable tbody');
-    tbody.innerHTML = '';
-    
-    // Batch DOM operations for better performance
-    const fragment = document.createDocumentFragment();
-    
-    notes.forEach((note, idx) => {
-        const rowData = mapNoteToRow(note);
-        const tr = document.createElement('tr');
-        tr.dataset.idx = idx;
-        Object.values(rowData).forEach(val => {
-            const td = document.createElement('td');
-            td.textContent = val;
-            tr.appendChild(td);
-        });
-        tr.addEventListener('click', () => selectNote(idx, notes));
-        fragment.appendChild(tr);
-    });
-    
-    tbody.appendChild(fragment);
-    
-    // 페이지네이션 UI 강제 표시 (일반 목록 보기에서도)
-    if (notes.length > 0) {
-        console.log('강제로 페이지네이션 UI 표시 중...');
+        // Filter notes by selected client if filter is active
+        // Note: If client filter is active, data should already be filtered from server and saved to IndexedDB
+        // So we just use all notes from IndexedDB directly (they are already filtered)
+        let filteredNotes = notes || [];
         
-        // 서버에서 받은 페이지네이션 정보 사용 (우선순위)
-        let paginationData;
-        if (window.serverPagination) {
-            console.log('서버 페이지네이션 정보 사용:', window.serverPagination);
-            paginationData = window.serverPagination;
-        } else {
-            // 서버 페이지네이션 정보가 없으면 전체 노트 수 사용
-            const totalCount = window.allNotes ? window.allNotes.length : notes.length;
-            console.log('전체 노트 수 사용:', totalCount, '현재 표시된 노트 수:', notes.length);
+        console.log(`[renderNotesTable] Filtering notes - selectedClientId: ${selectedClientId}, notes count: ${notes ? notes.length : 0}`);
+        
+        // If client filter is active, data from IndexedDB should already be filtered from server
+        // No need to filter again - just use all notes from IndexedDB
+        // But we add a safety check to log if there's a mismatch
+        if (selectedClientId && notes && notes.length > 0) {
+            console.log(`[renderNotesTable] Client filter is active (${selectedClientId}), using all notes from IndexedDB (already filtered from server)`);
             
-            paginationData = {
-                page: 1,
-                per_page: 50,
-                total_count: totalCount,
-                total_pages: Math.ceil(totalCount / 50)
-            };
+            // Optional: Verify that all notes match the selected client (for debugging)
+            const selectedClient = clientList.find(c => c.PersonId === selectedClientId);
+            if (selectedClient && selectedClient.MainClientServiceId) {
+                const mismatchedNotes = notes.filter(note => {
+                    return note && note.ClientServiceId && String(note.ClientServiceId) !== String(selectedClient.MainClientServiceId);
+                });
+                if (mismatchedNotes.length > 0) {
+                    console.warn(`[renderNotesTable] Warning: Found ${mismatchedNotes.length} notes that don't match the selected client's MainClientServiceId`);
+                    console.warn(`[renderNotesTable] Expected ClientServiceId: ${selectedClient.MainClientServiceId}`);
+                }
+            }
+        } else if (selectedClientId && (!notes || notes.length === 0)) {
+            console.warn(`[renderNotesTable] Client filter is active (${selectedClientId}) but no notes found in IndexedDB`);
+        }
+    
+        // 전역 변수에 모든 노트 데이터 저장 (필터링용)
+        window.allNotes = filteredNotes.map(note => mapNoteToRow(note));
+        
+        const tbody = document.querySelector('#notesTable tbody');
+        if (!tbody) {
+            console.error('[renderNotesTable] tbody element not found');
+            return;
         }
         
-        console.log('최종 페이지네이션 데이터:', paginationData);
-        updatePaginationUI(paginationData);
+        tbody.innerHTML = '';
+        
+        if (filteredNotes.length === 0) {
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 6;
+            td.style.textAlign = 'center';
+            td.style.padding = '20px';
+            td.textContent = selectedClientId ? 'No progress notes found for selected client' : 'No progress notes found';
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        } else {
+            // Batch DOM operations for better performance
+            const fragment = document.createDocumentFragment();
+            
+            filteredNotes.forEach((note, idx) => {
+                try {
+                    const rowData = mapNoteToRow(note);
+                    const tr = document.createElement('tr');
+                    tr.dataset.idx = idx;
+                    Object.values(rowData).forEach(val => {
+                        const td = document.createElement('td');
+                        td.textContent = val || '';
+                        tr.appendChild(td);
+                    });
+                    tr.addEventListener('click', () => selectNote(idx, filteredNotes));
+                    fragment.appendChild(tr);
+                } catch (error) {
+                    console.error('[renderNotesTable] Error mapping note to row:', error, note);
+                }
+            });
+            
+            tbody.appendChild(fragment);
+        }
+        
+        // 페이지네이션 UI 강제 표시 (일반 목록 보기에서도)
+        if (filteredNotes.length > 0 || (notes && notes.length > 0)) {
+            console.log('강제로 페이지네이션 UI 표시 중...');
+            
+            // 서버에서 받은 페이지네이션 정보 사용 (우선순위)
+            let paginationData;
+            if (window.serverPagination && !selectedClientId) {
+                // 필터가 없을 때만 서버 페이지네이션 정보 사용
+                console.log('서버 페이지네이션 정보 사용:', window.serverPagination);
+                paginationData = window.serverPagination;
+            } else {
+                // 필터링된 결과에 맞게 페이지네이션 정보 생성
+                const totalCount = filteredNotes.length;
+                console.log('필터링된 노트 수 사용:', totalCount, '전체 노트 수:', notes ? notes.length : 0);
+                
+                paginationData = {
+                    page: 1,
+                    per_page: 50,
+                    total_count: totalCount,
+                    total_pages: Math.ceil(totalCount / 50)
+                };
+            }
+            
+            console.log('최종 페이지네이션 데이터:', paginationData);
+            updatePaginationUI(paginationData);
+        }
+        
+        // Auto-select first visible row
+        if (filteredNotes.length > 0) {
+            selectNote(0, filteredNotes);
+        }
+        
+        logPerformance('Table rendering completed', { 
+            totalTime: Date.now() - startTime,
+            rowsRendered: filteredNotes.length 
+        });
+        
+        measure.end();
+    } catch (error) {
+        console.error('[renderNotesTable] Error rendering table:', error);
+        const tbody = document.querySelector('#notesTable tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error rendering table: ${error.message}</td></tr>`;
+        }
+        measure.end();
     }
-    
-    // Auto-select first visible row
-    if (notes.length > 0) {
-        selectNote(0, notes);
-    }
-    
-    logPerformance('Table rendering completed', { 
-        totalTime: Date.now() - startTime,
-        rowsRendered: notes.length 
-    });
-    
-    measure.end();
 }
 
 // Show details when row is selected
@@ -427,76 +661,434 @@ function updateProgressNotesTable(notes) {
 }
 
 // Execute on page load
-window.addEventListener('DOMContentLoaded', async () => {
-    performanceMetrics.startTime = Date.now();
-    logPerformance('Page loaded - starting initialization', { currentSite });
+// Client filter change handler
+async function handleClientFilterChange() {
+    console.log('[FILTER] ========== CLIENT FILTER CHANGE ==========');
+    console.log('[FILTER] Filter change event triggered at:', new Date().toISOString());
     
-    // 사이트 제목 업데이트
-    const siteTitle = document.getElementById('siteTitle');
-    if (siteTitle) {
-        siteTitle.textContent = `Progress Notes - ${currentSite}`;
+    const filterSelect = document.getElementById('clientFilter');
+    if (!filterSelect) {
+        console.error('[FILTER] clientFilter element not found');
+        return;
     }
     
-    // Detect site change and initialize
-    await initializeForSite(currentSite);
+    const previousClientId = selectedClientId;
+    selectedClientId = filterSelect.value ? parseInt(filterSelect.value) : null;
+    console.log('[FILTER] Previous client ID:', previousClientId);
+    console.log('[FILTER] New selected client ID:', selectedClientId);
+    console.log('[FILTER] Filter select value:', filterSelect.value);
     
-    // Detect URL change (browser back/forward)
-    window.addEventListener('popstate', handleSiteChange);
+    // Show loading indicator
+    const tbody = document.querySelector('#notesTable tbody');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Loading...</td></tr>';
+    }
     
-    // Detect URL change (programmatic) - with proper cleanup
-    let currentUrl = window.location.href;
-    const observer = new MutationObserver(() => {
-        if (window.location.href !== currentUrl) {
-            currentUrl = window.location.href;
-            handleSiteChange();
+    // If a client is selected, fetch data from server
+    if (selectedClientId) {
+        console.log('[FILTER] Client selected, looking up client in clientList');
+        console.log('[FILTER] clientList length:', clientList.length);
+        console.log('[FILTER] Searching for PersonId:', selectedClientId);
+        
+        // Try both numeric and string comparison (PersonId might be string or number)
+        let selectedClient = clientList.find(c => c.PersonId === selectedClientId);
+        if (!selectedClient) {
+            // Try with string comparison
+            selectedClient = clientList.find(c => String(c.PersonId) === String(selectedClientId));
         }
-    });
-    observer.observe(document, { subtree: true, childList: true });
-    performanceMetrics.observers.add(observer);
+        if (!selectedClient) {
+            // Try with numeric comparison
+            selectedClient = clientList.find(c => parseInt(c.PersonId) === selectedClientId);
+        }
+        
+        console.log('[FILTER] Selected client found:', selectedClient);
+        console.log('[FILTER] Selected client type check:', {
+            found: !!selectedClient,
+            hasMainClientServiceId: selectedClient ? !!selectedClient.MainClientServiceId : false,
+            MainClientServiceId: selectedClient ? selectedClient.MainClientServiceId : 'N/A',
+            MainClientServiceIdType: selectedClient ? typeof selectedClient.MainClientServiceId : 'N/A'
+        });
+        
+        if (selectedClient) {
+            console.log('[FILTER] Client details:', {
+                PersonId: selectedClient.PersonId,
+                PersonIdType: typeof selectedClient.PersonId,
+                FirstName: selectedClient.FirstName,
+                LastName: selectedClient.LastName,
+                MainClientServiceId: selectedClient.MainClientServiceId,
+                MainClientServiceIdType: typeof selectedClient.MainClientServiceId,
+                AllKeys: Object.keys(selectedClient)
+            });
+        } else {
+            console.error('[FILTER] Client not found in clientList for PersonId:', selectedClientId);
+            console.error('[FILTER] Searching in clientList:', {
+                clientListLength: clientList.length,
+                selectedClientId: selectedClientId,
+                selectedClientIdType: typeof selectedClientId,
+                firstFewClients: clientList.slice(0, 5).map(c => ({
+                    PersonId: c.PersonId,
+                    PersonIdType: typeof c.PersonId,
+                    Name: `${c.LastName}, ${c.FirstName}`,
+                    MainClientServiceId: c.MainClientServiceId
+                }))
+            });
+        }
+        
+        // Check if MainClientServiceId exists and is not empty
+        const hasValidMainClientServiceId = selectedClient && 
+            selectedClient.MainClientServiceId !== null && 
+            selectedClient.MainClientServiceId !== undefined && 
+            selectedClient.MainClientServiceId !== '';
+        
+        if (hasValidMainClientServiceId) {
+            console.log('[FILTER] MainClientServiceId found:', selectedClient.MainClientServiceId);
+            console.log('[FILTER] Preparing API request...');
+            
+            const requestBody = {
+                site: currentSite,
+                days: 365,
+                client_service_id: selectedClient.MainClientServiceId,
+                per_page: 10000,
+                page: 1
+            };
+            
+            console.log('[FILTER] Request body:', JSON.stringify(requestBody, null, 2));
+            console.log('[FILTER] Making API call to /api/fetch-progress-notes');
+            console.log('[FILTER] API call started at:', new Date().toISOString());
+            
+            try {
+                const response = await fetch('/api/fetch-progress-notes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                console.log('[FILTER] API response received at:', new Date().toISOString());
+                console.log('[FILTER] Response status:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('[FILTER] HTTP error response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                console.log('[FILTER] API response parsed:', {
+                    success: result.success,
+                    dataLength: result.data ? result.data.length : 0,
+                    count: result.count,
+                    hasPagination: !!result.pagination
+                });
+                
+                // Clear existing data and save filtered data
+                console.log('[FILTER] Clearing existing data from IndexedDB for site:', currentSite);
+                await window.progressNoteDB.deleteProgressNotes(currentSite);
+                console.log('[FILTER] Existing data cleared');
+                
+                if (result.success && result.data && Array.isArray(result.data)) {
+                    console.log('[FILTER] API returned', result.data.length, 'progress notes');
+                    
+                    if (result.data.length > 0) {
+                        console.log('[FILTER] Saving', result.data.length, 'progress notes to IndexedDB');
+                        const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
+                        console.log('[FILTER] Save result:', saveResult);
+                        console.log('[FILTER] Data saved successfully');
+                        
+                        // Log sample data to verify
+                        console.log('[FILTER] Sample saved notes (first 3):');
+                        result.data.slice(0, 3).forEach((note, idx) => {
+                            console.log(`  ${idx + 1}. Id: ${note.Id}, ClientServiceId: ${note.ClientServiceId}, EventDate: ${note.EventDate}`);
+                        });
+                    } else {
+                        console.warn('[FILTER] API returned empty array - no progress notes for this client');
+                        console.warn('[FILTER] This means the client has no progress notes in the selected time range');
+                    }
+                } else {
+                    console.error('[FILTER] Invalid API response:', result);
+                    console.error('[FILTER] Response success:', result.success);
+                    console.error('[FILTER] Response data type:', typeof result.data);
+                    console.error('[FILTER] Response data:', result);
+                }
+            } catch (error) {
+                console.error('[FILTER] Failed to fetch progress notes for client:', {
+                    error: error,
+                    message: error.message,
+                    stack: error.stack,
+                    clientId: selectedClientId,
+                    mainClientServiceId: selectedClient.MainClientServiceId
+                });
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error loading data: ${error.message}</td></tr>`;
+                }
+                return;
+            }
+        } else {
+            console.error('[FILTER] Client not found or missing MainClientServiceId');
+            console.error('[FILTER] selectedClient:', selectedClient);
+            if (selectedClient) {
+                console.error('[FILTER] MainClientServiceId check failed:', {
+                    MainClientServiceId: selectedClient.MainClientServiceId,
+                    MainClientServiceIdType: typeof selectedClient.MainClientServiceId,
+                    isNull: selectedClient.MainClientServiceId === null,
+                    isUndefined: selectedClient.MainClientServiceId === undefined,
+                    isEmptyString: selectedClient.MainClientServiceId === '',
+                    isZero: selectedClient.MainClientServiceId === 0
+                });
+            }
+            if (tbody) {
+                const errorMsg = selectedClient 
+                    ? `Client found but MainClientServiceId is missing or empty (ID: ${selectedClient.MainClientServiceId})`
+                    : 'Client not found in client list';
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Client information not found: ${errorMsg}</td></tr>`;
+            }
+            return;
+        }
+    } else {
+        // "All Clients" selected - reload all data
+        console.log('[FILTER] All clients selected - reloading all data');
+        await window.progressNoteDB.deleteProgressNotes(currentSite);
+        await fetchAndSaveProgressNotes();
+    }
     
-    // Add cleanup on page unload
-    window.addEventListener('beforeunload', cleanup);
-    window.addEventListener('pagehide', cleanup);
+    // Render table with filtered data
+    console.log('[FILTER] Rendering table with filtered data');
+    await renderNotesTable();
+    console.log('[FILTER] Table rendering completed');
+}
+
+// Fallback initialization function
+let initializationStarted = false;
+const startInitialization = async () => {
+    if (initializationStarted) {
+        console.log('[startInitialization] Initialization already started, skipping');
+        return;
+    }
+    initializationStarted = true;
     
-    logPerformance('Initialization completed');
+    try {
+        console.log('[startInitialization] ========== STARTING INITIALIZATION ==========');
+        console.log('[startInitialization] Document ready state:', document.readyState);
+        console.log('[startInitialization] Current site:', currentSite);
+        
+        // Wait for progressNoteDB
+        let retries = 0;
+        while (typeof window.progressNoteDB === 'undefined' && retries < 20) {
+            console.log(`[startInitialization] Waiting for progressNoteDB... (retry ${retries + 1}/20)`);
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof window.progressNoteDB === 'undefined') {
+            console.error('[startInitialization] CRITICAL: progressNoteDB still not available after waiting!');
+            console.error('[startInitialization] Available window properties:', Object.keys(window).filter(k => k.includes('progress') || k.includes('Progress')));
+            throw new Error('progressNoteDB is not available');
+        }
+        
+        console.log('[startInitialization] progressNoteDB is available, starting initializeForSite');
+        await initializeForSite(currentSite);
+        console.log('[startInitialization] Initialization completed');
+    } catch (error) {
+        console.error('[startInitialization] Error:', {
+            error: error,
+            message: error.message,
+            stack: error.stack
+        });
+        initializationStarted = false; // Allow retry
+    }
+};
+
+window.addEventListener('DOMContentLoaded', async () => {
+    // Mark initialization as started to prevent fallback from running
+    if (initializationStarted) {
+        console.log('[DOMContentLoaded] Initialization already started, skipping');
+        return;
+    }
+    initializationStarted = true;
+    
+    try {
+        console.log('[DOMContentLoaded] ========== PAGE LOADED ==========');
+        console.log('[DOMContentLoaded] Page loaded, starting initialization');
+        console.log('[DOMContentLoaded] Current site:', currentSite);
+        console.log('[DOMContentLoaded] Checking progressNoteDB availability...');
+        
+        // Check if progressNoteDB is available
+        if (typeof window.progressNoteDB === 'undefined') {
+            console.error('[DOMContentLoaded] CRITICAL: window.progressNoteDB is not defined!');
+            console.error('[DOMContentLoaded] Available window properties:', Object.keys(window).filter(k => k.includes('progress') || k.includes('Progress')));
+            throw new Error('progressNoteDB is not available. Make sure progressNoteDB.js is loaded before progressNoteList.js');
+        } else {
+            console.log('[DOMContentLoaded] progressNoteDB is available:', typeof window.progressNoteDB);
+        }
+        
+        performanceMetrics.startTime = Date.now();
+        logPerformance('Page loaded - starting initialization', { currentSite });
+        
+        // 사이트 제목 업데이트 (옵셔널 - 요소가 없어도 무시)
+        const siteTitle = document.getElementById('siteTitle');
+        if (siteTitle) {
+            siteTitle.textContent = `Progress Notes - ${currentSite}`;
+        }
+        
+        // Check if table element exists
+        const notesTable = document.querySelector('#notesTable');
+        if (notesTable) {
+            console.log('[DOMContentLoaded] Notes table element found');
+        } else {
+            console.error('[DOMContentLoaded] CRITICAL: #notesTable element not found!');
+        }
+        
+        // Check if client filter exists
+        const clientFilter = document.getElementById('clientFilter');
+        if (clientFilter) {
+            console.log('[DOMContentLoaded] Client filter element found');
+        } else {
+            console.warn('[DOMContentLoaded] Client filter element not found (may not be loaded yet)');
+        }
+        
+        // Detect site change and initialize
+        console.log('[DOMContentLoaded] Starting site initialization');
+        await initializeForSite(currentSite);
+        console.log('[DOMContentLoaded] Site initialization completed');
+        
+        // Add event listener for client filter
+        const clientFilterEl = document.getElementById('clientFilter');
+        if (clientFilterEl) {
+            console.log('[DOMContentLoaded] Adding event listener to clientFilter');
+            clientFilterEl.addEventListener('change', handleClientFilterChange);
+            console.log('[DOMContentLoaded] Event listener added successfully');
+        } else {
+            console.error('[DOMContentLoaded] clientFilter element not found when trying to add event listener');
+        }
+        
+        // Detect URL change (browser back/forward)
+        window.addEventListener('popstate', handleSiteChange);
+        
+        // Detect URL change (programmatic) - with proper cleanup
+        let currentUrl = window.location.href;
+        const observer = new MutationObserver(() => {
+            if (window.location.href !== currentUrl) {
+                currentUrl = window.location.href;
+                handleSiteChange();
+            }
+        });
+        observer.observe(document, { subtree: true, childList: true });
+        performanceMetrics.observers.add(observer);
+        
+        // Add cleanup on page unload
+        window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pagehide', cleanup);
+        
+        console.log('[DOMContentLoaded] Initialization completed successfully');
+        logPerformance('Initialization completed');
+    } catch (error) {
+        console.error('[DOMContentLoaded] Error during page initialization:', {
+            error: error,
+            message: error.message,
+            stack: error.stack
+        });
+    }
 });
+
+// Fallback: If DOMContentLoaded already fired, start immediately
+if (document.readyState !== 'loading') {
+    console.log('[progressNoteList.js] DOM already loaded, starting initialization immediately');
+    setTimeout(() => {
+        console.log('[progressNoteList.js] Calling startInitialization from fallback');
+        startInitialization();
+    }, 100);
+}
+
+// Additional fallback: Start after 1 second if still not started
+setTimeout(() => {
+    if (!initializationStarted) {
+        console.warn('[progressNoteList.js] Initialization not started after 1 second, forcing start');
+        startInitialization();
+    } else {
+        console.log('[progressNoteList.js] Initialization already started, skipping fallback');
+    }
+}, 1000);
+
 
 // Site-specific initialization function
 async function initializeForSite(site) {
+    console.log('[initializeForSite] Starting initialization for site:', site);
     logPerformance(`Initializing for site: ${site}`);
     
     try {
         // Refresh 버튼 비활성화
+        console.log('[initializeForSite] Disabling refresh button');
         disableRefreshButton();
         
         // 1. Load client mapping first (differs by site)
+        console.log('[initializeForSite] Step 1: Loading client map');
         await loadClientMap();
+        console.log('[initializeForSite] Step 1 completed: Client map loaded');
+        
+        // 1.5. Load client list for filter dropdown
+        console.log('[initializeForSite] Step 1.5: Loading client list for filter');
+        await loadClientListForFilter();
+        console.log('[initializeForSite] Step 1.5 completed: Client list loaded');
         
         // 2. Initialize IndexedDB
+        console.log('[initializeForSite] Step 2: Initializing IndexedDB');
         await window.progressNoteDB.init();
+        console.log('[initializeForSite] Step 2 completed: IndexedDB initialized');
         
         // 3. Clear existing data and fetch 1 week of data
+        console.log('[initializeForSite] Step 3: Clearing existing data and fetching progress notes');
         logPerformance('Clearing existing data and fetching 1 week of data for site:', { site });
         await window.progressNoteDB.deleteProgressNotes(site);
+        console.log('[initializeForSite] Step 3.1: Existing data cleared');
         
         // 일반 프로그레스 노트 목록: 모든 노트 가져오기 (성능 최적화를 위해 기본 limit 사용)
-        console.log('Fetching all progress notes for general list view');
-        await fetchAndSaveProgressNotes();
+        console.log('[initializeForSite] Step 3.2: Fetching all progress notes for general list view');
+        console.log('[initializeForSite] About to call fetchAndSaveProgressNotes()');
+        try {
+            await fetchAndSaveProgressNotes();
+            console.log('[initializeForSite] Step 3 completed: Progress notes fetched and saved');
+        } catch (fetchError) {
+            console.error('[initializeForSite] Error in fetchAndSaveProgressNotes:', {
+                error: fetchError,
+                message: fetchError.message,
+                stack: fetchError.stack
+            });
+            throw fetchError; // Re-throw to be caught by outer try-catch
+        }
         
         // 4. Table rendering
+        console.log('[initializeForSite] Step 4: Rendering table');
         await renderNotesTable();
+        console.log('[initializeForSite] Step 4 completed: Table rendered');
         
+        console.log('[initializeForSite] Initialization completed successfully for site:', site);
         logPerformance('Site initialization completed for:', { site });
     } catch (error) {
-        console.error('Error during site initialization for:', site, error);
+        console.error('[initializeForSite] Error during site initialization:', {
+            site: site,
+            error: error,
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         logPerformance('Site initialization failed:', { site, error: error.message });
+        
+        // Show error message to user
+        const tbody = document.querySelector('#notesTable tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Initialization Error: ${error.message}</td></tr>`;
+        }
     }
 }
 
 // Fetch Progress Notes from server and save (full refresh)
 async function fetchAndSaveProgressNotes(eventTypes = null) {
     try {
-        console.log('Starting to fetch Progress Notes from server...');
+        console.log('[fetchAndSaveProgressNotes] Starting to fetch Progress Notes from server...', {
+            site: currentSite,
+            eventTypes: eventTypes
+        });
         
         // Prepare request body
         const requestBody = {
@@ -507,10 +1099,12 @@ async function fetchAndSaveProgressNotes(eventTypes = null) {
         // Add event types if specified
         if (eventTypes && eventTypes.length > 0) {
             requestBody.event_types = eventTypes;
-            console.log(`Fetching progress notes with event type filtering: ${eventTypes.join(', ')}`);
+            console.log('[fetchAndSaveProgressNotes] Fetching progress notes with event type filtering:', eventTypes.join(', '));
         } else {
-            console.log('Fetching all progress notes (no event type filtering)');
+            console.log('[fetchAndSaveProgressNotes] Fetching all progress notes (no event type filtering)');
         }
+        
+        console.log('[fetchAndSaveProgressNotes] Request body:', JSON.stringify(requestBody, null, 2));
         
         const response = await fetch('/api/fetch-progress-notes-cached', {
             method: 'POST',
@@ -520,39 +1114,60 @@ async function fetchAndSaveProgressNotes(eventTypes = null) {
             body: JSON.stringify(requestBody)
         });
         
+        console.log('[fetchAndSaveProgressNotes] Response status:', response.status, response.statusText);
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            console.error('[fetchAndSaveProgressNotes] HTTP error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText
+            });
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
         }
         
         const result = await response.json();
+        console.log('[fetchAndSaveProgressNotes] Response received:', {
+            success: result.success,
+            count: result.count,
+            dataLength: result.data ? result.data.length : 0,
+            hasPagination: !!result.pagination
+        });
         
         if (result.success) {
-            console.log(`Successfully fetched ${result.count} Progress Notes from server`);
+            console.log(`[fetchAndSaveProgressNotes] Successfully fetched ${result.count} Progress Notes from server`);
             
             // 서버에서 받은 페이지네이션 정보를 전역 변수에 저장
             if (result.pagination) {
                 window.serverPagination = result.pagination;
-                console.log('서버 페이지네이션 정보 저장:', result.pagination);
+                console.log('[fetchAndSaveProgressNotes] 서버 페이지네이션 정보 저장:', result.pagination);
             }
             
             // Save to IndexedDB
             if (result.data && result.data.length > 0) {
+                console.log('[fetchAndSaveProgressNotes] Saving to IndexedDB...');
                 const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
-                console.log('IndexedDB save result:', saveResult);
+                console.log('[fetchAndSaveProgressNotes] IndexedDB save result:', saveResult);
                 
                 // Save last update time (use UTC time for API compatibility)
                 const utcTime = new Date().toISOString();
                 await window.progressNoteDB.saveLastUpdateTime(currentSite, utcTime);
                 
-                console.log('Progress Note data saved successfully');
+                console.log('[fetchAndSaveProgressNotes] Progress Note data saved successfully');
             } else {
-                console.log('No progress notes found.');
+                console.warn('[fetchAndSaveProgressNotes] No progress notes found in response');
             }
         } else {
+            console.error('[fetchAndSaveProgressNotes] API returned success=false:', result);
             throw new Error(result.message || 'Failed to fetch Progress Notes');
         }
     } catch (error) {
-        console.error('Failed to fetch Progress Notes:', error);
+        console.error('[fetchAndSaveProgressNotes] Failed to fetch Progress Notes:', {
+            error: error,
+            message: error.message,
+            stack: error.stack,
+            site: currentSite
+        });
         
         // 사용자에게 에러 메시지 표시
         const errorMessage = `데이터 가져오기 실패: ${error.message}`;
@@ -571,7 +1186,7 @@ async function fetchAndSaveProgressNotes(eventTypes = null) {
                 })
             });
         } catch (logError) {
-            console.error('Failed to log error to server:', logError);
+            console.error('[fetchAndSaveProgressNotes] Failed to log error to server:', logError);
         }
     }
 }

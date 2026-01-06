@@ -344,10 +344,10 @@
             color: white;
         }
 
-        /* 태블릿 반응형 (768px ~ 1024px) */
+        /* Tablet responsive (768px ~ 1024px) */
         @media (min-width: 768px) and (max-width: 1024px) {
             .sidebar {
-                width: 200px;  /* 좁은 사이드바 */
+                width: 200px;  /* Narrow sidebar */
             }
             
             .main-content {
@@ -355,26 +355,26 @@
                 padding: 1.5rem;
             }
             
-            /* KPI 카드 2열 배치 */
+            /* KPI cards 2 columns */
             .row > .col-md-3 {
                 flex: 0 0 50%;
                 max-width: 50%;
                 margin-bottom: 1rem;
             }
             
-            /* Incident grid 2열 */
+            /* Incident grid 2 columns */
             .incident-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 15px;
             }
             
-            /* Site grid 2열 */
+            /* Site grid 2 columns */
             .sites-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 15px;
             }
             
-            /* 테이블 폰트 크기 조정 */
+            /* Adjust table font size */
             .table thead th {
                 font-size: 0.85rem;
                 padding: 10px 6px;
@@ -385,35 +385,35 @@
                 padding: 10px 6px;
             }
             
-            /* 차트 높이 조정 */
+            /* Adjust chart height */
             canvas {
                 max-height: 220px !important;
             }
             
-            /* 모달 크기 조정 */
+            /* Adjust modal size */
             .modal-dialog {
                 max-width: 85%;
             }
             
-            /* 버튼 크기 조정 */
+            /* Adjust button size */
             .btn {
                 font-size: 0.9rem;
                 padding: 0.5rem 1rem;
             }
             
-            /* Navbar 높이 감소 */
+            /* Reduce navbar height */
             .navbar-brand {
                 font-size: 1.3rem;
             }
             
-            /* Sidebar 메뉴 패딩 감소 */
+            /* Reduce sidebar menu padding */
             .sidebar-menu a {
                 padding: 0.8rem 1rem;
                 font-size: 0.9rem;
             }
         }
         
-        /* 모바일 반응형 (768px 미만) */
+        /* Mobile responsive (below 768px) */
         @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
@@ -435,7 +435,7 @@
                 font-size: 2rem;
             }
             
-            /* KPI 카드 1열 배치 */
+            /* KPI cards 1 column */
             .row > .col-md-3 {
                 flex: 0 0 100%;
                 max-width: 100%;
@@ -861,7 +861,7 @@
         .overdue-task-row {
             background-color: rgba(220, 53, 69, 0.1) !important;
             border-left: 4px solid #dc3545 !important;
-            /* animation: blink-overdue 2s infinite; */ /* 깜박임 제거 */
+            /* animation: blink-overdue 2s infinite; */ /* Blink removed */
         }
 
         .overdue-task-row td {
@@ -869,7 +869,7 @@
             font-weight: 600;
         }
 
-        /* 깜박임 애니메이션 비활성화
+        /* Blink animation disabled
         @keyframes blink-overdue {
             0%, 50% { opacity: 1; }
             51%, 100% { opacity: 0.3; }
@@ -1433,7 +1433,7 @@
 
     <!-- Admin View -->
     <div id="admin-view" style="display: none;">
-                        <!-- KPI Cards (4개 카드 레이아웃) -->
+                        <!-- KPI Cards (4 card layout) -->
                         <div class="row mb-4">
                             <div class="col-md-3">
                                 <div class="kpi-card text-center">
@@ -1470,7 +1470,7 @@
                             <div class="col-12">
                                 <div style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
                                     <h4 style="color: #2c3e50; margin-bottom: 20px;">
-                                        <i class="fas fa-chart-bar me-2"></i>📊 전체 사이트 통계 (All Sites Overview)
+                                        <i class="fas fa-chart-bar me-2"></i>📊 All Sites Overview
                                     </h4>
                                     
                                     <div class="row">
@@ -1478,7 +1478,7 @@
                                         <div class="col-md-4">
                                             <div class="chart-container-small" style="height: 300px;">
                                                 <h6 style="color: #2c3e50; margin-bottom: 15px; text-align: center;">
-                                                    📋 이벤트 유형 분포
+                                                    📋 Event Type Distribution
                                                 </h6>
                                                 <canvas id="eventTypeChart"></canvas>
                                             </div>
@@ -1488,7 +1488,7 @@
                                         <div class="col-md-4">
                                             <div class="chart-container-small" style="height: 300px;">
                                                 <h6 style="color: #2c3e50; margin-bottom: 15px; text-align: center;">
-                                                    ⚠️ Risk Rating 분포
+                                                    ⚠️ Risk Rating Distribution
                                                 </h6>
                                                 <canvas id="riskRatingChart"></canvas>
                                             </div>
@@ -1498,7 +1498,7 @@
                                         <div class="col-md-4">
                                             <div class="chart-container-small" style="height: 300px;">
                                                 <h6 style="color: #2c3e50; margin-bottom: 15px; text-align: center;">
-                                                    🏥 Severity Rating 분포
+                                                    🏥 Severity Rating Distribution
                                                 </h6>
                                                 <canvas id="severityRatingChart"></canvas>
                                             </div>
@@ -1513,7 +1513,7 @@
                             <div class="col-12">
                                 <div style="background: white; border-radius: 15px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
                                     <h4 style="color: #2c3e50; margin-bottom: 20px;">
-                                        <i class="fas fa-heartbeat me-2"></i>🚑 추가 안전 지표 (Additional Safety KPIs)
+                                        <i class="fas fa-heartbeat me-2"></i>🚑 Additional Safety KPIs
                                     </h4>
                                     
                                     <div class="row">
@@ -1935,29 +1935,29 @@
                                 <div class="col-12">
                                     <div class="card shadow-sm">
                                         <div class="card-header bg-success text-white">
-                                            <h4 class="mb-0"><i class="fas fa-database me-2"></i>데이터 소스 정보</h4>
+                                            <h4 class="mb-0"><i class="fas fa-database me-2"></i>Data Source Information</h4>
                                         </div>
                                         <div class="card-body">
                                             <!-- Data Source Info -->
                                             <div class="alert alert-success mb-4">
                                                 <h5 class="text-success mb-3">
-                                                    <i class="fas fa-database me-2"></i>현재 모드: DB 직접 접속 (READ-ONLY)
+                                                    <i class="fas fa-database me-2"></i>Current Mode: Direct DB Access (READ-ONLY)
                                                 </h5>
                                                 <ul class="mb-0">
-                                                    <li><strong>Progress Notes:</strong> MANAD MSSQL 데이터베이스에서 실시간 조회</li>
-                                                    <li><strong>Incidents:</strong> API를 통해 조회 후 SQLite DB에 캐시</li>
-                                                    <li><strong>보안:</strong> 모든 DB 연결은 읽기 전용 모드 (autocommit=False + rollback)</li>
+                                                    <li><strong>Progress Notes:</strong> Real-time query from MANAD MSSQL database</li>
+                                                    <li><strong>Incidents:</strong> Cached in SQLite DB after query via API</li>
+                                                    <li><strong>Security:</strong> All DB connections are read-only mode (autocommit=False + rollback)</li>
                                                 </ul>
                                             </div>
 
                                             <!-- Auto Sync Info -->
                                             <div class="alert alert-info mb-3">
                                                 <h5 class="text-primary mb-2">
-                                                    <i class="fas fa-clock me-2"></i>자동 동기화
+                                                    <i class="fas fa-clock me-2"></i>Auto Sync
                                                 </h5>
                                                 <p class="mb-0">
                                                     <i class="fas fa-info-circle me-2"></i>
-                                                    시스템이 백그라운드에서 <strong>5분마다</strong> 자동으로 데이터를 동기화합니다.
+                                                    System automatically syncs data every <strong>5 minutes</strong> in the background.
                                                 </p>
                                             </div>
 
@@ -1965,16 +1965,16 @@
                                             <div class="card border-warning">
                                                 <div class="card-header bg-warning text-dark">
                                                     <h5 class="mb-0">
-                                                        <i class="fas fa-sync-alt me-2"></i>강제 동기화
+                                                        <i class="fas fa-sync-alt me-2"></i>Force Sync
                                                     </h5>
                                                 </div>
                                                 <div class="card-body">
                                                     <p class="text-muted mb-3">
-                                                        MANAD Plus API에서 최근 30일간의 Incidents를 가져와 내부 DB를 업데이트합니다.
+                                                        Fetch last 30 days of Incidents from MANAD Plus API and update internal DB.
                                                     </p>
                                                     <div class="d-flex align-items-center gap-3">
                                                         <button id="forceSyncBtn" class="btn btn-warning" onclick="performForceSync()">
-                                                            <i class="fas fa-sync-alt me-2"></i>지금 동기화
+                                                            <i class="fas fa-sync-alt me-2"></i>Sync Now
                                                         </button>
                                                         <div id="syncStatus" class="text-muted small"></div>
                                                     </div>
@@ -2186,10 +2186,10 @@
         // Load admin data
         async function loadAdminData() {
             try {
-                // 먼저 인시던트 데이터 로드 (filteredIncidents 설정)
+                // Load incident data first (set filteredIncidents)
                 await initializeIncidentViewer();
                 
-                // 그 다음 나머지 데이터 로드
+                // Then load remaining data
                 // loadComplianceSummary() is deprecated - updateKPICards() handles this
                 // loadOverdueTasks() // Removed - will be re-implemented later
                 
@@ -2239,8 +2239,8 @@
         }
         */
 
-        // Note: loadOpenIncidents는 loadAdminData()에서 initializeIncidentViewer()로 대체됨
-        // Open Incidents 테이블은 filteredIncidents를 사용하여 displayOpenIncidents()로 표시
+        // Note: loadOpenIncidents is replaced by initializeIncidentViewer() in loadAdminData()
+        // Open Incidents table is displayed using filteredIncidents via displayOpenIncidents()
 
         // Load my tasks
         async function loadMyTasks() {
@@ -2270,14 +2270,14 @@
             const alertsCard = document.getElementById('urgent-alerts');
             
             if (tasks && tasks.length > 0) {
-                // 2일(48시간) 이내의 overdue tasks만 필터링
+                // Filter overdue tasks within 2 days (48 hours)
                 const now = new Date();
                 const twoDaysAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
                 
                 const recentTasks = tasks.filter(task => {
                     if (!task.due_date) return false;
                     const dueDate = new Date(task.due_date);
-                    // 2일 이내에 마감된 Task만 표시
+                    // Show only tasks due within 2 days
                     return dueDate >= twoDaysAgo;
                 });
                 
@@ -2286,7 +2286,7 @@
                     alertsContainer.innerHTML = recentTasks.map(task => `
                         <div class="alert alert-danger mb-2">
                             <strong>${task.task_id}</strong> - ${task.resident_name}: ${task.description}
-                            <br><small>담당자: ${task.assigned_user} | 초과: ${task.overdue_by_hours}시간</small>
+                            <br><small>Assigned: ${task.assigned_user} | Overdue: ${task.overdue_by_hours} hours</small>
                         </div>
                     `).join('');
                 } else {
@@ -2543,7 +2543,7 @@
         // Auto-refresh data every 30 seconds
         setInterval(() => {
             if (currentRole === 'admin' || currentRole === 'clinical_manager') {
-                // Admin view: 인시던트 데이터만 갱신
+                // Admin view: Update incident data only
                 loadIncidents();
                 // loadComplianceSummary(); // Deprecated - updateKPICards() handles this
                 // loadOverdueTasks(); // Removed - will be re-implemented later
@@ -2554,12 +2554,12 @@
 
         // Incident Viewer Functions
         let currentSite = 'Parafield Gardens';
-        let incidents = [];  // 전체 인시던트 데이터
-        let filteredIncidents = [];  // 필터링된 인시던트 데이터
+        let incidents = [];  // All incident data
+        let filteredIncidents = [];  // Filtered incident data
         let clients = [];
         let chartInstances = {}; // Store chart instances to destroy them properly
-        let currentPeriod = 'week'; // 현재 선택된 기간 (기본값: This Week)
-        let currentIncidentType = 'all'; // 현재 선택된 incident type (기본값: All)
+        let currentPeriod = 'week'; // Currently selected period (default: This Week)
+        let currentIncidentType = 'all'; // Currently selected incident type (default: All)
 
         // Initialize incident viewer
         async function initializeIncidentViewer() {
@@ -2644,12 +2644,12 @@
                     
                     console.log(`✅ Loaded ${allIncidents.length} incidents from CIMS DB`);
                     
-                    // 초기 로드 시 데이터가 없으면 동기화 진행 중 메시지 표시
+                    // Show sync in progress message if no data on initial load
                     if (allIncidents.length === 0) {
                         console.log('⚠️ No incidents found - initial sync may be in progress');
                         showInfo('First time loading data. Synchronizing incidents from MANAD Plus... This may take 30-60 seconds.');
                         
-                        // 10초 후 자동으로 다시 로드
+                        // Auto-reload after 10 seconds
                         setTimeout(() => {
                             console.log('🔄 Auto-reloading after initial sync...');
                             loadIncidents();
@@ -2660,10 +2660,10 @@
                     incidents = allIncidents;
                     clients = []; // Not needed for CIMS data
                     
-                    // 초기 로드 시에는 filteredIncidents를 전체로 설정
+                    // Set filteredIncidents to all on initial load
                     filteredIncidents = allIncidents;
                     
-                    // 필터 적용 후 화면 갱신
+                    // Apply filters and refresh display
                     applyFilters();
                     
                 } else {
@@ -2791,7 +2791,7 @@
             
             console.log(`📊 Filtered ${filteredIncidents.length} incidents from ${incidents.length} total`);
             
-            // 화면 전체 갱신
+            // Refresh entire display
             displayStats();  // Shows site-specific incident cards with filtered data
             createSiteSpecificCharts();  // Updates all charts with filtered data
             updateKPICards();  // Updates KPI cards with backend data (period-aware)
@@ -2842,7 +2842,7 @@
                     totalIncidentsDescEl.textContent = `${periodText}: ${kpiData.total_incidents}`;
                 }
                 
-                // Update Open Incidents (한 번도 방문 안함)
+                // Update Open Incidents
                 const openIncidentsEl = document.getElementById('open-incidents');
                 const incidentsChangeEl = document.getElementById('incidents-change');
                 if (openIncidentsEl && incidentsChangeEl) {
@@ -2852,7 +2852,7 @@
                     incidentsChangeEl.textContent = `${periodText}: ${kpiData.open_incidents} not visited`;
                 }
                 
-                // Update In Progress Incidents (일부 완료)
+                // Update In Progress Incidents (partially completed)
                 const inProgressEl = document.getElementById('in-progress-incidents');
                 const inProgressDescEl = document.getElementById('in-progress-desc');
                 if (inProgressEl && inProgressDescEl) {
@@ -2862,7 +2862,7 @@
                     inProgressDescEl.textContent = `${periodText}: Partially completed`;
                 }
                 
-                // Update Closed/Completed Incidents (모두 완료)
+                // Update Closed/Completed Incidents (all completed)
                 const closedIncidentsEl = document.getElementById('closed-incidents');
                 const closedDescEl = document.getElementById('closed-desc');
                 if (closedIncidentsEl && closedDescEl) {
@@ -2884,7 +2884,7 @@
         
         // Display statistics by site
         function displayStats() {
-            // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
+            // Use filtered incidents (always use filteredIncidents)
             const dataToDisplay = filteredIncidents;
             
             // Group incidents by site
@@ -3276,7 +3276,7 @@
 
         // ==================== NEW: Dashboard Stats Charts ====================
         
-        // Load and display dashboard stats (전체 사이트 통계)
+        // Load and display dashboard stats (all sites statistics)
         async function loadDashboardStats() {
             try {
                 const periodSelect = document.getElementById('globalPeriodSelect');
@@ -3540,7 +3540,7 @@
                 delete chartInstances[chartId];
             }
 
-            // 필터링된 인시던트 사용 (항상 filteredIncidents)
+            // Use filtered incidents (always use filteredIncidents)
             const dataToDisplay = filteredIncidents;
             
             // Filter incidents for this specific site
@@ -3561,7 +3561,7 @@
             // If no data, show a placeholder chart with "No data" message
             if (labels.length === 0) {
                 
-                // 캔버스는 유지하고 빈 차트 생성
+                // Keep canvas and create empty chart
                 chartInstances[chartId] = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
@@ -3638,7 +3638,7 @@
                 delete chartInstances[chartId];
             }
 
-            // 필터링된 인시던트 사용 (항상 filteredIncidents 사용)
+            // Use filtered incidents (always use filteredIncidents)
             const dataToDisplay = filteredIncidents;
             
             // Filter incidents for this specific site
@@ -3679,7 +3679,7 @@
 
             // If no incidents, show empty chart
             if (siteIncidents.length === 0) {
-                // 캔버스는 유지하고 빈 차트 생성
+                // Keep canvas and create empty chart
                 chartInstances[chartId] = new Chart(ctx, {
                     type: 'pie',
                     data: {
@@ -4143,12 +4143,12 @@
             
             // Disable button
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>동기화 중...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Syncing...';
             
             // Show progress
             progress.style.display = 'block';
             result.style.display = 'none';
-            status.textContent = '동기화 시작 중...';
+            status.textContent = 'Starting sync...';
             
             // Animate progress bar
             let progressValue = 0;
@@ -4162,7 +4162,7 @@
             }, 200);
             
             try {
-                details.textContent = '📥 MANAD Plus에서 최근 30일 Incidents 가져오는 중...';
+                details.textContent = '📥 Fetching last 30 days of Incidents from MANAD Plus...';
                 
                 const response = await fetch('/api/cims/force-sync', {
                     method: 'POST',
@@ -4179,17 +4179,17 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        details.textContent = '✅ 동기화 완료!';
+                        details.textContent = '✅ Sync completed!';
                         status.textContent = '';
                         
                         result.className = 'alert alert-success';
                         result.innerHTML = `
-                            <h6 class="mb-2"><i class="fas fa-check-circle me-2"></i>동기화 완료!</h6>
+                            <h6 class="mb-2"><i class="fas fa-check-circle me-2"></i>Sync completed!</h6>
                             <ul class="mb-0 small">
-                                <li><strong>${data.details.incidents_synced || 0}</strong>개 신규 Incidents 추가</li>
-                                <li><strong>${data.details.incidents_updated || 0}</strong>개 기존 Incidents 업데이트</li>
-                                <li><strong>${data.details.tasks_generated || 0}</strong>개 Tasks 자동 생성 (Fall Incidents)</li>
-                                <li><strong>${data.details.statuses_updated || 0}</strong>개 Incidents 상태 업데이트</li>
+                                <li><strong>${data.details.incidents_synced || 0}</strong> new Incidents added</li>
+                                <li><strong>${data.details.incidents_updated || 0}</strong> existing Incidents updated</li>
+                                <li><strong>${data.details.tasks_generated || 0}</strong> Tasks auto-generated (Fall Incidents)</li>
+                                <li><strong>${data.details.statuses_updated || 0}</strong> Incidents status updated</li>
                             </ul>
                         `;
                         result.style.display = 'block';
@@ -4210,19 +4210,19 @@
                 clearInterval(progressInterval);
                 console.error('❌ Force sync error:', error);
                 
-                details.textContent = '❌ 동기화 실패!';
+                details.textContent = '❌ Sync failed!';
                 status.textContent = '';
                 
                 result.className = 'alert alert-danger';
                 result.innerHTML = `
-                    <h6 class="mb-2"><i class="fas fa-exclamation-circle me-2"></i>동기화 실패</h6>
-                    <p class="mb-0 small">오류: ${error.message}</p>
+                    <h6 class="mb-2"><i class="fas fa-exclamation-circle me-2"></i>Sync failed</h6>
+                    <p class="mb-0 small">Error: ${error.message}</p>
                 `;
                 result.style.display = 'block';
             } finally {
                 // Re-enable button
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>지금 동기화';
+                btn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Sync Now';
                 
                 // Hide progress after 3 seconds
                 setTimeout(() => {
