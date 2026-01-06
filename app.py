@@ -240,6 +240,19 @@ if not os.path.exists('data'):
 # - Unified Data Sync → CIMS 증분 동기화 + 클라이언트 캐싱으로 대체
 
 # ==============================
+# Database Schema Migration (자동 실행)
+# Production과 Development 환경의 데이터베이스 스키마 차이를 자동으로 해결
+# ==============================
+try:
+    from migrate_cims_schema import run_migration
+    db_path = flask_config.get('DATABASE_PATH', 'progress_report.db')
+    run_migration(db_path)
+    logger.info("✅ Database schema migration completed")
+except Exception as e:
+    logger.warning(f"⚠️ Database schema migration failed: {e}")
+    # 마이그레이션 실패해도 앱은 계속 실행
+
+# ==============================
 # 인증 관련 기능 (Flask-Login 사용)
 # ==============================
 
@@ -8559,6 +8572,17 @@ def start_periodic_sync():
     logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨 (5분마다)")
 
 if __name__ == '__main__':
+    # Database schema migration (자동 실행)
+    # Production과 Development 환경의 데이터베이스 스키마 차이를 자동으로 해결
+    try:
+        from migrate_cims_schema import run_migration
+        db_path = flask_config.get('DATABASE_PATH', 'progress_report.db')
+        run_migration(db_path)
+        logger.info("✅ Database schema migration completed")
+    except Exception as e:
+        logger.warning(f"⚠️ Database schema migration failed: {e}")
+        # 마이그레이션 실패해도 앱은 계속 실행
+    
     # CIMS Background Data Processor (선택적)
     # 기능: Dashboard KPI 캐시 생성 (10분마다) → 성능 향상
     # 개발 환경: 비활성화 (즉시 응답 확인 가능)
