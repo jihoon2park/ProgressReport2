@@ -7585,6 +7585,31 @@ def get_dashboard_kpis():
         # SQLite에서 사용할 날짜 문자열 (ISO 형식)
         start_date_str = start_date.isoformat()
         
+        logger.info(f"Date filter: period={period}, start_date={start_date_str}, now={now.isoformat()}")
+        
+        # 실제 데이터 샘플 확인 (디버깅용) - 날짜 필터 적용 전
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) as total_all,
+                       COUNT(CASE WHEN incident_date IS NOT NULL AND incident_date != '' THEN 1 END) as total_with_date,
+                       COUNT(CASE WHEN status IS NOT NULL AND status != '' THEN 1 END) as total_with_status
+                FROM cims_incidents
+            """)
+            total_check = cursor.fetchone()
+            logger.info(f"Total incidents in DB: all={total_check.get('total_all', 0)}, with_date={total_check.get('total_with_date', 0)}, with_status={total_check.get('total_with_status', 0)}")
+            
+            # 날짜 샘플 확인
+            cursor.execute("""
+                SELECT incident_date, status, incident_type
+                FROM cims_incidents
+                WHERE incident_date IS NOT NULL 
+                LIMIT 5
+            """)
+            date_samples = cursor.fetchall()
+            logger.info(f"Sample incident dates: {[dict(row) for row in date_samples]}")
+        except Exception as e:
+            logger.warning(f"Could not fetch data samples: {e}")
+        
         # 사고 유형 필터 조건 생성
         type_filter = ""
         type_params = []
@@ -7632,11 +7657,14 @@ def get_dashboard_kpis():
                 
             FROM cims_incidents i
             WHERE i.incident_date IS NOT NULL 
+            AND i.incident_date != ''
             AND i.incident_date >= ?
             {type_filter}
         """
         
         try:
+            logger.info(f"Executing KPI query with start_date: {start_date_str}, type_filter: {type_filter}, type_params: {type_params}")
+            logger.info(f"Full query: {incident_stats_query}")
             cursor.execute(incident_stats_query, [start_date_str] + type_params)
         except Exception as query_error:
             logger.error(f"SQL Query Error: {str(query_error)}")
@@ -7645,13 +7673,42 @@ def get_dashboard_kpis():
             raise
         incident_stats = cursor.fetchone()
         
+        # sqlite3.Row를 딕셔너리로 변환 (또는 직접 키로 접근)
+        if incident_stats:
+            incident_stats_dict = dict(incident_stats)
+        else:
+            incident_stats_dict = {'total_incidents': 0, 'open_incidents': 0, 'in_progress_incidents': 0, 'closed_incidents': 0}
+        
+        # 디버깅: 쿼리 결과 로그
+        logger.info(f"KPI Query Result: total={incident_stats_dict.get('total_incidents', 0)}, "
+                   f"open={incident_stats_dict.get('open_incidents', 0)}, "
+                   f"in_progress={incident_stats_dict.get('in_progress_incidents', 0)}, "
+                   f"closed={incident_stats_dict.get('closed_incidents', 0)}")
+        
+        # 실제 데이터 샘플 확인 (디버깅용)
+        try:
+            cursor.execute("""
+                SELECT status, incident_date, COUNT(*) as cnt
+                FROM cims_incidents
+                WHERE incident_date IS NOT NULL 
+                AND incident_date >= ?
+                GROUP BY status
+                LIMIT 10
+            """, [start_date_str])
+            status_samples = cursor.fetchall()
+            logger.info(f"Status distribution sample: {status_samples}")
+        except Exception as e:
+            logger.warning(f"Could not fetch status samples: {e}")
+        
         # ==========================================
         # 2. Fall 카운트
         # ==========================================
         fall_query = f"""
             SELECT COUNT(*) as fall_count
             FROM cims_incidents i
-            WHERE i.incident_date >= ?
+            WHERE i.incident_date IS NOT NULL 
+            AND i.incident_date != ''
+            AND i.incident_date >= ?
             AND LOWER(i.incident_type) LIKE '%fall%'
             {type_filter}
         """
@@ -7664,13 +7721,14 @@ def get_dashboard_kpis():
             logger.error(f"Params: {[start_date_str] + type_params}")
             raise
         fall_result = cursor.fetchone()
-        fall_count = fall_result['fall_count'] if fall_result else 0
+        fall_count = dict(fall_result).get('fall_count', 0) if fall_result else 0
+        logger.info(f"Fall count query result: {fall_count}")
         
         # ==========================================
         # 3. Compliance Rate 계산 (Closed / Total * 100)
         # ==========================================
-        total_incidents = incident_stats['total_incidents'] or 0
-        closed_incidents = incident_stats['closed_incidents'] or 0
+        total_incidents = incident_stats_dict.get('total_incidents', 0) or 0
+        closed_incidents = incident_stats_dict.get('closed_incidents', 0) or 0
         
         if total_incidents > 0:
             compliance_rate = round((closed_incidents / total_incidents) * 100, 1)
@@ -7683,10 +7741,10 @@ def get_dashboard_kpis():
         # 4. 응답 반환
         # ==========================================
         return jsonify({
-            'total_incidents': incident_stats['total_incidents'] or 0,
-            'closed_incidents': incident_stats['closed_incidents'] or 0,
-            'open_incidents': incident_stats['open_incidents'] or 0,
-            'in_progress_incidents': incident_stats['in_progress_incidents'] or 0,
+            'total_incidents': incident_stats_dict.get('total_incidents', 0) or 0,
+            'closed_incidents': incident_stats_dict.get('closed_incidents', 0) or 0,
+            'open_incidents': incident_stats_dict.get('open_incidents', 0) or 0,
+            'in_progress_incidents': incident_stats_dict.get('in_progress_incidents', 0) or 0,
             'fall_count': fall_count,
             'compliance_rate': compliance_rate,
             'period': period,
