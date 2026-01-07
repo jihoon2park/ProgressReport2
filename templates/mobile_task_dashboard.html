@@ -1063,6 +1063,8 @@
             
             console.log(`🔍 [${selectedSite}] Batch API - Incidents: ${incidents.length}, Policies: ${Object.keys(policies).length}`);
             console.log('📋 Available policies:', Object.keys(policies));
+            console.log('📋 Policies object structure:', policies);  // 전체 구조 확인
+            console.log('📋 Fallback policy:', policy ? (policy.policy_id || 'no policy_id') : 'null');
             console.log('📋 Incidents with fall_type:', incidents.map(inc => ({id: inc.incident_id, fall_type: inc.fall_type})));
             
             if (incidents.length === 0) {
@@ -1092,6 +1094,12 @@
             const incidentTasksMap = {};
             incidents.forEach(inc => {
                 incidentTasksMap[inc.id] = inc.tasks || [];
+                // 디버깅: task 수 로그
+                if (inc.tasks && inc.tasks.length > 0) {
+                    console.log(`📋 Incident ${inc.incident_id}: ${inc.tasks.length} tasks loaded`);
+                } else {
+                    console.warn(`⚠️ Incident ${inc.incident_id}: NO TASKS in API response!`);
+                }
             });
             
             // Generate all visits for all Fall incidents
@@ -1113,12 +1121,15 @@
                 
                 console.log(`  → Selected policy ID: ${selectedPolicyId}`);
                 console.log(`  → Available policies:`, Object.keys(policies));
+                console.log(`  → Policies object:`, policies);  // 디버깅: 전체 객체 확인
                 
                 selectedPolicy = policies[selectedPolicyId];
                 
                 // Fallback to legacy policy if new policies not available
                 if (!selectedPolicy) {
                     console.warn(`  ⚠️ Policy ${selectedPolicyId} not found in policies object, using fallback policy`);
+                    console.warn(`  → Available keys:`, Object.keys(policies));
+                    console.warn(`  → Looking for:`, selectedPolicyId);
                     selectedPolicy = policy;
                 }
                 
@@ -1166,8 +1177,15 @@
                             if (!task.due_date) return false;
                             const taskDueDate = new Date(task.due_date);
                             const timeDiff = Math.abs((visitTime - taskDueDate) / 1000 / 60);
-                            return timeDiff <= 30;
+                            // 매칭 범위를 30분에서 60분으로 확대 (더 관대하게)
+                            return timeDiff <= 60;
                         });
+                        
+                        // 디버깅: task 매칭 실패 시 로그
+                        if (!matchedTask && tasks.length > 0) {
+                            console.warn(`⚠️ No task matched for visit at ${visitTime.toISOString()}, available tasks:`, 
+                                tasks.map(t => ({due_date: t.due_date, status: t.status})));
+                        }
                         
                         if (matchedTask) {
                             taskStatus = matchedTask.status || 'pending';
@@ -1202,12 +1220,17 @@
             console.log(`📅 선택한 날짜: ${selectedDate}`);
             
             const filteredVisits = allVisits.filter(visit => {
-                // visitTime의 로컬 날짜 추출 (YYYY-MM-DD)
-                const visitLocalDate = visit.visitTime.toLocaleDateString('en-CA'); // ISO format (YYYY-MM-DD)
+                // visitTime의 날짜 추출 (YYYY-MM-DD) - 타임존 안전하게 처리
+                const visitDate = new Date(visit.visitTime);
+                const visitYear = visitDate.getFullYear();
+                const visitMonth = String(visitDate.getMonth() + 1).padStart(2, '0');
+                const visitDay = String(visitDate.getDate()).padStart(2, '0');
+                const visitLocalDate = `${visitYear}-${visitMonth}-${visitDay}`;
+                
                 const match = visitLocalDate === selectedDate;
                 
                 if (!match && allVisits.indexOf(visit) < 3) {
-                    console.log(`  🔍 Visit ${allVisits.indexOf(visit)}: ${visitLocalDate} vs ${selectedDate} = ${match}`);
+                    console.log(`  🔍 Visit ${allVisits.indexOf(visit)}: ${visitLocalDate} vs ${selectedDate} = ${match} (visitTime: ${visit.visitTime.toISOString()})`);
                 }
                 
                 return match;

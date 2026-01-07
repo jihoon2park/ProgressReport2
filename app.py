@@ -7093,11 +7093,10 @@ def get_cims_incidents():
         site_filter = request.args.get('site')
         date_filter = request.args.get('date')
         
-        # 🔧 수정: KPI와 일치시키기 위해 항상 CIMS SQLite DB에서 조회
-        # MANAD DB 직접 접속은 동기화에만 사용하고, 조회는 CIMS DB 사용
-        # 이렇게 하면 인시던트 로드와 KPI가 동일한 데이터 소스를 사용합니다
-        # 원래는 DB 설정을 확인하지만, KPI와 일치시키기 위해 강제로 CIMS DB 사용
-        use_db_direct = False  # 강제로 CIMS DB 사용 (KPI와 일치)
+        # 🔧 수정: KPI와 일치시키기 위해 MANAD DB에서 직접 쿼리
+        # 대시보드 KPI가 MANAD DB 직접 쿼리를 사용하므로, 인시던트 목록도 동일하게 처리
+        # 이렇게 하면 프로덕션/개발 서버 간 데이터 일치 보장
+        use_db_direct = True  # MANAD DB 직접 쿼리 사용 (KPI와 일치)
         
         # 주석 처리: 원래 DB 직접 접속 모드 확인 로직 (현재는 사용하지 않음)
         # try:
@@ -8210,15 +8209,19 @@ def get_schedule_batch(site, date):
             
             # Task가 있으면 추가 (인덱스가 1씩 증가)
             if row[12] is not None:  # task_db_id
-                incidents_map[incident_id]['tasks'].append({
+                task_data = {
                     'id': row[12],
                     'task_id': row[13],
                     'task_name': row[14],
                     'due_date': row[15],
-                    'status': row[16],
+                    'status': row[16] or 'pending',  # NULL이면 'pending'
                     'completed_at': row[17],
                     'completed_by': row[18]
-                })
+                }
+                incidents_map[incident_id]['tasks'].append(task_data)
+                # 디버깅: task 추가 로그
+                if len(incidents_map[incident_id]['tasks']) <= 3:  # 처음 3개만 로그
+                    logger.debug(f"Task added to incident {incident_id}: {task_data['task_id']} (due_date={task_data['due_date']}, status={task_data['status']})")
         
         # 2.5. Fall type 계산 및 업데이트 (NULL이거나 비어있는 경우)
         from services.fall_policy_detector import fall_detector
@@ -8285,6 +8288,10 @@ def get_schedule_batch(site, date):
         total_tasks = sum(len(i['tasks']) for i in incidents_map.values())
         logger.info(f"🚀 Batch API: {site}/{date} - {len(incidents_map)} incidents, {total_tasks} tasks")
         
+        # 디버깅: 각 incident의 task 수 로그
+        for inc_id, inc_data in list(incidents_map.items())[:5]:  # 처음 5개만
+            logger.debug(f"  Incident {inc_data['incident_id']}: {len(inc_data['tasks'])} tasks")
+        
         # Tasks가 없고 Fall incidents가 있으면 자동 생성 시도
         if len(incidents_map) > 0 and total_tasks == 0 and fall_policy:
             logger.info(f"💡 Tasks가 없습니다 - 자동 생성 시도 중...")
@@ -8325,11 +8332,15 @@ def get_schedule_batch(site, date):
                     except:
                         pass
         
+        # 디버깅: policies 키 확인
+        logger.debug(f"📋 Policies keys in response: {list(fall_policies.keys())}")
+        logger.debug(f"📋 Policies count: {len(fall_policies)}")
+        
         return jsonify({
             'success': True,
             'incidents': list(incidents_map.values()),
             'policy': fall_policy,  # Backwards compatibility
-            'policies': fall_policies,  # All Fall policies by policy_id
+            'policies': fall_policies,  # All Fall policies by policy_id (dict with policy_id as key)
             'site': site,
             'date': date,
             'cached': False,  # Server-side 캐싱 시 True로 변경
