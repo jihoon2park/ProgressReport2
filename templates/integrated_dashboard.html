@@ -2555,17 +2555,20 @@
         // Add event listener for page unload
         window.addEventListener('beforeunload', destroyAllCharts);
 
-        // Auto-refresh data every 30 seconds
+        // Auto-refresh data (fallback safety mechanism - event-based refresh is primary)
+        // This is a safety net in case event-based refresh fails
+        // Event-based refresh happens immediately after sync completion (via pollSyncStatus)
         setInterval(() => {
             if (currentRole === 'admin' || currentRole === 'clinical_manager') {
                 // Admin view: Update incident data only
+                console.log('🔄 [Fallback] 주기적 자동 새로고침 (이벤트 기반 새로고침이 실패한 경우를 위한 안전장치)');
                 loadIncidents();
                 // loadComplianceSummary(); // Deprecated - updateKPICards() handles this
                 // loadOverdueTasks(); // Removed - will be re-implemented later
             } else {
                 loadUserData();
             }
-        }, 30000);
+        }, 600000); // 10 minutes = 600000ms (fallback safety net)
 
         // Incident Viewer Functions
         let currentSite = 'Parafield Gardens';
@@ -3345,7 +3348,9 @@
             }
         }
 
-        // Sync indicator polling
+        // Sync indicator polling with event-based auto-refresh
+        let lastSyncEventTime = null; // Track last sync completion event
+        
         async function pollSyncStatus() {
             try {
                 const res = await fetch('/api/cache/status-current', { credentials: 'same-origin' });
@@ -3382,6 +3387,32 @@
                         latestDateEl.textContent = 'N/A';
                     }
                 }
+                
+                // 🔔 Event-based auto-refresh: 동기화 완료 이벤트 감지
+                if (data.sync_completion_event) {
+                    if (lastSyncEventTime === null) {
+                        // 첫 로드: 이벤트 시간 저장만
+                        lastSyncEventTime = data.sync_completion_event;
+                        console.log('📡 동기화 완료 이벤트 감지 (초기 로드):', data.sync_completion_event);
+                    } else if (lastSyncEventTime !== data.sync_completion_event) {
+                        // 새로운 동기화 완료 이벤트 감지: 자동 새로고침 트리거
+                        console.log('📡 새로운 동기화 완료 이벤트 감지! 자동 새로고침 시작...');
+                        console.log(`   이전: ${lastSyncEventTime}`);
+                        console.log(`   현재: ${data.sync_completion_event}`);
+                        
+                        lastSyncEventTime = data.sync_completion_event;
+                        
+                        // 동기화 완료 후 자동 새로고침 (2초 후 실행하여 DB 커밋 완료 대기)
+                        setTimeout(() => {
+                            console.log('🔄 동기화 완료 이벤트에 의해 자동 새로고침 실행');
+                            if (currentRole === 'admin' || currentRole === 'clinical_manager') {
+                                loadIncidents();
+                            } else {
+                                loadUserData();
+                            }
+                        }, 2000);
+                    }
+                }
             } catch (e) {
                 console.error('Error updating sync status:', e);
                 // Update to show error state
@@ -3391,8 +3422,9 @@
                 if (latestDateEl) latestDateEl.textContent = 'Error';
             }
         }
-        setInterval(pollSyncStatus, 5000);
-        pollSyncStatus();
+        // Sync status polling - check every 30 seconds to detect sync completion events quickly
+        setInterval(pollSyncStatus, 30000); // 30 seconds - 빠른 이벤트 감지를 위해
+        pollSyncStatus(); // Initial call
 
         // ==================== NEW: Dashboard Stats Charts ====================
         

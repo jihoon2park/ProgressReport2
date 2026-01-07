@@ -5706,6 +5706,14 @@ def get_cache_status_current():
         last_sync_result = cursor.fetchone()
         last_sync_time = last_sync_result[0] if last_sync_result else None
         
+        # 동기화 완료 이벤트 조회 (프론트엔드가 감지할 수 있도록)
+        cursor.execute("""
+            SELECT value FROM system_settings 
+            WHERE key = 'sync_completion_event'
+        """)
+        sync_event_result = cursor.fetchone()
+        sync_completion_event = sync_event_result[0] if sync_event_result else None
+        
         # 데이터 중 가장 최신 인시던트 날짜 조회
         cursor.execute("""
             SELECT MAX(incident_date) as latest_date
@@ -5719,7 +5727,7 @@ def get_cache_status_current():
         last = row[1] if row else None
         
         # Log for debugging
-        logger.debug(f"Sync status: status={status}, last_sync_time={last_sync_time}, latest_incident_date={latest_incident_date}")
+        logger.debug(f"Sync status: status={status}, last_sync_time={last_sync_time}, sync_event={sync_completion_event}, latest_incident_date={latest_incident_date}")
         
         conn.close()
         return jsonify({
@@ -5727,6 +5735,7 @@ def get_cache_status_current():
             'status': status, 
             'last_processed': last,
             'last_sync_time': last_sync_time,
+            'sync_completion_event': sync_completion_event,  # 동기화 완료 이벤트 타임스탬프
             'latest_incident_date': latest_incident_date
         })
     except Exception as e:
@@ -6854,17 +6863,26 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
         
         logger.info(f"Incident sync completed: {total_synced} new, {total_updated} updated")
         
-        # 전체 마지막 동기화 시간 업데이트
+        # 전체 마지막 동기화 시간 업데이트 (프론트엔드 이벤트 트리거용)
+        sync_completion_time = datetime.now().isoformat()
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO system_settings (key, value, updated_at)
                 VALUES ('last_incident_sync_time', ?, ?)
-            """, (datetime.now().isoformat(), datetime.now().isoformat()))
+            """, (sync_completion_time, sync_completion_time))
+            conn.commit()
+            
+            # 동기화 완료 이벤트 플래그 설정 (프론트엔드가 감지할 수 있도록)
+            cursor.execute("""
+                INSERT OR REPLACE INTO system_settings (key, value, updated_at)
+                VALUES ('sync_completion_event', ?, ?)
+            """, (sync_completion_time, sync_completion_time))
             conn.commit()
             conn.close()
-            logger.info(f"✅ last_incident_sync_time 업데이트 완료: {datetime.now().isoformat()}")
+            logger.info(f"✅ last_incident_sync_time 업데이트 완료: {sync_completion_time}")
+            logger.info(f"📡 동기화 완료 이벤트 발생: {sync_completion_time} (프론트엔드가 감지하여 자동 새로고침)")
         except Exception as e:
             logger.error(f"❌ last_incident_sync_time 업데이트 실패: {e}")
         
@@ -8776,33 +8794,57 @@ def start_periodic_sync():
             logger.error(f"❌ 초기 데이터 동기화 오류: {e}")
     
     def periodic_sync_job():
-        """5분마다 실행되는 증분 동기화 작업"""
+        """10분마다 실행되는 증분 동기화 작업"""
         try:
-            logger.info("🔄 주기적 백그라운드 동기화 시작 (증분 동기화)")
+            logger.info("=" * 60)
+            logger.info("🔄 [PERIODIC SYNC] 주기적 백그라운드 동기화 시작 (증분 동기화)")
+            logger.info(f"⏰ 동기화 시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info("=" * 60)
+            
             sync_result = sync_incidents_from_manad_to_cims(full_sync=False)
             
             # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
             # logger.info("🔄 Progress Note 동기화 시작...")
             # pn_sync_result = sync_progress_notes_from_manad_to_cims()
             
-            logger.info(f"✅ 주기적 백그라운드 동기화 완료: Incidents={sync_result}")
+            logger.info("=" * 60)
+            logger.info(f"✅ [PERIODIC SYNC] 주기적 백그라운드 동기화 완료: Incidents={sync_result}")
+            logger.info(f"⏰ 동기화 완료 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info("=" * 60)
         except Exception as e:
-            logger.error(f"❌ 주기적 백그라운드 동기화 오류: {e}")
+            logger.error("=" * 60)
+            logger.error(f"❌ [PERIODIC SYNC] 주기적 백그라운드 동기화 오류: {e}")
+            logger.error("=" * 60)
     
     # 서버 시작 시 초기 동기화 (백그라운드에서)
     initial_thread = threading.Thread(target=initial_sync_job, daemon=True)
     initial_thread.start()
     logger.info("🚀 초기 데이터 동기화 스레드 시작됨 (5초 후 실행)")
     
-    # 5분마다 증분 동기화 실행
-    schedule.every(5).minutes.do(periodic_sync_job)
+    # 10분마다 증분 동기화 실행
+    schedule.every(10).minutes.do(periodic_sync_job)
     
     def run_scheduler():
         """스케줄러 실행 루프"""
-        logger.info("🔄 주기적 백그라운드 동기화 스케줄러 시작됨 (5분마다)")
+        logger.info("🔄 주기적 백그라운드 동기화 스케줄러 시작됨 (10분마다)")
+        last_log_time = None
         while True:
             try:
                 schedule.run_pending()
+                
+                # 다음 동기화 시간 로그 (1분마다 한 번씩만)
+                current_time = datetime.now()
+                if last_log_time is None or (current_time - last_log_time).total_seconds() >= 60:
+                    jobs = schedule.get_jobs()
+                    if jobs:
+                        next_run = jobs[0].next_run
+                        if next_run:
+                            time_until_next = (next_run - current_time).total_seconds()
+                            minutes = int(time_until_next // 60)
+                            seconds = int(time_until_next % 60)
+                            logger.debug(f"⏰ 다음 동기화 예정: {minutes}분 {seconds}초 후 ({next_run.strftime('%H:%M:%S')})")
+                    last_log_time = current_time
+                
                 time.sleep(30)  # 30초마다 스케줄 확인
             except Exception as e:
                 logger.error(f"스케줄러 실행 중 오류: {e}")
@@ -8811,7 +8853,7 @@ def start_periodic_sync():
     # 백그라운드 스레드로 실행
     sync_thread = threading.Thread(target=run_scheduler, daemon=True)
     sync_thread.start()
-    logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨 (5분마다)")
+    logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨 (10분마다)")
 
 if __name__ == '__main__':
     # Database schema migration (자동 실행)
