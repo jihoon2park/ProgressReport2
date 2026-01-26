@@ -1125,12 +1125,21 @@
                 
                 selectedPolicy = policies[selectedPolicyId];
                 
-                // Fallback to legacy policy if new policies not available
+                // Fallback: 정확한 policy_id를 찾을 수 없으면 prefix로 시작하는 policy 찾기
+                // 예: FALL-001-UNWITNESSED를 찾을 수 없으면 FALL-001로 시작하는 policy 사용
                 if (!selectedPolicy) {
-                    console.warn(`  ⚠️ Policy ${selectedPolicyId} not found in policies object, using fallback policy`);
-                    console.warn(`  → Available keys:`, Object.keys(policies));
-                    console.warn(`  → Looking for:`, selectedPolicyId);
-                    selectedPolicy = policy;
+                    const policyKeys = Object.keys(policies);
+                    const prefixMatch = policyKeys.find(key => selectedPolicyId.startsWith(key) || key.startsWith(selectedPolicyId.split('-').slice(0, 2).join('-')));
+                    
+                    if (prefixMatch) {
+                        console.log(`  ℹ️ Policy ${selectedPolicyId} not found, using ${prefixMatch} (prefix match)`);
+                        selectedPolicy = policies[prefixMatch];
+                    } else {
+                        console.warn(`  ⚠️ Policy ${selectedPolicyId} not found in policies object, using fallback policy`);
+                        console.warn(`  → Available keys:`, policyKeys);
+                        console.warn(`  → Looking for:`, selectedPolicyId);
+                        selectedPolicy = policy;
+                    }
                 }
                 
                 if (!selectedPolicy) {
@@ -1236,27 +1245,48 @@
             console.log(`📅 선택한 날짜: ${selectedDate}`);
             
             const filteredVisits = allVisits.filter(visit => {
-                // visitTime은 이제 실제 task의 due_date를 사용하므로 직접 비교 가능
                 // taskDueDate가 있으면 우선 사용 (더 정확함)
-                let dateToCheck = visit.visitTime;
+                let dateToCheck = null;
                 
                 if (visit.taskDueDate) {
-                    // 실제 task의 due_date가 있으면 사용
-                    dateToCheck = new Date(visit.taskDueDate);
+                    // taskDueDate가 문자열이면 날짜 부분만 추출 (타임존 문제 방지)
+                    if (typeof visit.taskDueDate === 'string') {
+                        // ISO 형식: 2026-01-01T08:00:00 또는 2026-01-01T08:00:00.000000
+                        const dateMatch = visit.taskDueDate.match(/^(\d{4}-\d{2}-\d{2})/);
+                        if (dateMatch) {
+                            dateToCheck = dateMatch[1]; // YYYY-MM-DD 형식으로 직접 추출
+                        } else {
+                            // 파싱 실패 시 Date 객체로 변환
+                            dateToCheck = new Date(visit.taskDueDate);
+                        }
+                    } else {
+                        dateToCheck = new Date(visit.taskDueDate);
+                    }
+                } else if (visit.visitTime) {
+                    dateToCheck = visit.visitTime;
                 }
                 
+                if (!dateToCheck) return false;
+                
                 // 날짜 추출 (YYYY-MM-DD) - 타임존 안전하게 처리
-                const checkDate = new Date(dateToCheck);
-                const checkYear = checkDate.getFullYear();
-                const checkMonth = String(checkDate.getMonth() + 1).padStart(2, '0');
-                const checkDay = String(checkDate.getDate()).padStart(2, '0');
-                const checkLocalDate = `${checkYear}-${checkMonth}-${checkDay}`;
+                let checkLocalDate;
+                if (typeof dateToCheck === 'string') {
+                    // 이미 YYYY-MM-DD 형식인 경우
+                    checkLocalDate = dateToCheck;
+                } else {
+                    // Date 객체인 경우 로컬 날짜로 변환
+                    const checkDate = new Date(dateToCheck);
+                    const checkYear = checkDate.getFullYear();
+                    const checkMonth = String(checkDate.getMonth() + 1).padStart(2, '0');
+                    const checkDay = String(checkDate.getDate()).padStart(2, '0');
+                    checkLocalDate = `${checkYear}-${checkMonth}-${checkDay}`;
+                }
                 
                 const match = checkLocalDate === selectedDate;
                 
                 if (!match && allVisits.indexOf(visit) < 3) {
                     console.log(`  🔍 Visit ${allVisits.indexOf(visit)}: ${checkLocalDate} vs ${selectedDate} = ${match}`);
-                    console.log(`     visitTime: ${visit.visitTime.toISOString()}, taskDueDate: ${visit.taskDueDate || 'none'}`);
+                    console.log(`     visitTime: ${visit.visitTime ? visit.visitTime.toISOString() : 'none'}, taskDueDate: ${visit.taskDueDate || 'none'}`);
                 }
                 
                 return match;
