@@ -28,7 +28,7 @@ class DatabaseInitializer:
         
     def initialize_database(self):
         """데이터베이스 초기화 실행"""
-        logger.info("🚀 Progress Report System 데이터베이스 초기화 시작")
+        logger.info("🚀 Starting Progress Report System database initialization")
         
         try:
             # 1. 기존 데이터베이스 백업 (있다면)
@@ -46,11 +46,11 @@ class DatabaseInitializer:
             # 5. 데이터베이스 검증
             self.verify_database()
             
-            logger.info("✅ 데이터베이스 초기화 완료!")
+            logger.info("✅ Database initialization completed!")
             return True
             
         except Exception as e:
-            logger.error(f"❌ 데이터베이스 초기화 실패: {e}")
+            logger.error(f"❌ Database initialization failed: {e}")
             return False
     
     def backup_existing_database(self):
@@ -58,18 +58,18 @@ class DatabaseInitializer:
         if os.path.exists(self.db_path):
             backup_path = f"{self.db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             os.rename(self.db_path, backup_path)
-            logger.info(f"📦 기존 데이터베이스를 {backup_path}로 백업했습니다.")
+            logger.info(f"📦 Backed up existing database to {backup_path}.")
     
     def verify_schema_file(self):
         """스키마 파일 존재 확인"""
         if not os.path.exists(self.schema_file):
-            raise FileNotFoundError(f"스키마 파일 {self.schema_file}를 찾을 수 없습니다.")
+            raise FileNotFoundError(f"Schema file not found: {self.schema_file}")
         
-        logger.info(f"📋 스키마 파일 {self.schema_file} 확인 완료")
+        logger.info(f"📋 Schema file verified: {self.schema_file}")
     
     def create_database_schema(self):
         """데이터베이스 스키마 생성"""
-        logger.info("🏗️ 데이터베이스 스키마 생성 중...")
+        logger.info("🏗️ Creating database schema...")
         
         # 스키마 파일 읽기
         with open(self.schema_file, 'r', encoding='utf-8') as f:
@@ -87,15 +87,15 @@ class DatabaseInitializer:
                 if statement.strip():
                     try:
                         cursor.execute(statement)
-                        logger.debug(f"SQL 문 {i+1} 실행 완료")
+                        logger.debug(f"SQL statement {i+1} executed")
                     except sqlite3.Error as e:
                         if "already exists" not in str(e):
-                            logger.error(f"SQL 문 {i+1} 실행 실패: {e}")
-                            logger.error(f"문제가 된 SQL: {statement[:100]}...")
+                            logger.error(f"SQL statement {i+1} failed: {e}")
+                            logger.error(f"Failed SQL statement: {statement[:100]}...")
                             raise
             
             conn.commit()
-            logger.info("✅ 스키마 생성 완료")
+            logger.info("✅ Schema creation completed")
             
         finally:
             conn.close()
@@ -125,7 +125,7 @@ class DatabaseInitializer:
     
     def insert_initial_data(self):
         """초기 데이터 삽입"""
-        logger.info("📝 초기 데이터 삽입 중...")
+        logger.info("📝 Inserting initial data...")
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -164,17 +164,17 @@ class DatabaseInitializer:
                 ''', (data_type, site))
             
             conn.commit()
-            logger.info("✅ 초기 데이터 삽입 완료")
+            logger.info("✅ Initial data insertion completed")
             
         except Exception as e:
-            logger.error(f"초기 데이터 삽입 실패: {e}")
+            logger.error(f"Initial data insertion failed: {e}")
             raise
         finally:
             conn.close()
     
     def verify_database(self):
         """데이터베이스 구조 검증"""
-        logger.info("🔍 데이터베이스 구조 검증 중...")
+        logger.info("🔍 Verifying database structure...")
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -190,23 +190,23 @@ class DatabaseInitializer:
                 'sites', 'sync_status', 'alarm_templates', 'alarm_recipients'
             ]
             
-            logger.info(f"📊 생성된 테이블: {len(tables)}개")
+            logger.info(f"📊 Tables created: {len(tables)}")
             for table in tables:
                 logger.info(f"  ✓ {table}")
             
             # 누락된 테이블 확인
             missing_tables = set(expected_tables) - set(tables)
             if missing_tables:
-                logger.warning(f"⚠️ 누락된 테이블: {missing_tables}")
+                logger.warning(f"⚠️ Missing tables: {missing_tables}")
             
             # 각 테이블의 레코드 수 확인
-            logger.info("📈 테이블별 레코드 수:")
+            logger.info("📈 Record count by table:")
             for table in tables:
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 count = cursor.fetchone()[0]
-                logger.info(f"  {table}: {count}개")
+                logger.info(f"  {table}: {count}")
             
-            logger.info("✅ 데이터베이스 검증 완료")
+            logger.info("✅ Database verification completed")
             
         finally:
             conn.close()
@@ -245,7 +245,7 @@ class DatabaseInitializer:
 def main():
     """메인 실행 함수"""
     print("=" * 60)
-    print("🚀 Progress Report System - 데이터베이스 초기화")
+    print("🚀 Progress Report System - Database initialization")
     print("Week 1 - Day 1: Foundation Setup")
     print("=" * 60)
     
@@ -259,20 +259,20 @@ def main():
         db_info = initializer.get_database_info()
         if db_info:
             print("\n" + "=" * 60)
-            print("📊 데이터베이스 정보")
+            print("📊 Database info")
             print("=" * 60)
-            print(f"SQLite 버전: {db_info['sqlite_version']}")
-            print(f"데이터베이스 크기: {db_info['db_size_mb']} MB")
-            print(f"테이블 수: {db_info['table_count']}개")
-            print(f"파일 경로: {db_info['db_path']}")
+            print(f"SQLite version: {db_info['sqlite_version']}")
+            print(f"Database size: {db_info['db_size_mb']} MB")
+            print(f"Table count: {db_info['table_count']}")
+            print(f"File path: {db_info['db_path']}")
         
-        print("\n✅ 데이터베이스 초기화가 성공적으로 완료되었습니다!")
-        print("다음 단계: Phase 1 마이그레이션을 실행하세요.")
-        print("명령어: python migration_phase1.py")
+        print("\n✅ Database initialization completed successfully!")
+        print("Next step: run Phase 1 migration.")
+        print("Command: python migration_phase1.py")
         
     else:
-        print("\n❌ 데이터베이스 초기화에 실패했습니다.")
-        print("migration.log 파일을 확인하세요.")
+        print("\n❌ Database initialization failed.")
+        print("Check the migration.log file.")
         sys.exit(1)
 
 

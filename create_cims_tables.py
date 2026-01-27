@@ -17,7 +17,7 @@ def create_cims_tables():
     db_path = 'progress_report.db'
     
     if not os.path.exists(db_path):
-        print(f"❌ 데이터베이스 파일을 찾을 수 없습니다: {db_path}")
+        print(f"❌ Database file not found: {db_path}")
         return False
     
     conn = sqlite3.connect(db_path)
@@ -27,12 +27,12 @@ def create_cims_tables():
         # 기존 테이블 확인
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cims%'")
         existing_tables = [row[0] for row in cursor.fetchall()]
-        print(f"기존 CIMS 테이블: {existing_tables if existing_tables else '없음'}")
+        print(f"Existing CIMS tables: {existing_tables if existing_tables else 'none'}")
         
         # cims_database_schema.sql 파일 읽기
         schema_file = 'cims_database_schema.sql'
         if not os.path.exists(schema_file):
-            print(f"❌ 스키마 파일을 찾을 수 없습니다: {schema_file}")
+            print(f"❌ Schema file not found: {schema_file}")
             return False
         
         with open(schema_file, 'r', encoding='utf-8') as f:
@@ -99,48 +99,48 @@ def create_cims_tables():
                         # 테이블이 이미 존재하는지 확인
                         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
                         if cursor.fetchone():
-                            print(f"⏭️  테이블이 이미 존재합니다: {table_name}")
+                            print(f"⏭️  Table already exists: {table_name}")
                             continue
                     
                     cursor.execute(statement)
                     if table_name:
                         created_tables.append(table_name)
-                        print(f"✅ 테이블 생성 완료: {table_name}")
+                        print(f"✅ Table created: {table_name}")
                 
                 # CREATE INDEX 문 처리
                 elif statement_upper.startswith('CREATE INDEX'):
                     try:
                         cursor.execute(statement)
-                        print(f"✅ 인덱스 생성 완료")
+                        print("✅ Index created")
                     except sqlite3.OperationalError as e:
                         if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
-                            print(f"⏭️  인덱스가 이미 존재합니다")
+                            print("⏭️  Index already exists")
                         else:
-                            print(f"⚠️  인덱스 생성 오류: {str(e)[:100]}")
+                            print(f"⚠️  Index creation error: {str(e)[:100]}")
                 
                 # INSERT 문 처리
                 elif statement_upper.startswith('INSERT'):
                     try:
                         cursor.execute(statement)
-                        print(f"✅ 초기 데이터 삽입 완료")
+                        print("✅ Initial data inserted")
                     except sqlite3.IntegrityError as e:
                         if 'UNIQUE constraint' in str(e):
-                            print(f"⏭️  데이터가 이미 존재합니다")
+                            print("⏭️  Data already exists")
                         else:
-                            print(f"⚠️  데이터 삽입 오류: {str(e)[:100]}")
+                            print(f"⚠️  Data insert error: {str(e)[:100]}")
                 
                 # 기타 SQL 문
                 else:
                     try:
                         cursor.execute(statement)
                     except sqlite3.Error as e:
-                        print(f"⚠️  SQL 실행 오류 (무시): {str(e)[:100]}")
+                        print(f"⚠️  SQL execution error (ignored): {str(e)[:100]}")
                         
             except sqlite3.Error as e:
                 if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
-                    print(f"⏭️  이미 존재합니다: {str(e)[:50]}")
+                    print(f"⏭️  Already exists: {str(e)[:50]}")
                 else:
-                    print(f"⚠️  SQL 실행 중 오류: {str(e)[:100]}")
+                    print(f"⚠️  SQL execution error: {str(e)[:100]}")
         
         conn.commit()
         
@@ -149,21 +149,21 @@ def create_cims_tables():
         all_cims_tables = [row[0] for row in cursor.fetchall()]
         
         print("\n" + "=" * 60)
-        print(f"✅ CIMS 테이블 생성 완료!")
-        print(f"생성된 테이블: {len(created_tables)}개")
+        print("✅ CIMS table creation completed!")
+        print(f"Tables created: {len(created_tables)}")
         for table in created_tables:
             print(f"  - {table}")
-        print(f"\n전체 CIMS 테이블: {len(all_cims_tables)}개")
+        print(f"\nTotal CIMS tables: {len(all_cims_tables)}")
         for table in all_cims_tables:
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             count = cursor.fetchone()[0]
-            print(f"  - {table}: {count}개 레코드")
+            print(f"  - {table}: {count} records")
         print("=" * 60)
         
         return True
         
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        print(f"❌ Error occurred: {e}")
         import traceback
         traceback.print_exc()
         conn.rollback()
@@ -172,12 +172,12 @@ def create_cims_tables():
         conn.close()
 
 if __name__ == "__main__":
-    print("🚀 CIMS 테이블 생성 시작...")
+    print("🚀 Starting CIMS table creation...")
     success = create_cims_tables()
     if success:
-        print("\n✅ 완료!")
+        print("\n✅ Done!")
         sys.exit(0)
     else:
-        print("\n❌ 실패!")
+        print("\n❌ Failed!")
         sys.exit(1)
 

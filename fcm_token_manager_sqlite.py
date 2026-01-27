@@ -22,7 +22,7 @@ class FCMTokenManagerSQLite:
             db_path: SQLite 데이터베이스 파일 경로
         """
         self.db_path = db_path
-        logger.info(f"FCM 토큰 매니저 초기화 (SQLite): {db_path}")
+        logger.info(f"Initializing FCM token manager (SQLite): {db_path}")
     
     def register_token(self, user_id: str, token: str, device_info: str = None) -> bool:
         """
@@ -37,12 +37,12 @@ class FCMTokenManagerSQLite:
             등록 성공 여부
         """
         try:
-            logger.info(f"FCM 토큰 등록 시작: user_id={user_id}, device_info={device_info}, token={token[:20]}...")
+            logger.info(f"Starting FCM token registration: user_id={user_id}, device_info={device_info}, token={token[:20]}...")
             
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            logger.info(f"SQLite DB 연결 성공: {self.db_path}")
+            logger.info(f"SQLite DB connection opened: {self.db_path}")
             
             # 중복 토큰 확인
             cursor.execute('''
@@ -51,7 +51,7 @@ class FCMTokenManagerSQLite:
             ''', (user_id, token))
             
             existing = cursor.fetchone()
-            logger.info(f"중복 토큰 확인 결과: {existing is not None}")
+            logger.info(f"Duplicate token check: {existing is not None}")
             
             if existing:
                 # 기존 토큰 업데이트 (활성화 및 마지막 사용 시간 갱신)
@@ -61,7 +61,7 @@ class FCMTokenManagerSQLite:
                     WHERE user_id = ? AND token = ?
                 ''', (device_info, user_id, token))
                 updated_rows = cursor.rowcount
-                logger.info(f"기존 FCM 토큰 업데이트: {user_id}, 업데이트된 행: {updated_rows}")
+                logger.info(f"Updated existing FCM token: {user_id}, rows updated: {updated_rows}")
             else:
                 # 새 토큰 등록
                 cursor.execute('''
@@ -70,27 +70,27 @@ class FCMTokenManagerSQLite:
                     VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
                 ''', (user_id, token, device_info))
                 inserted_id = cursor.lastrowid
-                logger.info(f"새 FCM 토큰 등록: {user_id}, 삽입된 ID: {inserted_id}")
+                logger.info(f"Registered new FCM token: {user_id}, inserted id: {inserted_id}")
             
             conn.commit()
-            logger.info(f"FCM 토큰 등록 완료: {user_id}")
+            logger.info(f"FCM token registration completed: {user_id}")
             
             # 등록 후 확인
             cursor.execute('SELECT COUNT(*) FROM fcm_tokens WHERE user_id = ? AND is_active = 1', (user_id,))
             user_token_count = cursor.fetchone()[0]
-            logger.info(f"사용자 {user_id}의 활성 토큰 개수: {user_token_count}")
+            logger.info(f"Active token count for user {user_id}: {user_token_count}")
             
             return True
             
         except Exception as e:
-            logger.error(f"FCM 토큰 등록 실패 - user_id: {user_id}, error: {e}")
+            logger.error(f"FCM token registration failed - user_id: {user_id}, error: {e}")
             import traceback
-            logger.error(f"FCM 토큰 등록 스택 트레이스: {traceback.format_exc()}")
+            logger.error(f"FCM token registration stack trace: {traceback.format_exc()}")
             return False
         finally:
             if conn:
                 conn.close()
-                logger.info("SQLite DB 연결 종료")
+                logger.info("SQLite DB connection closed")
     
     def unregister_token(self, user_id: str = None, token: str = None) -> bool:
         """
@@ -109,32 +109,32 @@ class FCMTokenManagerSQLite:
             
             if user_id and token:
                 # 사용자 ID와 토큰 모두 제공된 경우
-                logger.info(f"FCM 토큰 완전 삭제 시도: user_id={user_id}, token={token[:20]}...")
+                logger.info(f"Attempting to hard-delete FCM token: user_id={user_id}, token={token[:20]}...")
                 cursor.execute('''
                     DELETE FROM fcm_tokens 
                     WHERE user_id = ? AND token = ?
                 ''', (user_id, token))
             elif token:
                 # 토큰만 제공된 경우 (FCM Admin Dashboard에서 호출)
-                logger.info(f"FCM 토큰 완전 삭제 시도 (토큰만): token={token[:20]}...")
+                logger.info(f"Attempting to hard-delete FCM token (token only): token={token[:20]}...")
                 cursor.execute('''
                     DELETE FROM fcm_tokens 
                     WHERE token = ?
                 ''', (token,))
             else:
-                logger.error("FCM 토큰 제거 실패: user_id 또는 token이 필요합니다")
+                logger.error("Failed to remove FCM token: user_id or token is required")
                 return False
             
             if cursor.rowcount > 0:
                 conn.commit()
-                logger.info(f"FCM 토큰 완전 삭제 성공: {cursor.rowcount}개 토큰")
+                logger.info(f"FCM token hard-delete succeeded: {cursor.rowcount} tokens")
                 return True
             else:
-                logger.warning(f"삭제할 FCM 토큰을 찾을 수 없음: user_id={user_id}, token={token[:20] if token else 'None'}...")
+                logger.warning(f"FCM token to delete not found: user_id={user_id}, token={token[:20] if token else 'None'}...")
                 return False
             
         except Exception as e:
-            logger.error(f"FCM 토큰 제거 실패: {e}")
+            logger.error(f"Failed to remove FCM token: {e}")
             return False
         finally:
             if conn:
@@ -178,7 +178,7 @@ class FCMTokenManagerSQLite:
             return tokens
             
         except Exception as e:
-            logger.error(f"사용자 토큰 조회 실패: {e}")
+            logger.error(f"Failed to fetch user tokens: {e}")
             return []
         finally:
             if conn:
@@ -207,7 +207,7 @@ class FCMTokenManagerSQLite:
             return [row[0] for row in cursor.fetchall()]
             
         except Exception as e:
-            logger.error(f"사용자 토큰 문자열 조회 실패: {e}")
+            logger.error(f"Failed to fetch user token strings: {e}")
             return []
         finally:
             if conn:
@@ -233,7 +233,7 @@ class FCMTokenManagerSQLite:
             return [row[0] for row in cursor.fetchall()]
             
         except Exception as e:
-            logger.error(f"전체 토큰 조회 실패: {e}")
+            logger.error(f"Failed to fetch all tokens: {e}")
             return []
         finally:
             if conn:
@@ -283,14 +283,14 @@ class FCMTokenManagerSQLite:
             
             if cursor.rowcount > 0:
                 conn.commit()
-                logger.info(f"FCM 토큰 정보 업데이트: {token[:20]}...")
+                logger.info(f"Updated FCM token info: {token[:20]}...")
                 return True
             else:
-                logger.warning(f"업데이트할 토큰을 찾을 수 없음: {token[:20]}...")
+                logger.warning(f"Token to update not found: {token[:20]}...")
                 return False
             
         except Exception as e:
-            logger.error(f"FCM 토큰 정보 업데이트 실패: {e}")
+            logger.error(f"Failed to update FCM token info: {e}")
             return False
         finally:
             if conn:
@@ -321,11 +321,11 @@ class FCMTokenManagerSQLite:
             cleanup_count = cursor.rowcount
             conn.commit()
             
-            logger.info(f"비활성 FCM 토큰 정리: {cleanup_count}개")
+            logger.info(f"Inactive FCM tokens cleaned up: {cleanup_count}")
             return cleanup_count
             
         except Exception as e:
-            logger.error(f"FCM 토큰 정리 실패: {e}")
+            logger.error(f"Failed to clean up FCM tokens: {e}")
             return 0
         finally:
             if conn:
@@ -394,7 +394,7 @@ class FCMTokenManagerSQLite:
             }
             
         except Exception as e:
-            logger.error(f"FCM 통계 조회 실패: {e}")
+            logger.error(f"Failed to fetch FCM stats: {e}")
             return {
                 'total_users': 0,
                 'total_tokens': 0,
@@ -430,14 +430,14 @@ class FCMTokenManagerSQLite:
             
             if cursor.rowcount > 0:
                 conn.commit()
-                logger.info(f"FCM 토큰 값 교체: {old_token[:20]}... → {new_token[:20]}...")
+                logger.info(f"Replacing FCM token value: {old_token[:20]}... -> {new_token[:20]}...")
                 return True
             else:
-                logger.warning(f"교체할 토큰을 찾을 수 없음: {old_token[:20]}...")
+                logger.warning(f"Token to replace not found: {old_token[:20]}...")
                 return False
             
         except Exception as e:
-            logger.error(f"FCM 토큰 값 교체 실패: {e}")
+            logger.error(f"Failed to replace FCM token value: {e}")
             return False
         finally:
             if conn:
@@ -453,7 +453,7 @@ class FCMTokenManagerSQLite:
             return cursor.fetchone()[0]
             
         except Exception as e:
-            logger.error(f"사용자 수 조회 실패: {e}")
+            logger.error(f"Failed to fetch user count: {e}")
             return 0
         finally:
             if conn:
@@ -474,7 +474,7 @@ class FCMTokenManagerSQLite:
             return [row[0] for row in cursor.fetchall()]
             
         except Exception as e:
-            logger.error(f"사용자 ID 목록 조회 실패: {e}")
+            logger.error(f"Failed to fetch user ID list: {e}")
             return []
         finally:
             if conn:
@@ -516,7 +516,7 @@ class FCMTokenManagerSQLite:
             return results
             
         except Exception as e:
-            logger.error(f"FCM 토큰 검색 실패: {e}")
+            logger.error(f"FCM token search failed: {e}")
             return []
         finally:
             if conn:

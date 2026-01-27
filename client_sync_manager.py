@@ -19,7 +19,7 @@ import logging
 try:
     from api_client import fetch_client_information
 except ImportError:
-    print("Warning: api_client 모듈을 찾을 수 없습니다. 일부 기능이 제한될 수 있습니다.")
+    print("Warning: api_client module not found. Some features may be limited.")
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class ClientSyncManager:
         
         # 데이터베이스 존재 확인
         if not os.path.exists(self.db_path):
-            raise FileNotFoundError(f"데이터베이스 파일 {self.db_path}를 찾을 수 없습니다.")
+            raise FileNotFoundError(f"Database file not found: {self.db_path}")
     
     def get_db_connection(self):
         """데이터베이스 연결"""
@@ -65,7 +65,7 @@ class ClientSyncManager:
             return last_sync < expiry_time
             
         except Exception as e:
-            logger.error(f"캐시 만료 확인 실패 ({site}): {e}")
+            logger.error(f"Failed to check cache expiry ({site}): {e}")
             return True  # 오류 시 만료된 것으로 간주
     
     def get_cache_age(self, site: str) -> Optional[int]:
@@ -91,7 +91,7 @@ class ClientSyncManager:
             return int(age.total_seconds() / 60)  # 분 단위
             
         except Exception as e:
-            logger.error(f"캐시 나이 확인 실패 ({site}): {e}")
+            logger.error(f"Failed to check cache age ({site}): {e}")
             return None
     
     def refresh_site_clients(self, site: str) -> Dict[str, Any]:
@@ -109,25 +109,25 @@ class ClientSyncManager:
         }
         
         try:
-            logger.info(f"{site} 거주자 데이터 조회 시작")
+            logger.info(f"Starting resident data fetch for {site}")
             
             # DB에서 최신 데이터 가져오기 (캐시 없이 직접 조회)
             api_success, latest_clients = fetch_client_information(site)
             
             if not api_success:
-                result['message'] = f"{site} 거주자 데이터를 가져올 수 없습니다"
+                result['message'] = f"Unable to fetch resident data for {site}"
                 return result
             
             client_count = len(latest_clients) if latest_clients else 0
             result['client_count'] = client_count
             result['success'] = True
-            result['message'] = f"{site} 거주자 데이터 조회 완료: {client_count}명"
+            result['message'] = f"Resident data fetch completed for {site}: {client_count} residents"
             
-            logger.info(f"{site} 거주자 데이터 조회 완료: {client_count}명")
+            logger.info(f"Resident data fetch completed for {site}: {client_count} residents")
             
         except Exception as e:
-            result['message'] = f"{site} 거주자 데이터 조회 실패: {str(e)}"
-            logger.error(f"{site} 거주자 데이터 조회 실패: {e}")
+            result['message'] = f"Resident data fetch failed for {site}: {str(e)}"
+            logger.error(f"Resident data fetch failed for {site}: {e}")
         
         return result
     
@@ -168,7 +168,7 @@ class ClientSyncManager:
                 return clients if isinstance(clients, list) else []
             return []
         except Exception as e:
-            logger.error(f"{site} 거주자 데이터 조회 실패: {e}")
+            logger.error(f"Resident data fetch failed for {site}: {e}")
             return []
     
     def get_sync_status_summary(self) -> Dict[str, Any]:
@@ -206,14 +206,17 @@ class ClientSyncManager:
         """백그라운드 동기화 시작"""
         def daily_sync_job():
             """매일 새벽 3시 동기화 작업"""
-            logger.info("매일 새벽 3시 거주자 데이터 확인 시작")
+            logger.info("Starting daily 3 AM resident data check")
             results = self.refresh_all_sites()
             
             success_count = results['success_count']
             total_sites = results['total_sites']
             total_clients = results['total_clients']
             
-            logger.info(f"매일 자동 확인 완료: {success_count}/{total_sites} 사이트 성공, 총 {total_clients}명")
+            logger.info(
+                f"Daily automatic check completed: {success_count}/{total_sites} sites succeeded, "
+                f"total {total_clients} residents"
+            )
         
         # 스케줄 설정 - 매일 새벽 3시만
         schedule.every().day.at("03:00").do(daily_sync_job)
@@ -227,7 +230,7 @@ class ClientSyncManager:
         sync_thread = threading.Thread(target=run_scheduler, daemon=False)
         sync_thread.start()
         
-        logger.info("백그라운드 동기화 시작됨 (매일 새벽 3시)")
+        logger.info("Background sync started (daily at 3 AM)")
 
 
 # Flask 앱에서 사용할 전역 인스턴스
@@ -249,55 +252,55 @@ def init_client_sync(app=None):
         manager.start_background_sync()
         
         if app:
-            app.logger.info("클라이언트 동기화 매니저 초기화 완료")
+            app.logger.info("Client sync manager initialized")
         
         return True
         
     except Exception as e:
         if app:
-            app.logger.error(f"클라이언트 동기화 매니저 초기화 실패: {e}")
+            app.logger.error(f"Failed to initialize client sync manager: {e}")
         else:
-            logger.error(f"클라이언트 동기화 매니저 초기화 실패: {e}")
+            logger.error(f"Failed to initialize client sync manager: {e}")
         return False
 
 
 # 명령줄에서 직접 실행 시 테스트
 if __name__ == "__main__":
-    print("클라이언트 동기화 매니저 테스트")
+    print("Client Sync Manager test")
     
     try:
         manager = ClientSyncManager()
         
         # 현재 동기화 상태 확인
-        print("\n현재 동기화 상태:")
+        print("\nCurrent sync status:")
         status = manager.get_sync_status_summary()
         for site, info in status.items():
             age = info['cache_age_minutes']
-            age_str = f"{age}분 전" if age is not None else "없음"
-            expired = "만료됨" if info['is_expired'] else "유효함"
-            print(f"  {site}: {info['records']}명, 마지막 동기화 {age_str} ({expired})")
+            age_str = f"{age} min ago" if age is not None else "N/A"
+            expired = "expired" if info['is_expired'] else "valid"
+            print(f"  {site}: {info['records']} residents, last sync {age_str} ({expired})")
         
         # 테스트: 한 사이트 새로고침
-        print(f"\nParafield Gardens 새로고침 테스트...")
+        print("\nParafield Gardens refresh test...")
         result = manager.refresh_site_clients('Parafield Gardens')
         
         if result['success']:
             changes = result['changes']
-            print(f"✅ 성공: 신규 {changes['added']}명, 업데이트 {changes['updated']}명, 제거 {changes['removed']}명")
+            print(f"✅ Success: added {changes['added']}, updated {changes['updated']}, removed {changes['removed']}")
         else:
-            print(f"❌ 실패: {result['message']}")
+            print(f"❌ Failed: {result['message']}")
         
         # 캐시된 클라이언트 조회 테스트
-        print(f"\n캐시된 클라이언트 조회 테스트...")
+        print("\nCached client fetch test...")
         clients = manager.get_clients_with_auto_refresh('Parafield Gardens')
-        print(f"조회된 클라이언트: {len(clients)}명")
+        print(f"Fetched clients: {len(clients)}")
         
         if clients:
-            print("처음 3명:")
+            print("First 3:")
             for i, client in enumerate(clients[:3]):
-                print(f"  {i+1}. {client['client_name']} (방: {client['room_number']})")
+                print(f"  {i+1}. {client['client_name']} (Room: {client['room_number']})")
         
     except Exception as e:
-        print(f"❌ 테스트 실패: {e}")
+        print(f"❌ Test failed: {e}")
         import traceback
         traceback.print_exc()

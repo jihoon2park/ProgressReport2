@@ -24,7 +24,7 @@ def search_resident_in_cache(name):
         
         return results
     except Exception as e:
-        print(f"SQLite 검색 오류: {e}")
+        print(f"SQLite search error: {e}")
         return []
 
 def search_resident_in_manad(name, site=None):

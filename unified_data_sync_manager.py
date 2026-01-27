@@ -19,7 +19,7 @@ try:
     from api_client import get_api_client, fetch_client_information
     from config import SITE_SERVERS
 except ImportError as e:
-    print(f"Warning: 일부 모듈을 찾을 수 없습니다: {e}")
+    print(f"Warning: some modules could not be found: {e}")
     SITE_SERVERS = {}
 
 # 선택적 import (실패해도 계속 진행)
@@ -49,7 +49,7 @@ class UnifiedDataSyncManager:
         
         # 데이터베이스 존재 확인
         if not os.path.exists(self.db_path):
-            raise FileNotFoundError(f"데이터베이스 파일 {self.db_path}를 찾을 수 없습니다.")
+            raise FileNotFoundError(f"Database file not found: {self.db_path}")
     
     def get_db_connection(self):
         """데이터베이스 연결"""
@@ -76,7 +76,7 @@ class UnifiedDataSyncManager:
             conn.commit()
             
         except Exception as e:
-            logger.error(f"동기화 상태 업데이트 실패: {e}")
+            logger.error(f"Failed to update sync status: {e}")
         finally:
             if 'conn' in locals():
                 conn.close()
@@ -89,19 +89,19 @@ class UnifiedDataSyncManager:
         별도의 캐시 업데이트는 불필요합니다.
         동기화 상태만 기록합니다.
         """
-        logger.info("🔄 거주자 데이터 동기화 상태 확인 시작")
+        logger.info("🔄 Starting resident data sync status check")
         results = {'success': 0, 'failed': 0, 'total_clients': 0}
         
         for site in self.sites:
             try:
-                logger.info(f"  📍 {site} 거주자 데이터 확인 중...")
+                logger.info(f"  📍 Checking resident data for {site}...")
                 
                 # DB에서 최신 데이터 가져오기 (캐시 없이 직접 조회)
                 api_success, latest_clients = fetch_client_information(site)
                 
                 if not api_success:
-                    logger.error(f"  ❌ {site} 거주자 데이터를 가져올 수 없습니다")
-                    self.update_sync_status('clients', site, 'failed', 0, '데이터 조회 실패')
+                    logger.error(f"  ❌ Unable to fetch resident data for {site}")
+                    self.update_sync_status('clients', site, 'failed', 0, 'Data fetch failed')
                     results['failed'] += 1
                     continue
                 
@@ -110,23 +110,26 @@ class UnifiedDataSyncManager:
                 results['success'] += 1
                 results['total_clients'] += client_count
                 
-                logger.info(f"  ✅ {site} 완료: {client_count}명")
+                logger.info(f"  ✅ {site} completed: {client_count} residents")
                 
             except Exception as e:
-                logger.error(f"  ❌ {site} 거주자 데이터 확인 실패: {e}")
+                logger.error(f"  ❌ Failed to check resident data for {site}: {e}")
                 self.update_sync_status('clients', site, 'failed', 0, str(e))
                 results['failed'] += 1
         
-        logger.info(f"🔄 거주자 데이터 동기화 상태 확인 완료: {results['success']}/{len(self.sites)} 사이트 성공, 총 {results['total_clients']}명")
+        logger.info(
+            f"🔄 Resident data sync status check completed: "
+            f"{results['success']}/{len(self.sites)} sites succeeded, total {results['total_clients']} residents"
+        )
         return results
     
     def sync_care_areas_data(self) -> Dict[str, Any]:
         """케어 영역 데이터 동기화"""
-        logger.info("🔄 케어 영역 데이터 동기화 시작")
+        logger.info("🔄 Starting care area data sync")
         
         if APICareArea is None:
-            logger.warning("⚠️ APICareArea 모듈을 찾을 수 없습니다. 케어 영역 동기화를 건너뜁니다.")
-            return {'success': False, 'message': 'APICareArea 모듈 없음'}
+            logger.warning("⚠️ APICareArea module not found. Skipping care area sync.")
+            return {'success': False, 'message': 'APICareArea module not found'}
         
         try:
             # API에서 케어 영역 데이터 가져오기 (첫 번째 사이트 사용)
@@ -134,9 +137,9 @@ class UnifiedDataSyncManager:
             care_areas = api_carearea.get_care_area_information()
             
             if not care_areas:
-                logger.error("❌ 케어 영역 API에서 데이터를 가져올 수 없습니다")
-                self.update_sync_status('carearea', None, 'failed', 0, 'API 호출 실패')
-                return {'success': False, 'message': 'API 호출 실패'}
+                logger.error("❌ Unable to fetch care area data from API")
+                self.update_sync_status('carearea', None, 'failed', 0, 'API call failed')
+                return {'success': False, 'message': 'API call failed'}
             
             # SQLite 캐시 업데이트
             conn = self.get_db_connection()
@@ -159,22 +162,22 @@ class UnifiedDataSyncManager:
             conn.close()
             
             self.update_sync_status('carearea', None, 'success', len(care_areas))
-            logger.info(f"✅ 케어 영역 동기화 완료: {len(care_areas)}개")
+            logger.info(f"✅ Care area sync completed: {len(care_areas)} items")
             
             return {'success': True, 'records': len(care_areas)}
             
         except Exception as e:
-            logger.error(f"❌ 케어 영역 동기화 실패: {e}")
+            logger.error(f"❌ Care area sync failed: {e}")
             self.update_sync_status('carearea', None, 'failed', 0, str(e))
             return {'success': False, 'message': str(e)}
     
     def sync_event_types_data(self) -> Dict[str, Any]:
         """이벤트 타입 데이터 동기화"""
-        logger.info("🔄 이벤트 타입 데이터 동기화 시작")
+        logger.info("🔄 Starting event type data sync")
         
         if APIEventType is None:
-            logger.warning("⚠️ APIEventType 모듈을 찾을 수 없습니다. 이벤트 타입 동기화를 건너뜁니다.")
-            return {'success': False, 'message': 'APIEventType 모듈 없음'}
+            logger.warning("⚠️ APIEventType module not found. Skipping event type sync.")
+            return {'success': False, 'message': 'APIEventType module not found'}
         
         try:
             # API에서 이벤트 타입 데이터 가져오기 (첫 번째 사이트 사용)
@@ -182,9 +185,9 @@ class UnifiedDataSyncManager:
             event_types = api_eventtype.get_event_type_information()
             
             if not event_types:
-                logger.error("❌ 이벤트 타입 API에서 데이터를 가져올 수 없습니다")
-                self.update_sync_status('eventtype', None, 'failed', 0, 'API 호출 실패')
-                return {'success': False, 'message': 'API 호출 실패'}
+                logger.error("❌ Unable to fetch event type data from API")
+                self.update_sync_status('eventtype', None, 'failed', 0, 'API call failed')
+                return {'success': False, 'message': 'API call failed'}
             
             # SQLite 캐시 업데이트
             conn = self.get_db_connection()
@@ -208,23 +211,23 @@ class UnifiedDataSyncManager:
             conn.close()
             
             self.update_sync_status('eventtype', None, 'success', len(event_types))
-            logger.info(f"✅ 이벤트 타입 동기화 완료: {len(event_types)}개")
+            logger.info(f"✅ Event type sync completed: {len(event_types)} items")
             
             return {'success': True, 'records': len(event_types)}
             
         except Exception as e:
-            logger.error(f"❌ 이벤트 타입 동기화 실패: {e}")
+            logger.error(f"❌ Event type sync failed: {e}")
             self.update_sync_status('eventtype', None, 'failed', 0, str(e))
             return {'success': False, 'message': str(e)}
     
     def sync_incidents_data(self) -> Dict[str, Any]:
         """인시던트 데이터 동기화 (DB 직접 접속)"""
-        logger.info("🔄 인시던트 데이터 동기화 시작 (DB 직접 접속)")
+        logger.info("🔄 Starting incident data sync (direct DB access)")
         results = {'success': 0, 'failed': 0, 'total_incidents': 0}
         
         if fetch_incidents_with_client_data_from_db is None:
-            logger.warning("⚠️ fetch_incidents_with_client_data_from_db 함수를 찾을 수 없습니다. 인시던트 동기화를 건너뜁니다.")
-            return {'success': False, 'message': 'fetch_incidents_with_client_data_from_db 함수 없음'}
+            logger.warning("⚠️ fetch_incidents_with_client_data_from_db function not found. Skipping incident sync.")
+            return {'success': False, 'message': 'fetch_incidents_with_client_data_from_db function not found'}
         
         # 최근 30일간의 인시던트 데이터 동기화
         end_date = datetime.now()
@@ -232,7 +235,7 @@ class UnifiedDataSyncManager:
         
         for site in self.sites:
             try:
-                logger.info(f"  📍 {site} 인시던트 동기화 중... (DB 직접 접속)")
+                logger.info(f"  📍 Syncing incidents for {site}... (direct DB access)")
                 
                 # DB에서 직접 인시던트 데이터 가져오기
                 incident_data = fetch_incidents_with_client_data_from_db(
@@ -243,8 +246,8 @@ class UnifiedDataSyncManager:
                 )
                 
                 if not incident_data or 'incidents' not in incident_data:
-                    logger.error(f"  ❌ {site} 인시던트 데이터를 가져올 수 없습니다")
-                    self.update_sync_status('incidents', site, 'failed', 0, 'DB 조회 실패')
+                    logger.error(f"  ❌ Unable to fetch incident data for {site}")
+                    self.update_sync_status('incidents', site, 'failed', 0, 'DB query failed')
                     results['failed'] += 1
                     continue
                 
@@ -262,7 +265,7 @@ class UnifiedDataSyncManager:
                         # incident_id가 없으면 건너뛰기
                         incident_id = incident.get('IncidentId') or incident.get('Id') or incident.get('incident_id')
                         if not incident_id:
-                            logger.warning(f"  ⚠️ {site} 인시던트 ID가 없어서 건너뜀: {incident}")
+                            logger.warning(f"  ⚠️ Skipping incident with no ID for {site}: {incident}")
                             continue
                         
                         cursor.execute('''
@@ -296,14 +299,17 @@ class UnifiedDataSyncManager:
                 results['success'] += 1
                 results['total_incidents'] += len(incidents)
                 
-                logger.info(f"  ✅ {site} 완료: {len(incidents)}개 인시던트")
+                logger.info(f"  ✅ {site} completed: {len(incidents)} incidents")
                 
             except Exception as e:
-                logger.error(f"  ❌ {site} 인시던트 동기화 실패: {e}")
+                logger.error(f"  ❌ Incident sync failed for {site}: {e}")
                 self.update_sync_status('incidents', site, 'failed', 0, str(e))
                 results['failed'] += 1
         
-        logger.info(f"🔄 인시던트 데이터 동기화 완료: {results['success']}/{len(self.sites)} 사이트 성공, 총 {results['total_incidents']}개")
+        logger.info(
+            f"🔄 Incident data sync completed: {results['success']}/{len(self.sites)} sites succeeded, "
+            f"total {results['total_incidents']} incidents"
+        )
         return results
     
     # _update_clients_cache 메서드 제거됨
@@ -311,7 +317,7 @@ class UnifiedDataSyncManager:
     
     def run_full_sync(self) -> Dict[str, Any]:
         """전체 데이터 동기화 실행"""
-        logger.info("🌅 매일 새벽 3시 통합 데이터 동기화 시작")
+        logger.info("🌅 Starting unified data sync at 3 AM")
         start_time = datetime.now()
         
         results = {
@@ -362,13 +368,17 @@ class UnifiedDataSyncManager:
             results['end_time'] = end_time.isoformat()
             results['duration_seconds'] = duration
             
-            logger.info(f"🌅 통합 데이터 동기화 완료: {duration:.1f}초")
-            logger.info(f"📊 결과: 성공 {results['summary']['total_success']}개, 실패 {results['summary']['total_failed']}개, 총 {results['summary']['total_records']}개 레코드")
+            logger.info(f"🌅 Unified data sync completed: {duration:.1f}s")
+            logger.info(
+                f"📊 Result: success {results['summary']['total_success']}, "
+                f"failed {results['summary']['total_failed']}, "
+                f"total {results['summary']['total_records']} records"
+            )
             
             return results
             
         except Exception as e:
-            logger.error(f"❌ 통합 데이터 동기화 실패: {e}")
+            logger.error(f"❌ Unified data sync failed: {e}")
             results['error'] = str(e)
             return results
     
@@ -376,14 +386,14 @@ class UnifiedDataSyncManager:
         """매일 새벽 3시 동기화 스케줄러 시작"""
         def daily_sync_job():
             """매일 새벽 3시 동기화 작업"""
-            logger.info("🌅 매일 새벽 3시 통합 데이터 동기화 시작")
+            logger.info("🌅 Starting unified data sync at 3 AM")
             results = self.run_full_sync()
             
             # 결과 로깅
             if 'error' in results:
-                logger.error(f"❌ 동기화 실패: {results['error']}")
+                logger.error(f"❌ Sync failed: {results['error']}")
             else:
-                logger.info(f"✅ 동기화 완료: {results['summary']['total_records']}개 레코드 처리")
+                logger.info(f"✅ Sync completed: processed {results['summary']['total_records']} records")
         
         # 스케줄 설정 - 매일 새벽 3시
         schedule.every().day.at("03:00").do(daily_sync_job)
@@ -397,7 +407,7 @@ class UnifiedDataSyncManager:
         sync_thread = threading.Thread(target=run_scheduler, daemon=False)
         sync_thread.start()
         
-        logger.info("🌅 매일 새벽 3시 통합 데이터 동기화 스케줄러 시작됨")
+        logger.info("🌅 Unified data sync scheduler started (daily at 3 AM)")
 
 
 # Flask 앱에서 사용할 전역 인스턴스
@@ -415,34 +425,34 @@ def init_unified_sync():
     try:
         manager = get_unified_sync_manager()
         manager.start_daily_sync()
-        logger.info("✅ 통합 데이터 동기화 매니저 초기화 완료")
+        logger.info("✅ Unified data sync manager initialized")
         return True
     except Exception as e:
-        logger.error(f"❌ 통합 데이터 동기화 매니저 초기화 실패: {e}")
+        logger.error(f"❌ Failed to initialize unified data sync manager: {e}")
         return False
 
 
 # 명령줄에서 직접 실행 시 테스트
 if __name__ == "__main__":
-    print("🌅 통합 데이터 동기화 매니저 테스트")
+    print("🌅 Unified Data Sync Manager test")
     
     try:
         manager = UnifiedDataSyncManager()
         
         # 수동으로 전체 동기화 실행
-        print("\n🔄 전체 데이터 동기화 실행 중...")
+        print("\n🔄 Running full data sync...")
         results = manager.run_full_sync()
         
-        print(f"\n📊 동기화 결과:")
-        print(f"  - 클라이언트: {results['clients']['success']}/{len(manager.sites)} 사이트 성공")
-        print(f"  - 케어 영역: {'성공' if results['care_areas']['success'] else '실패'}")
-        print(f"  - 이벤트 타입: {'성공' if results['event_types']['success'] else '실패'}")
-        print(f"  - 인시던트: {results['incidents']['success']}/{len(manager.sites)} 사이트 성공")
-        print(f"  - 총 레코드: {results['summary']['total_records']}개")
-        print(f"  - 소요 시간: {results.get('duration_seconds', 0):.1f}초")
+        print(f"\n📊 Sync results:")
+        print(f"  - Clients: {results['clients']['success']}/{len(manager.sites)} sites succeeded")
+        print(f"  - Care areas: {'success' if results['care_areas']['success'] else 'failed'}")
+        print(f"  - Event types: {'success' if results['event_types']['success'] else 'failed'}")
+        print(f"  - Incidents: {results['incidents']['success']}/{len(manager.sites)} sites succeeded")
+        print(f"  - Total records: {results['summary']['total_records']}")
+        print(f"  - Duration: {results.get('duration_seconds', 0):.1f}s")
         
     except Exception as e:
-        print(f"❌ 테스트 실패: {e}")
+        print(f"❌ Test failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -451,8 +461,8 @@ def init_unifiedd_sync():
     try:
         manager = UnifiedDataSyncManager()
         manager.start_background_sync()
-        logger.info("✅ 통합 데이터 동기화 매니저 초기화 완료")
+        logger.info("✅ Unified data sync manager initialized")
         return True
     except Exception as e:
-        logger.error(f"❌ 통합 데이터 동기화 매니저 초기화 실패: {e}")
+        logger.error(f"❌ Failed to initialize unified data sync manager: {e}")
         return False

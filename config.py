@@ -64,7 +64,7 @@ def get_available_sites():
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
-        logger.error(f"사이트 정보 조회 실패: {e}")
+        logger.error(f"Failed to fetch site information: {e}")
         return list(SITE_SERVERS.keys())  # 폴백
 
 # SITE_SERVERS는 하위 호환성을 위해 유지 (DB에서 동적으로 생성)

@@ -14,7 +14,7 @@ def diagnose_data_source():
     db_path = 'progress_report.db'
     
     if not os.path.exists(db_path):
-        print(f"❌ 데이터베이스 파일을 찾을 수 없습니다: {db_path}")
+        print(f"❌ Database file not found: {db_path}")
         return
     
     conn = sqlite3.connect(db_path)
@@ -28,20 +28,20 @@ def diagnose_data_source():
         use_db_direct = result[0].lower() == 'true' if result and result[0] else False
         
         print("=" * 60)
-        print("데이터 소스 진단")
+        print("Data source diagnosis")
         print("=" * 60)
-        print(f"\n📊 USE_DB_DIRECT_ACCESS 설정: {use_db_direct}")
+        print(f"\n📊 USE_DB_DIRECT_ACCESS setting: {use_db_direct}")
         
         if use_db_direct:
-            print("   ⚠️  DB 직접 접속 모드 활성화")
-            print("   → 인시던트 로드: MANAD DB에서 직접 조회 (실시간)")
-            print("   → KPI 계산: CIMS SQLite DB에서 조회 (동기화된 데이터)")
-            print("   → **데이터 소스가 다릅니다!**")
+            print("   ⚠️  Direct DB access mode enabled")
+            print("   → Incident load: query MANAD DB directly (real-time)")
+            print("   → KPI calculation: query CIMS SQLite DB (synced data)")
+            print("   → **Data sources differ!**")
         else:
-            print("   ✅ API 모드")
-            print("   → 인시던트 로드: CIMS SQLite DB에서 조회")
-            print("   → KPI 계산: CIMS SQLite DB에서 조회")
-            print("   → 데이터 소스가 동일합니다")
+            print("   ✅ API mode")
+            print("   → Incident load: query CIMS SQLite DB")
+            print("   → KPI calculation: query CIMS SQLite DB")
+            print("   → Data sources are the same")
         
         # 2. 최근 30일 인시던트 수 (CIMS DB)
         month_ago = (datetime.now() - timedelta(days=30)).isoformat()
@@ -53,7 +53,7 @@ def diagnose_data_source():
             AND incident_date >= ?
         """, [month_ago])
         cims_month_count = cursor.fetchone()[0]
-        print(f"\n📅 CIMS DB 최근 30일 인시던트: {cims_month_count}개")
+        print(f"\n📅 CIMS DB incidents (last 30 days): {cims_month_count}")
         
         # 3. 상태별 분포 (최근 30일)
         cursor.execute("""
@@ -67,9 +67,9 @@ def diagnose_data_source():
             ORDER BY cnt DESC
         """, [month_ago])
         status_dist = cursor.fetchall()
-        print(f"\n📈 최근 30일 상태별 분포:")
+        print("\n📈 Status distribution (last 30 days):")
         for row in status_dist:
-            print(f"   - {row[0]}: {row[1]}개")
+            print(f"   - {row[0]}: {row[1]}")
         
         # 4. 마지막 동기화 시간
         cursor.execute("""
@@ -80,36 +80,36 @@ def diagnose_data_source():
         if last_sync:
             sync_time = datetime.fromisoformat(last_sync[0])
             days_ago = (datetime.now() - sync_time).days
-            print(f"\n🔄 마지막 동기화: {last_sync[0]} ({days_ago}일 전)")
+            print(f"\n🔄 Last sync: {last_sync[0]} ({days_ago} days ago)")
             
             if days_ago > 1:
-                print(f"   ⚠️  동기화가 {days_ago}일 전에 실행되었습니다!")
-                print(f"   → CIMS DB 데이터가 최신이 아닐 수 있습니다")
+                print(f"   ⚠️  Sync ran {days_ago} days ago!")
+                print("   → CIMS DB data may not be up to date")
         else:
-            print(f"\n⚠️  동기화 기록이 없습니다")
+            print("\n⚠️  No sync record found")
         
         # 5. 문제 진단
         print(f"\n{'='*60}")
-        print("문제 진단")
+        print("Issue diagnosis")
         print(f"{'='*60}")
         
         if use_db_direct:
-            print("\n❌ 문제 발견:")
-            print("   1. 인시던트 로드: MANAD DB에서 직접 조회 (실시간)")
-            print("   2. KPI 계산: CIMS SQLite DB에서 조회 (동기화된 데이터)")
-            print("   3. 두 데이터 소스가 다르므로 숫자가 일치하지 않을 수 있습니다")
-            print("\n💡 해결 방법:")
-            print("   - 인시던트 로드도 CIMS SQLite DB를 사용하도록 수정")
-            print("   - 또는 KPI도 MANAD DB를 사용하도록 수정")
-            print("   - 두 API가 동일한 데이터 소스를 사용해야 합니다")
+            print("\n❌ Issue found:")
+            print("   1. Incident load: query MANAD DB directly (real-time)")
+            print("   2. KPI calculation: query CIMS SQLite DB (synced data)")
+            print("   3. Because data sources differ, numbers may not match")
+            print("\n💡 Fix options:")
+            print("   - Update incident loading to use the CIMS SQLite DB as well")
+            print("   - Or update KPI calculations to use the MANAD DB as well")
+            print("   - Both APIs should use the same data source")
         
         if last_sync and (datetime.now() - datetime.fromisoformat(last_sync[0])).days > 1:
-            print("\n❌ 추가 문제:")
-            print("   - CIMS DB 동기화가 오래 전에 실행되었습니다")
-            print("   - Force Sync를 실행하여 최신 데이터로 업데이트하세요")
+            print("\n❌ Additional issue:")
+            print("   - CIMS DB sync ran a long time ago")
+            print("   - Run Force Sync to update to the latest data")
         
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        print(f"❌ Error occurred: {e}")
     finally:
         conn.close()
 

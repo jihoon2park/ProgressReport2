@@ -17,7 +17,7 @@ def create_cims_tables():
     db_path = 'progress_report.db'
     
     if not os.path.exists(db_path):
-        print(f"❌ 데이터베이스 파일을 찾을 수 없습니다: {db_path}")
+        print(f"❌ Database file not found: {db_path}")
         return False
     
     conn = sqlite3.connect(db_path)
@@ -27,7 +27,7 @@ def create_cims_tables():
         # 기존 테이블 확인
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cims%'")
         existing_tables = [row[0] for row in cursor.fetchall()]
-        print(f"기존 CIMS 테이블: {existing_tables if existing_tables else '없음'}")
+        print(f"Existing CIMS tables: {existing_tables if existing_tables else 'none'}")
         
         created_tables = []
         
@@ -51,9 +51,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_policies')
-            print("✅ cims_policies 테이블 생성 완료")
+            print("✅ cims_policies table created")
         else:
-            print("⏭️  cims_policies 테이블이 이미 존재합니다")
+            print("⏭️  cims_policies table already exists")
         
         # 2. cims_incidents 테이블
         if 'cims_incidents' not in existing_tables:
@@ -83,9 +83,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_incidents')
-            print("✅ cims_incidents 테이블 생성 완료")
+            print("✅ cims_incidents table created")
         else:
-            print("⏭️  cims_incidents 테이블이 이미 존재합니다")
+            print("⏭️  cims_incidents table already exists")
         
         # 3. cims_tasks 테이블
         if 'cims_tasks' not in existing_tables:
@@ -115,9 +115,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_tasks')
-            print("✅ cims_tasks 테이블 생성 완료")
+            print("✅ cims_tasks table created")
         else:
-            print("⏭️  cims_tasks 테이블이 이미 존재합니다")
+            print("⏭️  cims_tasks table already exists")
         
         # 4. cims_progress_notes 테이블
         if 'cims_progress_notes' not in existing_tables:
@@ -141,9 +141,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_progress_notes')
-            print("✅ cims_progress_notes 테이블 생성 완료")
+            print("✅ cims_progress_notes table created")
         else:
-            print("⏭️  cims_progress_notes 테이블이 이미 존재합니다")
+            print("⏭️  cims_progress_notes table already exists")
         
         # 5. cims_audit_logs 테이블
         if 'cims_audit_logs' not in existing_tables:
@@ -163,9 +163,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_audit_logs')
-            print("✅ cims_audit_logs 테이블 생성 완료")
+            print("✅ cims_audit_logs table created")
         else:
-            print("⏭️  cims_audit_logs 테이블이 이미 존재합니다")
+            print("⏭️  cims_audit_logs table already exists")
         
         # 6. cims_task_assignments 테이블
         if 'cims_task_assignments' not in existing_tables:
@@ -184,9 +184,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_task_assignments')
-            print("✅ cims_task_assignments 테이블 생성 완료")
+            print("✅ cims_task_assignments table created")
         else:
-            print("⏭️  cims_task_assignments 테이블이 이미 존재합니다")
+            print("⏭️  cims_task_assignments table already exists")
         
         # 7. cims_notifications 테이블
         if 'cims_notifications' not in existing_tables:
@@ -211,9 +211,9 @@ def create_cims_tables():
                 )
             """)
             created_tables.append('cims_notifications')
-            print("✅ cims_notifications 테이블 생성 완료")
+            print("✅ cims_notifications table created")
         else:
-            print("⏭️  cims_notifications 테이블이 이미 존재합니다")
+            print("⏭️  cims_notifications table already exists")
         
         # 인덱스 생성
         indexes = [
@@ -232,10 +232,10 @@ def create_cims_tables():
         for idx_name, table_name, column_name in indexes:
             try:
                 cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table_name}({column_name})")
-                print(f"✅ 인덱스 생성 완료: {idx_name}")
+                print(f"✅ Index created: {idx_name}")
             except sqlite3.OperationalError as e:
                 if 'already exists' not in str(e).lower():
-                    print(f"⚠️  인덱스 생성 오류 ({idx_name}): {str(e)[:100]}")
+                    print(f"⚠️  Index creation error ({idx_name}): {str(e)[:100]}")
         
         conn.commit()
         
@@ -244,21 +244,21 @@ def create_cims_tables():
         all_cims_tables = [row[0] for row in cursor.fetchall()]
         
         print("\n" + "=" * 60)
-        print(f"✅ CIMS 테이블 생성 완료!")
-        print(f"생성된 테이블: {len(created_tables)}개")
+        print("✅ CIMS table creation completed!")
+        print(f"Tables created: {len(created_tables)}")
         for table in created_tables:
             print(f"  - {table}")
-        print(f"\n전체 CIMS 테이블: {len(all_cims_tables)}개")
+        print(f"\nTotal CIMS tables: {len(all_cims_tables)}")
         for table in all_cims_tables:
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             count = cursor.fetchone()[0]
-            print(f"  - {table}: {count}개 레코드")
+            print(f"  - {table}: {count} records")
         print("=" * 60)
         
         return True
         
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        print(f"❌ Error occurred: {e}")
         import traceback
         traceback.print_exc()
         conn.rollback()
@@ -267,12 +267,12 @@ def create_cims_tables():
         conn.close()
 
 if __name__ == "__main__":
-    print("🚀 CIMS 테이블 생성 시작...")
+    print("🚀 Starting CIMS table creation...")
     success = create_cims_tables()
     if success:
-        print("\n✅ 완료!")
+        print("\n✅ Done!")
         sys.exit(0)
     else:
-        print("\n❌ 실패!")
+        print("\n❌ Failed!")
         sys.exit(1)
 

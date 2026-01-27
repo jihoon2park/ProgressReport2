@@ -58,13 +58,13 @@ def get_safe_site_servers():
     try:
         # config에서 SITE_SERVERS 가져오기
         if SITE_SERVERS and len(SITE_SERVERS) > 0:
-            logger.info(f"SITE_SERVERS 로드 성공: {list(SITE_SERVERS.keys())}")
+            logger.info(f"SITE_SERVERS loaded successfully: {list(SITE_SERVERS.keys())}")
             return SITE_SERVERS
         else:
-            logger.warning("SITE_SERVERS가 비어있음, 폴백 사용")
+            logger.warning("SITE_SERVERS is empty, using fallback")
             return get_fallback_site_servers()
     except Exception as e:
-        logger.error(f"SITE_SERVERS 로드 실패: {e}, 폴백 사용")
+        logger.error(f"Failed to load SITE_SERVERS: {e}, using fallback")
         return get_fallback_site_servers()
 
 # IIS 환경 감지 및 설정
@@ -164,10 +164,10 @@ def setup_production_logging():
         root_logger.addHandler(error_handler)
         root_logger.addHandler(access_handler)
         
-        logger.info("운영 서버용 로깅 설정 완료")
+        logger.info("Production logging configured")
         
     except Exception as e:
-        logger.error(f"로깅 설정 중 오류: {str(e)}")
+        logger.error(f"Error while configuring logging: {str(e)}")
 
 # 운영 서버용 로깅 설정 적용
 setup_production_logging()
@@ -191,9 +191,9 @@ def set_session_permanent(user_role):
     try:
         # 모든 사용자에게 동일하게 적용
         session.permanent = True
-        logger.info(f"사용자 세션 설정: {user_role}")
+        logger.info(f"User session configured: {user_role}")
     except Exception as e:
-        logger.error(f"세션 설정 중 오류: {e}")
+        logger.error(f"Error while configuring session: {e}")
         # 오류 발생 시 기본값으로 설정
         session.permanent = False
 
@@ -211,28 +211,28 @@ def user_loader(user_id):
 
 @login_manager.unauthorized_handler
 def unauthorized_callback():
-    logger.warning(f"인증되지 않은 접근 시도: {request.method} {request.path}")
-    logger.warning(f"요청 IP: {request.remote_addr}")
+    logger.warning(f"Unauthenticated access attempt: {request.method} {request.path}")
+    logger.warning(f"Request IP: {request.remote_addr}")
     logger.warning(f"User-Agent: {request.headers.get('User-Agent', 'Unknown')}")
     
     if request.path.startswith('/api/'):
-        logger.error(f"API 인증 실패: {request.path}")
+        logger.error(f"API authentication failed: {request.path}")
         return jsonify({'success': False, 'message': 'Authentication required', 'is_expired': True}), 401
     
-    logger.info(f"웹 페이지 인증 실패, 홈으로 리다이렉트: {request.path}")
+    logger.info(f"Web page authentication failed, redirecting to home: {request.path}")
     return redirect(url_for('home'))
 
 # 설정 검증 로그
 if flask_config['ENVIRONMENT'] == 'production' and flask_config['DEBUG']:
-    logger.warning("⚠️  운영환경에서 DEBUG 모드가 활성화되어 있습니다!")
+    logger.warning("⚠️  DEBUG mode is enabled in production!")
 
 if flask_config['SECRET_KEY'] == 'fallback-secret-key':
-    logger.warning("⚠️  기본 SECRET_KEY를 사용하고 있습니다. 보안상 위험합니다!")
+    logger.warning("⚠️  Using fallback SECRET_KEY. This is insecure!")
 
 # 데이터 디렉토리 확인 및 생성
 if not os.path.exists('data'):
     os.makedirs('data')
-    logger.info("data 디렉토리 생성됨")
+    logger.info("`data` directory created")
 
 # Note: Policy Scheduler와 Unified Data Sync Manager는 JSON 기반 시스템용이므로
 # CIMS (DB 기반) 시스템에서는 사용하지 않습니다.
@@ -246,8 +246,11 @@ if not os.path.exists('data'):
 try:
     from migrate_cims_schema import run_migration
     db_path = flask_config.get('DATABASE_PATH', 'progress_report.db')
-    run_migration(db_path)
-    logger.info("✅ Database schema migration completed")
+    migration_ok = run_migration(db_path)
+    if migration_ok:
+        logger.info("✅ Database schema migration completed")
+    else:
+        logger.warning("⚠️ Database schema migration did not complete successfully (app will continue)")
 except Exception as e:
     logger.warning(f"⚠️ Database schema migration failed: {e}")
     # 마이그레이션 실패해도 앱은 계속 실행
@@ -276,7 +279,7 @@ def require_authentication(wrapped_function):
 def process_client_information(client_info):
     """클라이언트 정보를 가공하여 필요한 정보만 추출"""
     if not client_info:
-        logger.warning("처리할 클라이언트 정보가 없습니다.")
+        logger.warning("No client info to process.")
         return []
         
     processed_clients = []
@@ -301,7 +304,7 @@ def process_client_information(client_info):
         
         return processed_clients
     except Exception as e:
-        logger.error(f"클라이언트 정보 처리 중 오류 발생: {str(e)}")
+        logger.error(f"Error processing client info: {str(e)}")
         return []
 
 # fetch_client_information 함수는 api_client.py에서 통합 관리
@@ -309,14 +312,14 @@ def process_client_information(client_info):
 
 def fetch_care_area_information(site):
     """Care Area 정보를 가져오고 처리 (비활성화 - DB 사용)"""
-    logger.info(f"Care Area 정보 조회 건너뜀 - DB에서 조회됨 (사이트: {site})")
+    logger.info(f"Skipping Care Area fetch - retrieved from DB (site: {site})")
     return True, None  # DB에서 조회하므로 API 호출 불필요
 
 def fetch_event_type_information(site):
     """Event Type 정보를 가져오고 처리 (ROD 대시보드용 활성화)"""
     try:
         from api_eventtype import APIEventType
-        logger.info(f"Event Type 정보 조회 시작 - 사이트: {site}")
+        logger.info(f"Starting Event Type fetch - site: {site}")
         
         api_eventtype = APIEventType(site)
         event_type_data = api_eventtype.get_event_type_information()
@@ -324,20 +327,20 @@ def fetch_event_type_information(site):
         if event_type_data:
             # Event Type 데이터가 리스트 형태로 직접 반환됨
             if isinstance(event_type_data, list):
-                logger.info(f"Event Type 정보 조회 성공 - 사이트: {site}, {len(event_type_data)}개")
+                logger.info(f"Event Type fetch succeeded - site: {site}, {len(event_type_data)} items")
                 return True, event_type_data
             elif isinstance(event_type_data, dict) and 'data' in event_type_data:
-                logger.info(f"Event Type 정보 조회 성공 - 사이트: {site}, {len(event_type_data['data'])}개")
+                logger.info(f"Event Type fetch succeeded - site: {site}, {len(event_type_data['data'])} items")
                 return True, event_type_data['data']
             else:
-                logger.warning(f"Event Type 데이터 구조 예상과 다름 - 사이트: {site}, 타입: {type(event_type_data)}")
+                logger.warning(f"Unexpected Event Type data structure - site: {site}, type: {type(event_type_data)}")
                 return False, None
         else:
-            logger.warning(f"Event Type 정보 조회 실패 - 사이트: {site}")
+            logger.warning(f"Event Type fetch failed - site: {site}")
             return False, None
             
     except Exception as e:
-        logger.error(f"Event Type 정보 조회 중 오류 - 사이트: {site}, 오류: {e}")
+        logger.error(f"Error fetching Event Type - site: {site}, error: {e}")
         return False, None
 
 def save_json_file(filepath, data):
@@ -345,21 +348,21 @@ def save_json_file(filepath, data):
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        logger.info(f"파일 저장 성공: {filepath}")
+        logger.info(f"File saved successfully: {filepath}")
         return True
     except Exception as e:
-        logger.error(f"JSON 파일 저장 중 오류 발생: {str(e)}")
+        logger.error(f"Error saving JSON file: {str(e)}")
         return False
 
 def save_client_data(username, site, client_info):
     """클라이언트 데이터를 JSON 파일로 저장 (비활성화 - DB 사용)"""
-    logger.info(f"클라이언트 데이터 저장 건너뜀 - DB에 저장됨 (사이트: {site})")
+    logger.info(f"Skipping client data save - stored in DB (site: {site})")
     return None  # DB에 저장되므로 JSON 파일 생성 불필요
 
 def create_progress_note_json(form_data):
     """사용자 입력 데이터를 Progress Note JSON 형식으로 변환 (값이 있는 필드만 포함)"""
     try:
-        logger.info(f"Progress Note JSON 생성 시작 - 입력 데이터: {form_data}")
+        logger.info(f"Starting Progress Note JSON generation - input data: {form_data}")
         
         # 필수 필드들
         progress_note = {}
@@ -386,34 +389,36 @@ def create_progress_note_json(form_data):
                         progress_note["ClientId"] = selected_client.get('ClientRecordId', selected_client_id)  # 클라이언트 레코드 ID
                         progress_note["ClientServiceId"] = selected_client.get('MainClientServiceId', selected_client_id)  # MainClientServiceId
                         
-                        logger.info(f"ClientId 설정: {progress_note['ClientId']} (클라이언트 레코드 ID)")
-                        logger.info(f"ClientServiceId 설정: {progress_note['ClientServiceId']} (MainClientServiceId)")
+                        logger.info(f"ClientId set: {progress_note['ClientId']} (client record ID)")
+                        logger.info(f"ClientServiceId set: {progress_note['ClientServiceId']} (MainClientServiceId)")
                     else:
-                        logger.error(f"선택된 클라이언트를 찾을 수 없습니다: {selected_client_id}")
+                        logger.error(f"Selected client not found: {selected_client_id}")
                         return None
                         
                 except Exception as e:
-                    logger.error(f"Client_list.json 읽기 실패: {e}")
+                    logger.error(f"Failed to read Client_list.json: {e}")
                     # 기본값으로 설정 - 클라이언트 레코드 ID를 알 수 없으므로 MainClientServiceId 사용
                     progress_note["ClientId"] = selected_client_id  # MainClientServiceId를 ClientId로 사용 (fallback)
                     progress_note["ClientServiceId"] = selected_client_id  # MainClientServiceId
-                    logger.warning("기본값으로 설정 - 정확한 클라이언트 레코드 ID를 찾을 수 없어 MainClientServiceId 사용")
+                    logger.warning(
+                        "Using fallback - unable to find exact client record ID, using MainClientServiceId"
+                    )
                     
             except (ValueError, TypeError) as e:
-                logger.error(f"ClientId 변환 실패: {form_data.get('clientId')}, 오류: {e}")
+                logger.error(f"Failed to convert ClientId: {form_data.get('clientId')}, error: {e}")
                 return None
         else:
-            logger.error("ClientId가 없습니다 - 필수 필드")
+            logger.error("ClientId is missing - required field")
             return None
             
         # EventDate (필수)
         if form_data.get('eventDate'):
             progress_note["EventDate"] = form_data.get('eventDate')
-            logger.info(f"EventDate 설정: {progress_note['EventDate']}")
+            logger.info(f"EventDate set: {progress_note['EventDate']}")
         else:
             # EventDate가 없으면 현재 시간 사용
             progress_note["EventDate"] = get_australian_time().isoformat()
-            logger.info(f"EventDate 기본값 설정: {progress_note['EventDate']}")
+            logger.info(f"EventDate default set: {progress_note['EventDate']}")
             
         # ProgressNoteEventType (필수)
         if form_data.get('eventType'):
@@ -422,23 +427,23 @@ def create_progress_note_json(form_data):
                 progress_note["ProgressNoteEventType"] = {
                     "Id": event_type_id
                 }
-                logger.info(f"ProgressNoteEventType 설정: {event_type_id}")
+                logger.info(f"ProgressNoteEventType set: {event_type_id}")
             except (ValueError, TypeError) as e:
-                logger.error(f"EventType 변환 실패: {form_data.get('eventType')}, 오류: {e}")
+                logger.error(f"Failed to convert EventType: {form_data.get('eventType')}, error: {e}")
                 return None
         else:
-            logger.error("EventType이 없습니다 - 필수 필드")
+            logger.error("EventType is missing - required field")
             return None
             
         # NotesPlainText (필수)
         notes_text = form_data.get('notes', '').strip()
         if notes_text:
             progress_note["NotesPlainText"] = notes_text
-            logger.info(f"NotesPlainText 설정: {len(notes_text)}")
+            logger.info(f"NotesPlainText set: {len(notes_text)}")
         else:
             # 빈 노트라도 빈 문자열로 설정
             progress_note["NotesPlainText"] = ""
-            logger.info("NotesPlainText 빈 문자열로 설정")
+            logger.info("NotesPlainText set to empty string")
             
         # 선택적 필드들 (값이 있을 때만 추가)
         
@@ -450,13 +455,13 @@ def create_progress_note_json(form_data):
         
         # 세션에 정보가 없으면 사용자 DB에서 다시 가져오기 - 이부분 나중에 다시 확인해야 함...... Jay 2025-06-05
         if username and (not first_name or not last_name or not position):
-            logger.warning(f"세션에 사용자 정보 누락 - 사용자 DB에서 다시 조회: {username}")
+            logger.warning(f"Missing user info in session - refetching from user DB: {username}")
             user_data = get_user(username)
             if user_data:
                 first_name = user_data.get('first_name', first_name)
                 last_name = user_data.get('last_name', last_name)
                 position = user_data.get('position', position)
-                logger.info(f"사용자 DB에서 정보 복구 완료: {first_name} {last_name} - {position}")
+                logger.info(f"Recovered user info from DB: {first_name} {last_name} - {position}")
         
         if username:
             progress_note["CreatedByUser"] = {
@@ -465,15 +470,15 @@ def create_progress_note_json(form_data):
                 "UserName": username,
                 "Position": position
             }
-            logger.info(f"CreatedByUser 설정: {first_name} {last_name} ({username}) - {position}")
+            logger.info(f"CreatedByUser set: {first_name} {last_name} ({username}) - {position}")
             
             # 디버깅용 - 각 필드 상태 확인
-            logger.debug(f"CreatedByUser 필드 상태: FirstName='{first_name}', LastName='{last_name}', UserName='{username}', Position='{position}'")
+            logger.debug(f"CreatedByUser field state: FirstName='{first_name}', LastName='{last_name}', UserName='{username}', Position='{position}'")
             
         # CreatedDate (선택적)
         if form_data.get('createDate'):
             progress_note["CreatedDate"] = form_data.get('createDate')
-            logger.info(f"CreatedDate 설정: {progress_note['CreatedDate']}")
+            logger.info(f"CreatedDate set: {progress_note['CreatedDate']}")
             
         # CareAreas (선택한 경우만)
         if form_data.get('careArea'):
@@ -482,9 +487,9 @@ def create_progress_note_json(form_data):
                 progress_note["CareAreas"] = [{
                     "Id": care_area_id
                 }]
-                logger.info(f"CareAreas 설정: {care_area_id}")
+                logger.info(f"CareAreas set: {care_area_id}")
             except (ValueError, TypeError) as e:
-                logger.error(f"CareArea 변환 실패: {form_data.get('careArea')}, 오류: {e}")
+                logger.error(f"Failed to convert CareArea: {form_data.get('careArea')}, error: {e}")
                 
         # ProgressNoteRiskRating (선택한 경우만)
         if form_data.get('riskRating'):
@@ -508,29 +513,29 @@ def create_progress_note_json(form_data):
                 progress_note["ProgressNoteRiskRating"] = {
                     "Id": risk_rating_id
                 }
-                logger.info(f"ProgressNoteRiskRating 설정: {risk_rating_id}")
+                logger.info(f"ProgressNoteRiskRating set: {risk_rating_id}")
                 
         # Boolean 필드들 (true인 경우만 추가)
         if form_data.get('lateEntry'):
             progress_note["IsLateEntry"] = True
-            logger.info("IsLateEntry 설정: True")
+            logger.info("IsLateEntry set: True")
             
         if form_data.get('flagOnNoticeboard'):
             progress_note["IsNoticeFlag"] = True
-            logger.info("IsNoticeFlag 설정: True")
+            logger.info("IsNoticeFlag set: True")
             
         if form_data.get('archived'):
             progress_note["IsArchived"] = True
-            logger.info("IsArchived 설정: True")
+            logger.info("IsArchived set: True")
             
         # ClientServiceId는 API에서 필요한 경우에만 추가
         # progress_note["ClientServiceId"] = 26  # 임시 제거
         
-        logger.info(f"Progress Note JSON 생성 완료: {progress_note}")
+        logger.info(f"Progress Note JSON generated: {progress_note}")
         return progress_note
         
     except Exception as e:
-        logger.error(f"Progress Note JSON 생성 중 예외 발생: {str(e)}", exc_info=True)
+        logger.error(f"Exception during Progress Note JSON generation: {str(e)}", exc_info=True)
         return None
 
 def save_prepare_send_json(progress_note_data):
@@ -554,7 +559,7 @@ def save_prepare_send_json(progress_note_data):
             if len(existing_backups) < MAX_BACKUP_COUNT:
                 # 아직 최대 개수에 도달하지 않았으면 다음 번호 사용
                 backup_number = len(existing_backups) + 1
-                logger.info(f"새 백업 파일 생성: backup{backup_number}.json")
+                logger.info(f"Creating new backup file: backup{backup_number}.json")
             else:
                 # 최대 개수에 도달했으면 가장 오래된 파일 찾아서 덮어쓰기
                 oldest_backup = 1
@@ -569,7 +574,7 @@ def save_prepare_send_json(progress_note_data):
                             oldest_backup = i
                 
                 backup_number = oldest_backup
-                logger.info(f"최대 백업 개수 도달 - 가장 오래된 파일 덮어쓰기: backup{backup_number}.json")
+                logger.info(f"Max backup count reached - overwriting oldest backup: backup{backup_number}.json")
             
             backup_filepath = f'data/prepare_send_backup{backup_number}.json'
             
@@ -577,21 +582,23 @@ def save_prepare_send_json(progress_note_data):
             try:
                 import shutil
                 shutil.move(filepath, backup_filepath)
-                logger.info(f"기존 파일을 백업으로 이동: {filepath} -> {backup_filepath}")
-                logger.info(f"현재 백업 파일 개수: {min(len(existing_backups) + 1, MAX_BACKUP_COUNT)}/{MAX_BACKUP_COUNT}")
+                logger.info(f"Moved existing file to backup: {filepath} -> {backup_filepath}")
+                logger.info(
+                    f"Current backup count: {min(len(existing_backups) + 1, MAX_BACKUP_COUNT)}/{MAX_BACKUP_COUNT}"
+                )
             except Exception as e:
-                logger.error(f"백업 파일 생성 실패: {str(e)}")
+                logger.error(f"Failed to create backup: {str(e)}")
                 # 백업 실패해도 새 파일은 저장 계속 진행
         
         # 새 파일로 저장
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(progress_note_data, f, ensure_ascii=False, indent=4)
         
-        logger.info(f"Progress Note 데이터가 새 파일로 저장됨: {filepath}")
-        logger.info(f"저장된 데이터: {progress_note_data}")
+        logger.info(f"Progress Note data saved to new file: {filepath}")
+        logger.info(f"Saved data: {progress_note_data}")
         return True
     except Exception as e:
-        logger.error(f"prepare_send.json 저장 중 오류: {str(e)}")
+        logger.error(f"Error saving prepare_send.json: {str(e)}")
         return False
 
 # ==============================
@@ -605,7 +612,7 @@ def check_api_server_health(server_ip):
         response = requests.get(url, timeout=5)
         return response.status_code == 200 and response.text.strip() == 'true'
     except Exception as e:
-        logger.error(f"API 서버 상태 체크 실패 - {server_ip}: {str(e)}")
+        logger.error(f"API server health check failed - {server_ip}: {str(e)}")
         return False
 
 @app.route('/api/server-status')
@@ -619,15 +626,15 @@ def get_server_status():
         for site, server_ip in safe_site_servers.items():
             try:
                 status[site] = check_api_server_health(server_ip)
-                logger.debug(f"서버 상태 체크 완료 - {site}: {status[site]}")
+                logger.debug(f"Server health check completed - {site}: {status[site]}")
             except Exception as e:
-                logger.error(f"서버 상태 체크 실패 - {site}: {e}")
+                logger.error(f"Server health check failed - {site}: {e}")
                 status[site] = False
         
-        logger.info(f"서버 상태 API 응답: {status}")
+        logger.info(f"Server status API response: {status}")
         return jsonify(status)
     except Exception as e:
-        logger.error(f"서버 상태 API 오류: {e}")
+        logger.error(f"Server status API error: {e}")
         # 오류 시 빈 상태 반환
         return jsonify({})
 
@@ -660,7 +667,7 @@ def debug_site_servers_api():
             debug_info['use_db_api_keys'] = getattr(config, 'USE_DB_API_KEYS', 'Not defined')
             debug_info['site_servers'] = getattr(config, 'SITE_SERVERS', {})
         except Exception as e:
-            debug_info['errors'].append(f"Config 로드 실패: {str(e)}")
+            debug_info['errors'].append(f"Failed to load config: {str(e)}")
         
         # 안전한 사이트 서버 정보 확인
         try:
@@ -668,7 +675,7 @@ def debug_site_servers_api():
             debug_info['safe_site_servers'] = safe_servers
             debug_info['fallback_used'] = safe_servers == get_fallback_site_servers()
         except Exception as e:
-            debug_info['errors'].append(f"안전한 사이트 서버 로드 실패: {str(e)}")
+            debug_info['errors'].append(f"Failed to load safe site servers: {str(e)}")
             debug_info['safe_site_servers'] = get_fallback_site_servers()
             debug_info['fallback_used'] = True
         
@@ -992,15 +999,15 @@ def login():
                 if cache_policy['cleanup_data_on_login']:
                     cleanup_success = cleanup_data_folder()
                     if cleanup_success:
-                        logger.info("Data 폴더 정리 성공 - 기존 파일들 삭제됨")
+                        logger.info("Data folder cleanup succeeded - old files deleted")
                     else:
-                        logger.warning("Data 폴더 정리 실패")
+                        logger.warning("Data folder cleanup failed")
                 else:
-                    logger.info("캐시 정책에 따라 Data 폴더 정리 건너뜀")
+                    logger.info("Skipping data folder cleanup due to cache policy")
 
                 # 2. DB에서 데이터 조회 (JSON 파일 생성 제거)
                 # 매일 새벽 3시에 DB 업데이트되므로 로그인 시 API 호출 불필요
-                logger.info(f"로그인 시 사이트별 데이터 자동 수집 - 사이트: {site}")
+                logger.info(f"Auto-collecting site data on login - site: {site}")
                 
                 # 3. 사이트별 데이터 자동 수집
                 try:
@@ -1008,9 +1015,9 @@ def login():
                     from api_client import fetch_client_information
                     client_success, client_info = fetch_client_information(site)
                     if client_success:
-                        logger.info(f"클라이언트 데이터 수집 성공 - {site}: {len(client_info)}명")
+                        logger.info(f"Client data collection succeeded - {site}: {len(client_info)} residents")
                     else:
-                        logger.warning(f"클라이언트 데이터 수집 실패 - {site}")
+                        logger.warning(f"Client data collection failed - {site}")
                     
                     # 3-2. Progress Notes 데이터 수집 (DB 직접 접속 모드에서는 캐시 불필요)
                     # DB 직접 접속 모드 확인
@@ -1034,18 +1041,18 @@ def login():
                     
                     if use_db_direct:
                         # DB 직접 접속 모드: 캐시 불필요 - 필요할 때마다 직접 조회
-                        logger.info(f"🔌 DB 직접 접속 모드: Progress Notes는 실시간 조회됨 (캐시 불필요) - {site}")
+                        logger.info(f"🔌 Direct DB access mode: Progress Notes are fetched in real time (no cache) - {site}")
                     else:
                         # API 모드: 캐시 사용 (API 호출 비용 절감)
                         from progress_notes_json_cache import json_cache
                         from api_progressnote_fetch import fetch_progress_notes_for_site
-                        logger.info(f"🌐 API 모드: Progress Notes 조회 및 캐시 - {site}")
+                        logger.info(f"🌐 API mode: Fetch and cache Progress Notes - {site}")
                         progress_success, progress_notes = fetch_progress_notes_for_site(site, 7)
                         if progress_success and progress_notes:
                             json_cache.update_cache(site, progress_notes)
-                            logger.info(f"Progress Notes 데이터 수집 및 캐시 완료 - {site}: {len(progress_notes)}개")
+                            logger.info(f"Progress Notes fetched and cached - {site}: {len(progress_notes)} items")
                         else:
-                            logger.warning(f"Progress Notes 데이터 수집 실패 - {site}")
+                            logger.warning(f"Progress Notes fetch failed - {site}")
                     
                     # 3-3. Care Area 및 Event Type 데이터 수집 (DB 직접 접속)
                     if use_db_direct:
@@ -1057,21 +1064,21 @@ def login():
                             connector = MANADDBConnector(site)
                             
                             # Care Area 조회
-                            logger.info(f"🔌 DB 직접 접속 모드: Care Area 조회 - {site}")
+                            logger.info(f"🔌 Direct DB access mode: Fetching Care Area - {site}")
                             care_success, care_areas = connector.fetch_care_areas()
                             if care_success and care_areas:
                                 # JSON 파일로 저장 (기존 형식 유지)
                                 os.makedirs('data', exist_ok=True)
                                 with open('data/carearea.json', 'w', encoding='utf-8') as f:
                                     json.dump(care_areas, f, ensure_ascii=False, indent=4)
-                                logger.info(f"✅ DB에서 Care Area 조회 성공 - {site}: {len(care_areas)}개")
+                                logger.info(f"✅ Care Area fetched from DB - {site}: {len(care_areas)} items")
                             else:
-                                error_msg = f"❌ DB 직접 접속 실패: {site} - Care Area 조회 결과가 비어있습니다."
+                                error_msg = f"❌ Direct DB access failed: {site} - Care Area result is empty."
                                 logger.error(error_msg)
                                 raise Exception(error_msg)
                             
                             # Event Type 조회
-                            logger.info(f"🔌 DB 직접 접속 모드: Event Type 조회 - {site}")
+                            logger.info(f"🔌 Direct DB access mode: Fetching Event Types - {site}")
                             event_success, event_types = connector.fetch_event_types()
                             if event_success and event_types:
                                 # JSON 파일로 저장 (기존 형식 유지)
@@ -1081,13 +1088,16 @@ def login():
                                     json.dump(event_types, f, ensure_ascii=False, indent=4)
                                 with open('data/eventtype.json', 'w', encoding='utf-8') as f:
                                     json.dump(event_types, f, ensure_ascii=False, indent=4)
-                                logger.info(f"✅ DB에서 Event Type 조회 성공 - {site}: {len(event_types)}개")
+                                logger.info(f"✅ Event Types fetched from DB - {site}: {len(event_types)} items")
                             else:
-                                error_msg = f"❌ DB 직접 접속 실패: {site} - Event Type 조회 결과가 비어있습니다."
+                                error_msg = f"❌ Direct DB access failed: {site} - Event Type result is empty."
                                 logger.error(error_msg)
                                 raise Exception(error_msg)
                         except Exception as db_error:
-                            error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+                            error_msg = (
+                                f"❌ Direct DB access failed: {site} - {str(db_error)}. "
+                                f"Check DB connection settings and driver installation."
+                            )
                             logger.error(error_msg)
                             raise Exception(error_msg)
                     else:
@@ -1095,11 +1105,11 @@ def login():
                         from daily_data_manager import daily_data_manager
                         daily_results = daily_data_manager.collect_daily_data_if_needed(site)
                         if daily_results['care_area']:
-                            logger.info(f"Care Area 데이터 수집 완료 - {site}")
+                            logger.info(f"Care Area data collection completed - {site}")
                         if daily_results['event_type']:
-                            logger.info(f"Event Type 데이터 수집 완료 - {site}")
+                            logger.info(f"Event Type data collection completed - {site}")
                     
-                    logger.info(f"사이트별 데이터 수집 완료 - 사이트: {site}")
+                    logger.info(f"Site data collection completed - site: {site}")
                     
                     # 4. Flask-Login을 사용한 로그인 처리
                     user = User(username, user_info)
@@ -1108,7 +1118,7 @@ def login():
                     # 모든 사용자에게 동일한 세션 설정 적용
                     login_user(user, remember=False)  # 모든 사용자: 브라우저 닫으면 세션 만료
                     session.permanent = False
-                    logger.info(f"사용자 로그인: remember=False, session.permanent=False (역할: {user_role})")
+                    logger.info(f"User login: remember=False, session.permanent=False (role: {user_role})")
                     
                     # 사용자 역할에 따라 세션 타임아웃 설정
                     set_session_permanent(user_role)
@@ -1121,11 +1131,11 @@ def login():
                     session['site'] = site
                     session['allowed_sites'] = allowed_sites # 허용된 사이트 정보 저장
                     
-                    logger.info(f"세션 저장: site={site}, allowed_sites={allowed_sites}")
-                    logger.info(f"로그인 후 세션 전체 내용: {dict(session)}")
+                    logger.info(f"Session saved: site={site}, allowed_sites={allowed_sites}")
+                    logger.info(f"Full session contents after login: {dict(session)}")
                     
                     flash('Login successful!', 'success')
-                    logger.info(f"로그인 성공 - 사용자: {username}, 사이트: {site}")
+                    logger.info(f"Login succeeded - user: {username}, site: {site}")
                     
                     # 로그인 성공 로그 기록
                     success_user_info = {
@@ -1139,45 +1149,51 @@ def login():
                     # landing_page가 설정된 사용자는 해당 페이지로 이동
                     landing_page = user_info.get('landing_page')
                     if landing_page:
-                        logger.info(f"로그인 성공 - {username} 사용자, landing_page 설정됨: {landing_page}")
+                        logger.info(f"Login succeeded - user {username}, landing_page set: {landing_page}")
                         return redirect(landing_page)
                     
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
-                    logger.info(f"로그인 사용자명 확인: {username} -> {username_upper}")
+                    logger.info(f"Login username check: {username} -> {username_upper}")
                     if username_upper == 'ROD':
-                        logger.info(f"로그인 성공 - ROD 사용자 감지, rod_dashboard로 리다이렉트")
+                        logger.info("Login succeeded - ROD user detected, redirecting to rod_dashboard")
                         return redirect(url_for('rod_dashboard', site=site))
                     elif username_upper == 'YKROD':
-                        logger.info(f"로그인 성공 - YKROD 사용자 감지, Yankalilla ROD 대시보드로 리다이렉트")
+                        logger.info("Login succeeded - YKROD user detected, redirecting to Yankalilla ROD dashboard")
                         session['site'] = 'Yankalilla'
                         session['allowed_sites'] = ['Yankalilla']
                         return redirect(url_for('rod_dashboard', site='Yankalilla'))
                     elif username_upper == 'PGROD':
-                        logger.info(f"로그인 성공 - PGROD 사용자 감지, 다중 사이트 접근 가능, Parafield Gardens ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded - PGROD user detected, multi-site access enabled, redirecting to "
+                            "Parafield Gardens ROD dashboard"
+                        )
                         session['site'] = 'Parafield Gardens'
                         session['allowed_sites'] = ['Ramsay', 'Nerrilda', 'Parafield Gardens']
                         return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
                     elif username_upper == 'WPROD':
-                        logger.info(f"로그인 성공 - WPROD 사용자 감지, West Park ROD 대시보드로 리다이렉트")
+                        logger.info("Login succeeded - WPROD user detected, redirecting to West Park ROD dashboard")
                         session['site'] = 'West Park'
                         session['allowed_sites'] = ['West Park']
                         return redirect(url_for('rod_dashboard', site='West Park'))
                     elif username_upper == 'RSROD':
-                        logger.info(f"로그인 성공 - RSROD 사용자 감지, 다중 사이트 접근 가능, Ramsay ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded - RSROD user detected, multi-site access enabled, redirecting to "
+                            "Ramsay ROD dashboard"
+                        )
                         session['site'] = 'Ramsay'
                         session['allowed_sites'] = ['Ramsay', 'Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Ramsay'))
                     elif username_upper == 'NROD':
-                        logger.info(f"로그인 성공 - NROD 사용자 감지, Nerrilda ROD 대시보드로 리다이렉트")
+                        logger.info("Login succeeded - NROD user detected, redirecting to Nerrilda ROD dashboard")
                         session['site'] = 'Nerrilda'
                         session['allowed_sites'] = ['Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
-                        logger.info(f"로그인 성공 - PG_admin 사용자 감지, incident_viewer로 리다이렉트")
+                        logger.info("Login succeeded - SITE_ADMIN user detected, redirecting to incident_viewer")
                         return redirect(url_for('incident_viewer', site=site))
                     else:
-                        logger.info(f"로그인 성공 - 일반 사용자, progress_notes로 리다이렉트")
+                        logger.info("Login succeeded - regular user, redirecting to progress_notes")
                         return redirect(url_for('progress_notes', site=site))
                         
                 except Exception as e:
@@ -1202,7 +1218,7 @@ def login():
                         flash('Login failed due to system error.', 'error')
                         return redirect(url_for('home'))
             except Exception as e:
-                logger.error(f"API 호출 중 오류 발생: {str(e)}")
+                logger.error(f"Error during API call: {str(e)}")
                 # API 오류 시에도 로그인 허용
                 try:
                     # Flask-Login을 사용한 로그인 처리
@@ -1212,7 +1228,7 @@ def login():
                     # 모든 사용자에게 동일한 세션 설정 적용
                     login_user(user, remember=False)  # 모든 사용자: 브라우저 닫으면 세션 만료
                     session.permanent = False
-                    logger.info(f"사용자 로그인 (API 오류 있음): remember=False, session.permanent=False (역할: {user_role})")
+                    logger.info(f"User login (with API error): remember=False, session.permanent=False (role: {user_role})")
                     
                     # 사용자 역할에 따라 세션 타임아웃 설정
                     set_session_permanent(user_role)
@@ -1225,51 +1241,66 @@ def login():
                     session['site'] = site
                     session['allowed_sites'] = allowed_sites # 허용된 사이트 정보 저장
                     
-                    logger.info(f"세션 저장 (API 오류 있음): site={site}, allowed_sites={allowed_sites}")
-                    logger.info(f"API 오류 시 로그인 후 세션 전체 내용: {dict(session)}")
+                    logger.info(f"Session saved (with API error): site={site}, allowed_sites={allowed_sites}")
+                    logger.info(f"Full session contents after login (with API error): {dict(session)}")
                     
                     flash('Login successful! (Some data may not be available)', 'success')
-                    logger.info(f"로그인 성공 (API 오류 있음) - 사용자: {username}, 사이트: {site}")
+                    logger.info(f"Login succeeded (with API error) - user: {username}, site: {site}")
                     
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
-                    logger.info(f"로그인 사용자명 확인 (API 오류 있음): {username} -> {username_upper}")
+                    logger.info(f"Login username check (with API error): {username} -> {username_upper}")
                     if username_upper == 'ROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - ROD 사용자 감지, rod_dashboard로 리다이렉트")
+                        logger.info("Login succeeded (with API error) - ROD user detected, redirecting to rod_dashboard")
                         return redirect(url_for('rod_dashboard', site=site))
                     elif username_upper == 'YKROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - YKROD 사용자 감지, Yankalilla ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded (with API error) - YKROD user detected, redirecting to "
+                            "Yankalilla ROD dashboard"
+                        )
                         session['site'] = 'Yankalilla'
                         session['allowed_sites'] = ['Yankalilla']
                         return redirect(url_for('rod_dashboard', site='Yankalilla'))
                     elif username_upper == 'PGROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - PGROD 사용자 감지, 다중 사이트 접근 가능, Parafield Gardens ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded (with API error) - PGROD user detected, multi-site access enabled, "
+                            "redirecting to Parafield Gardens ROD dashboard"
+                        )
                         session['site'] = 'Parafield Gardens'
                         session['allowed_sites'] = ['Ramsay', 'Nerrilda', 'Parafield Gardens']
                         return redirect(url_for('rod_dashboard', site='Parafield Gardens'))
                     elif username_upper == 'WPROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - WPROD 사용자 감지, West Park ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded (with API error) - WPROD user detected, redirecting to West Park ROD dashboard"
+                        )
                         session['site'] = 'West Park'
                         session['allowed_sites'] = ['West Park']
                         return redirect(url_for('rod_dashboard', site='West Park'))
                     elif username_upper == 'RSROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - RSROD 사용자 감지, 다중 사이트 접근 가능, Ramsay ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded (with API error) - RSROD user detected, multi-site access enabled, "
+                            "redirecting to Ramsay ROD dashboard"
+                        )
                         session['site'] = 'Ramsay'
                         session['allowed_sites'] = ['Ramsay', 'Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Ramsay'))
                     elif username_upper == 'NROD':
-                        logger.info(f"로그인 성공 (API 오류 있음) - NROD 사용자 감지, Nerrilda ROD 대시보드로 리다이렉트")
+                        logger.info(
+                            "Login succeeded (with API error) - NROD user detected, redirecting to Nerrilda ROD dashboard"
+                        )
                         session['site'] = 'Nerrilda'
                         session['allowed_sites'] = ['Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
-                        logger.info(f"로그인 성공 (API 오류 있음) - PG_admin 사용자 감지, incident_viewer로 리다이렉트")
+                        logger.info(
+                            "Login succeeded (with API error) - SITE_ADMIN user detected, redirecting to incident_viewer"
+                        )
                         return redirect(url_for('incident_viewer', site=site))
                     else:
-                        logger.info(f"로그인 성공 (API 오류 있음) - 일반 사용자, progress_notes로 리다이렉트")
+                        logger.info("Login succeeded (with API error) - regular user, redirecting to progress_notes")
                         return redirect(url_for('progress_notes', site=site))
                 except Exception as login_error:
-                    logger.error(f"로그인 처리 중 오류: {str(login_error)}")
+                    logger.error(f"Error during login processing: {str(login_error)}")
                     flash('Login failed due to system error.', 'error')
                     return redirect(url_for('home'))
         else:
@@ -1277,7 +1308,7 @@ def login():
             return redirect(url_for('home'))
             
     except Exception as e:
-        logger.error(f"로그인 처리 중 예외 발생: {str(e)}")
+        logger.error(f"Exception during login processing: {str(e)}")
         flash('{An error occurred while connecting to the server}', 'error')
         return redirect(url_for('home'))
 
@@ -1287,7 +1318,7 @@ def logout():
     try:
         # 로그아웃 전 세션 상태 로깅
         if current_user.is_authenticated:
-            logger.info(f"로그아웃 시작 - 사용자: {current_user.username}, 역할: {current_user.role}")
+            logger.info(f"Logout started - user: {current_user.username}, role: {current_user.role}")
             user_info = {
                 "username": current_user.username,
                 "display_name": current_user.display_name,
@@ -1296,63 +1327,63 @@ def logout():
             }
             usage_logger.log_access(user_info)
         else:
-            logger.info("로그아웃 시작 - 인증되지 않은 사용자")
+            logger.info("Logout started - unauthenticated user")
         
         # Flask-Login 로그아웃
         logout_user()
-        logger.info("Flask-Login logout_user() 완료")
+        logger.info("Flask-Login logout_user() completed")
         
         # 세션 완전 정리
         session.clear()
-        logger.info("세션 clear() 완료")
+        logger.info("session.clear() completed")
         
         # 추가 세션 정리 (Flask-Login 관련)
         if '_user_id' in session:
             del session['_user_id']
-            logger.info("_user_id 세션 제거")
+            logger.info("_user_id removed from session")
         
         if 'user_role' in session:
             del session['user_role']
-            logger.info("user_role 세션 제거")
+            logger.info("user_role removed from session")
         
         if '_created' in session:
             del session['_created']
-            logger.info("_created 세션 제거")
+            logger.info("_created removed from session")
         
         if 'allowed_sites' in session:
             del session['allowed_sites']
-            logger.info("allowed_sites 세션 제거")
+            logger.info("allowed_sites removed from session")
         
         if 'site' in session:
             del session['site']
-            logger.info("site 세션 제거")
+            logger.info("site removed from session")
         
         # Flask-Login 관련 추가 세션 정리
         if '_fresh' in session:
             del session['_fresh']
-            logger.info("_fresh 세션 제거")
+            logger.info("_fresh removed from session")
         
         if '_permanent' in session:
             del session['_permanent']
-            logger.info("_permanent 세션 제거")
+            logger.info("_permanent removed from session")
         
         # 세션 수정 표시
         session.modified = True
-        logger.info("세션 수정 완료")
+        logger.info("Session update completed")
         
         # Flask-Login 세션 쿠키도 정리
         response = make_response(redirect(url_for('home')))
         response.delete_cookie('remember_token')
         response.delete_cookie('session')
-        logger.info("세션 쿠키 정리 완료")
+        logger.info("Session cookies cleared")
         
         flash('You have been logged out successfully.', 'info')
-        logger.info("로그아웃 완료 - 홈 페이지로 리다이렉트")
+        logger.info("Logout completed - redirecting to home page")
         
         return response
         
     except Exception as e:
-        logger.error(f"로그아웃 중 오류 발생: {str(e)}")
+        logger.error(f"Error during logout: {str(e)}")
         # 오류 발생 시에도 세션 정리 시도
         try:
             session.clear()
@@ -1372,7 +1403,7 @@ def clear_database():
             'message': 'Database cleared successfully'
         })
     except Exception as e:
-        logger.error(f"데이터베이스 초기화 중 오류: {str(e)}")
+        logger.error(f"Error clearing database: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error: {str(e)}'
@@ -1391,7 +1422,7 @@ def rod_dashboard():
     """ROD 전용 대시보드"""
     # ROD 사용자가 아닌 경우 접근 제한 (대소문자 구분 안함)
     username_upper = current_user.username.upper()
-    logger.info(f"ROD 대시보드 접근 시도 - 사용자명 확인: {current_user.username} -> {username_upper}")
+    logger.info(f"ROD dashboard access attempt - username check: {current_user.username} -> {username_upper}")
     if username_upper not in ['ROD', 'YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
         flash('Access denied. This dashboard is for ROD users only.', 'error')
         return redirect(url_for('progress_notes'))
@@ -1462,7 +1493,7 @@ def edenfield_dashboard():
                              sites=sites,
                              current_user=current_user)
     except Exception as e:
-        logger.error(f"Edenfield Dashboard 오류: {e}")
+        logger.error(f"Edenfield Dashboard error: {e}")
         return render_template('error.html', error=str(e)), 500
 
 
@@ -1653,7 +1684,7 @@ def get_edenfield_stats():
                     all_stats.append(site_stats)
                     
             except Exception as site_error:
-                logger.warning(f"Site {site_name} 통계 조회 실패: {site_error}")
+                logger.warning(f"Failed to fetch stats for site {site_name}: {site_error}")
                 all_stats.append({
                     'site': site_name,
                     'error': str(site_error),
@@ -1705,7 +1736,7 @@ def get_edenfield_stats():
         })
         
     except Exception as e:
-        logger.error(f"Edenfield Stats 오류: {e}")
+        logger.error(f"Edenfield stats error: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
@@ -1717,8 +1748,8 @@ def progress_notes():
     try:
         allowed_sites = session.get('allowed_sites', [])
         site = request.args.get('site', session.get('site', 'Parafield Gardens'))
-        logger.info(f"progress_notes: allowed_sites={allowed_sites} (타입: {type(allowed_sites)}), site={site}")
-        logger.info(f"progress_notes 세션 전체 내용: {dict(session)}")
+        logger.info(f"progress_notes: allowed_sites={allowed_sites} (type: {type(allowed_sites)}), site={site}")
+        logger.info(f"progress_notes full session contents: {dict(session)}")
         logger.info(f"progress_notes request.args: {dict(request.args)}")
         
         # allowed_sites가 비어있으면 기본 사이트 목록에서 선택
@@ -1727,13 +1758,13 @@ def progress_notes():
             allowed_sites = list(safe_site_servers.keys())
             # 세션에 다시 저장
             session['allowed_sites'] = allowed_sites
-            logger.warning(f"allowed_sites가 비어있음, 기본 사이트 목록으로 설정: {allowed_sites}")
+            logger.warning(f"allowed_sites is empty, using default site list: {allowed_sites}")
         
         # location이 1개면 무조건 그 사이트로 강제
         if isinstance(allowed_sites, list) and len(allowed_sites) == 1:
             forced_site = allowed_sites[0]
             if site != forced_site:
-                logger.info(f"단일 사이트 강제 리다이렉트: {site} -> {forced_site}")
+                logger.info(f"Forced single-site redirect: {site} -> {forced_site}")
                 return redirect(url_for('progress_notes', site=forced_site))
             site = forced_site
         
@@ -1747,15 +1778,15 @@ def progress_notes():
             }
             usage_logger.log_access(user_info)
         except Exception as e:
-            logger.error(f"접속 로그 기록 실패: {e}")
+            logger.error(f"Failed to write access log: {e}")
         
-        logger.info(f"progress_notes 최종 렌더링 - site: {site}, allowed_sites: {allowed_sites}")
+        logger.info(f"progress_notes final render - site: {site}, allowed_sites: {allowed_sites}")
         return render_template('ProgressNoteList.html', site=site)
     
     except Exception as e:
-        logger.error(f"progress_notes 오류: {e}")
+        logger.error(f"progress_notes error: {e}")
         # 오류 발생 시 로그인 페이지로 리다이렉트
-        flash('페이지 로드 중 오류가 발생했습니다. 다시 로그인해주세요.', 'error')
+        flash('An error occurred while loading the page. Please log in again.', 'error')
         return redirect(url_for('login_page'))
 
 @app.route('/save_progress_note', methods=['POST'])
@@ -1789,7 +1820,7 @@ def save_progress_note():
         if not save_prepare_send_json(progress_note):
             return jsonify({'success': False, 'message': 'Failed to save file.'})
         
-        logger.info("prepare_send.json 파일 저장 완료, API 전송 시작...")
+        logger.info("prepare_send.json saved, starting API transmission...")
         
         # API로 Progress Note 전송
         try:
@@ -1801,7 +1832,7 @@ def save_progress_note():
             api_success, api_response = send_progress_note_to_api(selected_site)
             
             if api_success:
-                logger.info("Progress Note API 전송 성공")
+                logger.info("Progress Note API transmission succeeded")
                 # 성공 로그 기록
                 usage_logger.log_progress_note(form_data, user_info, success=True)
                 return jsonify({
@@ -1811,7 +1842,7 @@ def save_progress_note():
                     'api_response': api_response
                 })
             else:
-                logger.warning(f"Progress Note API 전송 실패: {api_response}")
+                logger.warning(f"Progress Note API transmission failed: {api_response}")
                 # 실패 로그 기록
                 usage_logger.log_progress_note(form_data, user_info, success=False, error_message=api_response)
                 # 파일 저장은 성공했지만 API 전송 실패
@@ -1823,7 +1854,7 @@ def save_progress_note():
                     'warning': 'API transmission failed. The file was saved successfully.'
                 })
         except ImportError as e:
-            logger.error(f"API 모듈 import 오류: {str(e)}")
+            logger.error(f"API module import error: {str(e)}")
             # 실패 로그 기록
             usage_logger.log_progress_note(form_data, user_info, success=False, error_message=f"Import error: {str(e)}")
             return jsonify({
@@ -1833,7 +1864,7 @@ def save_progress_note():
                 'warning': 'API transmission module not found. The file was saved successfully.'
             })
         except Exception as e:
-            logger.error(f"API 전송 중 예상치 못한 오류: {str(e)}")
+            logger.error(f"Unexpected error during API transmission: {str(e)}")
             # 실패 로그 기록
             usage_logger.log_progress_note(form_data, user_info, success=False, error_message=str(e))
             return jsonify({
@@ -1879,7 +1910,7 @@ def get_clients_for_site(site):
         success, client_data = fetch_client_information(site)
         
         if not success or not client_data:
-            logger.warning(f"클라이언트 데이터를 가져올 수 없습니다: {site}")
+            logger.warning(f"Unable to fetch client data: {site}")
             return jsonify([]), 404
         
         # 클라이언트 데이터 형식 변환 (API 형식에 맞게)
@@ -1969,11 +2000,11 @@ def get_clients_for_site(site):
                         'IsActive': client.get('IsActive', True)
                     })
         
-        logger.info(f"✅ 클라이언트 목록 반환: {site} - {len(clients)}명")
+        logger.info(f"✅ Returning client list: {site} - {len(clients)} residents")
         return jsonify(clients)
         
     except Exception as e:
-        logger.error(f"클라이언트 목록 조회 오류 ({site}): {e}")
+        logger.error(f"Error retrieving client list ({site}): {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/data/carearea.json')
@@ -2151,7 +2182,7 @@ def get_rod_residence_list():
             }), 500
 
     except Exception as e:
-        logger.error(f"ROD Residence list 조회 중 오류: {str(e)}")
+        logger.error(f"Error fetching ROD residence list: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error: {str(e)}'
@@ -2197,7 +2228,7 @@ def get_rod_stats():
                                       if user != current_user.username])
             
         except Exception as e:
-            logger.error(f"통계 데이터 가져오기 중 오류: {str(e)}")
+            logger.error(f"Error fetching statistics data: {str(e)}")
             # 오류 시에도 기본 통계 반환
             stats['totalNotes'] = 0
             stats['todayNotes'] = 0
@@ -2212,7 +2243,7 @@ def get_rod_stats():
         })
         
     except Exception as e:
-        logger.error(f"ROD 통계 조회 중 오류: {str(e)}")
+        logger.error(f"Error fetching ROD stats: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error: {str(e)}'
@@ -2233,7 +2264,7 @@ def get_user_info():
         }
         return jsonify(user_info)
     except Exception as e:
-        logger.error(f"사용자 정보 조회 중 오류: {str(e)}")
+        logger.error(f"Error fetching user info: {str(e)}")
         return jsonify({'error': 'Failed to get user info'}), 500
 
 @app.route('/api/refresh-session', methods=['POST'])
@@ -2258,11 +2289,11 @@ def refresh_session():
         if user_role == 'ADMIN':
             login_user(user, remember=True)  # ADMIN: 브라우저 닫아도 세션 유지
             session.permanent = True
-            logger.info(f"ADMIN 사용자 세션 새로고침: remember=True, session.permanent=True")
+            logger.info("Admin session refresh: remember=True, session.permanent=True")
         else:
             login_user(user, remember=False)  # 일반 사용자: 브라우저 닫으면 세션 만료
             session.permanent = False
-            logger.info(f"일반 사용자 세션 새로고침: remember=False, session.permanent=False")
+            logger.info("Regular user session refresh: remember=False, session.permanent=False")
         
         # 사용자 역할에 따라 세션 타임아웃 설정
         set_session_permanent(user_role)
@@ -2270,7 +2301,7 @@ def refresh_session():
         # 사용자 역할을 세션에 저장
         session['user_role'] = user_role
         
-        logger.info(f"세션 새로고침 완료: {username}")
+        logger.info(f"Session refresh completed: {username}")
         
         return jsonify({
             'success': True,
@@ -2284,7 +2315,7 @@ def refresh_session():
             }
         })
     except Exception as e:
-        logger.error(f"세션 새로고침 중 오류: {str(e)}")
+        logger.error(f"Error refreshing session: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/session-status')
@@ -2313,7 +2344,7 @@ def get_session_status():
             'is_expired': remaining_seconds <= 0
         })
     except Exception as e:
-        logger.error(f"세션 상태 확인 중 오류: {str(e)}")
+        logger.error(f"Error checking session status: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/extend-session', methods=['POST'])
@@ -2328,7 +2359,7 @@ def extend_session():
         session.permanent = True
         session.modified = True
         
-        logger.info(f"세션 연장 완료: {current_user.username}")
+        logger.info(f"Session extended: {current_user.username}")
         
         return jsonify({
             'success': True,
@@ -2336,7 +2367,7 @@ def extend_session():
             'session_created': session['_created']
         })
     except Exception as e:
-        logger.error(f"세션 연장 중 오류: {str(e)}")
+        logger.error(f"Error extending session: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @app.route('/api/fetch-progress-notes', methods=['POST'])
@@ -2359,12 +2390,12 @@ def fetch_progress_notes():
             logger.error("Site parameter is missing in request")
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
-        logger.info(f"프로그레스 노트 가져오기 요청 - 사이트: {site}, 일수: {days}, 페이지: {page}, 페이지당: {per_page}")
+        logger.info(f"Progress notes fetch request - site: {site}, days: {days}, page: {page}, per_page: {per_page}")
         logger.info(f"Request data: {data}")
         if client_service_id:
-            logger.info(f"🔍 [FILTER] 클라이언트 필터 적용: client_service_id={client_service_id} (타입: {type(client_service_id)})")
+            logger.info(f"🔍 [FILTER] Client filter applied: client_service_id={client_service_id} (type: {type(client_service_id)})")
         else:
-            logger.info(f"🔍 [FILTER] 클라이언트 필터 없음 - 모든 클라이언트 조회")
+            logger.info("🔍 [FILTER] No client filter - fetching all clients")
         
         # 사이트 서버 설정 확인
         safe_site_servers = get_safe_site_servers()
@@ -2395,13 +2426,13 @@ def fetch_progress_notes():
         
         # Progress Notes 조회 (DB 직접 접속 또는 API)
         if use_db_direct:
-            logger.info(f"🔌 DB 직접 접속 모드: Progress Notes 실시간 조회 (캐시 없음) - {site}")
+            logger.info(f"🔌 Direct DB access mode: Progress Notes fetched in real time (no cache) - {site}")
         else:
-            logger.info(f"🌐 API 모드: Progress Notes 조회 - {site}")
+            logger.info(f"🌐 API mode: Fetching Progress Notes - {site}")
         
-        logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site 호출 - site={site}, days={days}, client_service_id={client_service_id}")
+        logger.info(f"🔍 [FILTER] Calling fetch_progress_notes_for_site - site={site}, days={days}, client_service_id={client_service_id}")
         success, notes = fetch_progress_notes_for_site(site, days, event_types=event_types, year=year, month=month, client_service_id=client_service_id)
-        logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site 결과 - success={success}, notes_count={len(notes) if notes else 0}")
+        logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site result - success={success}, notes_count={len(notes) if notes else 0}")
         
         if not success or not notes:
             result = {
@@ -2492,11 +2523,13 @@ def fetch_progress_notes():
         else:
             # 일반 Progress Notes 요청
             logger.info(f"Regular Progress Notes request for {site}")
-            logger.info(f"프로그레스 노트 가져오기 성공 - {site}: {result['total_count']}개 (페이지 {page}/{result['total_pages']})")
+            logger.info(
+                f"Progress notes fetch succeeded - {site}: {result['total_count']} items (page {page}/{result['total_pages']})"
+            )
             return jsonify(response_data)
             
     except Exception as e:
-        logger.error(f"프로그레스 노트 가져오기 중 오류: {str(e)}")
+        logger.error(f"Error fetching progress notes: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
@@ -2516,7 +2549,7 @@ def fetch_progress_notes_incremental():
         if not site:
             return jsonify({'success': False, 'message': 'Site is required'}), 400
         
-        logger.info(f"증분 업데이트 요청 (단순화됨) - 사이트: {site}, 항상 7일간 데이터 반환")
+        logger.info(f"Incremental update request (simplified) - site: {site}, always returning 7 days of data")
         
         try:
             from api_progressnote_fetch import fetch_progress_notes_for_site
@@ -2525,7 +2558,9 @@ def fetch_progress_notes_incremental():
             success, progress_notes = fetch_progress_notes_for_site(site, 7)
             
             if success:
-                logger.info(f"증분 업데이트 성공 (단순화됨) - {site}: {len(progress_notes) if progress_notes else 0}개")
+                logger.info(
+                    f"Incremental update succeeded (simplified) - {site}: {len(progress_notes) if progress_notes else 0} items"
+                )
                 
                 return jsonify({
                     'success': True,
@@ -2536,21 +2571,21 @@ def fetch_progress_notes_incremental():
                     'fetched_at': get_australian_time().isoformat()
                 })
             else:
-                logger.error(f"증분 업데이트 실패 (단순화됨) - {site}")
+                logger.error(f"Incremental update failed (simplified) - {site}")
                 return jsonify({
                     'success': False,
                     'message': 'Failed to fetch progress notes from server'
                 }), 500
                 
         except ImportError as e:
-            logger.error(f"API 모듈 import 오류: {str(e)}")
+            logger.error(f"API module import error: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': 'Progress note fetch module not available'
             }), 500
             
     except Exception as e:
-        logger.error(f"증분 업데이트 중 오류: {str(e)}")
+        logger.error(f"Error during incremental update: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'
@@ -2571,7 +2606,7 @@ def get_progress_notes_db_info():
             }
         })
     except Exception as e:
-        logger.error(f"데이터베이스 정보 조회 중 오류: {str(e)}")
+        logger.error(f"Error retrieving database info: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'
@@ -2769,7 +2804,7 @@ def fetch_incidents():
             # Incident 데이터와 클라이언트 데이터 가져오기 (DB 직접 접속)
             from manad_db_connector import fetch_incidents_with_client_data_from_db
             
-            logger.info(f"🔌 DB 직접 접속 모드: {site}")
+            logger.info(f"🔌 Direct DB access mode: {site}")
             incidents_data = fetch_incidents_with_client_data_from_db(site, start_date, end_date, fetch_clients=True)
             
             if incidents_data:
@@ -3082,7 +3117,7 @@ def get_app_log():
         })
         
     except Exception as e:
-        logger.error(f"app.log 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve app.log: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/logs/error-log')
@@ -3112,7 +3147,7 @@ def get_error_log():
         })
         
     except Exception as e:
-        logger.error(f"error.log 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve error.log: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/logs/access-log')
@@ -3142,7 +3177,7 @@ def get_access_log():
         })
         
     except Exception as e:
-        logger.error(f"access.log 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve access.log: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/usage-logs')
@@ -3189,7 +3224,7 @@ def get_usage_logs():
                         
                         all_logs.extend(logs)
                     except Exception as e:
-                        logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                        logger.error(f"Failed to read log file {filepath}: {str(e)}")
                         continue
         
         # 시간순 정렬
@@ -3238,7 +3273,7 @@ def get_usage_logs():
         })
         
     except Exception as e:
-        logger.error(f"사용자 활동 로그 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve user activity logs: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/usage-logs/months')
@@ -3272,7 +3307,7 @@ def get_usage_log_months():
         })
         
     except Exception as e:
-        logger.error(f"월 목록 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve month list: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/usage-logs/month/<month>')
@@ -3306,7 +3341,7 @@ def get_usage_logs_by_month(month):
                                         day = log_date.split('-')[2]  # 일자 추출
                                         days.add(day)
                         except Exception as e:
-                            logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                            logger.error(f"Failed to read log file {filepath}: {str(e)}")
                             continue
         
         # 시간순 정렬
@@ -3332,7 +3367,7 @@ def get_usage_logs_by_month(month):
         })
         
     except Exception as e:
-        logger.error(f"월별 로그 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve monthly logs: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/usage-logs/all')
@@ -3357,7 +3392,7 @@ def get_all_usage_logs():
                                 logs = json.load(f)
                                 all_logs.extend(logs)
                         except Exception as e:
-                            logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                            logger.error(f"Failed to read log file {filepath}: {str(e)}")
                             continue
         
         # 시간순 정렬
@@ -3380,7 +3415,7 @@ def get_all_usage_logs():
         })
         
     except Exception as e:
-        logger.error(f"전체 로그 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve all logs: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/usage-logs/monthly-stats')
@@ -3414,7 +3449,7 @@ def get_monthly_usage_stats():
                                         monthly_stats[year_month] = 0
                                     monthly_stats[year_month] += 1
                         except Exception as e:
-                            logger.error(f"로그 파일 읽기 실패 {filepath}: {str(e)}")
+                            logger.error(f"Failed to read log file {filepath}: {str(e)}")
                             continue
         
         # 월별 통계를 리스트로 변환
@@ -3427,7 +3462,7 @@ def get_monthly_usage_stats():
         })
         
     except Exception as e:
-        logger.error(f"월별 통계 조회 실패: {str(e)}")
+        logger.error(f"Failed to retrieve monthly stats: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/send-alarm', methods=['POST'])
@@ -3523,7 +3558,7 @@ def get_alarm_templates():
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
-                'message': '관리자 권한이 필요합니다.'
+                'message': 'Admin privileges are required.'
             }), 403
         
         # SQLite에서 실제 데이터 조회
@@ -3559,10 +3594,10 @@ def get_alarm_templates():
         })
         
     except Exception as e:
-        logger.error(f"알람 템플릿 조회 중 오류: {str(e)}")
+        logger.error(f"Error retrieving alarm templates: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'템플릿 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while retrieving templates: {str(e)}'
         }), 500
 
 @app.route('/api/alarm-templates', methods=['POST'])
@@ -3605,7 +3640,7 @@ def get_alarm_recipients():
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
-                'message': '관리자 권한이 필요합니다.'
+                'message': 'Admin privileges are required.'
             }), 403
         
         # SQLite에서 실제 데이터 조회
@@ -3643,10 +3678,10 @@ def get_alarm_recipients():
         })
         
     except Exception as e:
-        logger.error(f"알람 수신자 조회 중 오류: {str(e)}")
+        logger.error(f"Error retrieving alarm recipients: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'수신자 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while retrieving recipients: {str(e)}'
         }), 500
 
 @app.route('/api/alarm-recipients', methods=['POST'])
@@ -3814,9 +3849,11 @@ def cleanup_data_folder():
                     files_to_delete.append(json_file)
             
             if files_to_delete:
-                logger.info(f"Data 폴더 정리 시작 - {len(files_to_delete)}개 progress note JSON 파일 삭제")
-                logger.info(f"보존할 파일들: {preserve_files}")
-                logger.info(f"삭제할 파일들: {files_to_delete}")
+                logger.info(
+                    f"Starting data folder cleanup - deleting {len(files_to_delete)} progress note JSON files"
+                )
+                logger.info(f"Files to preserve: {preserve_files}")
+                logger.info(f"Files to delete: {files_to_delete}")
                 
                 # progress note 관련 JSON 파일들을 직접 삭제
                 deleted_count = 0
@@ -3825,21 +3862,23 @@ def cleanup_data_folder():
                         file_path = os.path.join(data_dir, json_file)
                         os.remove(file_path)
                         deleted_count += 1
-                        logger.info(f"Progress note JSON 파일 삭제: {json_file}")
+                        logger.info(f"Deleted progress note JSON file: {json_file}")
                     except Exception as e:
-                        logger.error(f"Progress note JSON 파일 삭제 실패 {json_file}: {str(e)}")
+                        logger.error(f"Failed to delete progress note JSON file {json_file}: {str(e)}")
                 
-                logger.info(f"Data 폴더 정리 완료 - {deleted_count}/{len(files_to_delete)}개 progress note 파일 삭제")
+                logger.info(
+                    f"Data folder cleanup completed - deleted {deleted_count}/{len(files_to_delete)} progress note files"
+                )
                 return True
             else:
-                logger.info("삭제할 progress note JSON 파일이 없음")
+                logger.info("No progress note JSON files to delete")
                 return True
         else:
-            logger.warning("Data 폴더가 존재하지 않음")
+            logger.warning("Data folder does not exist")
             return False
             
     except Exception as e:
-        logger.error(f"Data 폴더 정리 중 오류 발생: {str(e)}")
+        logger.error(f"Error during data folder cleanup: {str(e)}")
         return False
 
 # ==============================
@@ -3850,17 +3889,19 @@ def cleanup_data_folder():
 def register_fcm_token():
     """FCM 토큰을 등록하는 API"""
     try:
-        logger.info(f"FCM 토큰 등록 요청 - 사용자: {current_user.username if current_user.is_authenticated else 'Anonymous'}")
-        logger.info(f"요청 헤더: {dict(request.headers)}")
+        logger.info(
+            f"FCM token registration request - user: {current_user.username if current_user.is_authenticated else 'Anonymous'}"
+        )
+        logger.info(f"Request headers: {dict(request.headers)}")
         
         data = request.get_json()
-        logger.info(f"요청 데이터: {data}")
+        logger.info(f"Request data: {data}")
         
         # 모바일 앱 호환: 'token' 또는 'fcm_token' 필드 모두 지원
         token = data.get('token') or data.get('fcm_token')
         
         if not data or not token:
-            logger.error("FCM 토큰 등록 실패: 토큰 데이터 누락")
+            logger.error("FCM token registration failed: missing token data")
             return jsonify({
                 'success': False,
                 'message': 'Token or fcm_token is required.'
@@ -3880,17 +3921,17 @@ def register_fcm_token():
         platform = data.get('platform', 'unknown')
         app_version = data.get('app_version', '1.0.0')
         
-        logger.info(f"FCM 토큰 등록 시도: 사용자={user_id}, 디바이스={device_info}, 토큰={token[:20]}...")
+        logger.info(f"Attempting FCM token registration: user={user_id}, device={device_info}, token={token[:20]}...")
         
         # 사용자의 토큰 등록
         token_manager = get_fcm_token_manager()
-        logger.info(f"FCM 토큰 매니저 타입: {type(token_manager)}")
+        logger.info(f"FCM token manager type: {type(token_manager)}")
         
         success = token_manager.register_token(user_id, token, device_info)
-        logger.info(f"FCM 토큰 등록 결과: {success}")
+        logger.info(f"FCM token registration result: {success}")
         
         if success:
-            logger.info(f"FCM 토큰 등록 성공: {user_id}")
+            logger.info(f"FCM token registration succeeded: {user_id}")
             return jsonify({
                 'success': True,
                 'message': 'FCM token registered successfully.',
@@ -3900,16 +3941,16 @@ def register_fcm_token():
                 'app_version': app_version
             })
         else:
-            logger.error(f"FCM 토큰 등록 실패: {user_id}")
+            logger.error(f"FCM token registration failed: {user_id}")
             return jsonify({
                 'success': False,
                 'message': 'FCM token registration failed.'
             }), 500
             
     except Exception as e:
-        logger.error(f"FCM 토큰 등록 중 예외: {str(e)}")
+        logger.error(f"Exception during FCM token registration: {str(e)}")
         import traceback
-        logger.error(f"스택 트레이스: {traceback.format_exc()}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'message': f'Error occurred during token registration: {str(e)}'
@@ -3923,13 +3964,13 @@ def unregister_fcm_token():
         if not data or 'token' not in data:
             return jsonify({
                 'success': False,
-                'message': '토큰이 필요합니다.'
+                'message': 'Token is required.'
             }), 400
         
         token = data['token']
         user_id = data.get('user_id')  # 모바일 앱에서 user_id 제공 (선택사항)
         
-        logger.info(f"FCM 토큰 제거 시도: 사용자={user_id}, 토큰={token[:20]}...")
+        logger.info(f"Attempting to unregister FCM token: user={user_id}, token={token[:20]}...")
         
         # 토큰 제거 (user_id 있으면 함께 사용, 없으면 토큰만으로 제거)
         token_manager = get_fcm_token_manager()
@@ -3947,10 +3988,10 @@ def unregister_fcm_token():
             }), 404
             
     except Exception as e:
-        logger.error(f"FCM 토큰 제거 중 오류: {str(e)}")
+        logger.error(f"Error unregistering FCM token: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'토큰 제거 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while removing the token: {str(e)}'
         }), 500
 
 @app.route('/api/fcm/send-notification', methods=['POST'])
@@ -3961,7 +4002,7 @@ def send_fcm_notification():
         if not data:
             return jsonify({
                 'success': False,
-                'message': '요청 데이터가 필요합니다.'
+                'message': 'Request data is required.'
             }), 400
         
         # 필수 필드 확인
@@ -3970,7 +4011,7 @@ def send_fcm_notification():
             if field not in data:
                 return jsonify({
                     'success': False,
-                    'message': f'{field} 필드가 필요합니다.'
+                    'message': f'{field} field is required.'
                 }), 400
         
         title = data['title']
@@ -3984,7 +4025,7 @@ def send_fcm_notification():
         if fcm_service is None:
             return jsonify({
                 'success': False,
-                'message': 'FCM 서비스를 초기화할 수 없습니다. Firebase 설정을 확인해주세요.'
+                'message': 'Unable to initialize the FCM service. Please check your Firebase configuration.'
             }), 500
         
         token_manager = get_fcm_token_manager()
@@ -4004,7 +4045,7 @@ def send_fcm_notification():
             else:
                 return jsonify({
                     'success': False,
-                    'message': '전송할 수 있는 FCM 토큰이 없습니다.'
+                    'message': 'No FCM tokens available to send.'
                 }), 400
         else:
             # 모든 사용자에게 전송
@@ -4014,26 +4055,26 @@ def send_fcm_notification():
             else:
                 return jsonify({
                     'success': False,
-                    'message': '전송할 수 있는 FCM 토큰이 없습니다.'
+                    'message': 'No FCM tokens available to send.'
                 }), 400
         
         if result['success']:
             return jsonify({
                 'success': True,
-                'message': '푸시 알림이 성공적으로 전송되었습니다.',
+                'message': 'Push notification sent successfully.',
                 'result': result
             })
         else:
             return jsonify({
                 'success': False,
-                'message': f'푸시 알림 전송에 실패했습니다: {result.get("error", "알 수 없는 오류")}'
+                'message': f'Failed to send push notification: {result.get("error", "Unknown error")}'
             }), 500
             
     except Exception as e:
-        logger.error(f"FCM 알림 전송 중 오류: {str(e)}")
+        logger.error(f"Error sending FCM notification: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'알림 전송 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while sending the notification: {str(e)}'
         }), 500
 
 @app.route('/api/fcm/tokens', methods=['GET'])
@@ -4052,10 +4093,10 @@ def get_fcm_tokens():
         })
         
     except Exception as e:
-        logger.error(f"FCM 토큰 조회 중 오류: {str(e)}")
+        logger.error(f"Error fetching FCM tokens: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'토큰 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while fetching tokens: {str(e)}'
         }), 500
 
 @app.route('/api/fcm/stats', methods=['GET'])
@@ -4067,7 +4108,7 @@ def get_fcm_stats():
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
-                'message': '관리자 권한이 필요합니다.'
+                'message': 'Admin privileges are required.'
             }), 403
         
         token_manager = get_fcm_token_manager()
@@ -4079,10 +4120,10 @@ def get_fcm_stats():
         })
         
     except Exception as e:
-        logger.error(f"FCM 통계 조회 중 오류: {str(e)}")
+        logger.error(f"Error fetching FCM stats: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'통계 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while fetching stats: {str(e)}'
         }), 500
 
 @app.route('/api/fcm/export-tokens', methods=['GET'])
@@ -4114,7 +4155,7 @@ def export_fcm_tokens():
                     'is_active': token_info.get('is_active', True)
                 })
         
-        logger.info(f"FCM 토큰 내보내기: {len(tokens_data)}개 토큰")
+        logger.info(f"Exporting FCM tokens: {len(tokens_data)} tokens")
         
         return jsonify({
             'success': True,
@@ -4123,10 +4164,10 @@ def export_fcm_tokens():
         })
         
     except Exception as e:
-        logger.error(f"FCM 토큰 내보내기 중 오류: {str(e)}")
+        logger.error(f"Error exporting FCM tokens: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'토큰 내보내기 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while exporting tokens: {str(e)}'
         }), 500
 
 @app.route('/api/active-users', methods=['GET'])
@@ -4196,10 +4237,10 @@ def get_active_users():
         })
         
     except Exception as e:
-        logger.error(f"활성 사용자 조회 중 오류: {str(e)}")
+        logger.error(f"Error fetching active users: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'활성 사용자 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while fetching active users: {str(e)}'
         }), 500
 
 @app.route('/api/fcm/cleanup', methods=['POST'])
@@ -4211,7 +4252,7 @@ def cleanup_fcm_tokens():
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
-                'message': '관리자 권한이 필요합니다.'
+                'message': 'Admin privileges are required.'
             }), 403
         
         data = request.get_json() or {}
@@ -4222,15 +4263,15 @@ def cleanup_fcm_tokens():
         
         return jsonify({
             'success': True,
-            'message': f'{cleanup_count}개의 비활성 토큰이 정리되었습니다.',
+            'message': f'Cleaned up {cleanup_count} inactive tokens.',
             'cleanup_count': cleanup_count
         })
         
     except Exception as e:
-        logger.error(f"FCM 토큰 정리 중 오류: {str(e)}")
+        logger.error(f"Error cleaning up FCM tokens: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'토큰 정리 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while cleaning up tokens: {str(e)}'
         }), 500
 
 @app.route('/admin-settings')
@@ -4289,7 +4330,7 @@ def get_all_users_api():
         users = get_all_users()
         return jsonify({'success': True, 'users': users})
     except Exception as e:
-        logger.error(f"사용자 목록 조회 실패: {e}")
+        logger.error(f"Failed to retrieve user list: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/users/<username>', methods=['GET'])
@@ -4311,7 +4352,7 @@ def get_user_api(username):
         else:
             return jsonify({'success': False, 'message': 'User not found'}), 404
     except Exception as e:
-        logger.error(f"사용자 정보 조회 실패: {e}")
+        logger.error(f"Failed to retrieve user details: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/users', methods=['POST'])
@@ -4343,13 +4384,13 @@ def add_user_api():
         )
         
         if success:
-            logger.info(f"사용자 추가 성공: {data['username']} by {current_user.username}")
+            logger.info(f"User created successfully: {data['username']} by {current_user.username}")
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'message': message}), 400
             
     except Exception as e:
-        logger.error(f"사용자 추가 실패: {e}")
+        logger.error(f"Failed to create user: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/users/<username>', methods=['PUT'])
@@ -4375,13 +4416,13 @@ def update_user_api(username):
         )
         
         if success:
-            logger.info(f"사용자 수정 성공: {username} by {current_user.username}")
+            logger.info(f"User updated successfully: {username} by {current_user.username}")
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'message': message}), 400
             
     except Exception as e:
-        logger.error(f"사용자 수정 실패: {e}")
+        logger.error(f"Failed to update user: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/users/<username>', methods=['DELETE'])
@@ -4402,13 +4443,13 @@ def delete_user_api(username):
         success, message = delete_user(username)
         
         if success:
-            logger.info(f"사용자 삭제 성공: {username} by {current_user.username}")
+            logger.info(f"User deleted successfully: {username} by {current_user.username}")
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'message': message}), 400
             
     except Exception as e:
-        logger.error(f"사용자 삭제 실패: {e}")
+        logger.error(f"Failed to delete user: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/users/options', methods=['GET'])
@@ -4428,7 +4469,7 @@ def get_user_options_api():
             'locations': get_unique_locations()
         })
     except Exception as e:
-        logger.error(f"사용자 옵션 조회 실패: {e}")
+        logger.error(f"Failed to retrieve user options: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/fcm-admin-dashboard')
@@ -4529,7 +4570,7 @@ def get_alarm_escalation_status():
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
-                'message': '관리자 권한이 필요합니다.'
+                'message': 'Admin privileges are required.'
             }), 403
         
         # SQLite에서 실제 에스컬레이션 정책 조회
@@ -4575,10 +4616,10 @@ def get_alarm_escalation_status():
         })
         
     except Exception as e:
-        logger.error(f"에스컬레이션 상태 조회 중 오류: {str(e)}")
+        logger.error(f"Error retrieving escalation status: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'상태 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while retrieving status: {str(e)}'
         }), 500
 
 
@@ -4622,7 +4663,7 @@ def get_escalation_policies():
     """에스컬레이션 정책 목록 조회 (SQLite 기반)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
@@ -4660,7 +4701,7 @@ def get_escalation_policies():
         })
         
     except Exception as e:
-        logger.error(f"에스컬레이션 정책 조회 실패: {e}")
+        logger.error(f"Failed to fetch escalation policies: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/escalation-policies/<int:policy_id>', methods=['GET'])
@@ -4669,7 +4710,7 @@ def get_escalation_policy_detail(policy_id):
     """특정 에스컬레이션 정책 상세 조회"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
@@ -4683,7 +4724,7 @@ def get_escalation_policy_detail(policy_id):
         
         policy_row = cursor.fetchone()
         if not policy_row:
-            return jsonify({'success': False, 'message': '정책을 찾을 수 없습니다.'}), 404
+            return jsonify({'success': False, 'message': 'Policy not found.'}), 404
         
         policy = {
             'id': policy_row[0],
@@ -4723,7 +4764,7 @@ def get_escalation_policy_detail(policy_id):
         })
         
     except Exception as e:
-        logger.error(f"에스컬레이션 정책 상세 조회 실패: {e}")
+        logger.error(f"Failed to fetch escalation policy details: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
@@ -4741,10 +4782,10 @@ def refresh_clients_api(site):
             from unified_data_sync_manager import get_unified_sync_manager
             manager = get_unified_sync_manager()
         except ImportError:
-            logger.error("통합 데이터 동기화 매니저를 찾을 수 없습니다.")
+            logger.error("Unified data sync manager not found.")
             return jsonify({
                 'success': False,
-                'message': '동기화 매니저를 초기화할 수 없습니다.'
+                'message': 'Unable to initialize the sync manager.'
             }), 500
         
         # 새로고침 실행 (클라이언트 데이터만)
@@ -4754,21 +4795,21 @@ def refresh_clients_api(site):
             changes = result['total_changes']
             return jsonify({
                 'success': True,
-                'message': f'{site} 클라이언트 데이터 업데이트 완료',
+                'message': f'{site} client data update completed',
                 'changes': changes,
-                'summary': f"신규 {changes['added']}명, 업데이트 {changes['updated']}명, 제거 {changes['removed']}명"
+                'summary': f"Added {changes['added']}, updated {changes['updated']}, removed {changes['removed']}"
             })
         else:
             return jsonify({
                 'success': False,
-                'message': f'{site} 클라이언트 데이터 업데이트 실패'
+                'message': f'{site} client data update failed'
             }), 500
             
     except Exception as e:
-        logger.error(f"클라이언트 새로고침 API 오류: {str(e)}")
+        logger.error(f"Client refresh API error: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'새로고침 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred during refresh: {str(e)}'
         }), 500
 
 @app.route('/api/clients/sync-status', methods=['GET'])
@@ -4783,7 +4824,7 @@ def get_client_sync_status():
         except ImportError:
             return jsonify({
                 'success': False,
-                'message': '동기화 매니저를 찾을 수 없습니다.'
+                'message': 'Sync manager not found.'
             }), 500
         
         # 동기화 상태 조회 (클라이언트 데이터만)
@@ -4815,10 +4856,10 @@ def get_client_sync_status():
         })
         
     except Exception as e:
-        logger.error(f"동기화 상태 조회 API 오류: {str(e)}")
+        logger.error(f"Sync status API error: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'상태 조회 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred while fetching status: {str(e)}'
         }), 500
 
 @app.route('/api/clients/refresh-all', methods=['POST'])
@@ -4833,7 +4874,7 @@ def refresh_all_clients_api():
         except ImportError:
             return jsonify({
                 'success': False,
-                'message': '동기화 매니저를 찾을 수 없습니다.'
+                'message': 'Sync manager not found.'
             }), 500
         
         # 전체 데이터 새로고침 (모든 데이터)
@@ -4841,15 +4882,15 @@ def refresh_all_clients_api():
         
         return jsonify({
             'success': True,
-            'message': f'전체 데이터 동기화 완료: {results["summary"]["total_records"]}개 레코드',
+            'message': f'Full data sync completed: {results["summary"]["total_records"]} records',
             'summary': results['summary']
         })
         
     except Exception as e:
-        logger.error(f"전체 새로고침 API 오류: {str(e)}")
+        logger.error(f"Refresh-all API error: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'전체 새로고침 중 오류가 발생했습니다: {str(e)}'
+            'message': f'An error occurred during full refresh: {str(e)}'
         }), 500
 
 # ==============================
@@ -4862,7 +4903,7 @@ def create_escalation_policy_unified():
     """통합 에스컬레이션 정책 생성 (FCM 디바이스 기반)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         data = request.get_json()
         
@@ -4905,7 +4946,7 @@ def create_escalation_policy_unified():
             return jsonify({
                 'success': True,
                 'policy_id': policy_id,
-                'message': '에스컬레이션 정책이 성공적으로 생성되었습니다.',
+                'message': 'Escalation policy created successfully.',
                 'steps_created': len(data['steps'])
             })
             
@@ -4916,7 +4957,7 @@ def create_escalation_policy_unified():
             conn.close()
         
     except Exception as e:
-        logger.error(f"에스컬레이션 정책 생성 실패: {e}")
+        logger.error(f"Failed to create escalation policy: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/escalation-policies/<int:policy_id>', methods=['PUT'])
@@ -4925,7 +4966,7 @@ def update_escalation_policy_unified(policy_id):
     """통합 에스컬레이션 정책 업데이트"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         data = request.get_json()
         
@@ -4969,7 +5010,7 @@ def update_escalation_policy_unified(policy_id):
             
             return jsonify({
                 'success': True,
-                'message': '에스컬레이션 정책이 성공적으로 업데이트되었습니다.',
+                'message': 'Escalation policy updated successfully.',
                 'steps_updated': len(data['steps'])
             })
             
@@ -4980,7 +5021,7 @@ def update_escalation_policy_unified(policy_id):
             conn.close()
         
     except Exception as e:
-        logger.error(f"에스컬레이션 정책 업데이트 실패: {e}")
+        logger.error(f"Failed to update escalation policy: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/escalation-policies/<int:policy_id>', methods=['DELETE'])
@@ -4989,7 +5030,7 @@ def delete_escalation_policy_unified(policy_id):
     """통합 에스컬레이션 정책 삭제"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
@@ -5013,7 +5054,7 @@ def delete_escalation_policy_unified(policy_id):
             
             return jsonify({
                 'success': True,
-                'message': '에스컬레이션 정책이 성공적으로 삭제되었습니다.'
+                'message': 'Escalation policy deleted successfully.'
             })
             
         except Exception as e:
@@ -5023,7 +5064,7 @@ def delete_escalation_policy_unified(policy_id):
             conn.close()
         
     except Exception as e:
-        logger.error(f"에스컬레이션 정책 삭제 실패: {e}")
+        logger.error(f"Failed to delete escalation policy: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/escalation-policies/test', methods=['POST'])
@@ -5032,7 +5073,7 @@ def test_escalation_policy_unified():
     """통합 에스컬레이션 정책 테스트"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         data = request.get_json()
         
@@ -5054,11 +5095,11 @@ def test_escalation_policy_unified():
             'total_notifications': total_notifications,
             'total_duration': total_duration,
             'device_count': device_count,
-            'message': f'테스트 완료: {device_count}개 디바이스에 총 {total_notifications}개 알림'
+            'message': f'Test complete: {total_notifications} notifications to {device_count} devices'
         })
         
     except Exception as e:
-        logger.error(f"에스컬레이션 정책 테스트 실패: {e}")
+        logger.error(f"Escalation policy test failed: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/recipient-groups', methods=['POST'])
@@ -5067,14 +5108,14 @@ def save_recipient_group():
     """수신자 그룹 저장 (FCM 디바이스 기반)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         data = request.get_json()
         group_name = data.get('group_name')
         devices = data.get('devices', [])
         
         if not group_name or not devices:
-            return jsonify({'success': False, 'message': '그룹명과 디바이스를 선택하세요.'}), 400
+            return jsonify({'success': False, 'message': 'Please select a group name and devices.'}), 400
         
         # 수신자 그룹 테이블이 없다면 생성
         conn = sqlite3.connect('progress_report.db')
@@ -5103,11 +5144,11 @@ def save_recipient_group():
         
         return jsonify({
             'success': True,
-            'message': f'{group_name} 그룹에 {len(devices)}개 디바이스가 저장되었습니다.'
+            'message': f'Saved {len(devices)} devices to group {group_name}.'
         })
         
     except Exception as e:
-        logger.error(f"수신자 그룹 저장 실패: {e}")
+        logger.error(f"Failed to save recipient group: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/test-group-notification', methods=['POST'])
@@ -5116,14 +5157,14 @@ def test_group_notification():
     """그룹 알림 테스트"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         data = request.get_json()
         devices = data.get('devices', [])
-        message = data.get('message', '테스트 알림입니다.')
+        message = data.get('message', 'This is a test notification.')
         
         if not devices:
-            return jsonify({'success': False, 'message': '테스트할 디바이스를 선택하세요.'}), 400
+            return jsonify({'success': False, 'message': 'Please select devices to test.'}), 400
         
         # FCM 토큰 조회
         conn = sqlite3.connect('progress_report.db')
@@ -5140,7 +5181,7 @@ def test_group_notification():
         conn.close()
         
         if not tokens:
-            return jsonify({'success': False, 'message': '활성 토큰을 찾을 수 없습니다.'}), 404
+            return jsonify({'success': False, 'message': 'No active tokens found.'}), 404
         
         # 실제 FCM 전송 (여기서는 시뮬레이션)
         sent_count = len(tokens)
@@ -5150,13 +5191,13 @@ def test_group_notification():
         
         return jsonify({
             'success': True,
-            'message': f'{sent_count}개 디바이스에 테스트 알림을 전송했습니다.',
+            'message': f'Sent test notification to {sent_count} devices.',
             'sent_count': sent_count,
             'devices_tested': devices
         })
         
     except Exception as e:
-        logger.error(f"그룹 알림 테스트 실패: {e}")
+        logger.error(f"Group notification test failed: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
@@ -5182,12 +5223,12 @@ def get_workflow_status():
         # 임시 응답 (기능 비활성화)
         return jsonify({
             'success': False,
-            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.',
+            'message': 'Task Manager is disabled because it is part of the JSON-only system.',
             'workflow_status': 'unavailable'
         })
         
     except Exception as e:
-        logger.error(f"워크플로우 상태 조회 오류: {str(e)}")
+        logger.error(f"Workflow status lookup error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/workflow/tasks/complete', methods=['POST'])
@@ -5202,7 +5243,7 @@ def complete_workflow_task():
         return complete_task_api(task_id)
         
     except Exception as e:
-        logger.error(f"워크플로우 작업 완료 오류: {str(e)}")
+        logger.error(f"Workflow task completion error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/workflow/tasks/details', methods=['GET'])
@@ -5216,7 +5257,7 @@ def get_workflow_task_details():
         return get_task_detail(task_id)
         
     except Exception as e:
-        logger.error(f"워크플로우 작업 상세 조회 오류: {str(e)}")
+        logger.error(f"Workflow task details lookup error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/workflow/tasks/status', methods=['PUT'])
@@ -5260,7 +5301,7 @@ def update_workflow_task_status():
             })
         
     except Exception as e:
-        logger.error(f"작업 상태 업데이트 오류: {str(e)}")
+        logger.error(f"Task status update error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/policies/details', methods=['GET'])
@@ -5274,7 +5315,7 @@ def get_policy_details_mobile():
         return get_escalation_policy_detail(int(policy_id))
         
     except Exception as e:
-        logger.error(f"정책 상세 조회 오류: {str(e)}")
+        logger.error(f"Policy details lookup error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/incidents/details', methods=['GET'])
@@ -5360,7 +5401,7 @@ def get_incident_details_mobile():
         })
         
     except Exception as e:
-        logger.error(f"인시던트 상세 조회 오류: {str(e)}")
+        logger.error(f"Incident details lookup error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
@@ -5380,7 +5421,7 @@ def create_task_workflow():
         
         created_by = data.get('created_by', 'system')  # 모바일 앱에서 제공하거나 기본값
         
-        logger.info(f"워크플로우 생성 요청: incident_id={data['incident_id']}, created_by={created_by}")
+        logger.info(f"Workflow creation requested: incident_id={data['incident_id']}, created_by={created_by}")
         
         # Task Manager 비활성화됨 - JSON 전용 시스템
         # task_manager = get_task_manager()
@@ -5398,7 +5439,7 @@ def create_task_workflow():
         # 임시 응답 (기능 비활성화)
         result = {
             'success': False,
-            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.'
+            'message': 'Task Manager is disabled because it is part of the JSON-only system.'
         }
         
         if result['success']:
@@ -5407,7 +5448,7 @@ def create_task_workflow():
             return jsonify(result), 500
             
     except Exception as e:
-        logger.error(f"워크플로우 생성 API 오류: {str(e)}")
+        logger.error(f"Workflow creation API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/tasks/<task_id>/complete', methods=['POST'])
@@ -5418,7 +5459,7 @@ def complete_task_api(task_id):
         notes = data.get('notes', '')
         completed_by = data.get('completed_by', 'mobile_user')  # 모바일 앱에서 제공
         
-        logger.info(f"작업 완료 요청: task_id={task_id}, completed_by={completed_by}")
+        logger.info(f"Task completion requested: task_id={task_id}, completed_by={completed_by}")
         
         # Task Manager 비활성화됨 - JSON 전용 시스템
         # task_manager = get_task_manager()
@@ -5431,7 +5472,7 @@ def complete_task_api(task_id):
         # 임시 응답 (기능 비활성화)
         result = {
             'success': False,
-            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.'
+            'message': 'Task Manager is disabled because it is part of the JSON-only system.'
         }
         
         if result['success']:
@@ -5440,7 +5481,7 @@ def complete_task_api(task_id):
             return jsonify(result), 400
             
     except Exception as e:
-        logger.error(f"작업 완료 API 오류: {str(e)}")
+        logger.error(f"Task completion API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/tasks/my-tasks', methods=['GET'])
@@ -5459,7 +5500,7 @@ def get_my_tasks():
         else:
             assigned_role = 'RN'  # 기본값
         
-        logger.info(f"사용자 작업 조회: user_role={user_role}, assigned_role={assigned_role}, site={site}, status={status}")
+        logger.info(f"Fetching user tasks: user_role={user_role}, assigned_role={assigned_role}, site={site}, status={status}")
         
         # Task Manager 비활성화됨 - JSON 전용 시스템
         # task_manager = get_task_manager()
@@ -5476,7 +5517,7 @@ def get_my_tasks():
         })
         
     except Exception as e:
-        logger.error(f"작업 목록 조회 API 오류: {str(e)}")
+        logger.error(f"Task list API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/tasks/<task_id>', methods=['GET'])
@@ -5546,7 +5587,7 @@ def get_task_detail(task_id):
         })
         
     except Exception as e:
-        logger.error(f"작업 상세 조회 API 오류: {str(e)}")
+        logger.error(f"Task detail API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         if conn:
@@ -5567,7 +5608,7 @@ def send_task_notifications():
         # 임시 응답 (기능 비활성화)
         result = {
             'success': False,
-            'message': 'Task Manager는 JSON 전용 시스템으로 인해 비활성화되었습니다.',
+            'message': 'Task Manager is disabled because it is part of the JSON-only system.',
             'sent_count': 0,
             'failed_count': 0
         }
@@ -5575,7 +5616,7 @@ def send_task_notifications():
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"작업 알림 전송 API 오류: {str(e)}")
+        logger.error(f"Task notification send API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
@@ -5637,7 +5678,7 @@ def get_memory_status():
             'data': summary
         })
     except Exception as e:
-        logger.error(f"메모리 상태 조회 오류: {e}")
+        logger.error(f"Error fetching memory status: {e}")
         return jsonify({
             'success': False,
             'message': str(e)
@@ -5656,7 +5697,7 @@ def get_memory_history():
             'data': history
         })
     except Exception as e:
-        logger.error(f"메모리 히스토리 조회 오류: {e}")
+        logger.error(f"Error retrieving memory history: {e}")
         return jsonify({
             'success': False,
             'message': str(e)
@@ -5672,10 +5713,10 @@ def force_garbage_collection():
         return jsonify({
             'success': True,
             'data': result,
-            'message': f'{result["freed_mb"]}MB 메모리 해제됨'
+            'message': f'{result["freed_mb"]}MB memory freed'
         })
     except Exception as e:
-        logger.error(f"가비지 컬렉션 실행 오류: {e}")
+        logger.error(f"Error running garbage collection: {e}")
         return jsonify({
             'success': False,
             'message': str(e)
@@ -5923,7 +5964,7 @@ def get_cims_tasks():
         })
         
     except Exception as e:
-        logger.error(f"CIMS 태스크 조회 API 오류: {str(e)}")
+        logger.error(f"CIMS task fetch API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/cims/incidents', methods=['GET', 'POST'])
@@ -5952,7 +5993,7 @@ def get_fall_statistics():
         try:
             from services.fall_policy_detector import fall_detector
         except ImportError as e:
-            logger.warning(f"fall_policy_detector 모듈을 임포트할 수 없습니다: {e}")
+            logger.warning(f"Unable to import fall_policy_detector module: {e}")
             fall_detector = None
         
         # Fall incidents 조회 (최근 30일) - fall_type 포함
@@ -6046,14 +6087,16 @@ def get_fall_statistics():
             stats['unwitnessed_percentage'] = 0
             stats['unknown_percentage'] = 0
         
-        logger.info(f"📊 Fall 통계 조회: {stats['total_falls']}개 (W: {stats['witnessed']}, UW: {stats['unwitnessed']})")
+        logger.info(
+            f"📊 Fall stats: {stats['total_falls']} (W: {stats['witnessed']}, UW: {stats['unwitnessed']})"
+        )
         return jsonify(stats)
         
     except Exception as e:
-        logger.error(f"Fall 통계 조회 오류: {str(e)}")
+        logger.error(f"Error fetching fall stats: {str(e)}")
         import traceback
         error_trace = traceback.format_exc()
-        logger.error(f"Fall 통계 조회 상세 오류:\n{error_trace}")
+        logger.error(f"Fall stats detailed error:\n{error_trace}")
         return jsonify({
             'error': 'Internal server error',
             'message': str(e),
@@ -6209,7 +6252,7 @@ def trigger_progress_note_sync():
         if not (current_user.is_admin() or current_user.role in ['clinical_manager']):
             return jsonify({'error': 'Access denied'}), 403
         
-        logger.info(f"Progress Note 동기화 수동 트리거 by {current_user.username} (비활성화됨)")
+        logger.info(f"Progress Note sync manually triggered by {current_user.username} (disabled)")
         # result = sync_progress_notes_from_manad_to_cims()
         
         return jsonify({
@@ -6219,7 +6262,7 @@ def trigger_progress_note_sync():
         })
         
     except Exception as e:
-        logger.error(f"Progress Note 동기화 트리거 오류: {str(e)}")
+        logger.error(f"Progress Note sync trigger error: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/cims/check-progress-notes/<task_id>', methods=['GET'])
@@ -6406,13 +6449,13 @@ def _cache_clients_to_db(clients: list, site_name: str, cursor) -> None:
                     datetime.now().isoformat()
                 ))
             except Exception as e:
-                logger.warning(f"클라이언트 캐싱 오류 (ID: {client.get('Id', 'unknown')}): {e}")
+                logger.warning(f"Client caching error (ID: {client.get('Id', 'unknown')}): {e}")
                 continue
         
-        logger.info(f"✅ {len(clients)}명의 클라이언트 캐시 완료: {site_name}")
+        logger.info(f"✅ Client cache completed: {site_name} - {len(clients)} clients")
         
     except Exception as e:
-        logger.error(f"클라이언트 캐시 업데이트 오류: {e}")
+        logger.error(f"Client cache update error: {e}")
 
 def get_api_config_for_site(site_name):
     """사이트별 API 설정 생성"""
@@ -6444,7 +6487,7 @@ def sync_progress_notes_from_manad_to_cims():
     # TODO: 나중에 DB 직접 접속으로 Post Fall Progress Note 조회 및 Task 완료 처리 재구현
     # - manad_db_connector에서 Post Fall Progress Note 조회 메서드 추가
     # - Task와 매칭하여 자동 완료 처리
-    logger.info("⚠️ Progress Note 동기화 비활성화됨 (일시 중단 - DB 직접 접속으로 재구현 예정)")
+    logger.info("⚠️ Progress Note sync is disabled (paused; will be reimplemented with direct DB access)")
     return {'success': True, 'matched': 0, 'message': 'Progress Note sync temporarily disabled'}
 
 def ensure_fall_policy_exists():
@@ -6564,7 +6607,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
         
         if is_first_sync:
             # 첫 동기화: 최근 30일 (또는 더 많이)
-            logger.info("🔄 첫 동기화 시작: 최근 30일 데이터")
+            logger.info("🔄 Initial sync starting: last 30 days of data")
             start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         else:
             # 증분 동기화: 마지막 동기화 시간 이후
@@ -6578,11 +6621,11 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 # 마지막 동기화 시간 사용 (약간의 중복 허용을 위해 1시간 전부터)
                 last_sync_dt = datetime.fromisoformat(last_sync_result[0])
                 start_date = (last_sync_dt - timedelta(hours=1)).strftime('%Y-%m-%d')
-                logger.info(f"📥 증분 동기화: {last_sync_result[0]} 이후 변경분")
+                logger.info(f"📥 Incremental sync: changes since {last_sync_result[0]}")
             else:
                 # 동기화 기록 없으면 최근 7일
                 start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-                logger.info("🔄 동기화 기록 없음: 최근 7일 데이터")
+                logger.info("🔄 No sync record: last 7 days of data")
         
         end_date = datetime.now().strftime('%Y-%m-%d')
         conn.close()
@@ -6597,7 +6640,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 # MANAD 데이터 가져오기 (항상 DB 직접 접속 사용)
                 try:
                     from manad_db_connector import fetch_incidents_with_client_data_from_db
-                    logger.info(f"🔌 DB 직접 접속 모드: {site_name}")
+                    logger.info(f"🔌 Direct DB access mode: {site_name}")
                     incidents_data = fetch_incidents_with_client_data_from_db(
                         site_name, start_date, end_date, 
                         fetch_clients=is_first_sync
@@ -6611,7 +6654,11 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                     # Incident가 0개인 경우는 정상 (해당 기간에 Incident가 없을 수 있음)
                     incident_count = len(incidents_data.get('incidents', []))
                     if incident_count == 0:
-                        logger.info(f"📭 {site_name}: 최근 {(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days}일간 Incident 없음 (정상)")
+                        logger.info(
+                            f"📭 {site_name}: no incidents in the last "
+                            f"{(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days} "
+                            f"days (OK)"
+                        )
                 except Exception as db_error:
                     error_msg = f"❌ DB 직접 접속 실패: {site_name} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
                     logger.error(error_msg)
@@ -6628,7 +6675,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 불필요
                 clients_dict = {client.get('id', client.get('Id', '')): client for client in clients}
                 
-                logger.info(f"📋 클라이언트 매핑 완료: {len(clients_dict)}명 (최신 데이터)")
+                logger.info(f"📋 Client mapping completed: {len(clients_dict)} clients (latest data)")
                 
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -6881,10 +6928,12 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             """, (sync_completion_time, sync_completion_time))
             conn.commit()
             conn.close()
-            logger.info(f"✅ last_incident_sync_time 업데이트 완료: {sync_completion_time}")
-            logger.info(f"📡 동기화 완료 이벤트 발생: {sync_completion_time} (프론트엔드가 감지하여 자동 새로고침)")
+            logger.info(f"✅ last_incident_sync_time updated: {sync_completion_time}")
+            logger.info(
+                f"📡 Sync completion event emitted: {sync_completion_time} (frontend will detect and auto-refresh)"
+            )
         except Exception as e:
-            logger.error(f"❌ last_incident_sync_time 업데이트 실패: {e}")
+            logger.error(f"❌ Failed to update last_incident_sync_time: {e}")
         
         # 🚀 백그라운드 싱크 완료 후 타스크가 없는 Fall 인시던트에 대해 타스크 생성
         try:
@@ -6906,7 +6955,9 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             fall_incidents_without_tasks = cursor.fetchall()
             
             if fall_incidents_without_tasks:
-                logger.info(f"🔍 {len(fall_incidents_without_tasks)}개 Fall 인시던트에 타스크가 없음 - 자동 생성 시작...")
+                logger.info(
+                    f"🔍 {len(fall_incidents_without_tasks)} fall incidents have no tasks - starting auto-generation..."
+                )
                 tasks_generated = 0
                 
                 for incident_row in fall_incidents_without_tasks:
@@ -6919,19 +6970,19 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                         num_tasks = auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor)
                         if num_tasks > 0:
                             tasks_generated += num_tasks
-                            logger.info(f"✅ Incident {incident_id}: {num_tasks} tasks 생성됨")
+                            logger.info(f"✅ Incident {incident_id}: {num_tasks} tasks created")
                     except Exception as task_error:
-                        logger.warning(f"⚠️ Incident {incident_id} task 생성 실패: {task_error}")
+                        logger.warning(f"⚠️ Incident {incident_id} task creation failed: {task_error}")
                 
                 if tasks_generated > 0:
                     conn.commit()
-                    logger.info(f"✅ 총 {tasks_generated}개 tasks 생성 완료")
+                    logger.info(f"✅ Total tasks created: {tasks_generated}")
                 else:
                     conn.rollback()
             
             conn.close()
         except Exception as task_gen_error:
-            logger.error(f"❌ 백그라운드 타스크 생성 중 오류: {task_gen_error}")
+            logger.error(f"❌ Error during background task generation: {task_gen_error}")
         
         return {'success': True, 'synced': total_synced, 'updated': total_updated}
         
@@ -7071,7 +7122,7 @@ def get_cims_incidents():
         # 초기 동기화인 경우 전체 동기화로 전환
         if incident_count == 0 and not last_sync_result and should_sync:
             full_sync = True
-            logger.info(f"🆕 초기 로드 감지 - 자동 전체 동기화 시작 (인시던트: {incident_count}개)")
+            logger.info(f"🆕 Initial load detected - starting automatic full sync (incidents: {incident_count})")
         
         # 필요시 동기화 실행 (백그라운드로)
         if should_sync:
@@ -7092,20 +7143,20 @@ def get_cims_incidents():
             def background_sync():
                 try:
                     sync_type = "전체 동기화 (30일)" if full_sync else "증분 동기화"
-                    logger.info(f"🔄 백그라운드 동기화 시작: {sync_type}")
+                    logger.info(f"🔄 Starting background sync: {sync_type}")
                     sync_result = sync_incidents_from_manad_to_cims(full_sync=full_sync)
                     
                     # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
-                    # logger.info(f"🔄 Progress Note 동기화 시작...")
+                    # logger.info("🔄 Starting Progress Note sync...")
                     # pn_sync_result = sync_progress_notes_from_manad_to_cims()
                     
-                    logger.info(f"✅ 백그라운드 동기화 완료: Incidents={sync_result}")
+                    logger.info(f"✅ Background sync completed: Incidents={sync_result}")
                 except Exception as e:
-                    logger.error(f"❌ 백그라운드 동기화 오류: {e}")
+                    logger.error(f"❌ Background sync error: {e}")
             
             sync_thread = threading.Thread(target=background_sync, daemon=True)
             sync_thread.start()
-            logger.info(f"⚡ 백그라운드 동기화 시작됨 (페이지 로딩은 즉시 계속...)")
+            logger.info("⚡ Background sync started (page load continues immediately...)")
         
         # 필터 파라미터 확인
         site_filter = request.args.get('site')
@@ -7136,7 +7187,7 @@ def get_cims_incidents():
         if use_db_direct:
             # 🔌 DB 직접 접속 모드: MANAD DB에서 최신 인시던트 조회
             # ⚠️ 주의: 이 모드는 KPI와 데이터 소스가 달라서 불일치 발생 가능
-            logger.info(f"🔌 DB 직접 접속 모드: integrated_dashboard 인시던트 조회")
+            logger.info("🔌 Direct DB access mode: integrated_dashboard incident query")
             
             try:
                 from manad_db_connector import fetch_incidents_with_client_data_from_db
@@ -7231,13 +7282,13 @@ def get_cims_incidents():
                                     datetime.now().isoformat()  # created_at (임시)
                                 ))
                     except Exception as site_error:
-                        logger.error(f"❌ {site_name} 인시던트 조회 실패: {site_error}")
+                        logger.error(f"❌ Incident query failed for {site_name}: {site_error}")
                         continue
                 
-                logger.info(f"✅ DB 직접 접속: {len(incidents)}개 인시던트 조회 완료")
+                logger.info(f"✅ Direct DB access: fetched {len(incidents)} incidents")
                 
             except Exception as db_error:
-                logger.error(f"❌ DB 직접 접속 실패: {db_error}")
+                logger.error(f"❌ Direct DB access failed: {db_error}")
                 # Fallback: CIMS DB에서 조회
                 use_db_direct = False
         
@@ -7277,7 +7328,7 @@ def get_cims_incidents():
                     if 'database is locked' in str(e) and attempt < 4:
                         time.sleep(0.25 * (attempt + 1))
                         continue
-                    logger.error("Open 인시던트 조회 오류: database is locked (fallback)")
+                    logger.error("Open incident query error: database is locked (fallback)")
                     return jsonify({'incidents': [], 'stale': True}), 200
             
             incidents = cursor.fetchall()
@@ -7344,11 +7395,11 @@ def get_cims_incidents():
         finally:
             conn_fall.close()
         
-        logger.info(f"📤 API 응답: {len(result)}개 인시던트 반환 (모든 상태 포함)")
+        logger.info(f"📤 API response: returning {len(result)} incidents (all statuses)")
         return jsonify({'incidents': result, 'stale': False})
         
     except Exception as e:
-        logger.error(f"Open 인시던트 조회 오류: {str(e)}")
+        logger.error(f"Open incident query error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 def create_cims_incident():
@@ -7441,7 +7492,7 @@ def create_cims_incident():
         })
         
     except Exception as e:
-        logger.error(f"CIMS 인시던트 생성 API 오류: {str(e)}")
+        logger.error(f"CIMS incident create API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/cims/tasks/<int:task_id>/complete', methods=['POST'])
@@ -7470,7 +7521,7 @@ def complete_cims_task(task_id):
             }), 500
         
     except Exception as e:
-        logger.error(f"CIMS 태스크 완료 API 오류: {str(e)}")
+        logger.error(f"CIMS task completion API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/cims/progress-notes', methods=['POST'])
@@ -7562,7 +7613,7 @@ def create_cims_progress_note():
         })
         
     except Exception as e:
-        logger.error(f"CIMS 진행 노트 생성 API 오류: {str(e)}")
+        logger.error(f"CIMS progress note create API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 def check_and_update_incident_status(incident_id):
@@ -7626,15 +7677,17 @@ def check_and_update_incident_status(incident_id):
             
         except sqlite3.OperationalError as e:
             if 'database is locked' in str(e) and attempt < max_retries - 1:
-                logger.warning(f"⏳ 인시던트 상태 업데이트 재시도 ({attempt + 1}/{max_retries}): Incident {incident_id} - DB 잠금")
+                logger.warning(
+                    f"⏳ Retrying incident status update ({attempt + 1}/{max_retries}): Incident {incident_id} - DB locked"
+                )
                 time.sleep(retry_delay)
                 retry_delay *= 2  # 지수 백오프
                 continue
             else:
-                logger.error(f"인시던트 상태 업데이트 오류: Incident {incident_id} - {str(e)}")
+                logger.error(f"Incident status update error: Incident {incident_id} - {str(e)}")
                 return
         except Exception as e:
-            logger.error(f"인시던트 상태 업데이트 오류: Incident {incident_id} - {str(e)}")
+            logger.error(f"Incident status update error: Incident {incident_id} - {str(e)}")
             return
 
 @app.route('/api/cims/dashboard-kpis')
@@ -7795,7 +7848,7 @@ def get_dashboard_kpis():
         })
         
     except Exception as e:
-        logger.error(f"Dashboard KPI 조회 오류: {str(e)}")
+        logger.error(f"Dashboard KPI query error: {str(e)}")
         import traceback
         error_trace = traceback.format_exc()
         logger.error(error_trace)
@@ -8012,7 +8065,7 @@ def get_dashboard_stats():
         })
         
     except Exception as e:
-        logger.error(f"Dashboard Stats 조회 오류: {str(e)}")
+        logger.error(f"Dashboard Stats query error: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
         return jsonify({'error': 'Internal server error'}), 500
@@ -8031,7 +8084,7 @@ def reset_cims_database():
         if not (current_user.is_admin() or current_user.role == 'clinical_manager'):
             return jsonify({'success': False, 'error': 'Access denied'}), 403
         
-        logger.info(f"🗑️ CIMS DB 초기화 시작 - User: {current_user.username}")
+        logger.info(f"🗑️ CIMS DB reset started - User: {current_user.username}")
         
         conn = get_db_connection(read_only=False)
         cursor = conn.cursor()
@@ -8134,7 +8187,7 @@ def reset_cims_database():
         conn.commit()
         conn.close()
         
-        logger.info("✅ CIMS DB 초기화 완료")
+        logger.info("✅ CIMS DB reset completed")
         
         # 5. 초기 강제 동기화 실행
         try:
@@ -8153,7 +8206,7 @@ def reset_cims_database():
         })
         
     except Exception as e:
-        logger.error(f"❌ CIMS DB 초기화 오류: {str(e)}")
+        logger.error(f"❌ CIMS DB reset error: {str(e)}")
         import traceback
         error_trace = traceback.format_exc()
         logger.error(error_trace)
@@ -8312,7 +8365,7 @@ def get_schedule_batch(site, date):
         
         # Tasks가 없고 Fall incidents가 있으면 자동 생성 시도
         if len(incidents_map) > 0 and total_tasks == 0 and fall_policy:
-            logger.info(f"💡 Tasks가 없습니다 - 자동 생성 시도 중...")
+            logger.info("💡 No tasks found - attempting auto-generation...")
             conn_gen = None
             try:
                 conn_gen = get_db_connection()
@@ -8328,16 +8381,16 @@ def get_schedule_batch(site, date):
                             cursor_gen
                         )
                         tasks_generated += num_tasks
-                        logger.info(f"✅ Incident {incident_data['incident_id']}: {num_tasks} tasks 생성됨")
+                        logger.info(f"✅ Incident {incident_data['incident_id']}: {num_tasks} tasks created")
                     except Exception as gen_err:
-                        logger.warning(f"⚠️ Incident {incident_data['incident_id']} task 생성 실패: {gen_err}")
+                        logger.warning(f"⚠️ Incident {incident_data['incident_id']} task creation failed: {gen_err}")
                 
                 conn_gen.commit()
                 
-                logger.info(f"✅ 총 {tasks_generated}개 tasks 생성 완료")
+                logger.info(f"✅ Total tasks created: {tasks_generated}")
                 
             except Exception as e:
-                logger.warning(f"⚠️ Task 자동 생성 실패: {e}")
+                logger.warning(f"⚠️ Task auto-generation failed: {e}")
                 if conn_gen:
                     try:
                         conn_gen.rollback()
@@ -8367,7 +8420,7 @@ def get_schedule_batch(site, date):
         })
         
     except Exception as e:
-        logger.error(f"Batch API 오류: {str(e)}")
+        logger.error(f"Batch API error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/incident/<int:incident_id>/tasks')
@@ -8407,7 +8460,7 @@ def get_incident_tasks(incident_id):
         return jsonify({'tasks': result})
         
     except Exception as e:
-        logger.error(f"Incident tasks 조회 오류: {str(e)}")
+        logger.error(f"Incident tasks query error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/overdue-tasks')
@@ -8426,7 +8479,7 @@ def get_overdue_tasks():
         })
         
     except Exception as e:
-        logger.error(f"기한 초과 태스크 조회 API 오류: {str(e)}")
+        logger.error(f"Overdue tasks query API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/cims/upcoming-tasks')
@@ -8443,7 +8496,7 @@ def get_upcoming_tasks():
         })
         
     except Exception as e:
-        logger.error(f"곧 마감될 태스크 조회 API 오류: {str(e)}")
+        logger.error(f"Tasks due soon query API error: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
@@ -8481,7 +8534,7 @@ def policy_admin():
         return render_template('policy_admin_interface.html', current_user=current_user)
         
     except Exception as e:
-        logger.error(f"정책 관리 인터페이스 로드 오류: {str(e)}")
+        logger.error(f"Error loading policy management interface: {str(e)}")
         flash('Error loading policy management interface', 'error')
         return redirect(url_for('rod_dashboard'))
 
@@ -8522,15 +8575,19 @@ def mobile_dashboard():
         needs_init = (policy_count == 0) or (fall_incident_count > 0 and task_count == 0)
         
         if needs_init:
-            logger.info(f"🆕 Mobile Dashboard 초기화 필요 감지 - Policy: {policy_count}, Fall: {fall_incident_count}, Tasks: {task_count}")
-            logger.info(f"💡 Tip: Settings 페이지에서 Force Synchronization을 실행하면 Policy와 Tasks가 자동 생성됩니다.")
+            logger.info(
+                f"🆕 Mobile Dashboard initialization needed - Policy: {policy_count}, Fall: {fall_incident_count}, Tasks: {task_count}"
+            )
+            logger.info(
+                "💡 Tip: Run Force Synchronization on the Settings page to auto-create Policies and Tasks."
+            )
         
         return render_template('mobile_task_dashboard.html', 
                              current_user=current_user,
                              needs_init=needs_init)
         
     except Exception as e:
-        logger.error(f"모바일 대시보드 로드 오류: {str(e)}")
+        logger.error(f"Error loading mobile dashboard: {str(e)}")
         flash('Error loading mobile dashboard', 'error')
         return redirect(url_for('rod_dashboard'))
 
@@ -8547,7 +8604,7 @@ def task_confirmation():
         return render_template('task_completion_confirmation.html', current_user=current_user)
         
     except Exception as e:
-        logger.error(f"태스크 확인 페이지 로드 오류: {str(e)}")
+        logger.error(f"Error loading task confirmation page: {str(e)}")
         flash('Error loading task confirmation page', 'error')
         return redirect(url_for('rod_dashboard'))
 
@@ -8579,7 +8636,7 @@ def get_policies():
         return jsonify([dict(policy) for policy in policies])
         
     except Exception as e:
-        logger.error(f"정책 목록 조회 오류: {str(e)}")
+        logger.error(f"Error fetching policy list: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/policies/<int:policy_id>', methods=['GET'])
@@ -8603,7 +8660,7 @@ def get_policy(policy_id):
         return jsonify(dict(policy))
         
     except Exception as e:
-        logger.error(f"정책 조회 오류: {str(e)}")
+        logger.error(f"Error fetching policy: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/policies', methods=['POST'])
@@ -8655,7 +8712,7 @@ def create_policy():
         }), 201
         
     except Exception as e:
-        logger.error(f"정책 생성 오류: {str(e)}")
+        logger.error(f"Policy creation error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/policies/<int:policy_id>', methods=['PUT'])
@@ -8696,7 +8753,7 @@ def update_policy(policy_id):
         return jsonify({'message': 'Policy updated successfully'})
         
     except Exception as e:
-        logger.error(f"정책 업데이트 오류: {str(e)}")
+        logger.error(f"Policy update error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/cims/policies/<int:policy_id>', methods=['DELETE'])
@@ -8729,7 +8786,7 @@ def delete_policy(policy_id):
         return jsonify({'message': 'Policy deleted successfully'})
         
     except Exception as e:
-        logger.error(f"정책 삭제 오류: {str(e)}")
+        logger.error(f"Policy deletion error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 # ==============================
@@ -8746,7 +8803,7 @@ def integrated_dashboard():
         
         # 역할별 권한 확인
         if user_role not in ['admin', 'clinical_manager', 'registered_nurse', 'nurse', 'carer']:
-            flash('접근 권한이 없습니다.', 'error')
+            flash('You do not have permission to access this page.', 'error')
             return redirect(url_for('rod_dashboard'))
         
         return render_template('integrated_dashboard.html', 
@@ -8754,8 +8811,8 @@ def integrated_dashboard():
                              current_user=current_user)
         
     except Exception as e:
-        logger.error(f"통합 대시보드 오류: {str(e)}")
-        flash('대시보드를 불러올 수 없습니다.', 'error')
+        logger.error(f"Integrated dashboard error: {str(e)}")
+        flash('Unable to load the dashboard.', 'error')
         return redirect(url_for('rod_dashboard'))
 
 # ==============================
@@ -8783,50 +8840,50 @@ def start_periodic_sync():
             time.sleep(5)
             
             logger.info("=" * 60)
-            logger.info("🚀 서버 시작 - 초기 데이터 동기화 시작 (최근 30일)")
+            logger.info("🚀 Server start - initial data sync started (last 30 days)")
             logger.info("=" * 60)
             
             sync_result = sync_incidents_from_manad_to_cims(full_sync=True)
             
-            logger.info(f"✅ 초기 데이터 동기화 완료: {sync_result}")
+            logger.info(f"✅ Initial data sync completed: {sync_result}")
             logger.info("=" * 60)
         except Exception as e:
-            logger.error(f"❌ 초기 데이터 동기화 오류: {e}")
+            logger.error(f"❌ Initial data sync error: {e}")
     
     def periodic_sync_job():
         """10분마다 실행되는 증분 동기화 작업"""
         try:
             logger.info("=" * 60)
-            logger.info("🔄 [PERIODIC SYNC] 주기적 백그라운드 동기화 시작 (증분 동기화)")
-            logger.info(f"⏰ 동기화 시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info("🔄 [PERIODIC SYNC] Starting periodic background sync (incremental)")
+            logger.info(f"⏰ Sync start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             logger.info("=" * 60)
             
             sync_result = sync_incidents_from_manad_to_cims(full_sync=False)
             
             # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
-            # logger.info("🔄 Progress Note 동기화 시작...")
+            # logger.info("🔄 Starting Progress Note sync...")
             # pn_sync_result = sync_progress_notes_from_manad_to_cims()
             
             logger.info("=" * 60)
-            logger.info(f"✅ [PERIODIC SYNC] 주기적 백그라운드 동기화 완료: Incidents={sync_result}")
-            logger.info(f"⏰ 동기화 완료 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"✅ [PERIODIC SYNC] Periodic background sync completed: Incidents={sync_result}")
+            logger.info(f"⏰ Sync end time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             logger.info("=" * 60)
         except Exception as e:
             logger.error("=" * 60)
-            logger.error(f"❌ [PERIODIC SYNC] 주기적 백그라운드 동기화 오류: {e}")
+            logger.error(f"❌ [PERIODIC SYNC] Periodic background sync error: {e}")
             logger.error("=" * 60)
     
     # 서버 시작 시 초기 동기화 (백그라운드에서)
     initial_thread = threading.Thread(target=initial_sync_job, daemon=True)
     initial_thread.start()
-    logger.info("🚀 초기 데이터 동기화 스레드 시작됨 (5초 후 실행)")
+    logger.info("🚀 Initial data sync thread started (runs after 5 seconds)")
     
     # 10분마다 증분 동기화 실행
     schedule.every(10).minutes.do(periodic_sync_job)
     
     def run_scheduler():
         """스케줄러 실행 루프"""
-        logger.info("🔄 주기적 백그라운드 동기화 스케줄러 시작됨 (10분마다)")
+        logger.info("🔄 Periodic background sync scheduler started (every 10 minutes)")
         last_log_time = None
         while True:
             try:
@@ -8842,31 +8899,22 @@ def start_periodic_sync():
                             time_until_next = (next_run - current_time).total_seconds()
                             minutes = int(time_until_next // 60)
                             seconds = int(time_until_next % 60)
-                            logger.debug(f"⏰ 다음 동기화 예정: {minutes}분 {seconds}초 후 ({next_run.strftime('%H:%M:%S')})")
+                            logger.debug(
+                                f"⏰ Next sync scheduled in {minutes}m {seconds}s ({next_run.strftime('%H:%M:%S')})"
+                            )
                     last_log_time = current_time
                 
                 time.sleep(30)  # 30초마다 스케줄 확인
             except Exception as e:
-                logger.error(f"스케줄러 실행 중 오류: {e}")
+                logger.error(f"Scheduler error: {e}")
                 time.sleep(60)  # 오류 시 1분 대기
     
     # 백그라운드 스레드로 실행
     sync_thread = threading.Thread(target=run_scheduler, daemon=True)
     sync_thread.start()
-    logger.info("✅ 주기적 백그라운드 동기화 스케줄러 시작됨 (10분마다)")
+    logger.info("✅ Periodic background sync scheduler started (every 10 minutes)")
 
 if __name__ == '__main__':
-    # Database schema migration (자동 실행)
-    # Production과 Development 환경의 데이터베이스 스키마 차이를 자동으로 해결
-    try:
-        from migrate_cims_schema import run_migration
-        db_path = flask_config.get('DATABASE_PATH', 'progress_report.db')
-        run_migration(db_path)
-        logger.info("✅ Database schema migration completed")
-    except Exception as e:
-        logger.warning(f"⚠️ Database schema migration failed: {e}")
-        # 마이그레이션 실패해도 앱은 계속 실행
-    
     # CIMS Background Data Processor (선택적)
     # 기능: Dashboard KPI 캐시 생성 (10분마다) → 성능 향상
     # 개발 환경: 비활성화 (즉시 응답 확인 가능)
@@ -8874,23 +8922,23 @@ if __name__ == '__main__':
     if flask_config.get('ENABLE_BACKGROUND_PROCESSOR', False):
         try:
             start_background_processing()
-            logger.info("✅ CIMS Background Processor 시작됨 (Dashboard 성능 향상)")
+            logger.info("✅ CIMS Background Processor started (improves dashboard performance)")
         except Exception as e:
-            logger.warning(f"⚠️ Background Processor 시작 실패: {e}")
+            logger.warning(f"⚠️ Background Processor failed to start: {e}")
     # else: 개발 환경에서는 불필요한 메시지 출력 안 함
     
     # 메모리 모니터링 시작 (개발 환경에서 메모리 누수 감지)
     try:
         start_memory_monitoring()
-        logger.info("✅ 메모리 모니터링 시작됨")
+        logger.info("✅ Memory monitoring started")
     except Exception as e:
-        logger.warning(f"⚠️ 메모리 모니터링 시작 실패: {e}")
+        logger.warning(f"⚠️ Failed to start memory monitoring: {e}")
     
     # 주기적 백그라운드 동기화 시작 (5분마다 증분 동기화)
     try:
         start_periodic_sync()
     except Exception as e:
-        logger.warning(f"⚠️ 주기적 백그라운드 동기화 시작 실패: {e}")
+        logger.warning(f"⚠️ Failed to start periodic background sync: {e}")
     
     # MANAD Plus Integrator (백그라운드 폴링 - 선택적)
     # 현재: 증분 동기화로 충분 (API 호출 시 5분마다 자동 동기화)
@@ -8907,9 +8955,9 @@ if __name__ == '__main__':
         # Stop memory monitoring
         try:
             stop_memory_monitoring()
-            logger.info("메모리 모니터링 중지됨")
+            logger.info("Memory monitoring stopped")
         except Exception as e:
-            logger.error(f"메모리 모니터링 중지 오류: {e}")
+            logger.error(f"Error stopping memory monitoring: {e}")
         
         # Stop background processor when app shuts down (only if it was started)
         if flask_config.get('ENABLE_BACKGROUND_PROCESSOR', False):

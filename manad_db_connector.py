@@ -42,13 +42,13 @@ def _load_site_config() -> List[Dict[str, Any]]:
         if os.path.exists(_site_config_file):
             with open(_site_config_file, 'r', encoding='utf-8') as f:
                 _site_config_cache = json.load(f)
-                logger.info(f"✅ site_config.json 로드 완료: {len(_site_config_cache)}개 사이트")
+                logger.info(f"✅ Loaded site_config.json: {len(_site_config_cache)} sites")
                 return _site_config_cache
         else:
-            logger.warning(f"⚠️ site_config.json 파일이 없습니다: {_site_config_file}")
+            logger.warning(f"⚠️ site_config.json file not found: {_site_config_file}")
             return []
     except Exception as e:
-        logger.error(f"❌ site_config.json 로드 오류: {e}")
+        logger.error(f"❌ Error loading site_config.json: {e}")
         return []
 
 def get_site_db_config(site_name: str) -> Optional[Dict[str, Any]]:
@@ -73,7 +73,7 @@ def get_site_db_config(site_name: str) -> Optional[Dict[str, Any]]:
                     if server_ip:
                         # IP 주소로 변환
                         db_config['server'] = f"{server_ip}\\{instance}" if instance else server_ip
-                        logger.debug(f"🔧 서버 이름 변환: {server} -> {db_config['server']}")
+                        logger.debug(f"🔧 Server name conversion: {server} -> {db_config['server']}")
             
             return db_config
     
@@ -90,7 +90,7 @@ def _install_driver_package(driver_name='pyodbc'):
     import sys
     
     try:
-        logger.info(f"🔧 MSSQL 드라이버 설치 시도: {driver_name}")
+        logger.info(f"🔧 Attempting to install MSSQL driver: {driver_name}")
         result = subprocess.run(
             [sys.executable, '-m', 'pip', 'install', driver_name],
             capture_output=True,
@@ -99,7 +99,7 @@ def _install_driver_package(driver_name='pyodbc'):
         )
         
         if result.returncode == 0:
-            logger.info(f"✅ {driver_name} 설치 완료")
+            logger.info(f"✅ {driver_name} installed")
             # 재import 시도
             if driver_name == 'pyodbc':
                 import pyodbc  # type: ignore
@@ -108,33 +108,33 @@ def _install_driver_package(driver_name='pyodbc'):
                 import pymssql  # type: ignore
                 return 'pymssql'
         else:
-            logger.error(f"❌ {driver_name} 설치 실패: {result.stderr}")
+            logger.error(f"❌ {driver_name} install failed: {result.stderr}")
             return None
     except subprocess.TimeoutExpired:
-        logger.error(f"❌ {driver_name} 설치 타임아웃 (60초 초과)")
+        logger.error(f"❌ {driver_name} install timed out (over 60 seconds)")
         return None
     except Exception as e:
-        logger.error(f"❌ {driver_name} 설치 중 오류: {e}")
+        logger.error(f"❌ Error while installing {driver_name}: {e}")
         return None
 
 # 드라이버 확인 및 자동 설치 시도
 try:
     import pyodbc  # type: ignore
     DRIVER_AVAILABLE = 'pyodbc'
-    logger.debug("✅ pyodbc 드라이버 사용 가능")
+    logger.debug("✅ pyodbc driver available")
 except ImportError:
     try:
         import pymssql  # type: ignore
         DRIVER_AVAILABLE = 'pymssql'
-        logger.debug("✅ pymssql 드라이버 사용 가능")
+        logger.debug("✅ pymssql driver available")
     except ImportError:
         # 자동 설치 시도 (pyodbc 우선)
-        logger.warning("⚠️ MSSQL 드라이버가 설치되지 않았습니다. 자동 설치를 시도합니다...")
+        logger.warning("⚠️ MSSQL driver is not installed. Attempting automatic installation...")
         DRIVER_AVAILABLE = _install_driver_package('pyodbc')
         
         if not DRIVER_AVAILABLE:
             # pyodbc 설치 실패 시 pymssql 시도
-            logger.warning("⚠️ pyodbc 설치 실패. pymssql 설치를 시도합니다...")
+            logger.warning("⚠️ pyodbc install failed. Trying pymssql...")
             DRIVER_AVAILABLE = _install_driver_package('pymssql')
         
         if not DRIVER_AVAILABLE:
@@ -191,9 +191,9 @@ class MANADDBConnector:
             password = db_config.get('password')
             
             if server and database:
-                logger.info(f"📄 site_config.json에서 DB 설정 로드: {site}")
+                logger.info(f"📄 Loaded DB settings from site_config.json: {site}")
             else:
-                logger.warning(f"⚠️ site_config.json에 {site}의 DB 정보가 불완전합니다.")
+                logger.warning(f"⚠️ DB info for {site} is incomplete in site_config.json.")
                 db_config = None  # 폴백으로 진행
         
         # 2. 환경 변수에서 DB 연결 정보 가져오기 (폴백)
@@ -208,18 +208,20 @@ class MANADDBConnector:
             use_windows_auth = use_windows_auth or os.environ.get('MANAD_DB_USE_WINDOWS_AUTH', 'false').lower() == 'true'
             
             if not server or not database:
-                logger.warning(f"⚠️ {site}의 DB 서버/데이터베이스 정보가 설정되지 않았습니다. (site_config.json 또는 환경변수 확인 필요)")
+                logger.warning(
+                    f"⚠️ DB server/database is not configured for {site}. (Check site_config.json or environment variables)"
+                )
                 return None
             
             username = os.environ.get(f'MANAD_DB_USER_{site_key}') or os.environ.get('MANAD_DB_USER')
             password = os.environ.get(f'MANAD_DB_PASSWORD_{site_key}') or os.environ.get('MANAD_DB_PASSWORD')
             
-            logger.info(f"📄 환경변수에서 DB 설정 로드 (폴백): {site}")
+            logger.info(f"📄 Loaded DB settings from environment (fallback): {site}")
         
         # Windows Authentication 사용 여부 확인
         if not use_windows_auth:
             if not username or not password:
-                logger.warning(f"⚠️ {site}의 DB 사용자/비밀번호 정보가 설정되지 않았습니다.")
+                logger.warning(f"⚠️ DB username/password is not configured for {site}.")
                 return None
         
         # pyodbc 연결 문자열
@@ -246,13 +248,13 @@ class MANADDBConnector:
                 if not driver:
                     # 환경 변수에서 지정된 드라이버 사용
                     driver = os.environ.get('MANAD_DB_DRIVER', '{ODBC Driver 17 for SQL Server}')
-                    logger.warning(f"⚠️ 기본 드라이버 사용: {driver} (시스템에 설치되지 않았을 수 있음)")
+                    logger.warning(f"⚠️ Using default driver: {driver} (may not be installed on this system)")
                 else:
-                    logger.debug(f"✅ 사용할 드라이버: {driver}")
+                    logger.debug(f"✅ Driver to use: {driver}")
             except Exception as e:
                 # 폴백: 환경 변수 또는 기본값
                 driver = os.environ.get('MANAD_DB_DRIVER', 'SQL Server')
-                logger.warning(f"⚠️ 드라이버 확인 실패, 기본값 사용: {driver} ({e})")
+                logger.warning(f"⚠️ Driver check failed, using default: {driver} ({e})")
             
             # Windows Authentication 사용
             if use_windows_auth:
@@ -265,7 +267,7 @@ class MANADDBConnector:
                     f"Connection Timeout=30;"
                     f"ApplicationIntent=ReadOnly;"  # 읽기 전용 모드
                 )
-                logger.info(f"✅ Windows Authentication 사용 (READ-ONLY): {site} ({server})")
+                logger.info(f"✅ Using Windows Authentication (READ-ONLY): {site} ({server})")
             else:
                 # SQL Server Authentication 사용
                 conn_str = (
@@ -278,8 +280,8 @@ class MANADDBConnector:
                     f"Connection Timeout=30;"
                     f"ApplicationIntent=ReadOnly;"  # 읽기 전용 모드
                 )
-                logger.info(f"✅ SQL Server Authentication 사용 (READ-ONLY): {site} ({server})")
-                logger.debug(f"   연결 정보: UID={username}, DATABASE={database}")
+                logger.info(f"✅ Using SQL Server Authentication (READ-ONLY): {site} ({server})")
+                logger.debug(f"   Connection info: UID={username}, DATABASE={database}")
             
             return conn_str
         
@@ -287,7 +289,7 @@ class MANADDBConnector:
         elif DRIVER_AVAILABLE == 'pymssql':
             if use_windows_auth:
                 # pymssql은 Windows Authentication을 직접 지원하지 않으므로 경고
-                logger.warning(f"⚠️ pymssql은 Windows Authentication을 지원하지 않습니다. pyodbc를 사용하세요.")
+                logger.warning("⚠️ pymssql does not support Windows Authentication. Use pyodbc instead.")
                 return None
             
             return {
@@ -334,7 +336,7 @@ class MANADDBConnector:
                 cursor = conn.cursor()
                 try:
                     cursor.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
-                    logger.debug(f"🔒 READ-ONLY 모드: {self.site}")
+                    logger.debug(f"🔒 READ-ONLY mode: {self.site}")
                 except:
                     pass  # 일부 환경에서 지원 안 할 수 있음
                 cursor.close()
@@ -359,7 +361,7 @@ class MANADDBConnector:
             # 모든 변경사항은 finally 블록에서 자동 롤백됨
             
         except Exception as e:
-            logger.error(f"❌ DB 연결 오류 ({self.site}): {e}")
+            logger.error(f"❌ DB connection error ({self.site}): {e}")
             raise
         finally:
             if conn:
@@ -368,7 +370,7 @@ class MANADDBConnector:
                     if not conn.autocommit:
                         conn.rollback()
                     conn.close()
-                    logger.debug(f"🔒 연결 종료 (rollback 완료): {self.site}")
+                    logger.debug(f"🔒 Connection closed (rollback complete): {self.site}")
                 except:
                     pass
     
@@ -453,7 +455,7 @@ class MANADDBConnector:
                 start_dt = datetime.fromisoformat(start_date)
                 end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)  # 포함하려면 하루 더
                 
-                logger.info(f"🔍 DB 쿼리 실행: {self.site} ({start_date} ~ {end_date})")
+                logger.info(f"🔍 Executing DB query: {self.site} ({start_date} ~ {end_date})")
                 
                 cursor.execute(query, (start_dt, end_dt))
                 
@@ -468,12 +470,12 @@ class MANADDBConnector:
                     formatted_incident = self._format_incident_for_api(incident_dict)
                     incidents.append(formatted_incident)
                 
-                logger.info(f"✅ {len(incidents)}개 Incident 조회 완료: {self.site}")
+                logger.info(f"✅ Incident fetch completed: {self.site} - {len(incidents)} incidents")
                 
                 return True, incidents
                 
         except Exception as e:
-            logger.error(f"❌ Incident 조회 오류 ({self.site}): {e}")
+            logger.error(f"❌ Incident fetch error ({self.site}): {e}")
             return False, None
     
     def fetch_clients(self) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
@@ -560,14 +562,14 @@ class MANADDBConnector:
                     ORDER BY ISNULL(p.LastName, ''), ISNULL(p.FirstName, '')
                 """
                 
-                logger.info(f"🔍 Client 조회: {self.site}")
+                logger.info(f"🔍 Fetching clients: {self.site}")
                 
                 # 먼저 ClientService를 포함한 쿼리 시도
                 try:
                     cursor.execute(query_with_service)
                 except Exception as e:
                     # ClientService 테이블이 없거나 에러 발생 시 단순 쿼리 사용
-                    logger.warning(f"ClientService 필터링 쿼리 실패, 단순 쿼리 사용: {e}")
+                    logger.warning(f"ClientService filtering query failed; using simple query: {e}")
                     cursor.execute(query_simple)
                 
                 columns = [column[0] for column in cursor.description]
@@ -580,12 +582,12 @@ class MANADDBConnector:
                     formatted_client = self._format_client_for_api(client_dict)
                     clients.append(formatted_client)
                 
-                logger.info(f"✅ {len(clients)}명 Client 조회 완료: {self.site}")
+                logger.info(f"✅ Client fetch completed: {self.site} - {len(clients)} clients")
                 
                 return True, clients
                 
         except Exception as e:
-            logger.error(f"❌ Client 조회 오류 ({self.site}): {e}")
+            logger.error(f"❌ Client fetch error ({self.site}): {e}")
             return False, None
     
     def _format_incident_for_api(self, db_row: Dict) -> Dict[str, Any]:
@@ -685,7 +687,7 @@ class MANADDBConnector:
             if end_date is None:
                 end_date = datetime.now()
             
-            logger.info(f"🔍 [FILTER] fetch_progress_notes 시작 - site={self.site}, client_service_id={client_service_id}, limit={limit}")
+            logger.info(f"🔍 [FILTER] Starting fetch_progress_notes - site={self.site}, client_service_id={client_service_id}, limit={limit}")
             logger.info(f"🔍 [FILTER] Date range: {start_date.date()} ~ {end_date.date()}")
             
             with self.get_connection() as conn:
@@ -737,14 +739,14 @@ class MANADDBConnector:
                 # Event Type 필터링
                 if progress_note_event_type_id is not None:
                     query += " AND pn.ProgressNoteEventTypeId = ?"
-                    logger.info(f"🔍 [FILTER] Event Type 필터 추가: {progress_note_event_type_id}")
+                    logger.info(f"🔍 [FILTER] Added Event Type filter: {progress_note_event_type_id}")
                 
                 # Client Service ID 필터링
                 if client_service_id is not None:
                     query += " AND pn.ClientServiceId = ?"
-                    logger.info(f"🔍 [FILTER] Client Service ID 필터 추가: {client_service_id} (타입: {type(client_service_id)})")
+                    logger.info(f"🔍 [FILTER] Adding Client Service ID filter: {client_service_id} (type: {type(client_service_id)})")
                 else:
-                    logger.info(f"🔍 [FILTER] Client Service ID 필터 없음 - 모든 클라이언트 조회")
+                    logger.info("🔍 [FILTER] No Client Service ID filter - fetching all clients")
                 
                 query += " ORDER BY pn.Date DESC"
                 
@@ -754,22 +756,22 @@ class MANADDBConnector:
                 if client_service_id is not None:
                     params.append(client_service_id)
                 
-                logger.info(f"🔍 [FILTER] SQL 쿼리 실행 준비 완료")
+                logger.info("🔍 [FILTER] SQL query prepared")
                 logger.info(f"🔍 [FILTER] Query params: limit={limit}, start_date={start_date}, end_date={end_date}, client_service_id={client_service_id}")
-                logger.info(f"🔍 Progress Notes 조회: {self.site} ({start_date.date()} ~ {end_date.date()})")
-                logger.info(f"🔍 [FILTER] SQL 쿼리 실행 시작...")
+                logger.info(f"🔍 Fetching Progress Notes: {self.site} ({start_date.date()} ~ {end_date.date()})")
+                logger.info("🔍 [FILTER] Executing SQL query...")
                 
                 cursor.execute(query, params)
-                logger.info(f"🔍 [FILTER] SQL 쿼리 실행 완료")
+                logger.info("🔍 [FILTER] SQL query completed")
                 
                 columns = [column[0] for column in cursor.description]
                 progress_notes = []
                 progress_note_ids = []
                 
-                logger.info(f"🔍 [FILTER] 쿼리 결과 컬럼 수: {len(columns)}")
-                logger.info(f"🔍 [FILTER] fetchall() 호출 시작...")
+                logger.info(f"🔍 [FILTER] Query column count: {len(columns)}")
+                logger.info("🔍 [FILTER] Calling fetchall()...")
                 rows = cursor.fetchall()
-                logger.info(f"🔍 [FILTER] fetchall() 결과: {len(rows)}개 행 반환")
+                logger.info(f"🔍 [FILTER] fetchall() returned {len(rows)} rows")
                 for row in rows:
                     note_dict = dict(zip(columns, row))
                     progress_note_ids.append(note_dict['Id'])
@@ -864,19 +866,23 @@ class MANADDBConnector:
                     
                     progress_notes.append(formatted_note)
                 
-                logger.info(f"✅ {len(progress_notes)}개 Progress Notes 조회 완료: {self.site}")
+                logger.info(f"✅ Progress Notes fetch completed: {self.site} - {len(progress_notes)} notes")
                 if client_service_id:
-                    logger.info(f"🔍 [FILTER] 클라이언트 필터링 결과: client_service_id={client_service_id}로 {len(progress_notes)}개 노트 조회됨")
+                    logger.info(
+                        f"🔍 [FILTER] Client filter result: client_service_id={client_service_id}, notes={len(progress_notes)}"
+                    )
                     if len(progress_notes) > 0:
                         sample_note = progress_notes[0]
-                        logger.info(f"🔍 [FILTER] 첫 번째 노트 샘플: Id={sample_note.get('Id')}, ClientServiceId={sample_note.get('ClientServiceId')}")
+                        logger.info(
+                            f"🔍 [FILTER] First note sample: Id={sample_note.get('Id')}, ClientServiceId={sample_note.get('ClientServiceId')}"
+                        )
                 
                 return True, progress_notes
                 
         except Exception as e:
-            logger.error(f"🔍 [FILTER] Progress Notes 조회 중 오류 발생: {e}")
+            logger.error(f"🔍 [FILTER] Error fetching Progress Notes: {e}")
             logger.error(f"🔍 [FILTER] client_service_id={client_service_id}, start_date={start_date}, end_date={end_date}")
-            logger.error(f"❌ Progress Notes 조회 오류 ({self.site}): {e}")
+            logger.error(f"❌ Progress Notes fetch error ({self.site}): {e}")
             import traceback
             logger.error(traceback.format_exc())
             return False, None
@@ -917,7 +923,7 @@ class MANADDBConnector:
                     ORDER BY Description
                 """
                 
-                logger.info(f"🔍 Care Area 조회: {self.site}")
+                logger.info(f"🔍 Fetching Care Areas: {self.site}")
                 
                 cursor.execute(query)
                 
@@ -939,12 +945,12 @@ class MANADDBConnector:
                     
                     care_areas.append(formatted_area)
                 
-                logger.info(f"✅ {len(care_areas)}개 Care Area 조회 완료: {self.site}")
+                logger.info(f"✅ Care Area fetch completed: {self.site} - {len(care_areas)} items")
                 
                 return True, care_areas
                 
         except Exception as e:
-            logger.error(f"❌ Care Area 조회 오류 ({self.site}): {e}")
+            logger.error(f"❌ Care Area fetch error ({self.site}): {e}")
             import traceback
             logger.error(traceback.format_exc())
             return False, None
@@ -986,7 +992,7 @@ class MANADDBConnector:
                     ORDER BY Description
                 """
                 
-                logger.info(f"🔍 Progress Note Event Type 조회: {self.site}")
+                logger.info(f"🔍 Fetching Progress Note Event Types: {self.site}")
                 
                 cursor.execute(query)
                 
@@ -1009,12 +1015,12 @@ class MANADDBConnector:
                     
                     event_types.append(formatted_type)
                 
-                logger.info(f"✅ {len(event_types)}개 Event Type 조회 완료: {self.site}")
+                logger.info(f"✅ Event Type fetch completed: {self.site} - {len(event_types)} items")
                 
                 return True, event_types
                 
         except Exception as e:
-            logger.error(f"❌ Event Type 조회 오류 ({self.site}): {e}")
+            logger.error(f"❌ Event Type fetch error ({self.site}): {e}")
             import traceback
             logger.error(traceback.format_exc())
             return False, None
@@ -1063,6 +1069,6 @@ def fetch_incidents_with_client_data_from_db(
         }
         
     except Exception as e:
-        logger.error(f"❌ DB 조회 오류 ({site}): {e}")
+        logger.error(f"❌ DB query error ({site}): {e}")
         return None
 

@@ -38,15 +38,15 @@ class FCMTokenManager:
                             token_obj = FCMToken.from_dict(token_data)
                             self.tokens[user_id].append(token_obj)
                         except Exception as e:
-                            logger.error(f"토큰 로드 중 오류 (사용자: {user_id}): {e}")
+                            logger.error(f"Error loading token (user: {user_id}): {e}")
                 
-                logger.info(f"FCM 토큰 로드 완료: {len(self.tokens)} 사용자")
+                logger.info(f"FCM tokens loaded: {len(self.tokens)} users")
             else:
-                logger.info("FCM 토큰 파일이 존재하지 않습니다. 새로 생성합니다.")
+                logger.info("FCM token file does not exist. Creating a new one.")
                 self.save_tokens()
                 
         except Exception as e:
-            logger.error(f"FCM 토큰 로드 실패: {e}")
+            logger.error(f"Failed to load FCM tokens: {e}")
             self.tokens = {}
     
     def save_tokens(self):
@@ -63,10 +63,10 @@ class FCMTokenManager:
             with open(self.tokens_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"FCM 토큰 저장 완료: {len(self.tokens)} 사용자")
+            logger.info(f"FCM tokens saved: {len(self.tokens)} users")
             
         except Exception as e:
-            logger.error(f"FCM 토큰 저장 실패: {e}")
+            logger.error(f"Failed to save FCM tokens: {e}")
     
     def register_token(self, user_id: str, token: str, device_info: str = None) -> bool:
         """
@@ -97,7 +97,7 @@ class FCMTokenManager:
                 existing_token.last_used = datetime.now()
                 existing_token.device_info = device_info or existing_token.device_info
                 existing_token.is_active = True
-                logger.info(f"기존 FCM 토큰 업데이트: {user_id}")
+                logger.info(f"Updated existing FCM token: {user_id}")
                 
                 # 즉시 파일에 저장
                 self.save_tokens()
@@ -106,14 +106,14 @@ class FCMTokenManager:
                 # 새 토큰 추가
                 new_token = FCMToken(user_id, token, device_info)
                 self.tokens[user_id].append(new_token)
-                logger.info(f"새 FCM 토큰 등록: {user_id}")
+                logger.info(f"Registered new FCM token: {user_id}")
             
             # 파일에 저장
             self.save_tokens()
             return True
             
         except Exception as e:
-            logger.error(f"FCM 토큰 등록 실패: {e}")
+            logger.error(f"Failed to register FCM token: {e}")
             return False
     
     def unregister_token(self, user_id: str, token: str) -> bool:
@@ -135,7 +135,7 @@ class FCMTokenManager:
             for i, existing_token in enumerate(self.tokens[user_id]):
                 if existing_token.token == token:
                     del self.tokens[user_id][i]
-                    logger.info(f"FCM 토큰 제거: {user_id}")
+                    logger.info(f"Removed FCM token: {user_id}")
                     
                     # 사용자의 모든 토큰이 제거된 경우 사용자도 제거
                     if not self.tokens[user_id]:
@@ -147,7 +147,7 @@ class FCMTokenManager:
             return False
             
         except Exception as e:
-            logger.error(f"FCM 토큰 제거 실패: {e}")
+            logger.error(f"Failed to remove FCM token: {e}")
             return False
     
     def get_user_tokens(self, user_id: str) -> List[FCMToken]:
@@ -210,11 +210,11 @@ class FCMTokenManager:
                 token.is_active = False
             
             self.save_tokens()
-            logger.info(f"사용자 FCM 토큰 비활성화: {user_id}")
+            logger.info(f"Deactivated user's FCM tokens: {user_id}")
             return True
             
         except Exception as e:
-            logger.error(f"사용자 FCM 토큰 비활성화 실패: {e}")
+            logger.error(f"Failed to deactivate user's FCM tokens: {e}")
             return False
     
     def cleanup_inactive_tokens(self, days_threshold: int = 30) -> int:
@@ -251,12 +251,12 @@ class FCMTokenManager:
             
             if cleanup_count > 0:
                 self.save_tokens()
-                logger.info(f"비활성 FCM 토큰 정리 완료: {cleanup_count}개")
+                logger.info(f"Inactive FCM tokens cleaned up: {cleanup_count}")
             
             return cleanup_count
             
         except Exception as e:
-            logger.error(f"FCM 토큰 정리 실패: {e}")
+            logger.error(f"Failed to clean up FCM tokens: {e}")
             return 0
     
     def update_token_info(self, token: str, new_user_id: str, new_device_info: str = None) -> bool:
@@ -286,7 +286,7 @@ class FCMTokenManager:
                     break
             
             if not token_obj:
-                logger.warning(f"업데이트할 FCM 토큰을 찾을 수 없음: {token[:20]}...")
+                logger.warning(f"FCM token to update not found: {token[:20]}...")
                 return False
             
             # 사용자 ID가 변경된 경우
@@ -306,12 +306,12 @@ class FCMTokenManager:
                 token_obj.user_id = new_user_id
                 self.tokens[new_user_id].append(token_obj)
                 
-                logger.info(f"FCM 토큰 사용자 ID 변경: {old_user_id} -> {new_user_id}")
+                logger.info(f"FCM token user ID changed: {old_user_id} -> {new_user_id}")
             
             # 기기 정보 업데이트
             if new_device_info is not None:
                 token_obj.device_info = new_device_info
-                logger.info(f"FCM 토큰 기기 정보 업데이트: {new_device_info}")
+                logger.info(f"FCM token device info updated: {new_device_info}")
             
             # 마지막 사용 시간 업데이트
             token_obj.last_used = datetime.now()
@@ -319,11 +319,11 @@ class FCMTokenManager:
             # 파일에 저장
             self.save_tokens()
             
-            logger.info(f"FCM 토큰 정보 업데이트 완료: {token[:20]}...")
+            logger.info(f"FCM token info updated: {token[:20]}...")
             return True
             
         except Exception as e:
-            logger.error(f"FCM 토큰 정보 업데이트 실패: {e}")
+            logger.error(f"Failed to update FCM token info: {e}")
             return False
     
     def update_token_value(self, old_token: str, new_token: str) -> bool:
@@ -352,7 +352,7 @@ class FCMTokenManager:
                     break
             
             if not token_obj:
-                logger.warning(f"교체할 FCM 토큰을 찾을 수 없음: {old_token[:20]}...")
+                logger.warning(f"FCM token to replace not found: {old_token[:20]}...")
                 return False
             
             # 토큰 값 업데이트
@@ -362,11 +362,11 @@ class FCMTokenManager:
             # 파일에 저장
             self.save_tokens()
             
-            logger.info(f"FCM 토큰 값 교체 완료: {old_token[:20]}... -> {new_token[:20]}...")
+            logger.info(f"FCM token value replaced: {old_token[:20]}... -> {new_token[:20]}...")
             return True
             
         except Exception as e:
-            logger.error(f"FCM 토큰 값 교체 실패: {e}")
+            logger.error(f"Failed to replace FCM token value: {e}")
             return False
     
     def get_token_stats(self) -> Dict:

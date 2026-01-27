@@ -31,8 +31,10 @@ def migrate_cims_incidents_table(db_path='progress_report.db'):
         # 테이블이 존재하는지 확인
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cims_incidents'")
         if not cursor.fetchone():
-            logger.warning("cims_incidents table does not exist")
-            return False
+            # 신규 설치/아직 CIMS 테이블을 만들지 않은 환경에서는 정상적인 상태입니다.
+            # 스키마 마이그레이션은 "추가 컬럼 보강" 목적이므로, 대상 테이블이 없으면 스킵합니다.
+            logger.info("⏭️  Skipping migration: cims_incidents table does not exist")
+            return True
         
         # 추가할 컬럼 목록 (컬럼명, 타입, 기본값)
         columns_to_add = [
@@ -83,7 +85,7 @@ def run_migration(db_path='progress_report.db'):
     logger.info("🔄 Starting CIMS database migration...")
     success = migrate_cims_incidents_table(db_path)
     if success:
-        logger.info("✅ Migration completed successfully")
+        logger.info("✅ Migration completed (or skipped) successfully")
     else:
         logger.error("❌ Migration failed")
     return success

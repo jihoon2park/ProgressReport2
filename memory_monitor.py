@@ -19,7 +19,7 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-    logging.warning("psutil이 설치되지 않았습니다. 메모리 모니터링 기능이 제한됩니다. 설치: pip install psutil")
+    logging.warning("psutil is not installed. Memory monitoring is limited. Install: pip install psutil")
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class MemoryMonitor:
         if not PSUTIL_AVAILABLE:
             return {
                 'timestamp': datetime.now().isoformat(),
-                'error': 'psutil이 설치되지 않았습니다. pip install psutil로 설치하세요.',
+                'error': 'psutil is not installed. Install it with pip install psutil.',
                 'psutil_required': True
             }
         
@@ -70,7 +70,7 @@ class MemoryMonitor:
                 'system_percent': round(system_mem.percent, 2),
             }
         except Exception as e:
-            logger.error(f"메모리 정보 수집 오류: {e}")
+            logger.error(f"Error collecting memory info: {e}")
             return {
                 'timestamp': datetime.now().isoformat(),
                 'error': str(e)
@@ -134,7 +134,7 @@ class MemoryMonitor:
                 'increase_mb': round(increase, 2),
                 'increase_percent': round(increase_percent, 2),
                 'current_mb': round(rss_values[-1], 2),
-                'recommendation': '메모리 누수가 의심됩니다. 가비지 컬렉션을 실행하거나 서버를 재시작하세요.'
+                'recommendation': 'A memory leak is suspected. Run garbage collection or restart the server.'
             }
         
         return None
@@ -142,13 +142,13 @@ class MemoryMonitor:
     def start_monitoring(self):
         """메모리 모니터링 시작"""
         if self.monitoring:
-            logger.warning("메모리 모니터링이 이미 실행 중입니다.")
+            logger.warning("Memory monitoring is already running.")
             return
         
         self.monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
-        logger.info(f"메모리 모니터링 시작됨 (간격: {self.check_interval}초)")
+        logger.info(f"Memory monitoring started (interval: {self.check_interval}s)")
     
     def stop_monitoring(self):
         """메모리 모니터링 중지"""
@@ -157,8 +157,8 @@ class MemoryMonitor:
             try:
                 self.monitor_thread.join(timeout=5)
             except Exception as e:
-                logger.warning(f"메모리 모니터링 스레드 종료 중 오류 (무시 가능): {e}")
-        logger.info("메모리 모니터링 중지됨")
+                logger.warning(f"Error while stopping memory monitoring thread (can be ignored): {e}")
+        logger.info("Memory monitoring stopped")
     
     def _monitor_loop(self):
         """모니터링 루프"""
@@ -175,7 +175,7 @@ class MemoryMonitor:
                 if 'rss_mb' in mem_info:
                     if mem_info['rss_mb'] > 1000:  # 1GB 이상
                         logger.warning(
-                            f"⚠️ 높은 메모리 사용량: {mem_info['rss_mb']}MB "
+                            f"⚠️ High memory usage: {mem_info['rss_mb']}MB "
                             f"({mem_info['percent']}%)"
                         )
                     
@@ -183,12 +183,12 @@ class MemoryMonitor:
                     leak_info = self.detect_memory_leak()
                     if leak_info:
                         logger.warning(
-                            f"🚨 메모리 누수 감지: {leak_info['increase_mb']}MB 증가 "
+                            f"🚨 Memory leak detected: +{leak_info['increase_mb']}MB "
                             f"({leak_info['increase_percent']}%)"
                         )
                 
             except Exception as e:
-                logger.error(f"메모리 모니터링 오류: {e}")
+                logger.error(f"Memory monitoring error: {e}")
             
             time.sleep(self.check_interval)
     

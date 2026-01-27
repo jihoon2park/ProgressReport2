@@ -30,45 +30,45 @@ class FCMService:
         
         # 파일 존재 여부 확인
         if not os.path.exists(service_account_path):
-            raise FileNotFoundError(f"Firebase 서비스 계정 파일을 찾을 수 없습니다: {service_account_path}")
+            raise FileNotFoundError(f"Firebase service account file not found: {service_account_path}")
         
         try:
             # Firebase Admin SDK 초기화
             if not firebase_admin._apps:
-                logger.info(f"Firebase 서비스 계정 파일 경로: {service_account_path}")
-                logger.info(f"Firebase Admin SDK 버전: {firebase_admin.__version__}")
-                logger.info(f"Firebase Admin SDK 경로: {firebase_admin.__file__}")
+                logger.info(f"Firebase service account file path: {service_account_path}")
+                logger.info(f"Firebase Admin SDK version: {firebase_admin.__version__}")
+                logger.info(f"Firebase Admin SDK path: {firebase_admin.__file__}")
                 
                 cred = credentials.Certificate(service_account_path)
-                logger.info("Firebase 인증서 로드 완료")
-                logger.info(f"인증서 타입: {type(cred)}")
-                logger.info(f"인증서 속성들: {dir(cred)}")
+                logger.info("Firebase credential loaded")
+                logger.info(f"Credential type: {type(cred)}")
+                logger.info(f"Credential attributes: {dir(cred)}")
                 
                 # 최신 Firebase Admin SDK는 기본 설정으로 초기화
-                logger.info("Firebase Admin SDK 초기화 시작...")
+                logger.info("Initializing Firebase Admin SDK...")
                 firebase_admin.initialize_app(cred)
-                logger.info("Firebase Admin SDK 초기화 성공")
+                logger.info("Firebase Admin SDK initialized successfully")
                 
                 # 초기화 후 앱 상태 확인
                 app = firebase_admin.get_app()
-                logger.info(f"초기화된 앱: {app}")
-                logger.info(f"앱 이름: {app.name}")
-                logger.info(f"프로젝트 ID: {app.project_id}")
-                logger.info(f"앱 옵션: {app.options}")
+                logger.info(f"Initialized app: {app}")
+                logger.info(f"App name: {app.name}")
+                logger.info(f"Project ID: {app.project_id}")
+                logger.info(f"App options: {app.options}")
             else:
-                logger.info("Firebase Admin SDK가 이미 초기화되어 있습니다")
+                logger.info("Firebase Admin SDK is already initialized")
                 app = firebase_admin.get_app()
-                logger.info(f"기존 앱: {app}")
-                logger.info(f"앱 이름: {app.name}")
-                logger.info(f"프로젝트 ID: {app.project_id}")
+                logger.info(f"Existing app: {app}")
+                logger.info(f"App name: {app.name}")
+                logger.info(f"Project ID: {app.project_id}")
                 
             # FCM 서비스 연결 테스트
             self._test_fcm_connection()
             
         except Exception as e:
-            logger.error(f"Firebase Admin SDK 초기화 실패: {e}")
-            logger.error(f"오류 타입: {type(e).__name__}")
-            logger.error(f"오류 상세: {str(e)}")
+            logger.error(f"Firebase Admin SDK initialization failed: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {str(e)}")
             raise
     
     def _test_fcm_connection(self):
@@ -76,28 +76,28 @@ class FCMService:
         try:
             # Firebase Admin SDK가 제대로 초기화되었는지 확인
             if not firebase_admin._apps:
-                raise Exception("Firebase Admin SDK가 초기화되지 않았습니다")
+                raise Exception("Firebase Admin SDK is not initialized")
             
             # messaging 모듈이 제대로 로드되었는지 확인
             if not hasattr(messaging, 'Message'):
-                raise Exception("Firebase messaging 모듈을 로드할 수 없습니다")
+                raise Exception("Unable to load Firebase messaging module")
             
             # FCM 서비스 계정 정보 확인
             try:
                 app = firebase_admin.get_app()
-                logger.info(f"Firebase 앱 이름: {app.name}")
-                logger.info(f"Firebase 프로젝트 ID: {app.project_id}")
+                logger.info(f"Firebase app name: {app.name}")
+                logger.info(f"Firebase project ID: {app.project_id}")
                 
                 # FCM 서비스 상태 확인
-                logger.info("FCM 서비스 상태: 활성화됨")
-                logger.info("Web Push 인증서: 확인됨")
+                logger.info("FCM service status: enabled")
+                logger.info("Web Push certificate: present")
                 
             except Exception as app_error:
-                logger.warning(f"Firebase 앱 정보 조회 실패 (무시됨): {app_error}")
+                logger.warning(f"Failed to fetch Firebase app info (ignored): {app_error}")
             
-            logger.info("FCM 서비스 연결 테스트 성공")
+            logger.info("FCM service connection test succeeded")
         except Exception as e:
-            logger.error(f"FCM 서비스 연결 테스트 실패: {e}")
+            logger.error(f"FCM service connection test failed: {e}")
             raise
     
     def send_notification_to_token(
@@ -135,20 +135,20 @@ class FCMService:
             
             # 메시지 전송
             response = messaging.send(message)
-            logger.info(f"메시지 전송 성공: {response}")
+            logger.info(f"Message sent successfully: {response}")
             
             return {
                 "success": True,
                 "message_id": response,
-                "status": "전송 완료"
+                "status": "sent"
             }
             
         except Exception as e:
-            logger.error(f"메시지 전송 실패: {e}")
+            logger.error(f"Failed to send message: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "status": "전송 실패"
+                "status": "send_failed"
             }
     
     def send_notification_to_tokens(
@@ -175,27 +175,27 @@ class FCMService:
         if not tokens:
             return {
                 "success": False,
-                "error": "토큰 리스트가 비어있습니다",
-                "status": "전송 실패"
+                "error": "Token list is empty",
+                "status": "send_failed"
             }
         
         try:
             # 실제 FCM 전송 수행
-            logger.info(f"FCM 전송 시작: {len(tokens)}개 토큰으로 '{title}' 전송")
-            logger.info(f"전송할 토큰들: {tokens}")
-            logger.info(f"알림 제목: {title}")
-            logger.info(f"알림 본문: {body}")
-            logger.info(f"추가 데이터: {data}")
-            logger.info(f"이미지 URL: {image_url}")
+            logger.info(f"Starting FCM send: {len(tokens)} tokens, title='{title}'")
+            logger.info(f"Tokens: {tokens}")
+            logger.info(f"Notification title: {title}")
+            logger.info(f"Notification body: {body}")
+            logger.info(f"Additional data: {data}")
+            logger.info(f"Image URL: {image_url}")
             
             # 메시지 구성 단계
-            logger.info("메시지 구성 시작...")
+            logger.info("Building message...")
             notification = messaging.Notification(
                 title=title,
                 body=body,
                 image=image_url
             )
-            logger.info(f"알림 객체 생성 완료: {notification}")
+            logger.info(f"Notification object created: {notification}")
             
             # data 매개변수 검증 및 변환
             if data is None:
@@ -203,7 +203,7 @@ class FCMService:
             elif isinstance(data, dict):
                 message_data = data
             else:
-                logger.warning(f"data 매개변수가 dict가 아닙니다: {type(data)}, 빈 dict로 변환합니다")
+                logger.warning(f"data parameter is not a dict: {type(data)}; converting to empty dict")
                 message_data = {}
             
             message = messaging.MulticastMessage(
@@ -211,25 +211,25 @@ class FCMService:
                 data=message_data,
                 tokens=tokens
             )
-            logger.info(f"멀티캐스트 메시지 객체 생성 완료: {message}")
+            logger.info(f"Multicast message created: {message}")
             
             # 메시지 전송 단계
-            logger.info("FCM 서버로 메시지 전송 시작...")
-            logger.info(f"사용할 messaging 모듈: {messaging}")
-            logger.info(f"사용할 messaging 모듈의 속성들: {dir(messaging)}")
+            logger.info("Sending message to FCM server...")
+            logger.info(f"messaging module: {messaging}")
+            logger.info(f"messaging module attributes: {dir(messaging)}")
             
             # send_each_for_multicast 함수 존재 여부 확인 (Firebase Admin SDK 7.1.0에서 이름 변경)
             if hasattr(messaging, 'send_each_for_multicast'):
-                logger.info("send_each_for_multicast 함수 발견됨")
+                logger.info("send_each_for_multicast found")
             else:
-                logger.error("send_each_for_multicast 함수를 찾을 수 없음!")
-                logger.error(f"사용 가능한 함수들: {[attr for attr in dir(messaging) if not attr.startswith('_')]}")
-                raise AttributeError("send_each_for_multicast 함수가 messaging 모듈에 존재하지 않습니다")
+                logger.error("send_each_for_multicast not found!")
+                logger.error(f"Available functions: {[attr for attr in dir(messaging) if not attr.startswith('_')]}")
+                raise AttributeError("send_each_for_multicast does not exist on the messaging module")
             
             response = messaging.send_each_for_multicast(message)
-            logger.info(f"FCM 서버 응답 수신: {response}")
-            logger.info(f"응답 타입: {type(response)}")
-            logger.info(f"응답 속성들: {dir(response)}")
+            logger.info(f"FCM server response received: {response}")
+            logger.info(f"Response type: {type(response)}")
+            logger.info(f"Response attributes: {dir(response)}")
             
             # Firebase Admin SDK 7.1.0의 응답 구조에 맞게 처리
             try:
@@ -237,54 +237,56 @@ class FCMService:
                     # 기존 방식 (BatchResponse)
                     success_count = response.success_count
                     failure_count = response.failure_count
-                    logger.info(f"BatchResponse 방식 사용: 성공 {success_count}개, 실패 {failure_count}개")
+                    logger.info(f"BatchResponse: success {success_count}, failure {failure_count}")
                 elif hasattr(response, '__len__'):
                     # 새로운 방식 (리스트 형태)
                     total_count = len(response)
                     success_count = sum(1 for r in response if r.success)
                     failure_count = total_count - success_count
-                    logger.info(f"리스트 응답 방식 사용: 총 {total_count}개, 성공 {success_count}개, 실패 {failure_count}개")
+                    logger.info(f"List response: total {total_count}, success {success_count}, failure {failure_count}")
                 else:
                     # 기본값 설정
                     success_count = len(tokens)
                     failure_count = 0
-                    logger.info(f"응답 구조 파악 불가: 기본값 사용 - 성공 {success_count}개, 실패 {failure_count}개")
+                    logger.info(f"Unknown response structure: using defaults - success {success_count}, failure {failure_count}")
                     
             except Exception as count_error:
-                logger.warning(f"응답 처리 중 오류 발생: {count_error}")
+                logger.warning(f"Error processing response: {count_error}")
                 success_count = len(tokens)
                 failure_count = 0
             
-            logger.info(f"FCM 전송 완료: 성공 {success_count}개, 실패 {failure_count}개")
-            logger.info(f"성공 카운트 타입: {type(success_count)}")
-            logger.info(f"실패 카운트 타입: {type(failure_count)}")
+            logger.info(f"FCM send completed: success {success_count}, failure {failure_count}")
+            logger.info(f"success_count type: {type(success_count)}")
+            logger.info(f"failure_count type: {type(failure_count)}")
             
             return {
                 "success": True,
                 "success_count": success_count,
                 "failure_count": failure_count,
-                "status": f"전송 완료 (성공: {success_count}, 실패: {failure_count})"
+                "status": f"sent (success: {success_count}, failure: {failure_count})"
             }
             
         except Exception as e:
-            logger.error(f"FCM 전송 실패: {e}")
-            logger.error(f"오류 타입: {type(e).__name__}")
-            logger.error(f"오류 상세: {str(e)}")
-            logger.error(f"오류 발생 위치: {e.__traceback__.tb_frame.f_code.co_filename}:{e.__traceback__.tb_lineno}")
+            logger.error(f"FCM send failed: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {str(e)}")
+            logger.error(
+                f"Error location: {e.__traceback__.tb_frame.f_code.co_filename}:{e.__traceback__.tb_lineno}"
+            )
             
             # messaging 모듈 상태 확인
             try:
-                logger.error(f"messaging 모듈 상태: {messaging}")
-                logger.error(f"messaging 모듈 타입: {type(messaging)}")
-                logger.error(f"messaging 모듈 경로: {messaging.__file__}")
-                logger.error(f"messaging 모듈 버전: {getattr(messaging, '__version__', '버전 정보 없음')}")
+                logger.error(f"messaging module: {messaging}")
+                logger.error(f"messaging module type: {type(messaging)}")
+                logger.error(f"messaging module path: {messaging.__file__}")
+                logger.error(f"messaging module version: {getattr(messaging, '__version__', 'version unavailable')}")
             except Exception as log_error:
-                logger.error(f"messaging 모듈 상태 확인 실패: {log_error}")
+                logger.error(f"Failed to inspect messaging module state: {log_error}")
             
             return {
                 "success": False,
                 "error": str(e),
-                "status": "전송 실패"
+                "status": "send_failed"
             }
     
     def send_data_message(
@@ -324,20 +326,20 @@ class FCMService:
             
             # 메시지 전송
             response = messaging.send(message)
-            logger.info(f"데이터 메시지 전송 성공: {response}")
+            logger.info(f"Data message sent successfully: {response}")
             
             return {
                 "success": True,
                 "message_id": response,
-                "status": "전송 완료"
+                "status": "sent"
             }
             
         except Exception as e:
-            logger.error(f"데이터 메시지 전송 실패: {e}")
+            logger.error(f"Failed to send data message: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "status": "전송 실패"
+                "status": "send_failed"
             }
     
     def send_topic_message(
@@ -372,20 +374,20 @@ class FCMService:
             
             # 메시지 전송
             response = messaging.send(message)
-            logger.info(f"토픽 메시지 전송 성공: {response}")
+            logger.info(f"Topic message sent successfully: {response}")
             
             return {
                 "success": True,
                 "message_id": response,
-                "status": "전송 완료"
+                "status": "sent"
             }
             
         except Exception as e:
-            logger.error(f"토픽 메시지 전송 실패: {e}")
+            logger.error(f"Failed to send topic message: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "status": "전송 실패"
+                "status": "send_failed"
             }
     
     def subscribe_to_topic(self, tokens: List[str], topic: str) -> Dict[str, Union[str, bool]]:
@@ -401,21 +403,21 @@ class FCMService:
         """
         try:
             response = messaging.subscribe_to_topic(tokens, topic)
-            logger.info(f"토픽 구독 성공: {response.success_count}개 성공, {response.failure_count}개 실패")
+            logger.info(f"Topic subscribe succeeded: success {response.success_count}, failure {response.failure_count}")
             
             return {
                 "success": True,
                 "success_count": response.success_count,
                 "failure_count": response.failure_count,
-                "status": f"구독 완료 (성공: {response.success_count}, 실패: {response.failure_count})"
+                "status": f"subscribed (success: {response.success_count}, failure: {response.failure_count})"
             }
             
         except Exception as e:
-            logger.error(f"토픽 구독 실패: {e}")
+            logger.error(f"Topic subscribe failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "status": "구독 실패"
+                "status": "subscribe_failed"
             }
     
     def unsubscribe_from_topic(self, tokens: List[str], topic: str) -> Dict[str, Union[str, bool]]:
@@ -431,21 +433,21 @@ class FCMService:
         """
         try:
             response = messaging.unsubscribe_from_topic(tokens, topic)
-            logger.info(f"토픽 구독 해제 성공: {response.success_count}개 성공, {response.failure_count}개 실패")
+            logger.info(f"Topic unsubscribe succeeded: success {response.success_count}, failure {response.failure_count}")
             
             return {
                 "success": True,
                 "success_count": response.success_count,
                 "failure_count": response.failure_count,
-                "status": f"구독 해제 완료 (성공: {response.success_count}, 실패: {response.failure_count})"
+                "status": f"unsubscribed (success: {response.success_count}, failure: {response.failure_count})"
             }
             
         except Exception as e:
-            logger.error(f"토픽 구독 해제 실패: {e}")
+            logger.error(f"Topic unsubscribe failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "status": "구독 해제 실패"
+                "status": "unsubscribe_failed"
             }
 
 # 전역 FCM 서비스 인스턴스
@@ -459,7 +461,7 @@ def get_fcm_service() -> FCMService:
             fcm_service = FCMService()
         return fcm_service
     except Exception as e:
-        logger.error(f"FCM 서비스 생성 실패: {e}")
+        logger.error(f"Failed to create FCM service: {e}")
         # 오류 발생 시 None 반환하여 호출자가 처리할 수 있도록 함
         return None
 

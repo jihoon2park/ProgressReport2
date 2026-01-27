@@ -49,7 +49,7 @@ class ProgressNotesJSONCache:
             return datetime.now() < expires_at
             
         except Exception as e:
-            logger.error(f"캐시 유효성 확인 실패 ({site}): {e}")
+            logger.error(f"Failed to validate cache ({site}): {e}")
             return False
     
     def get_cached_notes(self, site: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
@@ -66,7 +66,7 @@ class ProgressNotesJSONCache:
                         'total_pages': 0,
                         'total_count': 0
                     },
-                    'message': '캐시 파일이 없습니다'
+                    'message': 'Cache file not found'
                 }
             
             with open(cache_file, 'r', encoding='utf-8') as f:
@@ -91,11 +91,11 @@ class ProgressNotesJSONCache:
                     'total_count': total_count
                 },
                 'cached_at': cache_data.get('cached_at'),
-                'message': f'캐시에서 {len(paginated_notes)}개 조회'
+                'message': f'Fetched {len(paginated_notes)} items from cache'
             }
             
         except Exception as e:
-            logger.error(f"캐시 조회 실패 ({site}): {e}")
+            logger.error(f"Failed to fetch cache ({site}): {e}")
             return {
                 'success': False,
                 'data': [],
@@ -105,7 +105,7 @@ class ProgressNotesJSONCache:
                     'total_pages': 0,
                     'total_count': 0
                 },
-                'message': f'캐시 조회 실패: {e}'
+                'message': f'Cache fetch failed: {e}'
             }
     
     def update_cache(self, site: str, notes: List[Dict[str, Any]]) -> bool:
@@ -136,11 +136,11 @@ class ProgressNotesJSONCache:
             with open(meta_file, 'w', encoding='utf-8') as f:
                 json.dump(meta_data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"캐시 업데이트 완료 - {site}: {len(notes)}개")
+            logger.info(f"Cache updated - {site}: {len(notes)} items")
             return True
             
         except Exception as e:
-            logger.error(f"캐시 업데이트 실패 ({site}): {e}")
+            logger.error(f"Cache update failed ({site}): {e}")
             return False
     
     def clear_cache(self, site: str = None) -> bool:
@@ -156,19 +156,19 @@ class ProgressNotesJSONCache:
                 if os.path.exists(meta_file):
                     os.remove(meta_file)
                 
-                logger.info(f"캐시 삭제 완료 - {site}")
+                logger.info(f"Cache cleared - {site}")
             else:
                 # 모든 캐시 삭제
                 for filename in os.listdir(self.cache_dir):
                     if filename.startswith('progress_notes_') and filename.endswith('.json'):
                         os.remove(os.path.join(self.cache_dir, filename))
                 
-                logger.info("모든 캐시 삭제 완료")
+                logger.info("All caches cleared")
             
             return True
             
         except Exception as e:
-            logger.error(f"캐시 삭제 실패: {e}")
+            logger.error(f"Cache clear failed: {e}")
             return False
     
     def get_cache_info(self, site: str = None) -> Dict[str, Any]:
@@ -212,7 +212,7 @@ class ProgressNotesJSONCache:
                 return cache_info
                 
         except Exception as e:
-            logger.error(f"캐시 정보 조회 실패: {e}")
+            logger.error(f"Failed to fetch cache info: {e}")
             return {'error': str(e)}
 
 # 전역 인스턴스
