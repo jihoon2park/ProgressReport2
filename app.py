@@ -4389,23 +4389,17 @@ def add_user_api():
     try:
         data = request.get_json()
         
-        # 필수 필드 확인
-        required_fields = ['username', 'password', 'first_name', 'last_name', 'role', 'position', 'location']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+        # Use validation from user_management.py
+        from user_management import validate_user_data, create_new_user
+        from config_users import USERS_DB
         
-        from config_users import add_user
-        success, message = add_user(
-            username=data['username'],
-            password=data['password'],
-            first_name=data['first_name'],
-            last_name=data['last_name'],
-            role=data['role'],
-            position=data['position'],
-            location=data['location'],
-            landing_page=data.get('landing_page')
-        )
+        # Validate user data (includes admin role check)
+        is_valid, error_msg = validate_user_data(data)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg}), 400
+        
+        # Create user using user_management module
+        success, message = create_new_user(data, USERS_DB)
         
         if success:
             logger.info(f"User created successfully: {data['username']} by {current_user.username}")
@@ -4457,14 +4451,11 @@ def delete_user_api(username):
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
-        # 자기 자신은 삭제할 수 없음
-        from config_users import get_username_by_lowercase
-        actual_username = get_username_by_lowercase(username)
-        if actual_username and actual_username.lower() == current_user.username.lower():
-            return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
+        # Use delete_user from user_management.py (includes admin check and self-deletion prevention)
+        from user_management import delete_user
+        from config_users import USERS_DB
         
-        from config_users import delete_user
-        success, message = delete_user(username)
+        success, message = delete_user(username, USERS_DB)
         
         if success:
             logger.info(f"User deleted successfully: {username} by {current_user.username}")
