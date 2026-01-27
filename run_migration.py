@@ -357,25 +357,89 @@ class DatabaseMigrator:
             conn.close()
     
     def parse_sql_statements(self, sql_content):
-        """Parse SQL content and split into individual statements"""
-        statements = []
-        
-        # Remove comments
-        lines = []
-        for line in sql_content.split('\n'):
-            line = line.strip()
-            if line and not line.startswith('--'):
-                lines.append(line)
-        
-        # Split by semicolon
-        full_content = ' '.join(lines)
-        raw_statements = full_content.split(';')
-        
-        for statement in raw_statements:
-            statement = statement.strip()
-            if statement:
-                statements.append(statement + ';')
-        
+        """
+        Parse SQL content and split into individual statements.
+
+        Important: do NOT join lines into one, because inline `--` comments would
+        then comment-out the rest of the whole script, causing "incomplete input"
+        errors and missing tables.
+        """
+        statements: list[str] = []
+        buf: list[str] = []
+
+        in_single_quote = False
+        in_double_quote = False
+        in_line_comment = False
+        in_block_comment = False
+
+        i = 0
+        n = len(sql_content)
+        while i < n:
+            ch = sql_content[i]
+            nxt = sql_content[i + 1] if i + 1 < n else ''
+
+            # End line comment
+            if in_line_comment:
+                if ch == '\n':
+                    in_line_comment = False
+                    buf.append(ch)
+                i += 1
+                continue
+
+            # End block comment
+            if in_block_comment:
+                if ch == '*' and nxt == '/':
+                    in_block_comment = False
+                    i += 2
+                else:
+                    i += 1
+                continue
+
+            # Start comments (only when not in quotes)
+            if not in_single_quote and not in_double_quote:
+                if ch == '-' and nxt == '-':
+                    in_line_comment = True
+                    i += 2
+                    continue
+                if ch == '/' and nxt == '*':
+                    in_block_comment = True
+                    i += 2
+                    continue
+
+            # Track quotes
+            if ch == "'" and not in_double_quote:
+                if in_single_quote and nxt == "'":  # escaped single quote in SQL ('')
+                    buf.append(ch)
+                    buf.append(nxt)
+                    i += 2
+                    continue
+                in_single_quote = not in_single_quote
+                buf.append(ch)
+                i += 1
+                continue
+
+            if ch == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                buf.append(ch)
+                i += 1
+                continue
+
+            # Statement terminator (only when not in quotes)
+            if ch == ';' and not in_single_quote and not in_double_quote:
+                stmt = ''.join(buf).strip()
+                if stmt:
+                    statements.append(stmt + ';')
+                buf = []
+                i += 1
+                continue
+
+            buf.append(ch)
+            i += 1
+
+        tail = ''.join(buf).strip()
+        if tail:
+            statements.append(tail)
+
         return statements
     
     def extract_table_name(self, create_table_sql):

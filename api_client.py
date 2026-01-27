@@ -80,21 +80,35 @@ def fetch_client_information(site):
     # DB 직접 접속 모드 (권장 - 매번 최신 데이터 조회)
     if use_db_direct:
         try:
+            logger.info(f"🔍 DEBUG: use_db_direct=True, importing MANADDBConnector")
             from manad_db_connector import MANADDBConnector
+            logger.info(f"🔍 DEBUG: MANADDBConnector imported successfully")
             logger.info(f"🔌 DB 직접 접속: 거주자 정보 조회 - {site} (최신 데이터)")
+            logger.info(f"🔍 DEBUG: Creating MANADDBConnector instance for site: {site}")
             connector = MANADDBConnector(site)
+            logger.info(f"🔍 DEBUG: MANADDBConnector instance created, about to call fetch_clients()")
+            import time
+            start_time = time.time()
             success, client_info = connector.fetch_clients()
+            elapsed_time = time.time() - start_time
+            logger.info(f"🔍 DEBUG: fetch_clients() returned after {elapsed_time:.2f} seconds - success: {success}")
             
             if success and client_info:
+                logger.info(f"🔍 DEBUG: Client info received, count: {len(client_info) if isinstance(client_info, list) else 'N/A'}")
                 # JSON 파일로 저장 (참고용, 읽기는 하지 않음)
                 save_client_data_to_json(site, client_info)
                 logger.info(f"✅ 거주자 정보 조회 성공 - {site}: {len(client_info)}명")
+                logger.info(f"🔍 DEBUG: Returning from fetch_client_information with success=True")
                 return True, client_info
             else:
                 error_msg = f"❌ DB 직접 접속 실패: {site} - 거주자 정보 조회 결과가 비어있습니다."
+                logger.error(f"🔍 DEBUG: fetch_clients returned success={success}, client_info is empty or None")
                 logger.error(error_msg)
                 raise Exception(error_msg)
         except Exception as db_error:
+            logger.error(f"🔍 DEBUG: Exception in fetch_client_information (DB direct mode): {type(db_error).__name__}: {str(db_error)}")
+            import traceback
+            logger.error(f"🔍 DEBUG: Full traceback:\n{traceback.format_exc()}")
             error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}"
             logger.error(error_msg)
             raise Exception(error_msg)

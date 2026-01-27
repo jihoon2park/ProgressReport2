@@ -327,6 +327,8 @@ class MANADDBConnector:
                 raise ValueError(f"{self.site}의 DB 연결 정보가 설정되지 않았습니다.")
             
             if DRIVER_AVAILABLE == 'pyodbc':
+                # Ensure module name is available even if driver was auto-installed
+                import pyodbc  # type: ignore
                 conn = pyodbc.connect(self.connection_string)  # type: ignore
                 
                 # 읽기 전용 보안 설정
@@ -342,6 +344,8 @@ class MANADDBConnector:
                 cursor.close()
                 
             elif DRIVER_AVAILABLE == 'pymssql':
+                # Ensure module name is available even if driver was auto-installed
+                import pymssql  # type: ignore
                 conn = pymssql.connect(**self.connection_string)  # type: ignore
                 conn.autocommit = False
             else:

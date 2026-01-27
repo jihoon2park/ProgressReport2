@@ -196,7 +196,32 @@ USERS_DB = {
         "position": "Operations Manager",
         "location": ["All"],
         "landing_page": "/edenfield-dashboard"
-    }
+    },
+
+    "physio1": {
+        "password_hash": hash_password("password123"),
+        "first_name": "Physio",
+        "last_name": "",
+        "role": "doctor",
+        "position": "Physiotherapist",
+        "location": ["All"]
+    },
+    "physio2": {
+        "password_hash": hash_password("password123"),
+        "first_name": "Physio",
+        "last_name": "",
+        "role": "doctor",
+        "position": "Physiotherapist",
+        "location": ["All"]
+    },
+    "physio3": {
+        "password_hash": hash_password("password123"),
+        "first_name": "Physio",
+        "last_name": "",
+        "role": "doctor",
+        "position": "Physiotherapist",
+        "location": ["All"]
+    },
 }
 
 def verify_password(password, password_hash):

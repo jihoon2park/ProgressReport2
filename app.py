@@ -1012,8 +1012,14 @@ def login():
                 # 3. 사이트별 데이터 자동 수집
                 try:
                     # 3-1. 클라이언트 데이터 수집 (매번)
+                    logger.info(f"🔍 DEBUG: About to call fetch_client_information for site: {site}")
                     from api_client import fetch_client_information
+                    logger.info(f"🔍 DEBUG: fetch_client_information imported, calling now...")
+                    import time
+                    start_time = time.time()
                     client_success, client_info = fetch_client_information(site)
+                    elapsed_time = time.time() - start_time
+                    logger.info(f"🔍 DEBUG: fetch_client_information returned after {elapsed_time:.2f} seconds - success: {client_success}")
                     if client_success:
                         logger.info(f"Client data collection succeeded - {site}: {len(client_info)} residents")
                     else:
@@ -1112,18 +1118,25 @@ def login():
                     logger.info(f"Site data collection completed - site: {site}")
                     
                     # 4. Flask-Login을 사용한 로그인 처리
+                    logger.info(f"🔍 DEBUG: Starting session creation for user: {username}")
                     user = User(username, user_info)
                     user_role = user_info.get('role', 'USER').upper()
+                    logger.info(f"🔍 DEBUG: User object created, role: {user_role}")
                     
                     # 모든 사용자에게 동일한 세션 설정 적용
+                    logger.info(f"🔍 DEBUG: About to call login_user()")
                     login_user(user, remember=False)  # 모든 사용자: 브라우저 닫으면 세션 만료
+                    logger.info(f"🔍 DEBUG: login_user() completed")
                     session.permanent = False
                     logger.info(f"User login: remember=False, session.permanent=False (role: {user_role})")
                     
                     # 사용자 역할에 따라 세션 타임아웃 설정
+                    logger.info(f"🔍 DEBUG: About to set session permanent for role: {user_role}")
                     set_session_permanent(user_role)
+                    logger.info(f"🔍 DEBUG: Session permanent set")
                     
                     # 세션 생성 시간 기록
+                    logger.info(f"🔍 DEBUG: Setting session variables")
                     session['_created'] = get_australian_time().isoformat()
                     session['user_role'] = user_role  # 사용자 역할을 세션에 저장
                     
@@ -1136,6 +1149,7 @@ def login():
                     
                     flash('Login successful!', 'success')
                     logger.info(f"Login succeeded - user: {username}, site: {site}")
+                    logger.info(f"🔍 DEBUG: About to determine redirect destination")
                     
                     # 로그인 성공 로그 기록
                     success_user_info = {
@@ -1149,12 +1163,14 @@ def login():
                     # landing_page가 설정된 사용자는 해당 페이지로 이동
                     landing_page = user_info.get('landing_page')
                     if landing_page:
+                        logger.info(f"🔍 DEBUG: Landing page found: {landing_page}, redirecting...")
                         logger.info(f"Login succeeded - user {username}, landing_page set: {landing_page}")
                         return redirect(landing_page)
                     
                     # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
                     username_upper = username.upper()
                     logger.info(f"Login username check: {username} -> {username_upper}")
+                    logger.info(f"🔍 DEBUG: Checking user type for redirect - username_upper: {username_upper}, user_role: {user_role}")
                     if username_upper == 'ROD':
                         logger.info("Login succeeded - ROD user detected, redirecting to rod_dashboard")
                         return redirect(url_for('rod_dashboard', site=site))
@@ -1190,16 +1206,24 @@ def login():
                         session['allowed_sites'] = ['Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
+                        logger.info("🔍 DEBUG: SITE_ADMIN detected, redirecting to incident_viewer")
                         logger.info("Login succeeded - SITE_ADMIN user detected, redirecting to incident_viewer")
                         return redirect(url_for('incident_viewer', site=site))
                     else:
+                        logger.info(f"🔍 DEBUG: Regular user detected, redirecting to progress_notes for site: {site}")
                         logger.info("Login succeeded - regular user, redirecting to progress_notes")
-                        return redirect(url_for('progress_notes', site=site))
+                        redirect_url = url_for('progress_notes', site=site)
+                        logger.info(f"🔍 DEBUG: Redirect URL generated: {redirect_url}, about to return redirect()")
+                        return redirect(redirect_url)
                         
                 except Exception as e:
+                    logger.error(f"🔍 DEBUG: Exception caught in login data collection: {type(e).__name__}: {str(e)}")
+                    import traceback
+                    logger.error(f"🔍 DEBUG: Full traceback:\n{traceback.format_exc()}")
                     logger.error(f"Error saving data: {str(e)}")
                     # Allow login even if data collection fails
                     try:
+                        logger.info(f"🔍 DEBUG: Attempting fallback login despite data collection error")
                         user = User(username, user_info)
                         user_role = user_info.get('role', 'USER').upper()
                         login_user(user, remember=False)

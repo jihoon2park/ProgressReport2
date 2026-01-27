@@ -101,26 +101,83 @@ class DatabaseInitializer:
             conn.close()
     
     def parse_sql_statements(self, sql_content):
-        """SQL 문들을 파싱하여 개별 문장으로 분리"""
-        # 더 간단한 방법으로 SQL 문 분리
-        statements = []
-        
-        # 주석 제거
-        lines = []
-        for line in sql_content.split('\n'):
-            line = line.strip()
-            if line and not line.startswith('--'):
-                lines.append(line)
-        
-        # 세미콜론으로 문장 분리
-        full_content = ' '.join(lines)
-        raw_statements = full_content.split(';')
-        
-        for statement in raw_statements:
-            statement = statement.strip()
-            if statement:
-                statements.append(statement + ';')
-        
+        """
+        SQL 문들을 파싱하여 개별 문장으로 분리.
+
+        NOTE: 기존 구현은 모든 줄을 하나로 합쳐 inline `--` 주석이 이후 전체를
+        주석 처리해버려 "incomplete input" / 테이블 누락을 유발할 수 있음.
+        """
+        statements: list[str] = []
+        buf: list[str] = []
+
+        in_single_quote = False
+        in_double_quote = False
+        in_line_comment = False
+        in_block_comment = False
+
+        i = 0
+        n = len(sql_content)
+        while i < n:
+            ch = sql_content[i]
+            nxt = sql_content[i + 1] if i + 1 < n else ''
+
+            if in_line_comment:
+                if ch == '\n':
+                    in_line_comment = False
+                    buf.append(ch)
+                i += 1
+                continue
+
+            if in_block_comment:
+                if ch == '*' and nxt == '/':
+                    in_block_comment = False
+                    i += 2
+                else:
+                    i += 1
+                continue
+
+            if not in_single_quote and not in_double_quote:
+                if ch == '-' and nxt == '-':
+                    in_line_comment = True
+                    i += 2
+                    continue
+                if ch == '/' and nxt == '*':
+                    in_block_comment = True
+                    i += 2
+                    continue
+
+            if ch == "'" and not in_double_quote:
+                if in_single_quote and nxt == "'":  # escaped single quote ('')
+                    buf.append(ch)
+                    buf.append(nxt)
+                    i += 2
+                    continue
+                in_single_quote = not in_single_quote
+                buf.append(ch)
+                i += 1
+                continue
+
+            if ch == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                buf.append(ch)
+                i += 1
+                continue
+
+            if ch == ';' and not in_single_quote and not in_double_quote:
+                stmt = ''.join(buf).strip()
+                if stmt:
+                    statements.append(stmt + ';')
+                buf = []
+                i += 1
+                continue
+
+            buf.append(ch)
+            i += 1
+
+        tail = ''.join(buf).strip()
+        if tail:
+            statements.append(tail)
+
         return statements
     
     def insert_initial_data(self):

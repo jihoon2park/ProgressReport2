@@ -247,14 +247,14 @@ CREATE INDEX idx_sync_status_time ON sync_status(last_sync_time);
 -- ===========================================
 
 -- 기본 사이트 정보
-INSERT INTO sites (site_name, description) VALUES 
+INSERT OR IGNORE INTO sites (site_name, description) VALUES 
 ('Parafield Gardens', 'Edenfield Family Care - Parafield Gardens'),
 ('Nerrilda', 'Nerrilda Care Facility'),
 ('Ramsay', 'Ramsay Care Center'),
 ('Yankalilla', 'Yankalilla Care Home');
 
 -- 기본 동기화 상태 레코드
-INSERT INTO sync_status (data_type, site) VALUES
+INSERT OR IGNORE INTO sync_status (data_type, site) VALUES
 ('clients', 'Parafield Gardens'),
 ('clients', 'Nerrilda'),
 ('clients', 'Ramsay'),
