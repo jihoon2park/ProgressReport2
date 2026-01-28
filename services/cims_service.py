@@ -1,6 +1,6 @@
 """
 CIMS Service Layer
-CIMS 관련 비즈니스 로직 처리
+Handle CIMS-related business logic
 """
 import json
 import logging
@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class CIMSService:
-    """CIMS 비즈니스 로직 처리 서비스"""
+    """CIMS Business Logic Processing Service"""
     
     @staticmethod
     def ensure_fall_policy_exists(conn: sqlite3.Connection) -> bool:
         """
-        Fall Policy가 DB에 존재하는지 확인하고 없으면 기본 Policy 생성
+        Check if Fall Policy exists in DB, create default Policy if not
         
         Args:
-            conn: DB 연결 객체
+            conn: DB connection object
             
         Returns:
-            bool: Policy가 존재하거나 생성 성공하면 True
+            bool: True if Policy exists or creation successful
         """
         cursor = conn.cursor()
         
@@ -104,19 +104,19 @@ class CIMSService:
         cursor: sqlite3.Cursor
     ) -> int:
         """
-        Fall incident에 대해 자동으로 task 생성
-        Progress Note를 분석하여 Witnessed/Unwitnessed를 자동 감지하고 적절한 Policy 적용
+        Automatically generate tasks for Fall incident
+        Analyze Progress Note to automatically detect Witnessed/Unwitnessed and apply appropriate Policy
         
         Args:
-            incident_db_id: CIMS DB의 incident ID (integer)
-            incident_date_iso: Incident 발생 시간 (ISO format string)
+            incident_db_id: CIMS DB incident ID (integer)
+            incident_date_iso: Incident occurrence time (ISO format string)
             cursor: DB cursor
             
         Returns:
-            생성된 task 수
+            Number of tasks created
         """
         try:
-            # Fall 유형 감지 및 적절한 Policy 선택
+            # Detect Fall type and select appropriate Policy
             from services.fall_policy_detector import fall_detector
             
             fall_policy = fall_detector.get_appropriate_policy_for_incident(
@@ -193,13 +193,13 @@ class CIMSService:
     @staticmethod
     def get_fall_policy(cursor: sqlite3.Cursor) -> Optional[Dict]:
         """
-        활성화된 Fall Policy 조회
+        Query active Fall Policy
         
         Args:
             cursor: DB cursor
             
         Returns:
-            Fall Policy 정보 또는 None
+            Fall Policy information or None
         """
         try:
             cursor.execute("""
@@ -235,14 +235,14 @@ class CIMSService:
         cursor: sqlite3.Cursor
     ) -> bool:
         """
-        Incident의 모든 태스크 완료 여부를 확인하여 status 업데이트
+        Check completion status of all tasks for Incident and update status
         
         Args:
             incident_id: Incident DB ID
             cursor: DB cursor
             
         Returns:
-            업데이트 성공 여부
+            Whether update was successful
         """
         try:
             # Get all tasks for the incident
@@ -290,6 +290,6 @@ class CIMSService:
             return False
 
 
-# 전역 서비스 인스턴스
+# Global service instance
 cims_service = CIMSService()
 

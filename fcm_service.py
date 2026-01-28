@@ -5,22 +5,22 @@ import json
 import logging
 from typing import Dict, List, Optional, Union
 
-# 로깅 설정
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FCMService:
-    """Firebase Cloud Messaging 서비스 클래스"""
+    """Firebase Cloud Messaging service class"""
     
     def __init__(self, service_account_path: str = None):
         """
-        FCM 서비스 초기화
+        Initialize FCM service
         
         Args:
-            service_account_path: Firebase 서비스 계정 JSON 파일 경로
+            service_account_path: Firebase service account JSON file path
         """
         if service_account_path is None:
-            # 기본 경로 설정 - 새로운 서비스 계정 키 사용
+            # Set default path - use new service account key
             current_dir = os.path.dirname(os.path.abspath(__file__))
             service_account_path = os.path.join(
                 current_dir, 
@@ -28,12 +28,12 @@ class FCMService:
                 'incidentalarmapp-firebase-adminsdk-fbsvc-07fb0e5787.json'
             )
         
-        # 파일 존재 여부 확인
+        # Check if file exists
         if not os.path.exists(service_account_path):
             raise FileNotFoundError(f"Firebase service account file not found: {service_account_path}")
         
         try:
-            # Firebase Admin SDK 초기화
+            # Initialize Firebase Admin SDK
             if not firebase_admin._apps:
                 logger.info(f"Firebase service account file path: {service_account_path}")
                 logger.info(f"Firebase Admin SDK version: {firebase_admin.__version__}")
@@ -44,12 +44,12 @@ class FCMService:
                 logger.info(f"Credential type: {type(cred)}")
                 logger.info(f"Credential attributes: {dir(cred)}")
                 
-                # 최신 Firebase Admin SDK는 기본 설정으로 초기화
+                # Latest Firebase Admin SDK initializes with default settings
                 logger.info("Initializing Firebase Admin SDK...")
                 firebase_admin.initialize_app(cred)
                 logger.info("Firebase Admin SDK initialized successfully")
                 
-                # 초기화 후 앱 상태 확인
+                # Check app state after initialization
                 app = firebase_admin.get_app()
                 logger.info(f"Initialized app: {app}")
                 logger.info(f"App name: {app.name}")
@@ -62,7 +62,7 @@ class FCMService:
                 logger.info(f"App name: {app.name}")
                 logger.info(f"Project ID: {app.project_id}")
                 
-            # FCM 서비스 연결 테스트
+            # Test FCM service connection
             self._test_fcm_connection()
             
         except Exception as e:
@@ -72,23 +72,23 @@ class FCMService:
             raise
     
     def _test_fcm_connection(self):
-        """FCM 서비스 연결을 테스트합니다."""
+        """Test FCM service connection"""
         try:
-            # Firebase Admin SDK가 제대로 초기화되었는지 확인
+            # Check if Firebase Admin SDK is properly initialized
             if not firebase_admin._apps:
                 raise Exception("Firebase Admin SDK is not initialized")
             
-            # messaging 모듈이 제대로 로드되었는지 확인
+            # Check if messaging module is properly loaded
             if not hasattr(messaging, 'Message'):
                 raise Exception("Unable to load Firebase messaging module")
             
-            # FCM 서비스 계정 정보 확인
+            # Check FCM service account information
             try:
                 app = firebase_admin.get_app()
                 logger.info(f"Firebase app name: {app.name}")
                 logger.info(f"Firebase project ID: {app.project_id}")
                 
-                # FCM 서비스 상태 확인
+                # Check FCM service status
                 logger.info("FCM service status: enabled")
                 logger.info("Web Push certificate: present")
                 
@@ -109,20 +109,20 @@ class FCMService:
         image_url: Optional[str] = None
     ) -> Dict[str, Union[str, bool]]:
         """
-        특정 토큰으로 푸시 알림 전송
+        Send push notification to specific token
         
         Args:
-            token: FCM 등록 토큰
-            title: 알림 제목
-            body: 알림 본문
-            data: 추가 데이터 (선택사항)
-            image_url: 알림 이미지 URL (선택사항)
+            token: FCM registration token
+            title: Notification title
+            body: Notification body
+            data: Additional data (optional)
+            image_url: Notification image URL (optional)
             
         Returns:
-            전송 결과 딕셔너리
+            Send result dictionary
         """
         try:
-            # 메시지 구성
+            # Build message
             message = messaging.Message(
                 notification=messaging.Notification(
                     title=title,
@@ -133,7 +133,7 @@ class FCMService:
                 token=token
             )
             
-            # 메시지 전송
+            # Send message
             response = messaging.send(message)
             logger.info(f"Message sent successfully: {response}")
             
@@ -160,17 +160,17 @@ class FCMService:
         image_url: Optional[str] = None
     ) -> Dict[str, Union[str, bool, int]]:
         """
-        여러 토큰으로 푸시 알림 전송 (멀티캐스트)
+        Send push notification to multiple tokens (multicast)
         
         Args:
-            tokens: FCM 등록 토큰 리스트
-            title: 알림 제목
-            body: 알림 본문
-            data: 추가 데이터 (선택사항)
-            image_url: 알림 이미지 URL (선택사항)
+            tokens: FCM registration token list
+            title: Notification title
+            body: Notification body
+            data: Additional data (optional)
+            image_url: Notification image URL (optional)
             
         Returns:
-            전송 결과 딕셔너리
+            Send result dictionary
         """
         if not tokens:
             return {
@@ -180,7 +180,7 @@ class FCMService:
             }
         
         try:
-            # 실제 FCM 전송 수행
+            # Perform actual FCM send
             logger.info(f"Starting FCM send: {len(tokens)} tokens, title='{title}'")
             logger.info(f"Tokens: {tokens}")
             logger.info(f"Notification title: {title}")
@@ -188,7 +188,7 @@ class FCMService:
             logger.info(f"Additional data: {data}")
             logger.info(f"Image URL: {image_url}")
             
-            # 메시지 구성 단계
+            # Build message step
             logger.info("Building message...")
             notification = messaging.Notification(
                 title=title,
@@ -197,7 +197,7 @@ class FCMService:
             )
             logger.info(f"Notification object created: {notification}")
             
-            # data 매개변수 검증 및 변환
+            # Validate and convert data parameter
             if data is None:
                 message_data = {}
             elif isinstance(data, dict):
@@ -213,12 +213,12 @@ class FCMService:
             )
             logger.info(f"Multicast message created: {message}")
             
-            # 메시지 전송 단계
+            # Send message step
             logger.info("Sending message to FCM server...")
             logger.info(f"messaging module: {messaging}")
             logger.info(f"messaging module attributes: {dir(messaging)}")
             
-            # send_each_for_multicast 함수 존재 여부 확인 (Firebase Admin SDK 7.1.0에서 이름 변경)
+            # Check if send_each_for_multicast function exists (renamed in Firebase Admin SDK 7.1.0)
             if hasattr(messaging, 'send_each_for_multicast'):
                 logger.info("send_each_for_multicast found")
             else:
@@ -231,21 +231,21 @@ class FCMService:
             logger.info(f"Response type: {type(response)}")
             logger.info(f"Response attributes: {dir(response)}")
             
-            # Firebase Admin SDK 7.1.0의 응답 구조에 맞게 처리
+            # Process according to Firebase Admin SDK 7.1.0 response structure
             try:
                 if hasattr(response, 'success_count') and hasattr(response, 'failure_count'):
-                    # 기존 방식 (BatchResponse)
+                    # Existing method (BatchResponse)
                     success_count = response.success_count
                     failure_count = response.failure_count
                     logger.info(f"BatchResponse: success {success_count}, failure {failure_count}")
                 elif hasattr(response, '__len__'):
-                    # 새로운 방식 (리스트 형태)
+                    # New method (list format)
                     total_count = len(response)
                     success_count = sum(1 for r in response if r.success)
                     failure_count = total_count - success_count
                     logger.info(f"List response: total {total_count}, success {success_count}, failure {failure_count}")
                 else:
-                    # 기본값 설정
+                    # Set default values
                     success_count = len(tokens)
                     failure_count = 0
                     logger.info(f"Unknown response structure: using defaults - success {success_count}, failure {failure_count}")
@@ -274,7 +274,7 @@ class FCMService:
                 f"Error location: {e.__traceback__.tb_frame.f_code.co_filename}:{e.__traceback__.tb_lineno}"
             )
             
-            # messaging 모듈 상태 확인
+            # Check messaging module state
             try:
                 logger.error(f"messaging module: {messaging}")
                 logger.error(f"messaging module type: {type(messaging)}")
@@ -297,25 +297,25 @@ class FCMService:
         body: Optional[str] = None
     ) -> Dict[str, Union[str, bool]]:
         """
-        데이터만 포함된 메시지 전송 (백그라운드 처리용)
+        Send message containing only data (for background processing)
         
         Args:
-            token: FCM 등록 토큰
-            data: 전송할 데이터
-            title: 알림 제목 (선택사항)
-            body: 알림 본문 (선택사항)
+            token: FCM registration token
+            data: Data to send
+            title: Notification title (optional)
+            body: Notification body (optional)
             
         Returns:
-            전송 결과 딕셔너리
+            Send result dictionary
         """
         try:
-            # 메시지 구성
+            # Build message
             message_data = {
                 "data": data,
                 "token": token
             }
             
-            # 알림이 있는 경우 추가
+            # Add notification if present
             if title or body:
                 message_data["notification"] = messaging.Notification(
                     title=title or "",
@@ -324,7 +324,7 @@ class FCMService:
             
             message = messaging.Message(**message_data)
             
-            # 메시지 전송
+            # Send message
             response = messaging.send(message)
             logger.info(f"Data message sent successfully: {response}")
             
@@ -350,19 +350,19 @@ class FCMService:
         data: Optional[Dict[str, str]] = None
     ) -> Dict[str, Union[str, bool]]:
         """
-        특정 토픽으로 구독한 모든 기기에 메시지 전송
+        Send message to all devices subscribed to specific topic
         
         Args:
-            topic: 토픽 이름
-            title: 알림 제목
-            body: 알림 본문
-            data: 추가 데이터 (선택사항)
+            topic: Topic name
+            title: Notification title
+            body: Notification body
+            data: Additional data (optional)
             
         Returns:
-            전송 결과 딕셔너리
+            Send result dictionary
         """
         try:
-            # 메시지 구성
+            # Build message
             message = messaging.Message(
                 notification=messaging.Notification(
                     title=title,
@@ -372,7 +372,7 @@ class FCMService:
                 topic=topic
             )
             
-            # 메시지 전송
+            # Send message
             response = messaging.send(message)
             logger.info(f"Topic message sent successfully: {response}")
             
@@ -392,14 +392,14 @@ class FCMService:
     
     def subscribe_to_topic(self, tokens: List[str], topic: str) -> Dict[str, Union[str, bool]]:
         """
-        여러 토큰을 특정 토픽에 구독
+        Subscribe multiple tokens to specific topic
         
         Args:
-            tokens: FCM 등록 토큰 리스트
-            topic: 토픽 이름
+            tokens: FCM registration token list
+            topic: Topic name
             
         Returns:
-            구독 결과 딕셔너리
+            Subscribe result dictionary
         """
         try:
             response = messaging.subscribe_to_topic(tokens, topic)
@@ -422,14 +422,14 @@ class FCMService:
     
     def unsubscribe_from_topic(self, tokens: List[str], topic: str) -> Dict[str, Union[str, bool]]:
         """
-        여러 토큰을 특정 토픽에서 구독 해제
+        Unsubscribe multiple tokens from specific topic
         
         Args:
-            tokens: FCM 등록 토큰 리스트
-            topic: 토픽 이름
+            tokens: FCM registration token list
+            topic: Topic name
             
         Returns:
-            구독 해제 결과 딕셔너리
+            Unsubscribe result dictionary
         """
         try:
             response = messaging.unsubscribe_from_topic(tokens, topic)
@@ -450,11 +450,11 @@ class FCMService:
                 "status": "unsubscribe_failed"
             }
 
-# 전역 FCM 서비스 인스턴스
+# Global FCM service instance
 fcm_service = None
 
 def get_fcm_service() -> FCMService:
-    """전역 FCM 서비스 인스턴스를 반환합니다."""
+    """Return global FCM service instance"""
     global fcm_service
     try:
         if fcm_service is None:
@@ -462,11 +462,11 @@ def get_fcm_service() -> FCMService:
         return fcm_service
     except Exception as e:
         logger.error(f"Failed to create FCM service: {e}")
-        # 오류 발생 시 None 반환하여 호출자가 처리할 수 있도록 함
+        # Return None on error so caller can handle it
         return None
 
 def initialize_fcm_service(service_account_path: str = None) -> FCMService:
-    """FCM 서비스를 초기화하고 반환합니다."""
+    """Initialize and return FCM service"""
     global fcm_service
     fcm_service = FCMService(service_account_path)
     return fcm_service

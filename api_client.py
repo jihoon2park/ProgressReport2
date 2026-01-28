@@ -42,26 +42,26 @@ class APIClient:
 
 
 def get_api_client(site):
-    """API 클라이언트 인스턴스를 반환하는 함수"""
+    """Function to return API client instance"""
     return APIClient(site)
 
 def fetch_client_information(site):
     """
-    거주자(Client) 정보를 가져오는 통합 함수
+    Integrated function to get resident (Client) information
     
-    DB 직접 접속 모드에서는 매번 최신 데이터를 DB에서 직접 조회합니다.
-    캐시를 사용하지 않으며, 항상 최신 데이터를 반환합니다.
+    In DB direct access mode, queries latest data directly from DB each time.
+    Does not use cache and always returns latest data.
     
     Args:
-        site: 사이트 이름 (예: 'Parafield Gardens')
+        site: Site name (e.g., 'Parafield Gardens')
         
     Returns:
-        (성공 여부, 클라이언트 리스트)
+        (Success status, client list)
     """
     import os
     import sqlite3
     
-    # DB 직접 접속 모드 확인
+    # Check DB direct access mode
     use_db_direct = False
     try:
         conn = sqlite3.connect('progress_report.db', timeout=10)
@@ -77,14 +77,18 @@ def fetch_client_information(site):
     except:
         use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
     
-    # DB 직접 접속 모드 (권장 - 매번 최신 데이터 조회)
+    # DB direct access mode (recommended - query latest data each time)
     if use_db_direct:
         try:
             logger.info(f"🔍 DEBUG: use_db_direct=True, importing MANADDBConnector")
             from manad_db_connector import MANADDBConnector
+<<<<<<< Updated upstream
             logger.info(f"🔍 DEBUG: MANADDBConnector imported successfully")
             logger.info(f"🔌 DB 직접 접속: 거주자 정보 조회 - {site} (최신 데이터)")
             logger.info(f"🔍 DEBUG: Creating MANADDBConnector instance for site: {site}")
+=======
+            logger.info(f"🔌 DB direct access: Querying resident information - {site} (latest data)")
+>>>>>>> Stashed changes
             connector = MANADDBConnector(site)
             logger.info(f"🔍 DEBUG: MANADDBConnector instance created, about to call fetch_clients()")
             import time
@@ -94,6 +98,7 @@ def fetch_client_information(site):
             logger.info(f"🔍 DEBUG: fetch_clients() returned after {elapsed_time:.2f} seconds - success: {success}")
             
             if success and client_info:
+<<<<<<< Updated upstream
                 logger.info(f"🔍 DEBUG: Client info received, count: {len(client_info) if isinstance(client_info, list) else 'N/A'}")
                 # JSON 파일로 저장 (참고용, 읽기는 하지 않음)
                 save_client_data_to_json(site, client_info)
@@ -110,40 +115,52 @@ def fetch_client_information(site):
             import traceback
             logger.error(f"🔍 DEBUG: Full traceback:\n{traceback.format_exc()}")
             error_msg = f"❌ DB 직접 접속 실패: {site} - {str(db_error)}"
+=======
+                # Save as JSON file (for reference, not read)
+                save_client_data_to_json(site, client_info)
+                logger.info(f"✅ Resident information query succeeded - {site}: {len(client_info)} residents")
+                return True, client_info
+            else:
+                error_msg = f"❌ DB direct access failed: {site} - Resident information query result is empty."
+                logger.error(error_msg)
+                raise Exception(error_msg)
+        except Exception as db_error:
+            error_msg = f"❌ DB direct access failed: {site} - {str(db_error)}"
+>>>>>>> Stashed changes
             logger.error(error_msg)
             raise Exception(error_msg)
     
-    # API 모드 (fallback)
-    logger.info(f"🌐 API 모드: 거주자 정보 조회 - {site}")
+    # API mode (fallback)
+    logger.info(f"🌐 API mode: Querying resident information - {site}")
     try:
         api_client = APIClient(site)
         client_info = api_client.get_client_information()
         
-        # JSON 파일로 저장 (참고용)
+        # Save as JSON file (for reference)
         if client_info:
             save_client_data_to_json(site, client_info)
-            logger.info(f"✅ 거주자 정보 조회 성공 - {site}: {len(client_info) if isinstance(client_info, list) else 'N/A'}명")
+            logger.info(f"✅ Resident information query succeeded - {site}: {len(client_info) if isinstance(client_info, list) else 'N/A'} residents")
         
         return True, client_info
     except requests.RequestException as e:
-        logger.error(f"❌ 거주자 정보 조회 실패 - {site}: {str(e)}")
+        logger.error(f"❌ Resident information query failed - {site}: {str(e)}")
         return False, None
 
 def save_client_data_to_json(site, client_data):
-    """클라이언트 데이터를 JSON 파일로 저장"""
+    """Save client data to JSON file"""
     try:
-        # data 디렉토리 생성
+        # Create data directory
         os.makedirs('data', exist_ok=True)
         
-        # 파일명 생성 (사이트명을 소문자로 변환하고 공백을 언더스코어로 변경)
+        # Generate filename (convert site name to lowercase and replace spaces with underscores)
         filename = f"data/{site.replace(' ', '_').lower()}_client.json"
         
-        # JSON 파일로 저장
+        # Save as JSON file
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(client_data, f, ensure_ascii=False, indent=2)
         
-        logger.info(f"클라이언트 데이터 JSON 저장 완료 - {filename}")
+        logger.info(f"Client data JSON save completed - {filename}")
         
     except Exception as e:
-        logger.error(f"클라이언트 데이터 JSON 저장 실패 - 사이트: {site}, 에러: {str(e)}")
+        logger.error(f"Client data JSON save failed - site: {site}, error: {str(e)}")
 

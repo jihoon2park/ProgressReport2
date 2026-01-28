@@ -4,7 +4,7 @@ echo Flask Server Restart Script
 echo ========================================
 echo.
 
-REM 포트 5000 사용 중인 프로세스 확인 및 종료
+REM Check and terminate processes using port 5000
 echo [1/4] Checking for existing server on port 5000...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5000 ^| findstr LISTENING') do (
     echo Found process on port 5000: PID %%a
@@ -12,7 +12,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5000 ^| findstr LISTENING') 
     taskkill /F /PID %%a >nul 2>&1
 )
 
-REM Python 프로세스 중 app.py 관련 확인
+REM Check for app.py related processes among Python processes
 echo [2/4] Checking for running app.py processes...
 for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| findstr "PID:"') do (
     set PID=%%a
@@ -27,17 +27,17 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| fi
     )
 )
 
-REM 잠시 대기
+REM Wait briefly
 echo [3/4] Waiting for processes to terminate...
 timeout /t 2 /nobreak >nul
 
-REM 가상 환경 활성화
+REM Activate virtual environment
 echo [4/4] Starting server...
 if exist "venv\Scripts\activate.bat" (
     call venv\Scripts\activate.bat
 )
 
-REM 서버 시작
+REM Start server
 echo.
 echo ========================================
 echo Starting Flask Server...

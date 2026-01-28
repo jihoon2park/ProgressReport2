@@ -1,20 +1,20 @@
 @echo off
 chcp 65001 > nul
-echo 🔍 IIS 서버 로그 모니터링 도구
+echo 🔍 IIS Server Log Monitoring Tool
 echo =====================================
 echo.
 
 :menu
-echo 선택하세요:
-echo 1. 로그 파일 목록 보기
-echo 2. app.log 실시간 모니터링
-echo 3. error.log 실시간 모니터링
-echo 4. access.log 실시간 모니터링
-echo 5. 모든 로그 파일 보기 (마지막 50줄)
-echo 6. wfastcgi.log 보기
-echo 7. 종료
+echo Please select:
+echo 1. View log file list
+echo 2. Real-time monitoring of app.log
+echo 3. Real-time monitoring of error.log
+echo 4. Real-time monitoring of access.log
+echo 5. View all log files (last 50 lines)
+echo 6. View wfastcgi.log
+echo 7. Exit
 echo.
-set /p choice="선택 (1-7): "
+set /p choice="Select (1-7): "
 
 if "%choice%"=="1" (
     python view_logs.py --list
@@ -23,21 +23,21 @@ if "%choice%"=="1" (
 )
 
 if "%choice%"=="2" (
-    echo app.log 실시간 모니터링 시작... (Ctrl+C로 중단)
+    echo Starting real-time monitoring of app.log... (Press Ctrl+C to stop)
     python view_logs.py --file app.log --follow
     pause
     goto menu
 )
 
 if "%choice%"=="3" (
-    echo error.log 실시간 모니터링 시작... (Ctrl+C로 중단)
+    echo Starting real-time monitoring of error.log... (Press Ctrl+C to stop)
     python view_logs.py --file error.log --follow
     pause
     goto menu
 )
 
 if "%choice%"=="4" (
-    echo access.log 실시간 모니터링 시작... (Ctrl+C로 중단)
+    echo Starting real-time monitoring of access.log... (Press Ctrl+C to stop)
     python view_logs.py --file access.log --follow
     pause
     goto menu
@@ -50,21 +50,21 @@ if "%choice%"=="5" (
 )
 
 if "%choice%"=="6" (
-    echo wfastcgi.log 보기 (마지막 100줄)
+    echo Viewing wfastcgi.log (last 100 lines)
     if exist wfastcgi.log (
         python view_logs.py --file wfastcgi.log --lines 100
     ) else (
-        echo wfastcgi.log 파일이 없습니다.
+        echo wfastcgi.log file does not exist.
     )
     pause
     goto menu
 )
 
 if "%choice%"=="7" (
-    echo 종료합니다.
+    echo Exiting.
     exit
 )
 
-echo 잘못된 선택입니다.
+echo Invalid selection.
 pause
 goto menu

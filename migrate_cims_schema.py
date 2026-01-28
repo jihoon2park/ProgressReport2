@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-CIMS 데이터베이스 스키마 마이그레이션 스크립트
-Production 서버의 데이터베이스에 누락된 컬럼들을 자동으로 추가합니다.
+CIMS Database Schema Migration Script
+Automatically adds missing columns to the database on production servers.
 """
 
 import sqlite3
@@ -11,14 +11,14 @@ import os
 logger = logging.getLogger(__name__)
 
 def check_column_exists(cursor, table_name, column_name):
-    """컬럼이 존재하는지 확인"""
+    """Check if column exists"""
     cursor.execute(f"PRAGMA table_info({table_name})")
     columns = cursor.fetchall()
     column_names = [col[1] for col in columns]
     return column_name in column_names
 
 def migrate_cims_incidents_table(db_path='progress_report.db'):
-    """cims_incidents 테이블에 누락된 컬럼들을 추가"""
+    """Add missing columns to cims_incidents table"""
     
     if not os.path.exists(db_path):
         logger.warning(f"Database file not found: {db_path}")
@@ -28,15 +28,15 @@ def migrate_cims_incidents_table(db_path='progress_report.db'):
     cursor = conn.cursor()
     
     try:
-        # 테이블이 존재하는지 확인
+        # Check if table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cims_incidents'")
         if not cursor.fetchone():
-            # 신규 설치/아직 CIMS 테이블을 만들지 않은 환경에서는 정상적인 상태입니다.
-            # 스키마 마이그레이션은 "추가 컬럼 보강" 목적이므로, 대상 테이블이 없으면 스킵합니다.
+            # This is normal for new installations or environments where CIMS tables haven't been created yet.
+            # Schema migration is for "adding missing columns", so skip if target table doesn't exist.
             logger.info("⏭️  Skipping migration: cims_incidents table does not exist")
             return True
         
-        # 추가할 컬럼 목록 (컬럼명, 타입, 기본값)
+        # List of columns to add (column_name, type, default_value)
         columns_to_add = [
             ('risk_rating', 'VARCHAR(50)', 'NULL'),
             ('is_review_closed', 'INTEGER', '0'),
@@ -81,7 +81,7 @@ def migrate_cims_incidents_table(db_path='progress_report.db'):
         conn.close()
 
 def run_migration(db_path='progress_report.db'):
-    """마이그레이션 실행"""
+    """Execute migration"""
     logger.info("🔄 Starting CIMS database migration...")
     success = migrate_cims_incidents_table(db_path)
     if success:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Progress Notes JSON Cache Manager
-DB 대신 JSON 파일로 Progress Notes를 캐시하는 매니저
+Manager that caches Progress Notes in JSON files instead of DB
 """
 
 import json
@@ -14,27 +14,27 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ProgressNotesJSONCache:
-    """Progress Notes JSON 파일 캐시 매니저"""
+    """Progress Notes JSON file cache manager"""
     
     def __init__(self, cache_dir: str = "data"):
         self.cache_dir = cache_dir
-        self.cache_duration = 3600  # 1시간 (초)
+        self.cache_duration = 3600  # 1 hour (seconds)
         
-        # 캐시 디렉토리 생성
+        # Create cache directory
         os.makedirs(cache_dir, exist_ok=True)
     
     def _get_cache_file_path(self, site: str) -> str:
-        """사이트별 캐시 파일 경로 반환"""
+        """Return cache file path for site"""
         safe_site = site.replace(" ", "_").lower()
         return os.path.join(self.cache_dir, f"progress_notes_{safe_site}.json")
     
     def _get_meta_file_path(self, site: str) -> str:
-        """사이트별 메타데이터 파일 경로 반환"""
+        """Return metadata file path for site"""
         safe_site = site.replace(" ", "_").lower()
         return os.path.join(self.cache_dir, f"progress_notes_{safe_site}_meta.json")
     
     def is_cache_valid(self, site: str) -> bool:
-        """캐시가 유효한지 확인"""
+        """Check if cache is valid"""
         try:
             meta_file = self._get_meta_file_path(site)
             if not os.path.exists(meta_file):
@@ -53,7 +53,7 @@ class ProgressNotesJSONCache:
             return False
     
     def get_cached_notes(self, site: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
-        """캐시된 Progress Notes 조회"""
+        """Get cached Progress Notes"""
         try:
             cache_file = self._get_cache_file_path(site)
             if not os.path.exists(cache_file):
@@ -76,7 +76,7 @@ class ProgressNotesJSONCache:
             total_count = len(notes)
             total_pages = (total_count + per_page - 1) // per_page
             
-            # 페이지네이션 적용
+            # Apply pagination
             start_idx = (page - 1) * per_page
             end_idx = start_idx + per_page
             paginated_notes = notes[start_idx:end_idx]
@@ -109,12 +109,12 @@ class ProgressNotesJSONCache:
             }
     
     def update_cache(self, site: str, notes: List[Dict[str, Any]]) -> bool:
-        """캐시 업데이트"""
+        """Update cache"""
         try:
             cache_file = self._get_cache_file_path(site)
             meta_file = self._get_meta_file_path(site)
             
-            # 캐시 데이터 저장
+            # Save cache data
             cache_data = {
                 'site': site,
                 'notes': notes,
@@ -125,7 +125,7 @@ class ProgressNotesJSONCache:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
             
-            # 메타데이터 저장
+            # Save metadata
             meta_data = {
                 'site': site,
                 'cached_at': datetime.now().isoformat(),
@@ -144,10 +144,10 @@ class ProgressNotesJSONCache:
             return False
     
     def clear_cache(self, site: str = None) -> bool:
-        """캐시 삭제"""
+        """Clear cache"""
         try:
             if site:
-                # 특정 사이트 캐시 삭제
+                # Clear cache for specific site
                 cache_file = self._get_cache_file_path(site)
                 meta_file = self._get_meta_file_path(site)
                 
@@ -158,7 +158,7 @@ class ProgressNotesJSONCache:
                 
                 logger.info(f"Cache cleared - {site}")
             else:
-                # 모든 캐시 삭제
+                # Clear all caches
                 for filename in os.listdir(self.cache_dir):
                     if filename.startswith('progress_notes_') and filename.endswith('.json'):
                         os.remove(os.path.join(self.cache_dir, filename))
@@ -172,10 +172,10 @@ class ProgressNotesJSONCache:
             return False
     
     def get_cache_info(self, site: str = None) -> Dict[str, Any]:
-        """캐시 정보 조회"""
+        """Get cache information"""
         try:
             if site:
-                # 특정 사이트 정보
+                # Information for specific site
                 meta_file = self._get_meta_file_path(site)
                 if not os.path.exists(meta_file):
                     return {'site': site, 'cached': False}
@@ -191,7 +191,7 @@ class ProgressNotesJSONCache:
                     'is_valid': self.is_cache_valid(site)
                 }
             else:
-                # 모든 사이트 정보
+                # Information for all sites
                 cache_info = []
                 for filename in os.listdir(self.cache_dir):
                     if filename.startswith('progress_notes_') and filename.endswith('_meta.json'):
@@ -215,5 +215,5 @@ class ProgressNotesJSONCache:
             logger.error(f"Failed to fetch cache info: {e}")
             return {'error': str(e)}
 
-# 전역 인스턴스
+# Global instance
 json_cache = ProgressNotesJSONCache()

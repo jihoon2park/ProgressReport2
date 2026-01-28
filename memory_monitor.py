@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Memory Monitor for Flask Application
-서버 메모리 사용량 모니터링 및 누수 감지
+Server memory usage monitoring and leak detection
 """
 
 import os
@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-# psutil은 선택적 의존성 (없어도 기본 기능은 작동)
+# psutil is an optional dependency (basic functionality works without it)
 try:
     import psutil
     PSUTIL_AVAILABLE = True
@@ -24,18 +24,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class MemoryMonitor:
-    """메모리 사용량 모니터링 클래스"""
+    """Memory Usage Monitoring Class"""
     
     def __init__(self, check_interval: int = 60):
         """
         Args:
-            check_interval: 메모리 체크 간격 (초)
+            check_interval: Memory check interval (seconds)
         """
         self.check_interval = check_interval
         self.monitoring = False
         self.monitor_thread = None
         self.memory_history: List[Dict[str, Any]] = []
-        self.max_history_size = 100  # 최대 100개 기록 보관
+        self.max_history_size = 100  # Keep maximum 100 records
         
         if PSUTIL_AVAILABLE:
             self.process = psutil.Process(os.getpid())
@@ -45,7 +45,7 @@ class MemoryMonitor:
         self.initial_memory = self._get_memory_info()
         
     def _get_memory_info(self) -> Dict[str, Any]:
-        """현재 메모리 사용량 정보 반환"""
+        """Return current memory usage information"""
         if not PSUTIL_AVAILABLE:
             return {
                 'timestamp': datetime.now().isoformat(),
@@ -57,12 +57,12 @@ class MemoryMonitor:
             mem_info = self.process.memory_info()
             mem_percent = self.process.memory_percent()
             
-            # 시스템 전체 메모리 정보
+            # System-wide memory information
             system_mem = psutil.virtual_memory()
             
             return {
                 'timestamp': datetime.now().isoformat(),
-                'rss_mb': round(mem_info.rss / 1024 / 1024, 2),  # Resident Set Size (실제 메모리)
+                'rss_mb': round(mem_info.rss / 1024 / 1024, 2),  # Resident Set Size (actual memory)
                 'vms_mb': round(mem_info.vms / 1024 / 1024, 2),  # Virtual Memory Size
                 'percent': round(mem_percent, 2),
                 'available_mb': round(system_mem.available / 1024 / 1024, 2),
@@ -77,10 +77,10 @@ class MemoryMonitor:
             }
     
     def get_current_memory(self) -> Dict[str, Any]:
-        """현재 메모리 사용량 반환"""
+        """Return current memory usage"""
         current = self._get_memory_info()
         
-        # 초기 메모리와 비교
+        # Compare with initial memory
         if 'rss_mb' in current and 'rss_mb' in self.initial_memory:
             current['increase_mb'] = round(
                 current['rss_mb'] - self.initial_memory['rss_mb'], 2
@@ -89,14 +89,14 @@ class MemoryMonitor:
                 (current['rss_mb'] - self.initial_memory['rss_mb']) / self.initial_memory['rss_mb'] * 100, 2
             ) if self.initial_memory['rss_mb'] > 0 else 0
         
-        # 가비지 컬렉션 통계
+        # Garbage collection statistics
         gc_stats = gc.get_stats()
         current['gc_stats'] = {
             'collections': sum(stat['collections'] for stat in gc_stats),
             'collected': sum(stat['collected'] for stat in gc_stats),
         }
         
-        # 스레드 수
+        # Thread count
         try:
             current['thread_count'] = threading.active_count()
         except:
@@ -105,29 +105,29 @@ class MemoryMonitor:
         return current
     
     def get_memory_history(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """메모리 사용량 히스토리 반환"""
+        """Return memory usage history"""
         return self.memory_history[-limit:]
     
     def detect_memory_leak(self) -> Optional[Dict[str, Any]]:
-        """메모리 누수 감지"""
+        """Detect memory leak"""
         if len(self.memory_history) < 10:
             return None
         
-        # 최근 10개 기록의 평균 증가율 계산
+        # Calculate average increase rate of recent 10 records
         recent = self.memory_history[-10:]
         rss_values = [m.get('rss_mb', 0) for m in recent if 'rss_mb' in m]
         
         if len(rss_values) < 10:
             return None
         
-        # 선형 증가 추세 확인
+        # Check linear increasing trend
         first_half = sum(rss_values[:5]) / 5
         second_half = sum(rss_values[5:]) / 5
         
         increase = second_half - first_half
         increase_percent = (increase / first_half * 100) if first_half > 0 else 0
         
-        # 10% 이상 증가하면 누수 의심
+        # Suspect leak if increase is 10% or more
         if increase_percent > 10:
             return {
                 'leak_detected': True,
@@ -140,7 +140,7 @@ class MemoryMonitor:
         return None
     
     def start_monitoring(self):
-        """메모리 모니터링 시작"""
+        """Start memory monitoring"""
         if self.monitoring:
             logger.warning("Memory monitoring is already running.")
             return
@@ -151,7 +151,7 @@ class MemoryMonitor:
         logger.info(f"Memory monitoring started (interval: {self.check_interval}s)")
     
     def stop_monitoring(self):
-        """메모리 모니터링 중지"""
+        """Stop memory monitoring"""
         self.monitoring = False
         if self.monitor_thread and self.monitor_thread.is_alive():
             try:
@@ -161,25 +161,25 @@ class MemoryMonitor:
         logger.info("Memory monitoring stopped")
     
     def _monitor_loop(self):
-        """모니터링 루프"""
+        """Monitoring loop"""
         while self.monitoring:
             try:
                 mem_info = self._get_memory_info()
                 self.memory_history.append(mem_info)
                 
-                # 히스토리 크기 제한
+                # Limit history size
                 if len(self.memory_history) > self.max_history_size:
                     self.memory_history.pop(0)
                 
-                # 메모리 사용량이 높으면 경고
+                # Warn if memory usage is high
                 if 'rss_mb' in mem_info:
-                    if mem_info['rss_mb'] > 1000:  # 1GB 이상
+                    if mem_info['rss_mb'] > 1000:  # 1GB or more
                         logger.warning(
                             f"⚠️ High memory usage: {mem_info['rss_mb']}MB "
                             f"({mem_info['percent']}%)"
                         )
                     
-                    # 누수 감지
+                    # Detect leak
                     leak_info = self.detect_memory_leak()
                     if leak_info:
                         logger.warning(
@@ -193,10 +193,10 @@ class MemoryMonitor:
             time.sleep(self.check_interval)
     
     def force_gc(self) -> Dict[str, Any]:
-        """가비지 컬렉션 강제 실행"""
+        """Force garbage collection"""
         before = self._get_memory_info()
         
-        # 모든 세대의 가비지 컬렉션 실행
+        # Run garbage collection for all generations
         collected = gc.collect()
         
         after = self._get_memory_info()
@@ -213,7 +213,7 @@ class MemoryMonitor:
         }
     
     def get_summary(self) -> Dict[str, Any]:
-        """메모리 사용량 요약 정보"""
+        """Memory usage summary information"""
         current = self.get_current_memory()
         leak_info = self.detect_memory_leak()
         
@@ -230,23 +230,23 @@ class MemoryMonitor:
         return summary
 
 
-# 전역 인스턴스
+# Global instance
 _memory_monitor: Optional[MemoryMonitor] = None
 
 def get_memory_monitor() -> MemoryMonitor:
-    """메모리 모니터 인스턴스 반환"""
+    """Return memory monitor instance"""
     global _memory_monitor
     if _memory_monitor is None:
         _memory_monitor = MemoryMonitor(check_interval=60)
     return _memory_monitor
 
 def start_memory_monitoring():
-    """메모리 모니터링 시작"""
+    """Start memory monitoring"""
     monitor = get_memory_monitor()
     monitor.start_monitoring()
 
 def stop_memory_monitoring():
-    """메모리 모니터링 중지"""
+    """Stop memory monitoring"""
     global _memory_monitor
     if _memory_monitor:
         _memory_monitor.stop_monitoring()

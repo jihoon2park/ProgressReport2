@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Progress Notes 캐시 매니저
-하이브리드 캐싱과 페이지네이션을 지원
+Progress Notes Cache Manager
+Supports hybrid caching and pagination
 """
 
 import sqlite3
@@ -14,15 +14,15 @@ import os
 logger = logging.getLogger(__name__)
 
 class ProgressNotesCacheManager:
-    """Progress Notes 캐시 관리 클래스"""
+    """Progress Notes Cache Management Class"""
     
     def __init__(self, db_path: str = 'progress_report.db'):
         self.db_path = db_path
-        self.cache_duration_hours = 1  # 1시간 캐시 유효
-        self.max_cache_days = 30  # 30일 이상된 데이터 삭제
+        self.cache_duration_hours = 1  # Cache valid for 1 hour
+        self.max_cache_days = 30  # Delete data older than 30 days
         
     def get_db_connection(self):
-        """데이터베이스 연결"""
+        """Database connection"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
@@ -30,14 +30,14 @@ class ProgressNotesCacheManager:
     def get_cached_notes(self, site: str, page: int = 1, per_page: int = 50, 
                         days: int = 7, use_hybrid: bool = True) -> Dict:
         """
-        하이브리드 캐싱으로 Progress Notes 조회
+        Query Progress Notes with hybrid caching
         
         Args:
-            site: 사이트명
-            page: 페이지 번호 (1부터 시작)
-            per_page: 페이지당 항목 수
-            days: 조회할 일수
-            use_hybrid: 하이브리드 캐싱 사용 여부
+            site: Site name
+            page: Page number (starts from 1)
+            per_page: Number of items per page
+            days: Number of days to query
+            use_hybrid: Whether to use hybrid caching
             
         Returns:
             {
@@ -54,20 +54,20 @@ class ProgressNotesCacheManager:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 1. 캐시 상태 확인
+            # 1. Check cache status
             cache_status = self._check_cache_status(site, days)
             
             if use_hybrid and cache_status['is_fresh']:
-                # 2. 캐시에서 데이터 조회
-                logger.info(f"캐시에서 Progress Notes 조회 - 사이트: {site}, 페이지: {page}")
+                # 2. Query data from cache
+                logger.info(f"Querying Progress Notes from cache - Site: {site}, Page: {page}")
                 return self._get_notes_from_cache(site, page, per_page, days, cache_status)
             else:
-                # 3. API에서 최신 데이터 조회 후 캐시 업데이트
-                logger.info(f"API에서 Progress Notes 조회 후 캐시 업데이트 - 사이트: {site}")
+                # 3. Query latest data from API and update cache
+                logger.info(f"Querying Progress Notes from API and updating cache - Site: {site}")
                 return self._get_notes_from_api_and_cache(site, page, per_page, days)
                 
         except Exception as e:
-            logger.error(f"Progress Notes 조회 실패: {e}")
+            logger.error(f"Failed to query Progress Notes: {e}")
             return {
                 'notes': [],
                 'total_count': 0,
@@ -82,12 +82,12 @@ class ProgressNotesCacheManager:
             conn.close()
     
     def _check_cache_status(self, site: str, days: int) -> Dict:
-        """캐시 상태 확인"""
+        """Check cache status"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 실제 캐시 데이터 확인
+            # Check actual cache data
             cursor.execute('''
                 SELECT COUNT(*) as count, MAX(created_at) as last_created
                 FROM progress_notes_cache 
@@ -98,7 +98,7 @@ class ProgressNotesCacheManager:
             cache_count = cache_info[0] if cache_info else 0
             last_created = cache_info[1] if cache_info and cache_info[1] else None
             
-            # 동기화 상태도 확인
+            # Also check sync status
             cursor.execute('''
                 SELECT last_sync, sync_status, records_count
                 FROM progress_notes_sync 
@@ -115,7 +115,7 @@ class ProgressNotesCacheManager:
                     'status': 'no_cache'
                 }
             
-            # 캐시 나이 계산
+            # Calculate cache age
             if last_created:
                 last_created_dt = datetime.fromisoformat(last_created)
                 cache_age_hours = (datetime.now() - last_created_dt).total_seconds() / 3600
@@ -131,7 +131,7 @@ class ProgressNotesCacheManager:
             }
             
         except Exception as e:
-            logger.error(f"캐시 상태 확인 실패: {e}")
+            logger.error(f"Failed to check cache status: {e}")
             return {
                 'is_fresh': False,
                 'last_sync': None,
@@ -143,15 +143,15 @@ class ProgressNotesCacheManager:
     
     def _get_notes_from_cache(self, site: str, page: int, per_page: int, 
                              days: int, cache_status: Dict) -> Dict:
-        """캐시에서 데이터 조회"""
+        """Query data from cache"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 날짜 범위 계산
+            # Calculate date range
             cutoff_date = datetime.now() - timedelta(days=days)
             
-            # 캐시에서 데이터 조회 (모든 노트가 하나의 JSON으로 저장됨)
+            # Query data from cache (all notes stored as a single JSON)
             cursor.execute('''
                 SELECT data
                 FROM progress_notes_cache 
@@ -172,13 +172,13 @@ class ProgressNotesCacheManager:
                     'last_sync': None
                 }
             
-            # JSON 데이터 파싱
+            # Parse JSON data
             try:
                 all_notes = json.loads(cache_row[0])
                 if not isinstance(all_notes, list):
                     all_notes = []
             except json.JSONDecodeError as e:
-                logger.error(f"캐시 데이터 JSON 파싱 실패: {e}")
+                logger.error(f"Failed to parse cache data JSON: {e}")
                 return {
                     'notes': [],
                     'total_count': 0,
@@ -189,12 +189,12 @@ class ProgressNotesCacheManager:
                     'last_sync': None
                 }
             
-            # 날짜 필터링 (days 파라미터 적용)
+            # Date filtering (apply days parameter)
             if days > 0:
                 cutoff_date = datetime.now() - timedelta(days=days)
                 filtered_notes = []
                 for note in all_notes:
-                    # 노트의 생성일 확인 (다양한 필드명 지원)
+                    # Check note creation date (support various field names)
                     note_date = None
                     for date_field in ['createdAt', 'CreatedAt', 'created_at', 'date']:
                         if date_field in note and note[date_field]:
@@ -211,7 +211,7 @@ class ProgressNotesCacheManager:
                         filtered_notes.append(note)
                 all_notes = filtered_notes
             
-            # 페이지네이션 적용
+            # Apply pagination
             total_count = len(all_notes)
             offset = (page - 1) * per_page
             notes = all_notes[offset:offset + per_page]
@@ -230,15 +230,15 @@ class ProgressNotesCacheManager:
             }
             
         except Exception as e:
-            logger.error(f"캐시에서 데이터 조회 실패: {e}")
+            logger.error(f"Failed to query data from cache: {e}")
             raise
         finally:
             conn.close()
     
     def _get_notes_from_api_and_cache(self, site: str, page: int, per_page: int, days: int) -> Dict:
-        """API에서 데이터 조회 후 캐시 업데이트"""
+        """Query data from API and update cache"""
         try:
-            # API에서 데이터 조회 (기존 로직 사용)
+            # Query data from API (use existing logic)
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
             success, api_notes = fetch_progress_notes_for_site(site, days=days, event_types=[])
@@ -254,10 +254,10 @@ class ProgressNotesCacheManager:
                     'last_sync': None
                 }
             
-            # 캐시 업데이트
+            # Update cache
             self._update_cache(site, api_notes)
             
-            # 페이지네이션 적용
+            # Apply pagination
             total_count = len(api_notes)
             offset = (page - 1) * per_page
             paginated_notes = api_notes[offset:offset + per_page]
@@ -274,24 +274,24 @@ class ProgressNotesCacheManager:
             }
             
         except Exception as e:
-            logger.error(f"API에서 데이터 조회 실패: {e}")
+            logger.error(f"Failed to query data from API: {e}")
             raise
     
     def _update_cache(self, site: str, notes: List[Dict]):
-        """캐시 업데이트"""
+        """Update cache"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 기존 데이터 삭제
+            # Delete existing data
             cursor.execute('DELETE FROM progress_notes_cache WHERE site_name = ?', (site,))
             
-            # 새 데이터 삽입
+            # Insert new data
             new_notes_count = 0
             cache_key = f"progress_notes_{site}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             expires_at = datetime.now() + timedelta(hours=self.cache_duration_hours)
             
-            # 모든 노트를 하나의 JSON으로 저장
+            # Store all notes as a single JSON
             cursor.execute('''
                 INSERT INTO progress_notes_cache 
                 (site_name, cache_key, data, created_at, expires_at)
@@ -305,7 +305,7 @@ class ProgressNotesCacheManager:
             ))
             new_notes_count = len(notes)
             
-            # 동기화 상태 업데이트
+            # Update sync status
             cursor.execute('''
                 INSERT OR REPLACE INTO progress_notes_sync 
                 (site_name, last_sync, records_count, sync_status)
@@ -317,16 +317,16 @@ class ProgressNotesCacheManager:
             ))
             
             conn.commit()
-            logger.info(f"캐시 업데이트 완료 - 사이트: {site}, 노트 수: {new_notes_count}")
+            logger.info(f"Cache update completed - Site: {site}, Notes count: {new_notes_count}")
             
         except Exception as e:
-            logger.error(f"캐시 업데이트 실패: {e}")
+            logger.error(f"Failed to update cache: {e}")
             raise
         finally:
             conn.close()
     
     def cleanup_old_cache(self, days: int = None):
-        """오래된 캐시 데이터 정리"""
+        """Clean up old cache data"""
         if days is None:
             days = self.max_cache_days
             
@@ -344,12 +344,12 @@ class ProgressNotesCacheManager:
             deleted_count = cursor.rowcount
             conn.commit()
             
-            logger.info(f"오래된 캐시 데이터 정리 완료 - 삭제된 항목: {deleted_count}")
+            logger.info(f"Old cache data cleanup completed - Deleted items: {deleted_count}")
             
         except Exception as e:
-            logger.error(f"캐시 정리 실패: {e}")
+            logger.error(f"Failed to clean up cache: {e}")
         finally:
             conn.close()
 
-# 전역 인스턴스
+# Global instance
 cache_manager = ProgressNotesCacheManager()

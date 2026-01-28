@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-MANAD Plus Integrator 시작 스크립트
-CIMS 시스템에서 MANAD Plus와의 연동을 시작합니다.
+MANAD Plus Integrator startup script
+Starts integration between CIMS system and MANAD Plus.
 """
 
 import sys
 import logging
 from manad_plus_integrator import MANADPlusIntegrator
 
-# 로깅 설정
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -21,14 +21,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    """MANAD Plus Integrator 시작"""
+    """Start MANAD Plus Integrator"""
     try:
         logger.info("Starting MANAD Plus Integrator...")
         
-        # Integrator 인스턴스 생성
+        # Create Integrator instance
         integrator = MANADPlusIntegrator()
         
-        # 폴링 시작
+        # Start polling
         success = integrator.start_polling()
         
         if success:
@@ -36,7 +36,7 @@ def main():
             logger.info("Polling incidents from MANAD Plus every 5 minutes.")
             logger.info("Press Ctrl+C to stop.")
             
-            # 메인 스레드에서 대기
+            # Wait in main thread
             try:
                 while integrator.is_running:
                     import time

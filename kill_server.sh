@@ -1,88 +1,88 @@
 #!/bin/bash
 
 ###############################################################################
-# Flask 서버 종료 스크립트
+# Flask Server Stop Script
 # 
-# 사용법:
-#   ./kill_server.sh              # 모든 Flask 서버 종료
-#   ./kill_server.sh --confirm    # 확인 없이 즉시 종료
+# Usage:
+#   ./kill_server.sh              # Stop all Flask servers
+#   ./kill_server.sh --confirm    # Stop immediately without confirmation
 #
-# 작성: 2025-10-15
+# Created: 2025-10-15
 ###############################################################################
 
 echo "╔═══════════════════════════════════════════════════════════════════════╗"
-echo "║     🛑 Flask 서버 종료 스크립트                                       ║"
+echo "║     🛑 Flask Server Stop Script                                       ║"
 echo "╚═══════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# 실행 중인 Flask 프로세스 확인
+# Check for running Flask processes
 FLASK_PROCESSES=$(ps aux | grep "python.*app.py" | grep -v grep)
 
 if [ -z "$FLASK_PROCESSES" ]; then
-    echo "ℹ️  실행 중인 Flask 서버가 없습니다."
+    echo "ℹ️  No Flask server is running."
     echo ""
     exit 0
 fi
 
-echo "실행 중인 Flask 프로세스:"
+echo "Running Flask processes:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "$FLASK_PROCESSES"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# # 확인 옵션이 없으면 사용자 확인 요청
+# # Request user confirmation if no confirm option
 # if [ "$1" != "--confirm" ] && [ "$1" != "-y" ]; then
-#     read -p "이 프로세스들을 종료하시겠습니까? (y/N): " response
+#     read -p "Do you want to stop these processes? (y/N): " response
 #     if [[ ! "$response" =~ ^[Yy]$ ]]; then
-#         echo "❌ 취소되었습니다."
+#         echo "❌ Cancelled."
 #         exit 0
 #     fi
 # fi
 
 echo ""
-echo "🔄 Flask 서버 종료 중..."
+echo "🔄 Stopping Flask server..."
 echo ""
 
-# 1. 정상 종료 시도 (SIGTERM)
-echo "1️⃣  정상 종료 시도 (SIGTERM)..."
+# 1. Try graceful shutdown (SIGTERM)
+echo "1️⃣  Attempting graceful shutdown (SIGTERM)..."
 pkill -f "python.*app.py" 2>/dev/null
 sleep 2
 
-# 2. 포트 5000 점유 프로세스 종료
-echo "2️⃣  포트 5000 해제 중..."
+# 2. Stop processes occupying port 5000
+echo "2️⃣  Releasing port 5000..."
 fuser -k 5000/tcp 2>/dev/null
 sleep 1
 
-# 3. 강제 종료 (SIGKILL)
+# 3. Force kill (SIGKILL)
 REMAINING=$(ps aux | grep "python.*app.py" | grep -v grep)
 if [ ! -z "$REMAINING" ]; then
-    echo "3️⃣  강제 종료 (SIGKILL)..."
+    echo "3️⃣  Force kill (SIGKILL)..."
     pkill -9 -f "python.*app.py" 2>/dev/null
     sleep 1
 fi
 
-# 4. 최종 확인
+# 4. Final check
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 FINAL_CHECK=$(ps aux | grep "python.*app.py" | grep -v grep)
 
 if [ -z "$FINAL_CHECK" ]; then
-    echo "✅ 모든 Flask 서버가 성공적으로 종료되었습니다!"
+    echo "✅ All Flask servers stopped successfully!"
 else
-    echo "⚠️  일부 프로세스가 여전히 실행 중입니다:"
+    echo "⚠️  Some processes are still running:"
     echo "$FINAL_CHECK"
     echo ""
-    echo "수동으로 종료하려면 다음 명령어를 사용하세요:"
+    echo "To stop manually, use the following command:"
     echo "  sudo kill -9 <PID>"
 fi
 
-# 5. 포트 상태 확인
+# 5. Check port status
 echo ""
 PORT_CHECK=$(lsof -ti:5000 2>/dev/null)
 if [ -z "$PORT_CHECK" ]; then
-    echo "✅ 포트 5000 사용 가능"
+    echo "✅ Port 5000 is available"
 else
-    echo "⚠️  포트 5000이 여전히 사용 중입니다 (PID: $PORT_CHECK)"
+    echo "⚠️  Port 5000 is still in use (PID: $PORT_CHECK)"
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

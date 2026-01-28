@@ -1,19 +1,19 @@
 """
 MANAD MSSQL Database Direct Connector (READ-ONLY)
-MANAD MSSQL 데이터베이스에 직접 접속하여 데이터를 가져오는 모듈
+Module for direct connection to MANAD MSSQL database to retrieve data
 
-⚠️  중요: READ-ONLY 모드로만 작동합니다
-- 모든 메서드는 SELECT 쿼리만 실행합니다
-- INSERT/UPDATE/DELETE 작업을 수행하지 않습니다
-- autocommit=False + rollback() 설정으로 실수 방지
-- ApplicationIntent=ReadOnly 연결 옵션 사용
+⚠️  Important: Works in READ-ONLY mode only
+- All methods execute SELECT queries only
+- Does not perform INSERT/UPDATE/DELETE operations
+- autocommit=False + rollback() configuration to prevent mistakes
+- Uses ApplicationIntent=ReadOnly connection option
 
-장점:
-- 실시간 데이터 접근 (API 레이턴시 없음)
-- 성능 향상 (배치 쿼리, JOIN 가능)
-- 백그라운드 동기화 불필요 (필요할 때마다 직접 조회)
-- 데이터 정확성 (원본 데이터 직접 접근)
-- 읽기 전용 보장 (데이터 무결성 보호)
+Advantages:
+- Real-time data access (no API latency)
+- Performance improvement (batch queries, JOIN possible)
+- No background synchronization needed (direct query when needed)
+- Data accuracy (direct access to original data)
+- Read-only guarantee (data integrity protection)
 """
 
 import logging
@@ -26,13 +26,13 @@ import json
 logger = logging.getLogger(__name__)
 
 # ============================================
-# Site Config JSON 로더
+# Site Config JSON Loader
 # ============================================
 _site_config_cache = None
 _site_config_file = os.path.join(os.path.dirname(__file__), "data", "api_keys", "site_config.json")
 
 def _load_site_config() -> List[Dict[str, Any]]:
-    """site_config.json에서 사이트 설정 로드 (캐시 사용)"""
+    """Load site configuration from site_config.json (uses cache)"""
     global _site_config_cache
     
     if _site_config_cache is not None:
@@ -52,26 +52,26 @@ def _load_site_config() -> List[Dict[str, Any]]:
         return []
 
 def get_site_db_config(site_name: str) -> Optional[Dict[str, Any]]:
-    """특정 사이트의 DB 설정 반환"""
+    """Return DB configuration for a specific site"""
     configs = _load_site_config()
     
     for config in configs:
         if config.get('site_name') == site_name:
             db_config = config.get('database', {}).copy()
-            # 서버 이름이 호스트명인 경우 IP 주소로 변환 시도
+            # Try to convert server name to IP address if it's a hostname
             server = db_config.get('server', '')
             if server and '\\' in server:
-                # 서버 이름 형식: SQLSVR04\SQLEXPRESS 또는 192.168.1.1\SQLEXPRESS
+                # Server name format: SQLSVR04\SQLEXPRESS or 192.168.1.1\SQLEXPRESS
                 parts = server.split('\\')
                 hostname_or_ip = parts[0]
                 instance = parts[1] if len(parts) > 1 else ''
                 
-                # IP 주소가 아닌 경우 (호스트명인 경우) API 설정에서 IP 가져오기
+                # If not an IP address (hostname), get IP from API configuration
                 if not hostname_or_ip.replace('.', '').isdigit():
                     api_config = config.get('api', {})
                     server_ip = api_config.get('server_ip')
                     if server_ip:
-                        # IP 주소로 변환
+                        # Convert to IP address
                         db_config['server'] = f"{server_ip}\\{instance}" if instance else server_ip
                         logger.debug(f"🔧 Server name conversion: {server} -> {db_config['server']}")
             
@@ -80,12 +80,12 @@ def get_site_db_config(site_name: str) -> Optional[Dict[str, Any]]:
     return None
 
 def get_all_site_configs() -> List[Dict[str, Any]]:
-    """모든 사이트 설정 반환"""
+    """Return all site configurations"""
     return _load_site_config()
 
-# MSSQL 연결을 위한 라이브러리 (pyodbc 또는 pymssql)
+# Library for MSSQL connection (pyodbc or pymssql)
 def _install_driver_package(driver_name='pyodbc'):
-    """MSSQL 드라이버 패키지 설치 시도"""
+    """Attempt to install MSSQL driver package"""
     import subprocess
     import sys
     
@@ -100,7 +100,7 @@ def _install_driver_package(driver_name='pyodbc'):
         
         if result.returncode == 0:
             logger.info(f"✅ {driver_name} installed")
-            # 재import 시도
+            # Retry import
             if driver_name == 'pyodbc':
                 import pyodbc  # type: ignore
                 return 'pyodbc'
@@ -117,7 +117,7 @@ def _install_driver_package(driver_name='pyodbc'):
         logger.error(f"❌ Error while installing {driver_name}: {e}")
         return None
 
-# 드라이버 확인 및 자동 설치 시도
+# Check driver and attempt automatic installation
 try:
     import pyodbc  # type: ignore
     DRIVER_AVAILABLE = 'pyodbc'
@@ -128,59 +128,59 @@ except ImportError:
         DRIVER_AVAILABLE = 'pymssql'
         logger.debug("✅ pymssql driver available")
     except ImportError:
-        # 자동 설치 시도 (pyodbc 우선)
+        # Attempt automatic installation (pyodbc first)
         logger.warning("⚠️ MSSQL driver is not installed. Attempting automatic installation...")
         DRIVER_AVAILABLE = _install_driver_package('pyodbc')
         
         if not DRIVER_AVAILABLE:
-            # pyodbc 설치 실패 시 pymssql 시도
+            # Try pymssql if pyodbc installation failed
             logger.warning("⚠️ pyodbc install failed. Trying pymssql...")
             DRIVER_AVAILABLE = _install_driver_package('pymssql')
         
         if not DRIVER_AVAILABLE:
             logger.error("""
-❌ MSSQL 드라이버 설치 실패
+❌ MSSQL Driver Installation Failed
 
-자동 설치가 실패했습니다. 다음 방법으로 수동 설치를 진행하세요:
+Automatic installation failed. Please install manually using the following methods:
 
-1. pip로 설치:
+1. Install via pip:
    pip install pyodbc
-   또는
+   or
    pip install pymssql
 
-2. Windows에서 ODBC Driver 확인:
-   - pyodbc를 사용하는 경우 ODBC Driver 17 for SQL Server가 필요합니다.
-   - https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server 에서 다운로드
+2. Check ODBC Driver on Windows:
+   - If using pyodbc, ODBC Driver 17 for SQL Server is required.
+   - Download from: https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server
 
-3. 설치 확인:
-   python -c "import pyodbc; print('pyodbc 설치 완료')"
-   또는
-   python -c "import pymssql; print('pymssql 설치 완료')"
+3. Verify installation:
+   python -c "import pyodbc; print('pyodbc installation complete')"
+   or
+   python -c "import pymssql; print('pymssql installation complete')"
 
-현재 DB 직접 접속 모드가 활성화되어 있지만, 드라이버가 없어 API 모드로 전환됩니다.
+DB direct access mode is currently enabled, but driver is missing. Switching to API mode.
             """)
 
 
 class MANADDBConnector:
-    """MANAD MSSQL 데이터베이스 직접 접속 클래스"""
+    """MANAD MSSQL Database Direct Connection Class"""
     
     def __init__(self, site: str):
         """
         Args:
-            site: 사이트 이름 (예: 'Parafield Gardens')
+            site: Site name (e.g., 'Parafield Gardens')
         """
         self.site = site
         self.connection_string = self._get_connection_string(site)
         self._connection_pool = {}
     
     def _get_connection_string(self, site: str) -> Optional[str]:
-        """사이트별 MSSQL 연결 문자열 생성
+        """Generate MSSQL connection string for each site
         
-        설정 우선순위:
-        1. site_config.json (권장)
-        2. 환경 변수 (폴백)
+        Configuration priority:
+        1. site_config.json (recommended)
+        2. Environment variables (fallback)
         """
-        # 1. site_config.json에서 DB 설정 시도
+        # Step 1: Try to get DB settings from site_config.json
         db_config = get_site_db_config(site)
         
         if db_config:
@@ -194,16 +194,16 @@ class MANADDBConnector:
                 logger.info(f"📄 Loaded DB settings from site_config.json: {site}")
             else:
                 logger.warning(f"⚠️ DB info for {site} is incomplete in site_config.json.")
-                db_config = None  # 폴백으로 진행
+                db_config = None  # Proceed with fallback
         
-        # 2. 환경 변수에서 DB 연결 정보 가져오기 (폴백)
+        # Step 2: Get DB connection info from environment variables (fallback)
         if not db_config:
             site_key = site.upper().replace(' ', '_').replace('-', '_')
             
             server = os.environ.get(f'MANAD_DB_SERVER_{site_key}')
             database = os.environ.get(f'MANAD_DB_NAME_{site_key}') or os.environ.get('MANAD_DB_NAME')
             
-            # Windows Authentication 지원
+            # Windows Authentication support
             use_windows_auth = os.environ.get(f'MANAD_DB_USE_WINDOWS_AUTH_{site_key}', '').lower() == 'true'
             use_windows_auth = use_windows_auth or os.environ.get('MANAD_DB_USE_WINDOWS_AUTH', 'false').lower() == 'true'
             
@@ -218,19 +218,19 @@ class MANADDBConnector:
             
             logger.info(f"📄 Loaded DB settings from environment (fallback): {site}")
         
-        # Windows Authentication 사용 여부 확인
+        # Check if Windows Authentication is used
         if not use_windows_auth:
             if not username or not password:
                 logger.warning(f"⚠️ DB username/password is not configured for {site}.")
                 return None
         
-        # pyodbc 연결 문자열
+        # pyodbc connection string
         if DRIVER_AVAILABLE == 'pyodbc':
-            # 사용 가능한 드라이버 확인
+            # Check available drivers
             try:
                 import pyodbc
                 available_drivers = pyodbc.drivers()
-                # 우선순위: ODBC Driver 17/18 > SQL Server Native Client > SQL Server
+                # Priority: ODBC Driver 17/18 > SQL Server Native Client > SQL Server
                 preferred_drivers = [
                     '{ODBC Driver 17 for SQL Server}',
                     '{ODBC Driver 18 for SQL Server}',
@@ -246,17 +246,17 @@ class MANADDBConnector:
                         break
                 
                 if not driver:
-                    # 환경 변수에서 지정된 드라이버 사용
+                    # Use driver specified in environment variable
                     driver = os.environ.get('MANAD_DB_DRIVER', '{ODBC Driver 17 for SQL Server}')
                     logger.warning(f"⚠️ Using default driver: {driver} (may not be installed on this system)")
                 else:
                     logger.debug(f"✅ Driver to use: {driver}")
             except Exception as e:
-                # 폴백: 환경 변수 또는 기본값
+                # Fallback: environment variable or default value
                 driver = os.environ.get('MANAD_DB_DRIVER', 'SQL Server')
                 logger.warning(f"⚠️ Driver check failed, using default: {driver} ({e})")
             
-            # Windows Authentication 사용
+            # Use Windows Authentication
             if use_windows_auth:
                 conn_str = (
                     f"DRIVER={driver};"
@@ -265,11 +265,11 @@ class MANADDBConnector:
                     f"Trusted_Connection=yes;"
                     f"TrustServerCertificate=yes;"
                     f"Connection Timeout=30;"
-                    f"ApplicationIntent=ReadOnly;"  # 읽기 전용 모드
+                    f"ApplicationIntent=ReadOnly;"  # Read-only mode
                 )
                 logger.info(f"✅ Using Windows Authentication (READ-ONLY): {site} ({server})")
             else:
-                # SQL Server Authentication 사용
+                # Use SQL Server Authentication
                 conn_str = (
                     f"DRIVER={driver};"
                     f"SERVER={server};"
@@ -278,17 +278,17 @@ class MANADDBConnector:
                     f"PWD={password};"
                     f"TrustServerCertificate=yes;"
                     f"Connection Timeout=30;"
-                    f"ApplicationIntent=ReadOnly;"  # 읽기 전용 모드
+                    f"ApplicationIntent=ReadOnly;"  # Read-only mode
                 )
                 logger.info(f"✅ Using SQL Server Authentication (READ-ONLY): {site} ({server})")
                 logger.debug(f"   Connection info: UID={username}, DATABASE={database}")
             
             return conn_str
         
-        # pymssql 연결 정보 (딕셔너리로 반환)
+        # pymssql connection info (return as dictionary)
         elif DRIVER_AVAILABLE == 'pymssql':
             if use_windows_auth:
-                # pymssql은 Windows Authentication을 직접 지원하지 않으므로 경고
+                # pymssql does not directly support Windows Authentication, so warn
                 logger.warning("⚠️ pymssql does not support Windows Authentication. Use pyodbc instead.")
                 return None
             
@@ -305,42 +305,42 @@ class MANADDBConnector:
     @contextmanager
     def get_connection(self):
         """
-        데이터베이스 연결 컨텍스트 매니저 (READ-ONLY 모드)
+        Database connection context manager (READ-ONLY mode)
         
-        ⚠️  중요: 읽기 전용 연결입니다
+        ⚠️  Important: This is a read-only connection
         
-        보안 정책:
-        1. ApplicationIntent=ReadOnly: 연결 문자열에 설정됨
-        2. autocommit=False: 자동 커밋 비활성화
-        3. rollback(): finally 블록에서 자동 롤백
-        4. commit() 미호출: 절대 데이터 변경 커밋하지 않음
+        Security policy:
+        1. ApplicationIntent=ReadOnly: Set in connection string
+        2. autocommit=False: Auto-commit disabled
+        3. rollback(): Automatic rollback in finally block
+        4. commit() not called: Never commit data changes
         
-        사용 예:
+        Usage example:
             with connector.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM Event")  # ✅ OK
-                # cursor.execute("INSERT INTO ...")    # ⚠️ 실행되어도 롤백됨
+                # cursor.execute("INSERT INTO ...")    # ⚠️ Will be rolled back even if executed
         """
         conn = None
         try:
             if not self.connection_string:
-                raise ValueError(f"{self.site}의 DB 연결 정보가 설정되지 않았습니다.")
+                raise ValueError(f"DB connection information for {self.site} is not configured.")
             
             if DRIVER_AVAILABLE == 'pyodbc':
                 # Ensure module name is available even if driver was auto-installed
                 import pyodbc  # type: ignore
                 conn = pyodbc.connect(self.connection_string)  # type: ignore
                 
-                # 읽기 전용 보안 설정
-                conn.autocommit = False  # 명시적 커밋 없이는 변경 불가
+                # Read-only security settings
+                conn.autocommit = False  # Cannot change without explicit commit
                 
-                # READ UNCOMMITTED로 읽기 성능 향상 (락 최소화)
+                # Improve read performance with READ UNCOMMITTED (minimize locks)
                 cursor = conn.cursor()
                 try:
                     cursor.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
                     logger.debug(f"🔒 READ-ONLY mode: {self.site}")
                 except:
-                    pass  # 일부 환경에서 지원 안 할 수 있음
+                    pass  # May not be supported in some environments
                 cursor.close()
                 
             elif DRIVER_AVAILABLE == 'pymssql':
@@ -350,19 +350,19 @@ class MANADDBConnector:
                 conn.autocommit = False
             else:
                 error_msg = (
-                    "MSSQL 드라이버가 설치되지 않았습니다.\n"
-                    "다음 명령어로 설치하세요:\n"
+                    "MSSQL driver is not installed.\n"
+                    "Please install using:\n"
                     "  pip install pyodbc\n"
-                    "또는\n"
+                    "or\n"
                     "  pip install pymssql\n\n"
-                    "Windows 사용자는 ODBC Driver 17 for SQL Server도 필요합니다."
+                    "Windows users also need ODBC Driver 17 for SQL Server."
                 )
                 raise ImportError(error_msg)
             
             yield conn
             
-            # ⚠️ 중요: commit()을 호출하지 않음 (READ-ONLY 보장)
-            # 모든 변경사항은 finally 블록에서 자동 롤백됨
+            # ⚠️ Important: commit() is not called (READ-ONLY guarantee)
+            # All changes are automatically rolled back in finally block
             
         except Exception as e:
             logger.error(f"❌ DB connection error ({self.site}): {e}")
@@ -370,7 +370,7 @@ class MANADDBConnector:
         finally:
             if conn:
                 try:
-                    # 읽기 전용 보장: 변경사항 모두 롤백
+                    # Read-only guarantee: rollback all changes
                     if not conn.autocommit:
                         conn.rollback()
                     conn.close()
@@ -380,34 +380,34 @@ class MANADDBConnector:
     
     def fetch_incidents(self, start_date: str, end_date: str) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
-        Incident 데이터를 DB에서 직접 조회
+        Query Incident data directly from DB
         
         Args:
-            start_date: 시작 날짜 (YYYY-MM-DD)
-            end_date: 종료 날짜 (YYYY-MM-DD)
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
             
         Returns:
-            (성공 여부, Incident 리스트)
+            (Success status, Incident list)
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
-                "❌ MSSQL 드라이버가 설치되지 않았습니다.\n"
-                "다음 명령어로 설치하세요:\n"
+                "❌ MSSQL driver is not installed.\n"
+                "Please install using:\n"
                 "  pip install pyodbc\n"
-                "또는\n"
+                "or\n"
                 "  pip install pymssql\n\n"
-                "Windows 사용자는 ODBC Driver 17 for SQL Server도 필요합니다:\n"
+                "Windows users also need ODBC Driver 17 for SQL Server:\n"
                 "https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server"
             )
             logger.error(error_msg)
-            raise ImportError("MSSQL 드라이버가 설치되지 않았습니다. pip install pyodbc 또는 pip install pymssql을 실행하세요.")
+            raise ImportError("MSSQL driver is not installed. Please run: pip install pyodbc or pip install pymssql")
         
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # MANAD DB의 실제 구조에 맞춘 쿼리
-                # AdverseEvent 테이블: 실제 Incident 데이터가 저장된 테이블
+                # Query matching actual MANAD DB structure
+                # AdverseEvent table: Actual table where Incident data is stored
                 # StatusEnumId: 0=Open, 1=In Progress(?), 2=Closed
                 query = """
                     SELECT 
@@ -437,7 +437,7 @@ class MANADDBConnector:
                         ae.IsAdmittedToHospital,
                         ae.IsMajorInjury,
                         ae.ReviewedDate,
-                        -- Event Types (AdverseEvent_AdverseEventType 연결 테이블 사용)
+                        -- Event Types (using AdverseEvent_AdverseEventType junction table)
                         ISNULL(
                             (SELECT TOP 1 aet.Description 
                              FROM AdverseEvent_AdverseEventType ae_aet 
@@ -455,22 +455,22 @@ class MANADDBConnector:
                     ORDER BY ae.Date DESC
                 """
                 
-                # 날짜 파라미터 변환
+                # Convert date parameters
                 start_dt = datetime.fromisoformat(start_date)
-                end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)  # 포함하려면 하루 더
+                end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)  # Add one day to include end date
                 
                 logger.info(f"🔍 Executing DB query: {self.site} ({start_date} ~ {end_date})")
                 
                 cursor.execute(query, (start_dt, end_dt))
                 
-                # 결과를 딕셔너리로 변환
+                # Convert results to dictionary
                 columns = [column[0] for column in cursor.description]
                 incidents = []
                 
                 for row in cursor.fetchall():
                     incident_dict = dict(zip(columns, row))
                     
-                    # API 형식에 맞게 변환
+                    # Convert to API format
                     formatted_incident = self._format_incident_for_api(incident_dict)
                     incidents.append(formatted_incident)
                 
@@ -484,32 +484,32 @@ class MANADDBConnector:
     
     def fetch_clients(self) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
-        Client 데이터를 DB에서 직접 조회
+        Query Client data directly from DB
         
         Returns:
-            (성공 여부, Client 리스트)
+            (Success status, Client list)
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
-                "❌ MSSQL 드라이버가 설치되지 않았습니다.\n"
-                "다음 명령어로 설치하세요:\n"
+                "❌ MSSQL driver is not installed.\n"
+                "Please install using:\n"
                 "  pip install pyodbc\n"
-                "또는\n"
+                "or\n"
                 "  pip install pymssql\n\n"
-                "Windows 사용자는 ODBC Driver 17 for SQL Server도 필요합니다:\n"
+                "Windows users also need ODBC Driver 17 for SQL Server:\n"
                 "https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server"
             )
             logger.error(error_msg)
-            raise ImportError("MSSQL 드라이버가 설치되지 않았습니다. pip install pyodbc 또는 pip install pymssql을 실행하세요.")
+            raise ImportError("MSSQL driver is not installed. Please run: pip install pyodbc or pip install pymssql")
         
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # MANAD DB의 실제 Client 테이블 구조에 맞춘 쿼리
-                # Client -> Person JOIN 필요 (이름 정보는 Person 테이블에)
-                # 활성 거주자만 조회 (Edenfield Dashboard와 동일한 로직 사용)
-                # MainClientServiceId를 통해 활성 서비스 확인 (EndDate가 NULL인 것만)
+                # Query matching actual MANAD DB Client table structure
+                # Client -> Person JOIN required (name information is in Person table)
+                # Query only active residents (using same logic as Edenfield Dashboard)
+                # Check active service via MainClientServiceId (only those with EndDate NULL)
                 query_with_service = """
                     SELECT 
                         c.Id,
@@ -568,11 +568,11 @@ class MANADDBConnector:
                 
                 logger.info(f"🔍 Fetching clients: {self.site}")
                 
-                # 먼저 ClientService를 포함한 쿼리 시도
+                # First try query with ClientService
                 try:
                     cursor.execute(query_with_service)
                 except Exception as e:
-                    # ClientService 테이블이 없거나 에러 발생 시 단순 쿼리 사용
+                    # Use simple query if ClientService table doesn't exist or error occurs
                     logger.warning(f"ClientService filtering query failed; using simple query: {e}")
                     cursor.execute(query_simple)
                 
@@ -582,7 +582,7 @@ class MANADDBConnector:
                 for row in cursor.fetchall():
                     client_dict = dict(zip(columns, row))
                     
-                    # API 형식에 맞게 변환
+                    # Convert to API format
                     formatted_client = self._format_client_for_api(client_dict)
                     clients.append(formatted_client)
                 
@@ -595,14 +595,14 @@ class MANADDBConnector:
             return False, None
     
     def _format_incident_for_api(self, db_row: Dict) -> Dict[str, Any]:
-        """DB 결과를 API 형식으로 변환"""
-        # EventTypeName 파싱 (단일 또는 복수)
+        """Convert DB result to API format"""
+        # Parse EventTypeName (single or multiple)
         event_types = []
         event_type_name = db_row.get('EventTypeName') or db_row.get('EventTypeNames')
         if event_type_name:
             event_types = [et.strip() for et in str(event_type_name).split(',') if et.strip()]
         
-        # API 응답 형식과 일치시키기
+        # Match API response format
         return {
             'Id': db_row.get('Id'),
             'ClientId': db_row.get('ClientId'),
@@ -631,7 +631,7 @@ class MANADDBConnector:
         }
     
     def _format_client_for_api(self, db_row: Dict) -> Dict[str, Any]:
-        """DB 결과를 API 형식으로 변환"""
+        """Convert DB result to API format"""
         birth_date = db_row.get('BirthDate')
         admission_date = db_row.get('AdmissionDate')
         departure_date = db_row.get('DepartureDate')
@@ -649,7 +649,7 @@ class MANADDBConnector:
             'AdmissionDate': admission_date.isoformat() if admission_date and hasattr(admission_date, 'isoformat') else (str(admission_date) if admission_date else None),
             'DepartureDate': departure_date.isoformat() if departure_date and hasattr(departure_date, 'isoformat') else (str(departure_date) if departure_date else None),
             'CareType': db_row.get('CareType', 'Permanent'),
-            'MainClientServiceId': db_row.get('MainClientServiceId'),  # 필터링에 필요한 MainClientServiceId 추가
+            'MainClientServiceId': db_row.get('MainClientServiceId'),  # Add MainClientServiceId needed for filtering
             'IsActive': bool(db_row.get('IsActive', False))
         }
     
@@ -660,32 +660,32 @@ class MANADDBConnector:
                              progress_note_event_type_id: Optional[int] = None,
                              client_service_id: Optional[int] = None) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
-        Progress Notes 데이터를 DB에서 직접 조회
+        Query Progress Notes data directly from DB
         
         Args:
-            start_date: 시작 날짜 (datetime, 기본값: 14일 전)
-            end_date: 종료 날짜 (datetime, 기본값: 현재)
-            limit: 최대 조회 개수
-            progress_note_event_type_id: 특정 이벤트 타입 ID로 필터링
-            client_service_id: 특정 클라이언트 서비스 ID로 필터링
+            start_date: Start date (datetime, default: 14 days ago)
+            end_date: End date (datetime, default: now)
+            limit: Maximum number of records to fetch
+            progress_note_event_type_id: Filter by specific event type ID
+            client_service_id: Filter by specific client service ID
             
         Returns:
-            (성공 여부, Progress Notes 리스트) - API 응답 형식과 동일
+            (Success status, Progress Notes list) - Same format as API response
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
-                "❌ MSSQL 드라이버가 설치되지 않았습니다.\n"
-                "다음 명령어로 설치하세요:\n"
+                "❌ MSSQL driver is not installed.\n"
+                "Please install using:\n"
                 "  pip install pyodbc\n"
-                "또는\n"
+                "or\n"
                 "  pip install pymssql\n\n"
-                "Windows 사용자는 ODBC Driver 17 for SQL Server도 필요합니다."
+                "Windows users also need ODBC Driver 17 for SQL Server."
             )
             logger.error(error_msg)
-            raise ImportError("MSSQL 드라이버가 설치되지 않았습니다.")
+            raise ImportError("MSSQL driver is not installed.")
         
         try:
-            # 기본값 설정
+            # Set default values
             if start_date is None:
                 start_date = datetime.now() - timedelta(days=14)
             if end_date is None:
@@ -697,8 +697,8 @@ class MANADDBConnector:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # ProgressNote 조회 쿼리 (API 응답 형식에 맞춤)
-                # Client, Wing, Location 정보 포함
+                # ProgressNote query (matching API response format)
+                # Includes Client, Wing, Location information
                 query = """
                     SELECT TOP (?)
                         pn.Id,
@@ -711,12 +711,12 @@ class MANADDBConnector:
                         pn.ProgressNoteEventTypeId,
                         pn.IsArchived,
                         pn.IsDeleted,
-                        -- Person 정보 (ClientId -> Client -> PersonId -> Person)
+                        -- Person information (ClientId -> Client -> PersonId -> Person)
                         ISNULL(p.FirstName, '') AS ClientFirstName,
                         ISNULL(p.LastName, '') AS ClientLastName,
                         ISNULL(p.PreferredName, '') AS ClientPreferredName,
-                        '' AS ClientTitle,  -- Person 테이블에 Title 컬럼이 없음
-                        -- ClientService 정보 (Service Wing, Location)
+                        '' AS ClientTitle,  -- Person table does not have Title column
+                        -- ClientService information (Service Wing, Location)
                         ISNULL(cs.WingId, 0) AS WingId,
                         ISNULL(w.Name, '') AS WingName,
                         ISNULL(cs.LocationId, 0) AS LocationId,
@@ -725,9 +725,9 @@ class MANADDBConnector:
                         ISNULL(pne.Id, 0) AS EventTypeId,
                         ISNULL(pne.Description, '') AS EventTypeDescription,
                         ISNULL(pne.ColorArgb, 0) AS EventTypeColorArgb,
-                        -- ProgressNoteDetail (Note 텍스트)
+                        -- ProgressNoteDetail (Note text)
                         (SELECT TOP 1 Note FROM ProgressNoteDetail WHERE ProgressNoteId = pn.Id) AS NotesPlainText,
-                        -- CreatedByUser 정보 (간단한 버전)
+                        -- CreatedByUser information (simple version)
                         ISNULL(pn.CreatedByUserId, 0) AS CreatedByUserId
                     FROM ProgressNote pn
                     LEFT JOIN Client c ON pn.ClientId = c.Id
@@ -740,12 +740,12 @@ class MANADDBConnector:
                     AND pn.Date >= ? AND pn.Date <= ?
                 """
                 
-                # Event Type 필터링
+                # Event Type filtering
                 if progress_note_event_type_id is not None:
                     query += " AND pn.ProgressNoteEventTypeId = ?"
                     logger.info(f"🔍 [FILTER] Added Event Type filter: {progress_note_event_type_id}")
                 
-                # Client Service ID 필터링
+                # Client Service ID filtering
                 if client_service_id is not None:
                     query += " AND pn.ClientServiceId = ?"
                     logger.info(f"🔍 [FILTER] Adding Client Service ID filter: {client_service_id} (type: {type(client_service_id)})")
@@ -780,7 +780,7 @@ class MANADDBConnector:
                     note_dict = dict(zip(columns, row))
                     progress_note_ids.append(note_dict['Id'])
                 
-                # CareArea 매핑 정보 가져오기 (ProgressNote ID별로 그룹화)
+                # Get CareArea mapping information (grouped by ProgressNote ID)
                 care_area_mappings = {}
                 if progress_note_ids:
                     placeholders = ','.join('?' * len(progress_note_ids))
@@ -796,7 +796,7 @@ class MANADDBConnector:
                             care_area_mappings[progress_note_id] = []
                         care_area_mappings[progress_note_id].append(care_area_id)
                     
-                    # CareArea 상세 정보 가져오기
+                    # Get CareArea detail information
                     if care_area_mappings:
                         all_care_area_ids = []
                         for mapping_ids in care_area_mappings.values():
@@ -819,11 +819,11 @@ class MANADDBConnector:
                     else:
                         care_area_details = {}
                 
-                # ProgressNote 데이터 구성
+                # Build ProgressNote data
                 for row in rows:
                     note_dict = dict(zip(columns, row))
                     
-                    # Care Areas 정보 생성
+                    # Generate Care Areas information
                     care_areas = []
                     progress_note_id = note_dict['Id']
                     if progress_note_id in care_area_mappings:
@@ -834,7 +834,7 @@ class MANADDBConnector:
                                     'Description': care_area_details[ca_id]
                                 })
                     
-                    # API 응답 형식에 맞게 변환
+                    # Convert to API response format
                     formatted_note = {
                         'Id': note_dict['Id'],
                         'ClientId': note_dict['ClientId'],
@@ -854,17 +854,17 @@ class MANADDBConnector:
                         'CreatedByUser': {
                             'Id': note_dict.get('CreatedByUserId', 0)
                         },
-                        # Client 정보 추가
+                        # Add Client information
                         'Client': {
                             'FirstName': note_dict.get('ClientFirstName', ''),
                             'LastName': note_dict.get('ClientLastName', ''),
                             'PreferredName': note_dict.get('ClientPreferredName', ''),
                             'Title': note_dict.get('ClientTitle', '')
                         },
-                        # Service Wing, Location 정보 추가
+                        # Add Service Wing, Location information
                         'WingName': note_dict.get('WingName', ''),
                         'LocationName': note_dict.get('LocationName', ''),
-                        # Care Areas 추가
+                        # Add Care Areas
                         'CareAreas': care_areas
                     }
                     
@@ -893,22 +893,22 @@ class MANADDBConnector:
     
     def fetch_care_areas(self) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
-        Care Area 데이터를 DB에서 직접 조회
+        Query Care Area data directly from DB
         
         Returns:
-            (성공 여부, Care Area 리스트) - API 응답 형식과 동일
+            (Success status, Care Area list) - Same format as API response
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
-                "❌ MSSQL 드라이버가 설치되지 않았습니다.\n"
-                "다음 명령어로 설치하세요:\n"
+                "❌ MSSQL driver is not installed.\n"
+                "Please install using:\n"
                 "  pip install pyodbc\n"
-                "또는\n"
+                "or\n"
                 "  pip install pymssql\n\n"
-                "Windows 사용자는 ODBC Driver 17 for SQL Server도 필요합니다."
+                "Windows users also need ODBC Driver 17 for SQL Server."
             )
             logger.error(error_msg)
-            raise ImportError("MSSQL 드라이버가 설치되지 않았습니다.")
+            raise ImportError("MSSQL driver is not installed.")
         
         try:
             with self.get_connection() as conn:
@@ -937,7 +937,7 @@ class MANADDBConnector:
                 for row in cursor.fetchall():
                     area_dict = dict(zip(columns, row))
                     
-                    # API 응답 형식에 맞게 변환
+                    # Convert to API response format
                     formatted_area = {
                         'Id': area_dict['Id'],
                         'Description': area_dict['Description'],
@@ -961,22 +961,22 @@ class MANADDBConnector:
     
     def fetch_event_types(self) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
-        Progress Note Event Type 데이터를 DB에서 직접 조회
+        Query Progress Note Event Type data directly from DB
         
         Returns:
-            (성공 여부, Event Type 리스트) - API 응답 형식과 동일
+            (Success status, Event Type list) - Same format as API response
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
-                "❌ MSSQL 드라이버가 설치되지 않았습니다.\n"
-                "다음 명령어로 설치하세요:\n"
+                "❌ MSSQL driver is not installed.\n"
+                "Please install using:\n"
                 "  pip install pyodbc\n"
-                "또는\n"
+                "or\n"
                 "  pip install pymssql\n\n"
-                "Windows 사용자는 ODBC Driver 17 for SQL Server도 필요합니다."
+                "Windows users also need ODBC Driver 17 for SQL Server."
             )
             logger.error(error_msg)
-            raise ImportError("MSSQL 드라이버가 설치되지 않았습니다.")
+            raise ImportError("MSSQL driver is not installed.")
         
         try:
             with self.get_connection() as conn:
@@ -1006,7 +1006,7 @@ class MANADDBConnector:
                 for row in cursor.fetchall():
                     type_dict = dict(zip(columns, row))
                     
-                    # API 응답 형식에 맞게 변환
+                    # Convert to API response format
                     formatted_type = {
                         'Id': type_dict['Id'],
                         'Description': type_dict['Description'],
@@ -1037,28 +1037,28 @@ def fetch_incidents_with_client_data_from_db(
     fetch_clients: bool = True
 ) -> Optional[Dict[str, Any]]:
     """
-    DB에서 직접 Incident와 Client 데이터를 가져오는 함수
-    (기존 API 함수와 동일한 인터페이스)
+    Function to fetch Incident and Client data directly from DB
+    (Same interface as existing API function)
     
     Args:
-        site: 사이트 이름
-        start_date: 시작 날짜
-        end_date: 종료 날짜
-        fetch_clients: Client 데이터도 가져올지 여부
+        site: Site name
+        start_date: Start date
+        end_date: End date
+        fetch_clients: Whether to also fetch Client data
         
     Returns:
-        {'incidents': [...], 'clients': [...]} 형식의 딕셔너리
+        Dictionary in format {'incidents': [...], 'clients': [...]}
     """
     try:
         connector = MANADDBConnector(site)
         
-        # Incident 조회
+        # Query Incidents
         incidents_success, incidents = connector.fetch_incidents(start_date, end_date)
         if not incidents_success:
             logger.error(f"Failed to fetch incidents from DB for {site}")
             return None
         
-        # Client 조회 (선택적)
+        # Query Clients (optional)
         clients = []
         if fetch_clients:
             clients_success, clients = connector.fetch_clients()
@@ -1066,7 +1066,7 @@ def fetch_incidents_with_client_data_from_db(
                 logger.warning(f"Failed to fetch clients from DB for {site}, proceeding with empty client list")
                 clients = []
         
-        # API 형식과 동일하게 반환
+        # Return in same format as API
         return {
             'incidents': incidents or [],
             'clients': clients or []

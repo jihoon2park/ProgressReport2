@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-프로덕션과 개발 환경 비교 스크립트
-두 환경의 데이터베이스 상태를 비교합니다.
+Production and development environment comparison script
+Compare database status between two environments.
 """
 
 import sqlite3
@@ -9,16 +9,16 @@ import os
 from datetime import datetime
 
 def compare_environments():
-    """프로덕션과 개발 환경 비교"""
+    """Compare production and development environments"""
     
     print("=" * 60)
-    print("프로덕션 vs 개발 환경 비교")
+    print("Production vs Development Environment Comparison")
     print("=" * 60)
     
-    # 프로덕션 경로 (IIS)
+    # Production path (IIS)
     prod_path = r'C:\inetpub\wwwroot\ProgressNoteWeb\ProgressReport2\progress_report.db'
     
-    # 개발 경로 (현재 디렉토리)
+    # Development path (current directory)
     dev_path = 'progress_report.db'
     
     environments = {
@@ -34,7 +34,7 @@ def compare_environments():
         print(f"{'='*60}")
         
         if not os.path.exists(db_path):
-            print(f"❌ 데이터베이스 파일을 찾을 수 없습니다: {db_path}")
+            print(f"❌ Database file not found: {db_path}")
             results[env_name] = None
             continue
         
@@ -43,12 +43,12 @@ def compare_environments():
         cursor = conn.cursor()
         
         try:
-            # 1. 전체 인시던트 수
+            # 1. Total incident count
             cursor.execute("SELECT COUNT(*) as total FROM cims_incidents")
             total = cursor.fetchone()[0]
-            print(f"📊 전체 인시던트 수: {total}")
+            print(f"📊 Total incidents: {total}")
             
-            # 2. 상태별 분포
+            # 2. Status distribution
             cursor.execute("""
                 SELECT status, COUNT(*) as cnt
                 FROM cims_incidents
@@ -57,13 +57,13 @@ def compare_environments():
                 ORDER BY cnt DESC
             """)
             status_dist = cursor.fetchall()
-            print(f"📈 상태별 분포:")
+            print(f"📈 Status distribution:")
             status_dict = {}
             for row in status_dist:
-                print(f"   - {row[0]}: {row[1]}개")
+                print(f"   - {row[0]}: {row[1]}")
                 status_dict[row[0]] = row[1]
             
-            # 3. 최근 7일 인시던트 수
+            # 3. Incidents in last 7 days
             week_ago = (datetime.now() - timedelta(days=7)).isoformat()
             cursor.execute("""
                 SELECT COUNT(*) as cnt
@@ -73,9 +73,9 @@ def compare_environments():
                 AND incident_date >= ?
             """, [week_ago])
             week_count = cursor.fetchone()[0]
-            print(f"📅 최근 7일 인시던트: {week_count}개")
+            print(f"📅 Incidents in last 7 days: {week_count}")
             
-            # 4. 마지막 동기화 시간
+            # 4. Last sync time
             cursor.execute("""
                 SELECT value FROM system_settings 
                 WHERE key = 'last_incident_sync_time'
@@ -84,11 +84,11 @@ def compare_environments():
             if last_sync:
                 sync_time = datetime.fromisoformat(last_sync[0])
                 days_ago = (datetime.now() - sync_time).days
-                print(f"🔄 마지막 동기화: {last_sync[0]} ({days_ago}일 전)")
+                print(f"🔄 Last sync: {last_sync[0]} ({days_ago} days ago)")
             else:
-                print(f"⚠️  동기화 기록이 없습니다.")
+                print(f"⚠️  No sync record found.")
             
-            # 5. 최신 인시던트 날짜
+            # 5. Latest incident date
             cursor.execute("""
                 SELECT MAX(incident_date) as latest_date
                 FROM cims_incidents
@@ -96,7 +96,7 @@ def compare_environments():
             """)
             latest = cursor.fetchone()[0]
             if latest:
-                print(f"📅 최신 인시던트 날짜: {latest}")
+                print(f"📅 Latest incident date: {latest}")
             
             results[env_name] = {
                 'total': total,
@@ -107,43 +107,43 @@ def compare_environments():
             }
             
         except Exception as e:
-            print(f"❌ 오류 발생: {e}")
+            print(f"❌ Error occurred: {e}")
             results[env_name] = None
         finally:
             conn.close()
     
-    # 비교 결과
+    # Comparison results
     print(f"\n{'='*60}")
-    print("비교 결과")
+    print("Comparison Results")
     print(f"{'='*60}")
     
     if results.get('Production') and results.get('Development'):
         prod = results['Production']
         dev = results['Development']
         
-        print(f"\n전체 인시던트 수:")
-        print(f"  Production: {prod['total']}개")
-        print(f"  Development: {dev['total']}개")
-        print(f"  차이: {abs(prod['total'] - dev['total'])}개")
+        print(f"\nTotal incidents:")
+        print(f"  Production: {prod['total']}")
+        print(f"  Development: {dev['total']}")
+        print(f"  Difference: {abs(prod['total'] - dev['total'])}")
         
-        print(f"\n최근 7일 인시던트:")
-        print(f"  Production: {prod['week_count']}개")
-        print(f"  Development: {dev['week_count']}개")
-        print(f"  차이: {abs(prod['week_count'] - dev['week_count'])}개")
+        print(f"\nIncidents in last 7 days:")
+        print(f"  Production: {prod['week_count']}")
+        print(f"  Development: {dev['week_count']}")
+        print(f"  Difference: {abs(prod['week_count'] - dev['week_count'])}")
         
         if prod['last_sync'] and dev['last_sync']:
             prod_sync = datetime.fromisoformat(prod['last_sync'])
             dev_sync = datetime.fromisoformat(dev['last_sync'])
-            print(f"\n마지막 동기화 시간:")
+            print(f"\nLast sync time:")
             print(f"  Production: {prod['last_sync']}")
             print(f"  Development: {dev['last_sync']}")
-            print(f"  차이: {abs((prod_sync - dev_sync).days)}일")
+            print(f"  Difference: {abs((prod_sync - dev_sync).days)} days")
         
-        print(f"\n⚠️  두 환경이 서로 다른 데이터를 사용하고 있습니다!")
-        print(f"   해결 방법:")
-        print(f"   1. 프로덕션에서 Force Sync 실행")
-        print(f"   2. 두 환경이 동일한 MANAD DB 소스를 사용하는지 확인")
-        print(f"   3. 동기화 스케줄이 제대로 작동하는지 확인")
+        print(f"\n⚠️  The two environments are using different data!")
+        print(f"   Solutions:")
+        print(f"   1. Run Force Sync on production")
+        print(f"   2. Verify both environments use the same MANAD DB source")
+        print(f"   3. Check if sync schedule is working properly")
 
 if __name__ == '__main__':
     from datetime import timedelta

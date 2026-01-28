@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
 """
-Dashboard KPI API 테스트 스크립트
+Dashboard KPI API test script
 """
 
 import requests
 import json
 
-# 서버 URL 설정
+# Server URL configuration
 BASE_URL = "http://202.90.243.226"  # Production
 # BASE_URL = "http://localhost:5000"  # Development
 
-# 로그인 정보
-USERNAME = "admin"  # 실제 사용자명으로 변경
-PASSWORD = "your_password"  # 실제 비밀번호로 변경
+# Login credentials
+USERNAME = "admin"  # Change to actual username
+PASSWORD = "your_password"  # Change to actual password
 
 def test_dashboard_kpis():
-    """Dashboard KPI API 테스트"""
+    """Test Dashboard KPI API"""
     
-    # 세션 생성
+    # Create session
     session = requests.Session()
     
-    # 1. 로그인
+    # 1. Login
     print("🔐 Logging in...")
     login_url = f"{BASE_URL}/login"
     login_data = {
         'username': USERNAME,
         'password': PASSWORD,
-        'site': 'Parafield Gardens'  # 사이트 선택
+        'site': 'Parafield Gardens'  # Select site
     }
     
     login_response = session.post(login_url, data=login_data)
@@ -38,7 +38,7 @@ def test_dashboard_kpis():
     
     print("✅ Login successful")
     
-    # 2. Dashboard KPI API 호출
+    # 2. Call Dashboard KPI API
     print("\n📊 Fetching Dashboard KPIs...")
     kpi_url = f"{BASE_URL}/api/cims/dashboard-kpis"
     params = {
@@ -58,7 +58,7 @@ def test_dashboard_kpis():
         print(f"\n❌ Error: {kpi_response.status_code}")
         print(f"Response: {kpi_response.text}")
     
-    # 3. 다른 기간 테스트
+    # 3. Test different periods
     print("\n📊 Testing different periods...")
     periods = ['today', 'week', 'month']
     

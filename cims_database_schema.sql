@@ -1,13 +1,13 @@
 -- =========================================
 -- CIMS (Compliance-Driven Incident Management System) - Database Schema
--- 새로운 인시던트 관리 시스템을 위한 데이터베이스 스키마
+-- Database schema for new incident management system
 -- =========================================
 
 -- ===========================================
--- CIMS 핵심 테이블들
+-- CIMS Core Tables
 -- ===========================================
 
--- 1. 정책 관리 테이블 (Policy Management)
+-- 1. Policy management table (Policy Management)
 CREATE TABLE cims_policies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     policy_id VARCHAR(50) UNIQUE NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE cims_policies (
     version VARCHAR(20) NOT NULL,
     effective_date TIMESTAMP NOT NULL,
     expiry_date TIMESTAMP,
-    rules_json TEXT NOT NULL, -- JSON 형태의 정책 규칙
+    rules_json TEXT NOT NULL, -- Policy rules in JSON format
     is_active BOOLEAN DEFAULT 1,
     created_by INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -24,11 +24,11 @@ CREATE TABLE cims_policies (
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- 2. 인시던트 테이블 (Incident Management)
+-- 2. Incident table (Incident Management)
 CREATE TABLE cims_incidents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     incident_id VARCHAR(100) UNIQUE NOT NULL,
-    manad_incident_id VARCHAR(100), -- MANAD Plus 시스템의 원본 incident ID
+    manad_incident_id VARCHAR(100), -- Original incident ID from MANAD Plus system
     resident_id INTEGER NOT NULL,
     resident_name VARCHAR(200) NOT NULL,
     incident_type VARCHAR(100) NOT NULL, -- 'Fall', 'Skin Breakdown', 'Medication Error'
@@ -40,16 +40,16 @@ CREATE TABLE cims_incidents (
     initial_actions_taken TEXT,
     witnesses TEXT,
     reported_by INTEGER,
-    reported_by_name VARCHAR(200), -- 리포터 이름 (MANAD 통합용)
+    reported_by_name VARCHAR(200), -- Reporter name (for MANAD integration)
     site VARCHAR(100) NOT NULL,
-    policy_applied INTEGER, -- 적용된 정책 ID
+    policy_applied INTEGER, -- Applied policy ID
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (reported_by) REFERENCES users(id),
     FOREIGN KEY (policy_applied) REFERENCES cims_policies(id)
 );
 
--- 3. 태스크 관리 테이블 (Task Management)
+-- 3. Task management table (Task Management)
 CREATE TABLE cims_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id VARCHAR(100) UNIQUE NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE cims_tasks (
     task_name VARCHAR(300) NOT NULL,
     description TEXT,
     assigned_role VARCHAR(100) NOT NULL, -- 'Registered Nurse', 'All Staff', 'Clinical Manager'
-    assigned_user_id INTEGER, -- 특정 사용자에게 할당된 경우
+    assigned_user_id INTEGER, -- When assigned to specific user
     due_date TIMESTAMP NOT NULL,
     priority VARCHAR(20) DEFAULT 'normal', -- 'urgent', 'high', 'normal', 'low'
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'overdue'
@@ -74,7 +74,7 @@ CREATE TABLE cims_tasks (
     FOREIGN KEY (completed_by_user_id) REFERENCES users(id)
 );
 
--- 4. 진행 노트 테이블 (Progress Notes)
+-- 4. Progress notes table (Progress Notes)
 CREATE TABLE cims_progress_notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     note_id VARCHAR(100) UNIQUE NOT NULL,
@@ -83,9 +83,9 @@ CREATE TABLE cims_progress_notes (
     author_id INTEGER NOT NULL,
     content TEXT NOT NULL,
     note_type VARCHAR(100),
-    vitals_data TEXT, -- JSON 형태의 바이탈 데이터
-    assessment_data TEXT, -- JSON 형태의 평가 데이터
-    attachments TEXT, -- JSON 형태의 첨부파일 정보
+    vitals_data TEXT, -- Vitals data in JSON format
+    assessment_data TEXT, -- Assessment data in JSON format
+    attachments TEXT, -- Attachment information in JSON format
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (incident_id) REFERENCES cims_incidents(id),
@@ -93,7 +93,7 @@ CREATE TABLE cims_progress_notes (
     FOREIGN KEY (author_id) REFERENCES users(id)
 );
 
--- 5. 감사 로그 테이블 (Audit Log)
+-- 5. Audit log table (Audit Log)
 CREATE TABLE cims_audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     log_id VARCHAR(100) UNIQUE NOT NULL,
@@ -102,13 +102,13 @@ CREATE TABLE cims_audit_logs (
     action VARCHAR(100) NOT NULL, -- 'incident_created', 'task_completed', 'policy_updated'
     target_entity_type VARCHAR(50) NOT NULL, -- 'incident', 'task', 'policy', 'note'
     target_entity_id INTEGER NOT NULL,
-    details TEXT, -- JSON 형태의 상세 정보 (변경 전/후 값 등)
+    details TEXT, -- Detailed information in JSON format (before/after values, etc.)
     ip_address VARCHAR(45),
     user_agent TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- 6. 태스크 할당 테이블 (Task Assignments)
+-- 6. Task assignment table (Task Assignments)
 CREATE TABLE cims_task_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id INTEGER NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE cims_task_assignments (
     FOREIGN KEY (assigned_by_user_id) REFERENCES users(id)
 );
 
--- 7. 알림 테이블 (Notifications)
+-- 7. Notification table (Notifications)
 CREATE TABLE cims_notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     notification_id VARCHAR(100) UNIQUE NOT NULL,
@@ -143,15 +143,15 @@ CREATE TABLE cims_notifications (
 );
 
 -- ===========================================
--- 인덱스 생성 (성능 최적화)
+-- Create indexes (performance optimization)
 -- ===========================================
 
--- 정책 관련 인덱스
+-- Policy-related indexes
 CREATE INDEX idx_cims_policies_active ON cims_policies(is_active);
 CREATE INDEX idx_cims_policies_effective ON cims_policies(effective_date);
 CREATE INDEX idx_cims_policies_policy_id ON cims_policies(policy_id);
 
--- 인시던트 관련 인덱스
+-- Incident-related indexes
 CREATE INDEX idx_cims_incidents_type ON cims_incidents(incident_type);
 CREATE INDEX idx_cims_incidents_severity ON cims_incidents(severity);
 CREATE INDEX idx_cims_incidents_status ON cims_incidents(status);
@@ -160,7 +160,7 @@ CREATE INDEX idx_cims_incidents_site ON cims_incidents(site);
 CREATE INDEX idx_cims_incidents_resident ON cims_incidents(resident_id);
 CREATE INDEX idx_cims_incidents_manad_id ON cims_incidents(manad_incident_id);
 
--- 태스크 관련 인덱스
+-- Task-related indexes
 CREATE INDEX idx_cims_tasks_incident ON cims_tasks(incident_id);
 CREATE INDEX idx_cims_tasks_assigned_user ON cims_tasks(assigned_user_id);
 CREATE INDEX idx_cims_tasks_assigned_role ON cims_tasks(assigned_role);
@@ -168,28 +168,28 @@ CREATE INDEX idx_cims_tasks_status ON cims_tasks(status);
 CREATE INDEX idx_cims_tasks_due_date ON cims_tasks(due_date);
 CREATE INDEX idx_cims_tasks_priority ON cims_tasks(priority);
 
--- 진행 노트 관련 인덱스
+-- Progress note-related indexes
 CREATE INDEX idx_cims_notes_incident ON cims_progress_notes(incident_id);
 CREATE INDEX idx_cims_notes_task ON cims_progress_notes(task_id);
 CREATE INDEX idx_cims_notes_author ON cims_progress_notes(author_id);
 CREATE INDEX idx_cims_notes_created ON cims_progress_notes(created_at);
 
--- 감사 로그 관련 인덱스
+-- Audit log-related indexes
 CREATE INDEX idx_cims_audit_user ON cims_audit_logs(user_id);
 CREATE INDEX idx_cims_audit_timestamp ON cims_audit_logs(timestamp);
 CREATE INDEX idx_cims_audit_action ON cims_audit_logs(action);
 CREATE INDEX idx_cims_audit_target ON cims_audit_logs(target_entity_type, target_entity_id);
 
--- 알림 관련 인덱스
+-- Notification-related indexes
 CREATE INDEX idx_cims_notifications_user ON cims_notifications(user_id);
 CREATE INDEX idx_cims_notifications_read ON cims_notifications(is_read);
 CREATE INDEX idx_cims_notifications_created ON cims_notifications(created_at);
 
 -- ===========================================
--- 기본 정책 데이터 삽입
+-- Insert default policy data
 -- ===========================================
 
--- Fall Management Policy 예시
+-- Fall Management Policy example
 INSERT INTO cims_policies (policy_id, name, description, version, effective_date, rules_json, created_by) VALUES 
 ('FALL-001', 'Fall Management Policy V3', 'Comprehensive fall management protocol for aged care facilities', '3.0', CURRENT_TIMESTAMP, 
 '{
@@ -289,7 +289,7 @@ INSERT INTO cims_policies (policy_id, name, description, version, effective_date
   ]
 }', 1);
 
--- Skin Breakdown Policy 예시
+-- Skin Breakdown Policy example
 INSERT INTO cims_policies (policy_id, name, description, version, effective_date, rules_json, created_by) VALUES 
 ('SKIN-001', 'Skin Breakdown Management Policy V2', 'Skin integrity and wound management protocol', '2.0', CURRENT_TIMESTAMP,
 '{

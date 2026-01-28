@@ -3,7 +3,7 @@ from config_users import get_user
 from datetime import datetime
 
 class User(UserMixin):
-    """Flask-Login을 위한 User 클래스"""
+    """User class for Flask-Login"""
     
     def __init__(self, username, user_data):
         self.id = username
@@ -12,76 +12,76 @@ class User(UserMixin):
         self.last_name = user_data.get('last_name', '')
         self.role = user_data.get('role', '')
         self.position = user_data.get('position', '')
-        # display_name 속성 추가 (first_name과 last_name 조합)
+        # Add display_name attribute (combination of first_name and last_name)
         self.display_name = f"{self.first_name} {self.last_name}".strip() if (self.first_name or self.last_name) else username
         
     def get_id(self):
-        """Flask-Login에서 요구하는 사용자 ID 반환"""
+        """Return user ID required by Flask-Login"""
         return self.username
         
     @property
     def is_authenticated(self):
-        """인증된 사용자인지 확인"""
+        """Check if user is authenticated"""
         return True
         
     def is_active(self):
-        """활성 사용자인지 확인"""
+        """Check if user is active"""
         return True
         
     def is_anonymous(self):
-        """익명 사용자인지 확인"""
+        """Check if user is anonymous"""
         return False
         
     def get_full_name(self):
-        """전체 이름 반환"""
+        """Return full name"""
         return self.display_name
         
     def has_role(self, role):
-        """특정 역할을 가지고 있는지 확인"""
+        """Check if user has specific role"""
         return self.role == role
         
     def is_admin(self):
-        """관리자인지 확인"""
+        """Check if user is admin"""
         return self.role == 'admin'
         
     def is_doctor(self):
-        """의사인지 확인"""
+        """Check if user is doctor"""
         return self.role == 'doctor'
         
     def is_physiotherapist(self):
-        """물리치료사인지 확인"""
+        """Check if user is physiotherapist"""
         return self.role == 'physiotherapist'
         
     def is_site_admin(self):
-        """사이트 관리자인지 확인"""
+        """Check if user is site admin"""
         return self.role == 'site_admin'
     
     def is_nurse(self):
-        """간호사인지 확인"""
+        """Check if user is nurse"""
         return self.role in ['nurse', 'registered_nurse']
     
     def is_registered_nurse(self):
-        """정규 간호사인지 확인"""
+        """Check if user is registered nurse"""
         return self.role == 'registered_nurse'
     
     def is_carer(self):
-        """케어러인지 확인"""
+        """Check if user is carer"""
         return self.role == 'carer'
     
     def is_clinical_manager(self):
-        """임상 관리자인지 확인"""
+        """Check if user is clinical manager"""
         return self.role == 'clinical_manager'
     
     def can_manage_incidents(self):
-        """인시던트 관리 권한이 있는지 확인"""
+        """Check if user has incident management permission"""
         return self.role in ['admin', 'clinical_manager', 'registered_nurse']
     
     def can_complete_tasks(self):
-        """태스크 완료 권한이 있는지 확인"""
+        """Check if user has task completion permission"""
         return self.role in ['nurse', 'registered_nurse', 'carer', 'clinical_manager']
 
 class FCMToken:
-    """FCM 토큰 관리 모델"""
+    """FCM Token Management Model"""
     
     def __init__(self, user_id: str, token: str, device_info: str = None, created_at: datetime = None):
         self.user_id = user_id
@@ -92,7 +92,7 @@ class FCMToken:
         self.is_active = True
     
     def to_dict(self):
-        """딕셔너리 형태로 변환"""
+        """Convert to dictionary format"""
         return {
             'user_id': self.user_id,
             'token': self.token,
@@ -104,7 +104,7 @@ class FCMToken:
     
     @classmethod
     def from_dict(cls, data: dict):
-        """딕셔너리에서 객체 생성"""
+        """Create object from dictionary"""
         created_at = None
         last_used = None
         
@@ -128,7 +128,7 @@ class FCMToken:
         )
 
 def load_user(user_id):
-    """Flask-Login의 user_loader 콜백 함수"""
+    """Flask-Login user_loader callback function"""
     user_data = get_user(user_id)
     if user_data:
         return User(user_id, user_data)

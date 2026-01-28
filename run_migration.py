@@ -47,7 +47,7 @@ class DatabaseMigrator:
     def run_all_migrations(self):
         """Execute all migration steps in sequence"""
         logger.info("=" * 70)
-        logger.info("🚀 Progress Report System - 통합 데이터베이스 마이그레이션 시작")
+        logger.info("🚀 Progress Report System - Unified Database Migration Started")
         logger.info("=" * 70)
         
         try:

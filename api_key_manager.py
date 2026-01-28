@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-API 키 관리자 - 데이터베이스에서 API 키를 안전하게 관리
+API Key Manager - Safely manage API keys in database
 """
 
 import sqlite3
@@ -11,16 +11,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 class APIKeyManager:
-    """API 키 관리자 - DB에 평문으로 저장 및 관리"""
+    """API Key Manager - Store and manage in plain text in DB"""
     
     def __init__(self, db_path='progress_report.db'):
         self.db_path = db_path
         
-        # 테이블 생성
+        # Create table
         self._create_table()
     
     def _create_table(self):
-        """API 키 테이블 생성"""
+        """Create API key table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -40,18 +40,18 @@ class APIKeyManager:
             )
         ''')
         
-        # 인덱스 생성
+        # Create indexes
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_api_keys_site ON api_keys(site_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_api_keys_active ON api_keys(is_active)')
         
         conn.commit()
         conn.close()
     
-    # 암호화 제거 - 평문으로 저장
+    # Encryption removed - store in plain text
     
     def add_api_key(self, site_name: str, api_username: str, api_key: str, 
                    server_ip: str, server_port: int = 8080, notes: str = "") -> bool:
-        """새 API 키 추가"""
+        """Add new API key"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -65,33 +65,33 @@ class APIKeyManager:
             conn.commit()
             conn.close()
             
-            logger.info(f"API 키 추가/업데이트 완료: {site_name}")
+            logger.info(f"API key added/updated: {site_name}")
             return True
             
         except Exception as e:
-            logger.error(f"API 키 추가 실패 ({site_name}): {e}")
+            logger.error(f"API key addition failed ({site_name}): {e}")
             return False
     
     def get_api_key(self, site_name: str) -> Optional[Dict]:
-        """사이트별 API 키 조회 (복호화된 키 포함)"""
+        """Get API key for site (includes decrypted key)"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 먼저 api_key 컬럼이 있는지 확인
+            # First check if api_key column exists
             cursor.execute("PRAGMA table_info(api_keys)")
             columns = [column[1] for column in cursor.fetchall()]
             
             if 'api_key' in columns:
-                # 새로운 스키마 (평문 API 키)
+                # New schema (plain text API key)
                 cursor.execute('''
                     SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
                     FROM api_keys 
                     WHERE site_name = ? AND is_active = 1
                 ''', (site_name,))
             else:
-                # 기존 스키마 (암호화된 API 키) - 폴백 사용
-                logger.warning(f"api_key 컬럼이 없음, 폴백 사용: {site_name}")
+                # Old schema (encrypted API key) - use fallback
+                logger.warning(f"api_key column not found, using fallback: {site_name}")
                 return None
             
             result = cursor.fetchone()
@@ -111,21 +111,21 @@ class APIKeyManager:
             return None
             
         except Exception as e:
-            logger.error(f"API 키 조회 실패 ({site_name}): {e}")
+            logger.error(f"API key lookup failed ({site_name}): {e}")
             return None
     
     def get_all_api_keys(self) -> List[Dict]:
-        """모든 활성 API 키 조회"""
+        """Get all active API keys"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 먼저 api_key 컬럼이 있는지 확인
+            # First check if api_key column exists
             cursor.execute("PRAGMA table_info(api_keys)")
             columns = [column[1] for column in cursor.fetchall()]
             
             if 'api_key' in columns:
-                # 새로운 스키마 (평문 API 키)
+                # New schema (plain text API key)
                 cursor.execute('''
                     SELECT site_name, api_username, api_key, server_ip, server_port, is_active, notes
                     FROM api_keys 
@@ -133,8 +133,8 @@ class APIKeyManager:
                     ORDER BY site_name
                 ''')
             else:
-                # 기존 스키마 (암호화된 API 키) - 빈 결과 반환
-                logger.warning("api_key 컬럼이 없음, 빈 결과 반환")
+                # Old schema (encrypted API key) - return empty result
+                logger.warning("api_key column not found, returning empty result")
                 conn.close()
                 return []
             
@@ -156,26 +156,26 @@ class APIKeyManager:
             return api_keys
             
         except Exception as e:
-            logger.error(f"모든 API 키 조회 실패: {e}")
+            logger.error(f"Failed to get all API keys: {e}")
             return []
     
     def update_api_key(self, site_name: str, api_key: str = None, 
                       server_ip: str = None, server_port: int = None, 
                       is_active: bool = None, notes: str = None) -> bool:
-        """API 키 업데이트"""
+        """Update API key"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 기존 데이터 조회
+            # Get existing data
             cursor.execute('SELECT * FROM api_keys WHERE site_name = ?', (site_name,))
             existing = cursor.fetchone()
             
             if not existing:
-                logger.error(f"API 키를 찾을 수 없습니다: {site_name}")
+                logger.error(f"API key not found: {site_name}")
                 return False
             
-            # 업데이트할 필드들
+            # Fields to update
             update_fields = []
             update_values = []
             
@@ -208,25 +208,25 @@ class APIKeyManager:
                 cursor.execute(query, update_values)
                 
                 conn.commit()
-                logger.info(f"API 키 업데이트 완료: {site_name}")
+                logger.info(f"API key updated: {site_name}")
             
             conn.close()
             return True
             
         except Exception as e:
-            logger.error(f"API 키 업데이트 실패 ({site_name}): {e}")
+            logger.error(f"API key update failed ({site_name}): {e}")
             return False
     
     def deactivate_api_key(self, site_name: str) -> bool:
-        """API 키 비활성화"""
+        """Deactivate API key"""
         return self.update_api_key(site_name, is_active=False)
     
     def get_api_headers(self, site_name: str) -> Optional[Dict[str, str]]:
-        """사이트별 API 헤더 반환 (기존 get_api_headers 함수 대체)"""
+        """Return API headers for site (replaces existing get_api_headers function)"""
         api_data = self.get_api_key(site_name)
         
         if not api_data:
-            logger.error(f"API 키를 찾을 수 없습니다: {site_name}")
+            logger.error(f"API key not found: {site_name}")
             return None
         
         return {
@@ -237,7 +237,7 @@ class APIKeyManager:
         }
     
     def get_server_info(self, site_name: str) -> Optional[Dict[str, str]]:
-        """사이트별 서버 정보 반환"""
+        """Return server information for site"""
         api_data = self.get_api_key(site_name)
         
         if not api_data:
@@ -250,28 +250,28 @@ class APIKeyManager:
         }
 
 
-# 전역 인스턴스
+# Global instance
 _api_key_manager = None
 
 def get_api_key_manager():
-    """API 키 매니저 싱글톤 인스턴스"""
+    """API key manager singleton instance"""
     global _api_key_manager
     if _api_key_manager is None:
         _api_key_manager = APIKeyManager()
     return _api_key_manager
 
 def get_api_headers(site_name: str) -> Optional[Dict[str, str]]:
-    """기존 함수와 호환성을 위한 래퍼"""
+    """Wrapper for backward compatibility with existing function"""
     manager = get_api_key_manager()
     return manager.get_api_headers(site_name)
 
 def get_server_info(site_name: str) -> Optional[Dict[str, str]]:
-    """서버 정보 조회"""
+    """Get server information"""
     manager = get_api_key_manager()
     return manager.get_server_info(site_name)
 
 def get_site_servers() -> Dict[str, str]:
-    """모든 사이트 서버 정보 조회"""
+    """Get server information for all sites"""
     manager = get_api_key_manager()
     servers = {}
     

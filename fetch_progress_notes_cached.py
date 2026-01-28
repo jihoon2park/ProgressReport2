@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-캐시 기반 Progress Notes API 엔드포인트
-하이브리드 캐싱과 페이지네이션 지원
+Cache-based Progress Notes API Endpoints
+Supports hybrid caching and pagination
 """
 
 from flask import Blueprint, request, jsonify, current_app
@@ -11,16 +11,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Blueprint 생성
+# Create Blueprint
 progress_notes_cached_bp = Blueprint('progress_notes_cached', __name__)
 
 def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int):
-    """Progress Notes 조회 (DB 직접 접속 또는 API) - DB 직접 접속 모드에서는 캐시 불필요"""
+    """Query Progress Notes (Direct DB access or API) - Cache not needed in direct DB access mode"""
     try:
         import sqlite3
         import os
         
-        # DB 직접 접속 모드 확인
+        # Check direct DB access mode
         use_db_direct = False
         try:
             conn = sqlite3.connect('progress_report.db', timeout=10)
@@ -52,12 +52,12 @@ def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int
                 'cache_age_hours': 0
             }
         
-        # API 모드일 때만 캐시에 저장 (DB 직접 접속 모드는 캐시 불필요 - 매번 실시간 조회)
+        # Save to cache only in API mode (direct DB access mode doesn't need cache - always real-time query)
         if not use_db_direct:
             from progress_notes_json_cache import json_cache
             json_cache.update_cache(site, notes)
         
-        # 페이지네이션 적용
+        # Apply pagination
         total_count = len(notes)
         total_pages = (total_count + per_page - 1) // per_page
         start_idx = (page - 1) * per_page
@@ -93,17 +93,17 @@ def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int
 @progress_notes_cached_bp.route('/api/fetch-progress-notes-cached', methods=['POST'])
 @login_required
 def fetch_progress_notes_cached():
-    """프로그레스 노트를 사이트에서 가져오기 (캐시 기반)"""
+    """Fetch progress notes from site (cache-based)"""
     try:
         data = request.get_json()
         site = data.get('site')
-        days = data.get('days', 7)  # 기본값: 7일
-        page = data.get('page', 1)  # 페이지 번호
-        per_page = data.get('per_page', 50)  # 페이지당 항목 수
-        force_refresh = data.get('force_refresh', False)  # 강제 새로고침
-        event_types = data.get('event_types', [])  # 이벤트 타입 필터
-        year = data.get('year')  # 년도
-        month = data.get('month')  # 월
+        days = data.get('days', 7)  # Default: 7 days
+        page = data.get('page', 1)  # Page number
+        per_page = data.get('per_page', 50)  # Items per page
+        force_refresh = data.get('force_refresh', False)  # Force refresh
+        event_types = data.get('event_types', [])  # Event type filter
+        year = data.get('year')  # Year
+        month = data.get('month')  # Month
         
         if not site:
             logger.error("Site parameter is missing in request")
@@ -112,7 +112,7 @@ def fetch_progress_notes_cached():
         logger.info(f"Progress notes fetch request - site: {site}, days: {days}, page: {page}, per_page: {per_page}")
         logger.info(f"Request data: {data}")
         
-        # 사이트 서버 설정 확인
+        # Check site server configuration
         from config import SITE_SERVERS
         if site not in SITE_SERVERS:
             logger.error(f"Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}")
@@ -121,7 +121,7 @@ def fetch_progress_notes_cached():
                 'message': f'Unknown site: {site}. Available sites: {list(SITE_SERVERS.keys())}'
             }), 400
         
-        # DB 직접 접속 모드 확인
+        # Check direct DB access mode
         import sqlite3
         import os
         
@@ -140,29 +140,29 @@ def fetch_progress_notes_cached():
         except:
             use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
         
-        # DB 직접 접속 모드: 캐시 없이 항상 실시간 조회
+        # Direct DB access mode: Always real-time query without cache
         if use_db_direct:
             logger.info(f"🔌 Direct DB access mode: Progress Notes fetched in real time (no cache) - {site}")
             result = _get_notes_from_api_and_cache(site, page, per_page, days)
         else:
-            # API 모드: JSON 캐시 사용 (API 호출 비용 절감)
+            # API mode: Use JSON cache (reduce API call costs)
             from progress_notes_json_cache import json_cache
             
             if force_refresh:
-                # 강제 새로고침: 캐시 무시하고 API에서 직접 조회
+                # Force refresh: Ignore cache and query directly from API
                 logger.info(f"Force refresh mode - fetching directly from API: {site}")
                 result = _get_notes_from_api_and_cache(site, page, per_page, days)
             else:
-                # JSON 캐시 사용
+                # Use JSON cache
                 logger.info(f"JSON cache mode - site: {site}")
                 result = json_cache.get_cached_notes(site, page, per_page)
                 
-                # 캐시가 없거나 만료된 경우 API에서 조회
+                # Query from API if cache is missing or expired
                 if not result['success'] or not json_cache.is_cache_valid(site):
                     logger.info(f"Cache missing/expired - fetching from API: {site}")
                     result = _get_notes_from_api_and_cache(site, page, per_page, days)
                 else:
-                    # 캐시 데이터를 API 형식으로 변환
+                    # Convert cache data to API format
                     result = {
                         'success': True,
                         'notes': result.get('data', []),
@@ -175,7 +175,7 @@ def fetch_progress_notes_cached():
                         'cache_age_hours': result.get('cache_age_hours', 0)
                     }
         
-        # 응답 데이터 구성
+        # Compose response data
         response_data = {
             'success': True,
             'data': result['notes'],
@@ -210,9 +210,9 @@ def fetch_progress_notes_cached():
 @progress_notes_cached_bp.route('/api/clear-progress-notes-cache', methods=['POST'])
 @login_required
 def clear_progress_notes_cache():
-    """Progress Notes 캐시 초기화 (Admin 전용)"""
+    """Clear Progress Notes cache (Admin only)"""
     try:
-        # 관리자 권한 확인
+        # Check admin privileges
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -222,7 +222,7 @@ def clear_progress_notes_cache():
         from progress_notes_json_cache import json_cache
         
         if site:
-            # 특정 사이트 캐시만 초기화
+            # Clear cache for specific site only
             json_cache.clear_cache(site)
             logger.info(f"Progress Notes cache cleared - site: {site}")
             return jsonify({
@@ -230,7 +230,7 @@ def clear_progress_notes_cache():
                 'message': f'Cache cleared for {site}'
             })
         else:
-            # 전체 캐시 초기화
+            # Clear all caches
             json_cache.clear_cache()
             logger.info("All Progress Notes caches cleared")
             return jsonify({

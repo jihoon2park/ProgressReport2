@@ -1,6 +1,6 @@
 """
-SQLite 기반 FCM 토큰 관리 서비스
-JSON 파일 대신 SQLite DB를 사용하여 보안과 성능을 향상
+SQLite-based FCM Token Management Service
+Uses SQLite DB instead of JSON files to improve security and performance
 """
 
 import sqlite3
@@ -12,29 +12,29 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class FCMTokenManagerSQLite:
-    """SQLite 기반 FCM 토큰 관리 클래스"""
+    """SQLite-based FCM Token Management Class"""
     
     def __init__(self, db_path: str = "progress_report.db"):
         """
-        FCM 토큰 매니저 초기화 (SQLite 기반)
+        Initialize FCM Token Manager (SQLite-based)
         
         Args:
-            db_path: SQLite 데이터베이스 파일 경로
+            db_path: SQLite database file path
         """
         self.db_path = db_path
         logger.info(f"Initializing FCM token manager (SQLite): {db_path}")
     
     def register_token(self, user_id: str, token: str, device_info: str = None) -> bool:
         """
-        새로운 FCM 토큰을 등록합니다.
+        Register new FCM token.
         
         Args:
-            user_id: 사용자 ID
-            token: FCM 토큰
-            device_info: 디바이스 정보
+            user_id: User ID
+            token: FCM token
+            device_info: Device information
             
         Returns:
-            등록 성공 여부
+            Registration success status
         """
         try:
             logger.info(f"Starting FCM token registration: user_id={user_id}, device_info={device_info}, token={token[:20]}...")
@@ -44,7 +44,7 @@ class FCMTokenManagerSQLite:
             
             logger.info(f"SQLite DB connection opened: {self.db_path}")
             
-            # 중복 토큰 확인
+            # Check for duplicate token
             cursor.execute('''
                 SELECT id FROM fcm_tokens 
                 WHERE user_id = ? AND token = ?
@@ -54,7 +54,7 @@ class FCMTokenManagerSQLite:
             logger.info(f"Duplicate token check: {existing is not None}")
             
             if existing:
-                # 기존 토큰 업데이트 (활성화 및 마지막 사용 시간 갱신)
+                # Update existing token (activate and update last used time)
                 cursor.execute('''
                     UPDATE fcm_tokens 
                     SET device_info = ?, last_used = CURRENT_TIMESTAMP, is_active = 1
@@ -63,7 +63,7 @@ class FCMTokenManagerSQLite:
                 updated_rows = cursor.rowcount
                 logger.info(f"Updated existing FCM token: {user_id}, rows updated: {updated_rows}")
             else:
-                # 새 토큰 등록
+                # Register new token
                 cursor.execute('''
                     INSERT INTO fcm_tokens 
                     (user_id, token, device_info, created_at, last_used, is_active)
@@ -75,7 +75,7 @@ class FCMTokenManagerSQLite:
             conn.commit()
             logger.info(f"FCM token registration completed: {user_id}")
             
-            # 등록 후 확인
+            # Verify after registration
             cursor.execute('SELECT COUNT(*) FROM fcm_tokens WHERE user_id = ? AND is_active = 1', (user_id,))
             user_token_count = cursor.fetchone()[0]
             logger.info(f"Active token count for user {user_id}: {user_token_count}")
@@ -94,28 +94,28 @@ class FCMTokenManagerSQLite:
     
     def unregister_token(self, user_id: str = None, token: str = None) -> bool:
         """
-        FCM 토큰을 비활성화합니다.
+        Deactivate FCM token.
         
         Args:
-            user_id: 사용자 ID (선택사항)
-            token: 제거할 FCM 토큰
+            user_id: User ID (optional)
+            token: FCM token to remove
             
         Returns:
-            제거 성공 여부
+            Removal success status
         """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
             if user_id and token:
-                # 사용자 ID와 토큰 모두 제공된 경우
+                # Both user_id and token provided
                 logger.info(f"Attempting to hard-delete FCM token: user_id={user_id}, token={token[:20]}...")
                 cursor.execute('''
                     DELETE FROM fcm_tokens 
                     WHERE user_id = ? AND token = ?
                 ''', (user_id, token))
             elif token:
-                # 토큰만 제공된 경우 (FCM Admin Dashboard에서 호출)
+                # Only token provided (called from FCM Admin Dashboard)
                 logger.info(f"Attempting to hard-delete FCM token (token only): token={token[:20]}...")
                 cursor.execute('''
                     DELETE FROM fcm_tokens 
@@ -142,13 +142,13 @@ class FCMTokenManagerSQLite:
     
     def get_user_tokens(self, user_id: str) -> List[FCMToken]:
         """
-        특정 사용자의 모든 토큰을 조회합니다.
+        Query all tokens for specific user.
         
         Args:
-            user_id: 사용자 ID
+            user_id: User ID
             
         Returns:
-            FCMToken 객체 리스트
+            List of FCMToken objects
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -186,13 +186,13 @@ class FCMTokenManagerSQLite:
     
     def get_user_token_strings(self, user_id: str) -> List[str]:
         """
-        특정 사용자의 활성 토큰 문자열 리스트를 반환합니다.
+        Return list of active token strings for specific user.
         
         Args:
-            user_id: 사용자 ID
+            user_id: User ID
             
         Returns:
-            토큰 문자열 리스트
+            List of token strings
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -215,10 +215,10 @@ class FCMTokenManagerSQLite:
     
     def get_all_tokens(self) -> List[str]:
         """
-        모든 활성 토큰 문자열 리스트를 반환합니다.
+        Return list of all active token strings.
         
         Returns:
-            모든 활성 토큰 문자열 리스트
+            List of all active token strings
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -241,21 +241,21 @@ class FCMTokenManagerSQLite:
     
     def update_token_info(self, token: str, user_id: str = None, device_info: str = None) -> bool:
         """
-        토큰 정보를 업데이트합니다.
+        Update token information.
         
         Args:
-            token: 업데이트할 토큰
-            user_id: 새 사용자 ID (선택사항)
-            device_info: 새 디바이스 정보 (선택사항)
+            token: Token to update
+            user_id: New user ID (optional)
+            device_info: New device information (optional)
             
         Returns:
-            업데이트 성공 여부
+            Update success status
         """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 업데이트할 필드들 구성
+            # Compose fields to update
             update_fields = []
             update_values = []
             
@@ -298,13 +298,13 @@ class FCMTokenManagerSQLite:
     
     def cleanup_inactive_tokens(self, days_threshold: int = 30) -> int:
         """
-        비활성 토큰을 정리합니다.
+        Clean up inactive tokens.
         
         Args:
-            days_threshold: 정리 기준 일수
+            days_threshold: Days threshold for cleanup
             
         Returns:
-            정리된 토큰 개수
+            Number of cleaned up tokens
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -333,16 +333,16 @@ class FCMTokenManagerSQLite:
     
     def get_token_stats(self) -> Dict:
         """
-        FCM 토큰 통계를 반환합니다.
+        Return FCM token statistics.
         
         Returns:
-            토큰 통계 딕셔너리
+            Token statistics dictionary
         """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 기본 통계
+            # Basic statistics
             cursor.execute('SELECT COUNT(DISTINCT user_id) FROM fcm_tokens WHERE is_active = 1')
             total_users = cursor.fetchone()[0]
             
@@ -352,7 +352,7 @@ class FCMTokenManagerSQLite:
             cursor.execute('SELECT COUNT(*) FROM fcm_tokens WHERE is_active = 1')
             active_tokens = cursor.fetchone()[0]
             
-            # 오늘 등록된 토큰
+            # Tokens registered today
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             cursor.execute('''
                 SELECT COUNT(*) FROM fcm_tokens 
@@ -360,7 +360,7 @@ class FCMTokenManagerSQLite:
             ''', (today.isoformat(),))
             today_tokens = cursor.fetchone()[0]
             
-            # 사용자별 토큰 정보
+            # Token information by user
             cursor.execute('''
                 SELECT user_id, token, device_info, created_at, last_used, is_active
                 FROM fcm_tokens
@@ -369,7 +369,7 @@ class FCMTokenManagerSQLite:
             
             all_token_rows = cursor.fetchall()
             
-            # 사용자별로 그룹화
+            # Group by user
             user_tokens = {}
             for row in all_token_rows:
                 user_id = row[0]
@@ -409,14 +409,14 @@ class FCMTokenManagerSQLite:
     
     def update_token_value(self, old_token: str, new_token: str) -> bool:
         """
-        토큰 값을 교체합니다.
+        Replace token value.
         
         Args:
-            old_token: 기존 토큰
-            new_token: 새 토큰
+            old_token: Existing token
+            new_token: New token
             
         Returns:
-            교체 성공 여부
+            Replacement success status
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -444,7 +444,7 @@ class FCMTokenManagerSQLite:
                 conn.close()
     
     def get_user_count(self) -> int:
-        """등록된 사용자 수를 반환합니다."""
+        """Return number of registered users."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -460,7 +460,7 @@ class FCMTokenManagerSQLite:
                 conn.close()
     
     def get_all_user_ids(self) -> List[str]:
-        """모든 등록된 사용자 ID 리스트를 반환합니다."""
+        """Return list of all registered user IDs."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -482,13 +482,13 @@ class FCMTokenManagerSQLite:
     
     def search_tokens(self, search_term: str) -> List[Dict]:
         """
-        토큰을 검색합니다 (사용자 ID 또는 디바이스 정보 기준).
+        Search tokens (by user ID or device information).
         
         Args:
-            search_term: 검색어
+            search_term: Search term
             
         Returns:
-            검색된 토큰 정보 리스트
+            List of searched token information
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -523,11 +523,11 @@ class FCMTokenManagerSQLite:
                 conn.close()
 
 
-# 전역 FCM 토큰 매니저 인스턴스 (SQLite 기반)
+# Global FCM token manager instance (SQLite-based)
 fcm_token_manager_sqlite = None
 
 def get_fcm_token_manager_sqlite() -> FCMTokenManagerSQLite:
-    """SQLite 기반 FCM 토큰 매니저 싱글톤 인스턴스 반환"""
+    """Return SQLite-based FCM token manager singleton instance"""
     global fcm_token_manager_sqlite
     if fcm_token_manager_sqlite is None:
         fcm_token_manager_sqlite = FCMTokenManagerSQLite()

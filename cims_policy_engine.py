@@ -1,6 +1,6 @@
 """
 CIMS Policy Engine
-정책 규칙을 파싱하고 인시던트에 따라 자동으로 태스크를 생성하는 엔진
+Engine that parses policy rules and automatically generates tasks based on incidents
 """
 
 import json
@@ -13,47 +13,47 @@ import uuid
 logger = logging.getLogger(__name__)
 
 class PolicyEngine:
-    """정책 엔진 - 인시던트에 따라 자동으로 태스크 생성"""
+    """Policy Engine - Automatically generates tasks based on incidents"""
     
     def __init__(self, db_path: str = "progress_report.db"):
         self.db_path = db_path
     
     def get_db_connection(self):
-        """데이터베이스 연결 반환"""
+        """Return database connection"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
     
     def apply_policies_to_incident(self, incident_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        인시던트에 정책을 적용하여 태스크 생성
+        Apply policies to incident and generate tasks
         
         Args:
-            incident_data: 인시던트 정보
+            incident_data: Incident information
             
         Returns:
-            생성된 태스크 목록
+            List of generated tasks
         """
         try:
-            # Fall Incident인 경우 Post Fall Timeline 분석
+            # Analyze Post Fall Timeline for Fall Incidents
             if incident_data.get('type') == 'Fall':
                 logger.info(f"Fall incident detected: {incident_data.get('incident_id')}")
                 return self._apply_fall_policy_with_timeline(incident_data)
             
-            # 적용 가능한 정책 찾기
+            # Find applicable policies
             applicable_policies = self._find_applicable_policies(incident_data)
             
             if not applicable_policies:
                 logger.warning(f"No applicable policies found for incident: {incident_data}")
                 return []
             
-            # 태스크 생성
+            # Generate tasks
             generated_tasks = []
             for policy in applicable_policies:
                 tasks = self._generate_tasks_from_policy(policy, incident_data)
                 generated_tasks.extend(tasks)
             
-            # 태스크를 데이터베이스에 저장
+            # Save tasks to database
             saved_tasks = self._save_tasks_to_database(generated_tasks)
             
             logger.info(f"Generated {len(saved_tasks)} tasks for incident {incident_data.get('incident_id')}")
@@ -64,12 +64,12 @@ class PolicyEngine:
             return []
     
     def _find_applicable_policies(self, incident_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """인시던트에 적용 가능한 정책 찾기"""
+        """Find applicable policies for incident"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 활성 정책 조회
+            # Query active policies
             cursor.execute("""
                 SELECT * FROM cims_policies 
                 WHERE is_active = 1 
@@ -103,7 +103,7 @@ class PolicyEngine:
             return []
     
     def _check_policy_conditions(self, rules_json: Dict[str, Any], incident_data: Dict[str, Any]) -> bool:
-        """정책 조건이 인시던트와 일치하는지 확인"""
+        """Check if policy conditions match incident"""
         try:
             # Check incident association first (new format)
             if 'incident_association' in rules_json:
@@ -124,7 +124,7 @@ class PolicyEngine:
             return False
     
     def _check_incident_association(self, incident_association: Dict[str, Any], incident_data: Dict[str, Any]) -> bool:
-        """인시던트 연계 조건 확인"""
+        """Check incident association conditions"""
         try:
             # Check incident type
             policy_incident_type = incident_association.get('incident_type')
@@ -155,7 +155,7 @@ class PolicyEngine:
             return False
     
     def _evaluate_condition(self, condition: Dict[str, Any], incident_data: Dict[str, Any]) -> bool:
-        """조건 평가"""
+        """Evaluate condition"""
         try:
             field = condition.get('incident_field')
             operator = condition.get('operator')
@@ -166,7 +166,7 @@ class PolicyEngine:
             
             incident_value = incident_data.get(field)
             
-            # 기본 조건 평가
+            # Evaluate basic condition
             result = False
             if operator == 'EQUALS':
                 result = incident_value == value
@@ -177,7 +177,7 @@ class PolicyEngine:
             elif operator == 'CONTAINS':
                 result = value in str(incident_value) if incident_value else False
             
-            # AND 조건 처리
+            # Handle AND conditions
             if result and 'AND' in condition:
                 and_conditions = condition['AND']
                 for and_condition in and_conditions:
@@ -185,7 +185,7 @@ class PolicyEngine:
                         result = False
                         break
             
-            # OR 조건 처리
+            # Handle OR conditions
             if not result and 'OR' in condition:
                 or_conditions = condition['OR']
                 for or_condition in or_conditions:
@@ -200,7 +200,7 @@ class PolicyEngine:
             return False
     
     def _generate_tasks_from_policy(self, policy: Dict[str, Any], incident_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """정책에서 태스크 생성"""
+        """Generate tasks from policy"""
         try:
             tasks = []
             rules_json = policy['rules_json']
@@ -209,7 +209,7 @@ class PolicyEngine:
             for rule_set in rule_sets:
                 trigger_condition = rule_set.get('trigger_condition', {})
                 
-                # 조건이 맞는 경우에만 태스크 생성
+                # Generate tasks only if conditions match
                 if self._evaluate_condition(trigger_condition, incident_data):
                     tasks_to_generate = rule_set.get('tasks_to_generate', [])
                     
@@ -229,9 +229,9 @@ class PolicyEngine:
             return []
     
     def _create_task_from_template(self, task_template: Dict[str, Any], policy: Dict[str, Any], incident_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """태스크 템플릿에서 실제 태스크 생성"""
+        """Create actual task from task template"""
         try:
-            # 마감일 계산
+            # Calculate due date
             due_offset = task_template.get('due_offset', 0)
             due_unit = task_template.get('due_unit', 'hours')
             
@@ -246,7 +246,7 @@ class PolicyEngine:
             else:
                 due_date = incident_date + timedelta(hours=due_offset)
             
-            # 우선순위 결정
+            # Determine priority
             priority = 'normal'
             if due_offset <= 15 and due_unit == 'minutes':
                 priority = 'urgent'
@@ -278,22 +278,22 @@ class PolicyEngine:
     
     def _apply_fall_policy_with_timeline(self, incident_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Fall Incident에 대한 특별 처리 - Post Fall Timeline 추적
+        Special handling for Fall Incident - Post Fall Timeline tracking
         
         Args:
-            incident_data: Fall incident 정보
+            incident_data: Fall incident information
             
         Returns:
-            생성된 태스크 목록
+            List of generated tasks
         """
         try:
-            # Fall incident 발생 시간
+            # Fall incident occurrence time
             fall_date_str = incident_data.get('incident_date')
             if not fall_date_str:
                 logger.error("No incident_date in fall incident data")
                 return []
             
-            # Timezone-aware datetime 처리
+            # Handle timezone-aware datetime
             if isinstance(fall_date_str, str):
                 if 'Z' in fall_date_str:
                     fall_date = datetime.fromisoformat(fall_date_str.replace('Z', '+00:00'))
@@ -304,25 +304,25 @@ class PolicyEngine:
             else:
                 fall_date = fall_date_str
             
-            # Timezone-naive로 변환 (비교를 위해)
+            # Convert to timezone-naive (for comparison)
             if fall_date.tzinfo is not None:
                 fall_date = fall_date.replace(tzinfo=None)
             
-            # Post Fall Progress Notes 조회 및 분석
+            # Query and analyze Post Fall Progress Notes
             post_fall_timeline = self._get_post_fall_timeline(
                 incident_data.get('resident_id'),
                 incident_data.get('manad_incident_id'),
                 fall_date
             )
             
-            # Timeline 기반으로 Task 생성
+            # Generate Tasks based on Timeline
             tasks_to_create = self._generate_tasks_from_timeline(
                 post_fall_timeline,
                 incident_data,
                 fall_date
             )
             
-            # 태스크를 데이터베이스에 저장
+            # Save tasks to database
             saved_tasks = self._save_tasks_to_database(tasks_to_create)
             
             logger.info(f"Fall Policy applied with timeline: {len(saved_tasks)} tasks created")
@@ -337,25 +337,25 @@ class PolicyEngine:
     def _get_post_fall_timeline(self, resident_id: str, manad_incident_id: str, 
                                 fall_date: datetime) -> Dict:
         """
-        MANAD Plus API에서 Post Fall Progress Notes 조회 및 타임라인 분석
+        Query Post Fall Progress Notes from MANAD Plus API and analyze timeline
         
         Args:
-            resident_id: 거주자 ID
-            manad_incident_id: MANAD Fall Incident Progress Note ID (트리거)
-            fall_date: Fall 발생 시간
+            resident_id: Resident ID
+            manad_incident_id: MANAD Fall Incident Progress Note ID (trigger)
+            fall_date: Fall occurrence time
             
         Returns:
-            타임라인 분석 결과
+            Timeline analysis result
         """
         try:
-            # MANAD Plus API에서 Progress Notes 조회
+            # Query Progress Notes from MANAD Plus API
             from manad_plus_integrator import get_manad_integrator
             integrator = get_manad_integrator()
             
-            # Post Fall Progress Notes 조회 (Fall Incident ID를 트리거로 사용)
+            # Query Post Fall Progress Notes (use Fall Incident ID as trigger)
             result = integrator.get_post_fall_progress_notes(manad_incident_id)
             
-            # 조회 실패 시 빈 타임라인 반환
+            # Return empty timeline if query fails
             if not result or not isinstance(result, dict):
                 logger.warning(f"Failed to get Post Fall notes for incident {manad_incident_id}")
                 return {
@@ -370,7 +370,7 @@ class PolicyEngine:
             fall_trigger_date = result.get('fall_trigger_date')
             post_fall_notes = result.get('post_fall_notes', [])
             
-            # Timeline 분석
+            # Timeline analysis
             timeline = {
                 'total_notes': len(post_fall_notes),
                 'post_fall_notes': post_fall_notes,
@@ -381,11 +381,11 @@ class PolicyEngine:
                 'final_assessment_72h': {'completed': False, 'time': None, 'note_id': None}
             }
             
-            # Post Fall notes를 시간대별로 분류
+            # Classify Post Fall notes by time period
             for note in post_fall_notes:
                 note_date_str = note.get('CreatedDate', '')
                 
-                # Datetime 파싱
+                # Parse datetime
                 if isinstance(note_date_str, str):
                     note_date_clean = note_date_str.replace('Z', '')
                     try:
@@ -395,18 +395,18 @@ class PolicyEngine:
                 else:
                     note_date = note_date_str
                 
-                # 시간 차이 계산 (hours) - Fall Incident trigger 기준
+                # Calculate time difference (hours) - based on Fall Incident trigger
                 time_diff = (note_date - fall_trigger_date).total_seconds() / 3600
                 
-                # 시간대별 분류 (각 슬롯에 첫 번째 노트만 할당)
+                # Classify by time period (assign only first note to each slot)
                 if time_diff <= 0.5 and not timeline['initial_assessment']['completed']:
-                    # Initial Assessment (30분 이내)
+                    # Initial Assessment (within 30 minutes)
                     timeline['initial_assessment']['completed'] = True
                     timeline['initial_assessment']['time'] = time_diff * 60  # minutes
                     timeline['initial_assessment']['note_id'] = note.get('Id')
                     
                 elif 0.5 < time_diff <= 4 and not timeline['neuro_monitoring_4h']['completed']:
-                    # Neurological Monitoring (4시간 이내)
+                    # Neurological Monitoring (within 4 hours)
                     timeline['neuro_monitoring_4h']['completed'] = True
                     timeline['neuro_monitoring_4h']['time'] = time_diff
                     timeline['neuro_monitoring_4h']['note_id'] = note.get('Id')
@@ -418,7 +418,7 @@ class PolicyEngine:
                     timeline['follow_up_24h']['note_id'] = note.get('Id')
                     
                 elif 24 < time_diff <= 72 and not timeline['final_assessment_72h']['completed']:
-                    # Final Assessment (72시간)
+                    # Final Assessment (72 hours)
                     timeline['final_assessment_72h']['completed'] = True
                     timeline['final_assessment_72h']['time'] = time_diff
                     timeline['final_assessment_72h']['note_id'] = note.get('Id')
@@ -441,22 +441,22 @@ class PolicyEngine:
     def _generate_tasks_from_timeline(self, timeline: Dict, incident_data: Dict, 
                                      fall_date: datetime) -> List[Dict[str, Any]]:
         """
-        Fall Policy 기준으로 모든 Task 생성 후, Post Fall Timeline에 따라 완료 상태 마킹
+        Generate all Tasks based on Fall Policy, then mark completion status according to Post Fall Timeline
         
         Args:
-            timeline: Post Fall 타임라인 분석 결과
-            incident_data: Incident 정보
-            fall_date: Fall 발생 시간 (실제로는 Fall Incident trigger date 사용)
+            timeline: Post Fall timeline analysis result
+            incident_data: Incident information
+            fall_date: Fall occurrence time (actually uses Fall Incident trigger date)
             
         Returns:
-            생성할 태스크 목록 (완료 여부 포함)
+            List of tasks to create (including completion status)
         """
-        # Fall Incident trigger date 사용
+        # Use Fall Incident trigger date
         trigger_date = timeline.get('fall_trigger_date', fall_date)
         
         tasks = []
         
-        # 1. Initial Assessment Task (30분 이내) - 항상 생성
+        # 1. Initial Assessment Task (within 30 minutes) - always create
         task_initial = {
             'task_name': 'Post Fall Assessment (Initial - 30min)',
             'task_description': 'Immediate post-fall assessment and vital signs check',
@@ -474,7 +474,7 @@ class PolicyEngine:
         }
         tasks.append(task_initial)
         
-        # 2. Neurological Monitoring Task (4시간 이내) - 항상 생성
+        # 2. Neurological Monitoring Task (within 4 hours) - always create
         task_neuro = {
             'task_name': '4-Hour Neurological Monitoring',
             'task_description': 'Neurological observations and monitoring',
@@ -492,7 +492,7 @@ class PolicyEngine:
         }
         tasks.append(task_neuro)
         
-        # 3. 24-Hour Follow-up Task - 항상 생성
+        # 3. 24-Hour Follow-up Task - always create
         task_24h = {
             'task_name': '24-Hour Post Fall Follow-up',
             'task_description': '24-hour post-fall condition assessment',
@@ -510,7 +510,7 @@ class PolicyEngine:
         }
         tasks.append(task_24h)
         
-        # 4. Final Assessment Task (72시간) - 항상 생성
+        # 4. Final Assessment Task (72 hours) - always create
         task_72h = {
             'task_name': 'Final Post Fall Assessment (72h)',
             'task_description': 'Final post-fall assessment and incident closure review',
@@ -534,7 +534,7 @@ class PolicyEngine:
         return tasks
     
     def _save_tasks_to_database(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """태스크를 데이터베이스에 저장"""
+        """Save tasks to database"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -576,12 +576,12 @@ class PolicyEngine:
             return []
     
     def get_user_tasks(self, user_id: int, role: str, status_filter: str = None) -> List[Dict[str, Any]]:
-        """사용자에게 할당된 태스크 조회"""
+        """Query tasks assigned to user"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 기본 쿼리 (Closed Incident의 Task는 제외)
+            # Base query (exclude Tasks from Closed Incidents)
             query = """
                 SELECT t.*, i.incident_id as incident_number, i.resident_name, i.incident_type, i.severity
                 FROM cims_tasks t
@@ -591,7 +591,7 @@ class PolicyEngine:
             """
             params = [user_id, role, f"%{role}%"]
             
-            # 상태 필터 추가
+            # Add status filter
             if status_filter:
                 query += " AND t.status = ?"
                 params.append(status_filter)
@@ -603,7 +603,7 @@ class PolicyEngine:
             
             conn.close()
             
-            # 딕셔너리로 변환
+            # Convert to dictionary
             return [dict(task) for task in tasks]
             
         except Exception as e:
@@ -611,12 +611,12 @@ class PolicyEngine:
             return []
     
     def complete_task(self, task_id: int, user_id: int, completion_notes: str = None) -> bool:
-        """태스크 완료 처리"""
+        """Process task completion"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 태스크 완료 업데이트
+            # Update task completion
             cursor.execute("""
                 UPDATE cims_tasks 
                 SET status = 'completed', 
@@ -626,7 +626,7 @@ class PolicyEngine:
                 WHERE id = ?
             """, (user_id, datetime.now(), datetime.now(), task_id))
             
-            # 감사 로그 추가
+            # Add audit log
             cursor.execute("""
                 INSERT INTO cims_audit_logs (
                     log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -650,7 +650,7 @@ class PolicyEngine:
             return False
     
     def get_overdue_tasks(self) -> List[Dict[str, Any]]:
-        """기한이 지난 태스크 조회"""
+        """Query overdue tasks"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -674,7 +674,7 @@ class PolicyEngine:
             return []
     
     def get_upcoming_tasks(self, hours_ahead: int = 2) -> List[Dict[str, Any]]:
-        """곧 마감될 태스크 조회"""
+        """Query tasks approaching deadline"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()

@@ -1,13 +1,13 @@
 -- =========================================
 -- Progress Report System - SQLite Schema
--- 전체 JSON 데이터 마이그레이션을 위한 종합 스키마
+-- Comprehensive schema for full JSON data migration
 -- =========================================
 
 -- ===========================================
--- TIER 1: 핵심 영구 데이터 테이블
+-- TIER 1: Core permanent data tables
 -- ===========================================
 
--- 1. 사용자 관리 테이블
+-- 1. User management table
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -16,13 +16,13 @@ CREATE TABLE users (
     last_name VARCHAR(100) NOT NULL,
     role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'site_admin', 'doctor', 'physiotherapist', 'nurse', 'registered_nurse', 'carer', 'clinical_manager')),
     position VARCHAR(100),
-    location TEXT, -- JSON 배열로 저장 ["Parafield Gardens", "Ramsay"]
+    location TEXT, -- Stored as JSON array ["Parafield Gardens", "Ramsay"]
     is_active BOOLEAN DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. FCM 토큰 관리 테이블 (credential/fcm_tokens.json)
+-- 2. FCM token management table (credential/fcm_tokens.json)
 CREATE TABLE fcm_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id VARCHAR(100) NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE fcm_tokens (
     UNIQUE(user_id, token)
 );
 
--- 3. 사용자 접근 로그 테이블 (UsageLog/access_*.json)
+-- 3. User access logs table (UsageLog/access_*.json)
 CREATE TABLE access_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -46,11 +46,11 @@ CREATE TABLE access_logs (
     ip_address VARCHAR(45),
     user_agent TEXT,
     page_accessed VARCHAR(200),
-    session_duration INTEGER, -- 초 단위
+    session_duration INTEGER, -- In seconds
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- 4. Progress Note 작성 로그 테이블 (UsageLog/progress_notes_*.json)
+-- 4. Progress Note creation logs table (UsageLog/progress_notes_*.json)
 CREATE TABLE progress_note_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -69,10 +69,10 @@ CREATE TABLE progress_note_logs (
 );
 
 -- ===========================================
--- TIER 2: 캐시 테이블 (임시 데이터 + 성능)
+-- TIER 2: Cache tables (temporary data + performance)
 -- ===========================================
 
--- 5. 클라이언트 캐시 테이블 (*_client.json, Client_list.json)
+-- 5. Client cache table (*_client.json, Client_list.json)
 CREATE TABLE clients_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL,
@@ -99,7 +99,7 @@ CREATE TABLE clients_cache (
     UNIQUE(person_id, site)
 );
 
--- 6. 케어 영역 테이블 (carearea.json)
+-- 6. Care area table (carearea.json)
 CREATE TABLE care_areas (
     id INTEGER PRIMARY KEY,
     description VARCHAR(500) NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE care_areas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. 이벤트 타입 테이블 (eventtype.json)
+-- 7. Event type table (eventtype.json)
 CREATE TABLE event_types (
     id INTEGER PRIMARY KEY,
     description VARCHAR(500) NOT NULL,
@@ -121,10 +121,10 @@ CREATE TABLE event_types (
 );
 
 -- ===========================================
--- TIER 3: 하이브리드 데이터 테이블
+-- TIER 3: Hybrid data tables
 -- ===========================================
 
--- 8. 인시던트 캐시 테이블 (incidents_*.json)
+-- 8. Incident cache table (incidents_*.json)
 CREATE TABLE incidents_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     incident_id VARCHAR(100) NOT NULL,
@@ -142,10 +142,10 @@ CREATE TABLE incidents_cache (
 );
 
 -- ===========================================
--- 보조 테이블들
+-- Auxiliary tables
 -- ===========================================
 
--- 9. 사이트 정보 테이블
+-- 9. Site information table
 CREATE TABLE sites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     site_name VARCHAR(100) UNIQUE NOT NULL,
@@ -155,7 +155,7 @@ CREATE TABLE sites (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 10. 데이터 동기화 상태 테이블
+-- 10. Data synchronization status table
 CREATE TABLE sync_status (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     data_type VARCHAR(50) NOT NULL, -- 'clients', 'incidents', 'carearea', 'eventtype'
@@ -167,7 +167,7 @@ CREATE TABLE sync_status (
     UNIQUE(data_type, site)
 );
 
--- 11. 알람 템플릿 테이블 (Policy & Alarm Management)
+-- 11. Alarm template table (Policy & Alarm Management)
 CREATE TABLE alarm_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     template_id VARCHAR(50) UNIQUE NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE alarm_templates (
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- 12. 알람 수신자 테이블
+-- 12. Alarm recipient table
 CREATE TABLE alarm_recipients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -200,15 +200,15 @@ CREATE TABLE alarm_recipients (
 );
 
 -- ===========================================
--- 인덱스 생성 (성능 최적화)
+-- Create indexes (performance optimization)
 -- ===========================================
 
--- 사용자 관련 인덱스
+-- User-related indexes
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_active ON users(is_active);
 
--- 클라이언트 관련 인덱스
+-- Client-related indexes
 CREATE INDEX idx_clients_person_id ON clients_cache(person_id);
 CREATE INDEX idx_clients_site ON clients_cache(site);
 CREATE INDEX idx_clients_room ON clients_cache(room_number);
@@ -216,11 +216,11 @@ CREATE INDEX idx_clients_name ON clients_cache(client_name);
 CREATE INDEX idx_clients_active ON clients_cache(is_active);
 CREATE INDEX idx_clients_sync ON clients_cache(last_synced);
 
--- FCM 토큰 인덱스
+-- FCM token indexes
 CREATE INDEX idx_fcm_tokens_user ON fcm_tokens(user_id);
 CREATE INDEX idx_fcm_tokens_active ON fcm_tokens(is_active);
 
--- 로그 관련 인덱스
+-- Log-related indexes
 CREATE INDEX idx_access_logs_timestamp ON access_logs(timestamp);
 CREATE INDEX idx_access_logs_user ON access_logs(user_id);
 CREATE INDEX idx_access_logs_username ON access_logs(username);
@@ -228,33 +228,43 @@ CREATE INDEX idx_progress_logs_timestamp ON progress_note_logs(timestamp);
 CREATE INDEX idx_progress_logs_user ON progress_note_logs(user_id);
 CREATE INDEX idx_progress_logs_client ON progress_note_logs(client_id);
 
--- 참조 데이터 인덱스
+-- Reference data indexes
 CREATE INDEX idx_care_areas_archived ON care_areas(is_archived);
 CREATE INDEX idx_event_types_archived ON event_types(is_archived);
 
--- 인시던트 관련 인덱스
+-- Incident-related indexes
 CREATE INDEX idx_incidents_site ON incidents_cache(site);
 CREATE INDEX idx_incidents_date ON incidents_cache(incident_date);
 CREATE INDEX idx_incidents_client ON incidents_cache(client_id);
 
--- 동기화 상태 인덱스
+-- Sync status indexes
 CREATE INDEX idx_sync_status_type ON sync_status(data_type);
 CREATE INDEX idx_sync_status_site ON sync_status(site);
 CREATE INDEX idx_sync_status_time ON sync_status(last_sync_time);
 
 -- ===========================================
--- 초기 데이터 삽입
+-- Initial data insertion
 -- ===========================================
 
+<<<<<<< Updated upstream
 -- 기본 사이트 정보
 INSERT OR IGNORE INTO sites (site_name, description) VALUES 
+=======
+-- Default site information
+INSERT INTO sites (site_name, description) VALUES 
+>>>>>>> Stashed changes
 ('Parafield Gardens', 'Edenfield Family Care - Parafield Gardens'),
 ('Nerrilda', 'Nerrilda Care Facility'),
 ('Ramsay', 'Ramsay Care Center'),
 ('Yankalilla', 'Yankalilla Care Home');
 
+<<<<<<< Updated upstream
 -- 기본 동기화 상태 레코드
 INSERT OR IGNORE INTO sync_status (data_type, site) VALUES
+=======
+-- Default sync status records
+INSERT INTO sync_status (data_type, site) VALUES
+>>>>>>> Stashed changes
 ('clients', 'Parafield Gardens'),
 ('clients', 'Nerrilda'),
 ('clients', 'Ramsay'),

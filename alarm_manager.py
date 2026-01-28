@@ -1,6 +1,6 @@
 """
-통합 알람 관리 서비스 모듈
-FCM, 템플릿, 수신자 관리, 에스컬레이션을 통합하여 관리합니다.
+Unified Alarm Management Service Module
+Manages FCM, templates, recipient management, and escalations in an integrated manner.
 """
 
 import os
@@ -17,31 +17,31 @@ from alarm_service import get_alarm_services
 logger = logging.getLogger(__name__)
 
 class AlarmManager:
-    """통합 알람 관리 클래스"""
+    """Unified Alarm Management Class"""
     
     def __init__(self):
-        """알람 매니저 초기화"""
+        """Initialize Alarm Manager"""
         self.fcm_service = get_fcm_service()
         self.template_service, self.recipient_service, self.escalation_service = get_alarm_services()
         self.active_alarms: Dict[str, Dict[str, Any]] = {}
         self.escalation_timers: Dict[str, List[Timer]] = {}
         
-        # 에스컬레이션 체크 타이머 시작
+        # Start escalation check timer
         self._start_escalation_checker()
     
     def _start_escalation_checker(self):
-        """에스컬레이션 체크 타이머를 시작합니다."""
+        """Start escalation check timer."""
         def check_escalations():
             try:
                 self._process_pending_escalations()
             except Exception as e:
-                logger.error(f"에스컬레이션 체크 중 오류 발생: {e}")
+                logger.error(f"Error occurred during escalation check: {e}")
             finally:
-                # 1분마다 체크
+                # Check every minute
                 Timer(60.0, check_escalations).start()
         
         Timer(60.0, check_escalations).start()
-        logger.info("에스컬레이션 체크 타이머 시작")
+        logger.info("Escalation check timer started")
     
     def send_alarm(
         self,
@@ -56,51 +56,51 @@ class AlarmManager:
         priority: str = "normal"
     ) -> Dict[str, Any]:
         """
-        알람을 전송합니다.
+        Send alarm.
         
         Args:
-            incident_id: 사고 ID
-            event_type: 사고 유형
-            client_name: 클라이언트 이름
-            site: 사이트
-            risk_rating: 위험도
-            template_id: 사용할 템플릿 ID (None이면 자동 선택)
-            custom_message: 사용자 정의 메시지
-            custom_recipients: 사용자 정의 수신자 리스트
-            priority: 우선순위
+            incident_id: Incident ID
+            event_type: Incident type
+            client_name: Client name
+            site: Site
+            risk_rating: Risk rating
+            template_id: Template ID to use (auto-select if None)
+            custom_message: Custom message
+            custom_recipients: Custom recipient list
+            priority: Priority
             
         Returns:
-            알람 전송 결과
+            Alarm sending result
         """
         try:
-            # 1. 템플릿 선택 또는 생성
+            # 1. Select or create template
             if template_id:
                 template = self.template_service.get_template(template_id)
                 if not template:
-                    return {"success": False, "error": f"템플릿을 찾을 수 없습니다: {template_id}"}
+                    return {"success": False, "error": f"Template not found: {template_id}"}
             else:
-                # 위험도에 따라 자동으로 템플릿 선택
+                # Automatically select template based on risk rating
                 template = self._select_template_by_risk(risk_rating)
             
-            # 2. 수신자 결정
+            # 2. Determine recipients
             recipients = custom_recipients or template.recipients
             if not recipients:
-                return {"success": False, "error": "수신자가 지정되지 않았습니다"}
+                return {"success": False, "error": "Recipients not specified"}
             
-            # 3. 메시지 구성
+            # 3. Compose message
             if custom_message:
                 title = custom_message
                 body = f"{event_type} - {client_name} at {site} (Risk: {risk_rating})"
             else:
                 title = template.title
-                body = f"{template.body}\n\n사고: {event_type}\n클라이언트: {client_name}\n사이트: {site}\n위험도: {risk_rating}"
+                body = f"{template.body}\n\nIncident: {event_type}\nClient: {client_name}\nSite: {site}\nRisk Rating: {risk_rating}"
             
-            # 4. FCM 토큰 수집
+            # 4. Collect FCM tokens
             fcm_tokens = self._get_fcm_tokens(recipients)
             if not fcm_tokens:
-                logger.warning(f"FCM 토큰이 없는 수신자들: {recipients}")
+                logger.warning(f"Recipients without FCM tokens: {recipients}")
             
-            # 5. 알람 데이터 구성
+            # 5. Compose alarm data
             alarm_data = {
                 "alarm_id": f"alarm_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{incident_id}",
                 "incident_id": incident_id,
@@ -119,7 +119,7 @@ class AlarmManager:
                 "escalation_enabled": template.escalation_enabled
             }
             
-            # 6. FCM 알림 전송
+            # 6. Send FCM notification
             fcm_result = None
             if fcm_tokens:
                 if len(fcm_tokens) == 1:
@@ -155,36 +155,36 @@ class AlarmManager:
                         priority=priority
                     )
             
-            # 7. 알람 로그 저장
+            # 7. Save alarm log
             self._save_alarm_log(alarm_data, fcm_result)
             
-            # 8. 에스컬레이션 계획 생성 및 타이머 설정
+            # 8. Create escalation plan and set timer
             if template.escalation_enabled:
                 escalations = self.escalation_service.create_escalation_plan(
                     alarm_data["alarm_id"], template, recipients
                 )
                 self._setup_escalation_timers(alarm_data["alarm_id"], escalations)
             
-            # 9. 활성 알람에 추가
+            # 9. Add to active alarms
             self.active_alarms[alarm_data["alarm_id"]] = alarm_data
             
-            logger.info(f"알람 전송 완료: {alarm_data['alarm_id']} - {len(fcm_tokens)}개 디바이스")
+            logger.info(f"Alarm sent successfully: {alarm_data['alarm_id']} - {len(fcm_tokens)} devices")
             
             return {
                 "success": True,
                 "alarm_id": alarm_data["alarm_id"],
-                "message": "알람이 성공적으로 전송되었습니다",
+                "message": "Alarm sent successfully",
                 "fcm_result": fcm_result,
                 "recipients_count": len(recipients),
                 "fcm_tokens_count": len(fcm_tokens)
             }
             
         except Exception as e:
-            logger.error(f"알람 전송 실패: {e}")
+            logger.error(f"Failed to send alarm: {e}")
             return {"success": False, "error": str(e)}
     
     def _select_template_by_risk(self, risk_rating: str) -> Any:
-        """위험도에 따라 적절한 템플릿을 선택합니다."""
+        """Select appropriate template based on risk rating."""
         risk_mapping = {
             "High": "incident_high_risk",
             "Medium": "incident_normal",
@@ -195,13 +195,13 @@ class AlarmManager:
         template = self.template_service.get_template(template_id)
         
         if not template:
-            # 기본 템플릿이 없으면 생성
+            # Create default template if it doesn't exist
             template = self.template_service.get_template("incident_normal")
         
         return template
     
     def _get_fcm_tokens(self, recipients: List[str]) -> List[str]:
-        """수신자들의 FCM 토큰을 수집합니다."""
+        """Collect FCM tokens from recipients."""
         tokens = []
         for recipient_id in recipients:
             recipient = self.recipient_service.get_recipient(recipient_id)
@@ -212,18 +212,18 @@ class AlarmManager:
         return tokens
     
     def _save_alarm_log(self, alarm_data: Dict[str, Any], fcm_result: Optional[Dict[str, Any]]):
-        """알람 로그를 파일에 저장합니다."""
+        """Save alarm log to file."""
         try:
             log_file = "data/alarm_logs.json"
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
             
-            # 기존 로그 로드
+            # Load existing logs
             logs = []
             if os.path.exists(log_file):
                 with open(log_file, 'r', encoding='utf-8') as f:
                     logs = json.load(f)
             
-            # 새 로그 추가
+            # Add new log
             log_entry = {
                 **alarm_data,
                 "fcm_result": fcm_result,
@@ -231,25 +231,25 @@ class AlarmManager:
             }
             logs.append(log_entry)
             
-            # 최근 1000개만 유지
+            # Keep only last 1000 entries
             if len(logs) > 1000:
                 logs = logs[-1000:]
             
-            # 로그 저장
+            # Save logs
             with open(log_file, 'w', encoding='utf-8') as f:
                 json.dump(logs, f, ensure_ascii=False, indent=2)
                 
         except Exception as e:
-            logger.error(f"알람 로그 저장 실패: {e}")
+            logger.error(f"Failed to save alarm log: {e}")
     
     def _setup_escalation_timers(self, alarm_id: str, escalations: List[Any]):
-        """에스컬레이션 타이머를 설정합니다."""
+        """Set up escalation timers."""
         if alarm_id not in self.escalation_timers:
             self.escalation_timers[alarm_id] = []
         
         for escalation in escalations:
             if escalation.status == "pending":
-                # 지연 시간 후 에스컬레이션 실행
+                # Execute escalation after delay
                 timer = Timer(
                     escalation.delay_minutes * 60.0,
                     self._execute_escalation,
@@ -258,10 +258,10 @@ class AlarmManager:
                 timer.start()
                 self.escalation_timers[alarm_id].append(timer)
                 
-                logger.info(f"에스컬레이션 타이머 설정: {alarm_id} 레벨 {escalation.level} - {escalation.delay_minutes}분 후")
+                logger.info(f"Escalation timer set: {alarm_id} level {escalation.level} - after {escalation.delay_minutes} minutes")
     
     def _execute_escalation(self, alarm_id: str, level: int):
-        """에스컬레이션을 실행합니다."""
+        """Execute escalation."""
         try:
             escalations = self.escalation_service.get_escalations_for_alarm(alarm_id)
             escalation = next((e for e in escalations if e.level == level), None)
@@ -269,11 +269,11 @@ class AlarmManager:
             if not escalation or escalation.status != "pending":
                 return
             
-            # 에스컬레이션 수신자들에게 알림 전송
+            # Send notification to escalation recipients
             fcm_tokens = self._get_fcm_tokens(escalation.recipients)
             
             if fcm_tokens:
-                title = f"🚨 에스컬레이션 알림 (레벨 {level})"
+                title = f"🚨 Escalation Alert (Level {level})"
                 body = escalation.message
                 
                 if len(fcm_tokens) == 1:
@@ -293,72 +293,72 @@ class AlarmManager:
                         priority="high"
                     )
                 
-                # 에스컬레이션 상태 업데이트
+                # Update escalation status
                 self.escalation_service.mark_escalation_sent(alarm_id, level)
                 
-                logger.info(f"에스컬레이션 실행 완료: {alarm_id} 레벨 {level} - {len(fcm_tokens)}개 디바이스")
+                logger.info(f"Escalation executed: {alarm_id} level {level} - {len(fcm_tokens)} devices")
             
         except Exception as e:
-            logger.error(f"에스컬레이션 실행 실패: {e}")
+            logger.error(f"Failed to execute escalation: {e}")
     
     def _process_pending_escalations(self):
-        """대기 중인 에스컬레이션들을 처리합니다."""
+        """Process pending escalations."""
         try:
             pending_escalations = self.escalation_service.get_pending_escalations()
             
             for escalation in pending_escalations:
-                # 타이머가 만료되지 않은 경우 스킵
+                # Skip if timer hasn't expired
                 if datetime.now() < escalation.created_at + timedelta(minutes=escalation.delay_minutes):
                     continue
                 
-                # 에스컬레이션 실행
+                # Execute escalation
                 self._execute_escalation(escalation.alarm_id, escalation.level)
                 
         except Exception as e:
-            logger.error(f"대기 중인 에스컬레이션 처리 실패: {e}")
+            logger.error(f"Failed to process pending escalations: {e}")
     
     def acknowledge_alarm(self, alarm_id: str, user_id: str) -> Dict[str, Any]:
-        """알람을 확인 처리합니다."""
+        """Acknowledge alarm."""
         try:
             if alarm_id not in self.active_alarms:
-                return {"success": False, "error": "알람을 찾을 수 없습니다"}
+                return {"success": False, "error": "Alarm not found"}
             
             alarm = self.active_alarms[alarm_id]
             
-            # 에스컬레이션 확인 처리
+            # Process escalation acknowledgment
             escalations = self.escalation_service.get_escalations_for_alarm(alarm_id)
             for escalation in escalations:
                 if escalation.status == "sent" and user_id in escalation.recipients:
                     self.escalation_service.mark_escalation_acknowledged(alarm_id, escalation.level)
             
-            # 확인 로그 저장
+            # Save acknowledgment log
             self._save_acknowledgment_log(alarm_id, user_id)
             
-            logger.info(f"알람 확인 완료: {alarm_id} by {user_id}")
+            logger.info(f"Alarm acknowledged: {alarm_id} by {user_id}")
             
             return {
                 "success": True,
-                "message": "알람이 확인되었습니다",
+                "message": "Alarm acknowledged",
                 "acknowledged_at": datetime.now().isoformat()
             }
             
         except Exception as e:
-            logger.error(f"알람 확인 처리 실패: {e}")
+            logger.error(f"Failed to acknowledge alarm: {e}")
             return {"success": False, "error": str(e)}
     
     def _save_acknowledgment_log(self, alarm_id: str, user_id: str):
-        """알람 확인 로그를 저장합니다."""
+        """Save alarm acknowledgment log."""
         try:
             log_file = "data/alarm_acknowledgments.json"
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
             
-            # 기존 로그 로드
+            # Load existing logs
             logs = []
             if os.path.exists(log_file):
                 with open(log_file, 'r', encoding='utf-8') as f:
                     logs = json.load(f)
             
-            # 새 확인 로그 추가
+            # Add new acknowledgment log
             acknowledgment = {
                 "alarm_id": alarm_id,
                 "user_id": user_id,
@@ -367,19 +367,19 @@ class AlarmManager:
             }
             logs.append(acknowledgment)
             
-            # 최근 1000개만 유지
+            # Keep only last 1000 entries
             if len(logs) > 1000:
                 logs = logs[-1000:]
             
-            # 로그 저장
+            # Save logs
             with open(log_file, 'w', encoding='utf-8') as f:
                 json.dump(logs, f, ensure_ascii=False, indent=2)
                 
         except Exception as e:
-            logger.error(f"알람 확인 로그 저장 실패: {e}")
+            logger.error(f"Failed to save acknowledgment log: {e}")
     
     def get_alarm_history(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """알람 히스토리를 가져옵니다."""
+        """Get alarm history."""
         try:
             log_file = "data/alarm_logs.json"
             if not os.path.exists(log_file):
@@ -388,24 +388,24 @@ class AlarmManager:
             with open(log_file, 'r', encoding='utf-8') as f:
                 logs = json.load(f)
             
-            # 최근 순으로 정렬하고 제한
+            # Sort by most recent and limit
             sorted_logs = sorted(logs, key=lambda x: x.get('log_timestamp', ''), reverse=True)
             return sorted_logs[:limit]
             
         except Exception as e:
-            logger.error(f"알람 히스토리 로드 실패: {e}")
+            logger.error(f"Failed to load alarm history: {e}")
             return []
     
     def get_alarm_status(self, alarm_id: str) -> Optional[Dict[str, Any]]:
-        """특정 알람의 상태를 가져옵니다."""
+        """Get status of specific alarm."""
         return self.active_alarms.get(alarm_id)
     
     def get_pending_escalations_count(self) -> int:
-        """대기 중인 에스컬레이션 개수를 반환합니다."""
+        """Return count of pending escalations."""
         return len(self.escalation_service.get_pending_escalations())
     
     def cleanup_expired_alarms(self, days: int = 7):
-        """만료된 알람들을 정리합니다."""
+        """Clean up expired alarms."""
         try:
             cutoff_date = datetime.now() - timedelta(days=days)
             expired_alarms = []
@@ -418,23 +418,23 @@ class AlarmManager:
             for alarm_id in expired_alarms:
                 del self.active_alarms[alarm_id]
                 
-                # 에스컬레이션 타이머 정리
+                # Clean up escalation timers
                 if alarm_id in self.escalation_timers:
                     for timer in self.escalation_timers[alarm_id]:
                         timer.cancel()
                     del self.escalation_timers[alarm_id]
             
             if expired_alarms:
-                logger.info(f"만료된 알람 {len(expired_alarms)}개 정리 완료")
+                logger.info(f"Cleaned up {len(expired_alarms)} expired alarms")
                 
         except Exception as e:
-            logger.error(f"만료된 알람 정리 실패: {e}")
+            logger.error(f"Failed to clean up expired alarms: {e}")
 
-# 전역 알람 매니저 인스턴스
+# Global alarm manager instance
 alarm_manager = None
 
 def get_alarm_manager() -> AlarmManager:
-    """전역 알람 매니저 인스턴스를 반환합니다."""
+    """Return global alarm manager instance."""
     global alarm_manager
     if alarm_manager is None:
         alarm_manager = AlarmManager()
