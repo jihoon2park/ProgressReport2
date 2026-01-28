@@ -11,6 +11,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Default period (days) for cached API. Must match frontend PERIOD_OPTIONS[0].value in progressNoteList.js.
+# Change here if default becomes 2 weeks (14), etc. Frontend populates period options from PERIOD_OPTIONS only.
+DEFAULT_PERIOD_DAYS = 7
+
 # Blueprint 생성
 progress_notes_cached_bp = Blueprint('progress_notes_cached', __name__)
 
@@ -97,7 +101,7 @@ def fetch_progress_notes_cached():
     try:
         data = request.get_json()
         site = data.get('site')
-        days = data.get('days', 7)  # 기본값: 7일
+        days = int(data.get('days', DEFAULT_PERIOD_DAYS))
         page = data.get('page', 1)  # 페이지 번호
         per_page = data.get('per_page', 50)  # 페이지당 항목 수
         force_refresh = data.get('force_refresh', False)  # 강제 새로고침

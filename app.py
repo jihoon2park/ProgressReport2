@@ -2397,11 +2397,11 @@ def extend_session():
 @app.route('/api/fetch-progress-notes', methods=['POST'])
 @login_required
 def fetch_progress_notes():
-    """프로그레스 노트를 사이트에서 가져오기 (캐시 기반)"""
+    """프로그레스 노트를 사이트에서 가져오기. days from request; default = DEFAULT_PERIOD_DAYS (matches frontend PERIOD_OPTIONS)."""
     try:
         data = request.get_json()
         site = data.get('site')
-        days = data.get('days', 7)  # 기본값: 7일
+        days = int(data.get('days', DEFAULT_PERIOD_DAYS))
         page = data.get('page', 1)  # 페이지 번호
         per_page = data.get('per_page', 50)  # 페이지당 항목 수
         force_refresh = data.get('force_refresh', False)  # 강제 새로고침
@@ -2454,16 +2454,18 @@ def fetch_progress_notes():
         else:
             logger.info(f"🌐 API mode: Fetching Progress Notes - {site}")
         
-        logger.info(f"🔍 [FILTER] Calling fetch_progress_notes_for_site - site={site}, days={days}, client_service_id={client_service_id}")
-        success, notes = fetch_progress_notes_for_site(site, days, event_types=event_types, year=year, month=month, client_service_id=client_service_id)
+        # Filter endpoint: fetch with high limit, return ALL in one page (no server-side pagination slice)
+        fetch_limit = min(1000000, max(1, int(data.get('per_page', 100000))))
+        logger.info(f"🔍 [FILTER] Calling fetch_progress_notes_for_site - site={site}, days={days}, client_service_id={client_service_id}, limit={fetch_limit}")
+        success, notes = fetch_progress_notes_for_site(site, days, event_types=event_types, year=year, month=month, client_service_id=client_service_id, limit=fetch_limit)
         logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site result - success={success}, notes_count={len(notes) if notes else 0}")
         
         if not success or not notes:
             result = {
                 'success': False,
                 'notes': [],
-                'page': page,
-                'per_page': per_page,
+                'page': 1,
+                'per_page': 0,
                 'total_count': 0,
                 'total_pages': 0,
                 'cache_status': 'no_data',
@@ -2471,25 +2473,19 @@ def fetch_progress_notes():
                 'cache_age_hours': 0
             }
         else:
-            # API 모드일 때만 캐시에 저장 (DB 직접 접속 모드는 캐시 불필요)
+            notes = list(notes)
+            total_count = len(notes)
             if not use_db_direct:
                 from progress_notes_json_cache import json_cache
                 json_cache.update_cache(site, notes)
-            
-            # 페이지네이션 적용
-            total_count = len(notes)
-            total_pages = (total_count + per_page - 1) // per_page
-            start_idx = (page - 1) * per_page
-            end_idx = start_idx + per_page
-            paginated_notes = notes[start_idx:end_idx]
-            
+            # Return ALL in one page — no slice (filter endpoint; frontend does client-side paging if needed)
             result = {
                 'success': True,
-                'notes': paginated_notes,
-                'page': page,
-                'per_page': per_page,
+                'notes': notes,
+                'page': 1,
+                'per_page': total_count,
                 'total_count': total_count,
-                'total_pages': total_pages,
+                'total_pages': 1,
                 'cache_status': 'fresh_db_data' if use_db_direct else 'fresh_api_data',
                 'last_sync': get_australian_time().isoformat(),
                 'cache_age_hours': 0
@@ -8837,8 +8833,8 @@ def integrated_dashboard():
 # Admin API Blueprint 등록
 app.register_blueprint(admin_api)
 
-# Progress Notes Cached API Blueprint 등록
-from fetch_progress_notes_cached import progress_notes_cached_bp
+# Progress Notes Cached API Blueprint 등록 (DEFAULT_PERIOD_DAYS = default period for cached API; must match frontend PERIOD_OPTIONS[0])
+from fetch_progress_notes_cached import progress_notes_cached_bp, DEFAULT_PERIOD_DAYS
 app.register_blueprint(progress_notes_cached_bp)
 
 # ==============================

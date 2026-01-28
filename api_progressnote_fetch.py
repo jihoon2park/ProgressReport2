@@ -161,20 +161,21 @@ class ProgressNoteFetchClient:
             logger.error(f"Unexpected error while fetching progress notes from {self.site}: {str(e)}")
             return False, None
     
-    def fetch_recent_progress_notes(self, days: int = 14) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+    def fetch_recent_progress_notes(self, days: int = 14, limit: Optional[int] = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
         최근 N일간의 프로그레스 노트를 가져옵니다.
         
         Args:
             days: 가져올 일수 (기본값: 14일)
+            limit: 최대 개수 (None이면 기본값 500 사용)
             
         Returns:
             (성공 여부, 데이터 리스트 또는 None)
         """
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
-        
-        return self.fetch_progress_notes(start_date, end_date)
+        effective_limit = limit if limit is not None else 500
+        return self.fetch_progress_notes(start_date, end_date, limit=effective_limit)
     
     def fetch_progress_notes_since(self, since_date: datetime) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
         """
@@ -405,7 +406,7 @@ class ProgressNoteFetchClient:
             logger.error(f"Error finding event type ID for '{event_type_name}': {str(e)}")
             return None
 
-def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None, client_service_id: int = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None, client_service_id: int = None, limit: Optional[int] = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
     """
     특정 사이트의 프로그레스 노트를 가져오는 편의 함수 (DB 직접 접속 또는 API)
     
@@ -416,6 +417,7 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
         year: 년도 (ROD 대시보드용)
         month: 월 (ROD 대시보드용)
         client_service_id: 특정 클라이언트 서비스 ID로 필터링
+        limit: 최대 조회 개수 (None이면 DB 500/API 기본값 사용). filter endpoint에서 전체를 한 번에 받을 때 큰 값 전달.
         
     Returns:
         (성공 여부, 데이터 리스트 또는 None)
@@ -465,10 +467,11 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
                 # Event Type 이름으로 ID 찾기 (간단한 버전, 실제로는 더 복잡할 수 있음)
                 logger.warning(f"Event Type 필터링은 DB 직접 접속 모드에서 아직 완전히 지원되지 않습니다: {event_types}")
             
-            logger.info(f"🔍 [FILTER] connector.fetch_progress_notes 호출 - client_service_id={client_service_id}")
-            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit=500, event_type_id={event_type_id}, client_service_id={client_service_id}")
+            effective_limit = limit if limit is not None else 500
+            logger.info(f"🔍 [FILTER] connector.fetch_progress_notes 호출 - client_service_id={client_service_id}, limit={effective_limit}")
+            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit={effective_limit}, event_type_id={event_type_id}, client_service_id={client_service_id}")
             progress_success, progress_notes = connector.fetch_progress_notes(
-                start_date, end_date, limit=500, progress_note_event_type_id=event_type_id, client_service_id=client_service_id
+                start_date, end_date, limit=effective_limit, progress_note_event_type_id=event_type_id, client_service_id=client_service_id
             )
             logger.info(f"🔍 [FILTER] connector.fetch_progress_notes 결과 - success={progress_success}, notes_count={len(progress_notes) if progress_notes else 0}")
             
@@ -520,7 +523,7 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
                 logger.info("No event types specified, fetching all progress notes")
                 if client_service_id:
                     logger.warning(f"Client service ID filter ({client_service_id}) is not supported in API mode. Filtering will be done client-side.")
-        return client.fetch_recent_progress_notes(days)
+                return client.fetch_recent_progress_notes(days, limit=limit)
     except Exception as e:
         logger.error(f"Error creating client for site {site}: {str(e)}")
         return False, None

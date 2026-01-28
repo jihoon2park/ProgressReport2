@@ -25,6 +25,9 @@ import json
 
 logger = logging.getLogger(__name__)
 
+# SQL Server allows max 2100 parameters per request; batch IN(...) to stay under limit
+IN_CLAUSE_BATCH_SIZE = 2000
+
 # ============================================
 # Site Config JSON 로더
 # ============================================
@@ -657,20 +660,23 @@ class MANADDBConnector:
                              start_date: Optional[datetime] = None,
                              end_date: Optional[datetime] = None,
                              limit: int = 500,
+                             offset: int = 0,
                              progress_note_event_type_id: Optional[int] = None,
-                             client_service_id: Optional[int] = None) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
+                             client_service_id: Optional[int] = None) -> Tuple[bool, Optional[List[Dict[str, Any]]], Optional[int]]:
         """
-        Progress Notes 데이터를 DB에서 직접 조회
+        Progress Notes 데이터를 DB에서 직접 조회 (페이지 단위, fetch-all 없음).
+        한 번에 limit개만 읽어서 DB 부하를 줄입니다.
         
         Args:
             start_date: 시작 날짜 (datetime, 기본값: 14일 전)
             end_date: 종료 날짜 (datetime, 기본값: 현재)
-            limit: 최대 조회 개수
+            limit: 페이지당 개수 (기본 500)
+            offset: 건너뛸 행 수 (페이지네이션용, 기본 0)
             progress_note_event_type_id: 특정 이벤트 타입 ID로 필터링
             client_service_id: 특정 클라이언트 서비스 ID로 필터링
             
         Returns:
-            (성공 여부, Progress Notes 리스트) - API 응답 형식과 동일
+            (성공 여부, Progress Notes 리스트, 전체 개수 또는 None)
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
@@ -781,22 +787,26 @@ class MANADDBConnector:
                     progress_note_ids.append(note_dict['Id'])
                 
                 # CareArea 매핑 정보 가져오기 (ProgressNote ID별로 그룹화)
+                # SQL Server max 2100 params; batch progress_note_ids to avoid "too many parameters"
                 care_area_mappings = {}
+                care_area_details = {}  # default so it's defined when progress_note_ids is empty
                 if progress_note_ids:
-                    placeholders = ','.join('?' * len(progress_note_ids))
-                    care_area_query = f"""
-                        SELECT ProgressNoteId, CareAreaId
-                        FROM ProgressNote_CareArea
-                        WHERE ProgressNoteId IN ({placeholders})
-                    """
-                    cursor.execute(care_area_query, progress_note_ids)
-                    for mapping_row in cursor.fetchall():
-                        progress_note_id, care_area_id = mapping_row
-                        if progress_note_id not in care_area_mappings:
-                            care_area_mappings[progress_note_id] = []
-                        care_area_mappings[progress_note_id].append(care_area_id)
+                    for chunk_start in range(0, len(progress_note_ids), IN_CLAUSE_BATCH_SIZE):
+                        chunk = progress_note_ids[chunk_start:chunk_start + IN_CLAUSE_BATCH_SIZE]
+                        placeholders = ','.join('?' * len(chunk))
+                        care_area_query = f"""
+                            SELECT ProgressNoteId, CareAreaId
+                            FROM ProgressNote_CareArea
+                            WHERE ProgressNoteId IN ({placeholders})
+                        """
+                        cursor.execute(care_area_query, chunk)
+                        for mapping_row in cursor.fetchall():
+                            progress_note_id, care_area_id = mapping_row
+                            if progress_note_id not in care_area_mappings:
+                                care_area_mappings[progress_note_id] = []
+                            care_area_mappings[progress_note_id].append(care_area_id)
                     
-                    # CareArea 상세 정보 가져오기
+                    # CareArea 상세 정보 가져오기 (batch if many IDs to stay under 2100 params)
                     if care_area_mappings:
                         all_care_area_ids = []
                         for mapping_ids in care_area_mappings.values():
@@ -804,16 +814,18 @@ class MANADDBConnector:
                         
                         if all_care_area_ids:
                             unique_ca_ids = list(set(all_care_area_ids))
-                            ca_placeholders = ','.join('?' * len(unique_ca_ids))
-                            care_area_detail_query = f"""
-                                SELECT Id, Description
-                                FROM CareArea
-                                WHERE Id IN ({ca_placeholders})
-                            """
-                            cursor.execute(care_area_detail_query, unique_ca_ids)
                             care_area_details = {}
-                            for ca_row in cursor.fetchall():
-                                care_area_details[ca_row[0]] = ca_row[1]
+                            for ca_start in range(0, len(unique_ca_ids), IN_CLAUSE_BATCH_SIZE):
+                                ca_chunk = unique_ca_ids[ca_start:ca_start + IN_CLAUSE_BATCH_SIZE]
+                                ca_placeholders = ','.join('?' * len(ca_chunk))
+                                care_area_detail_query = f"""
+                                    SELECT Id, Description
+                                    FROM CareArea
+                                    WHERE Id IN ({ca_placeholders})
+                                """
+                                cursor.execute(care_area_detail_query, ca_chunk)
+                                for ca_row in cursor.fetchall():
+                                    care_area_details[ca_row[0]] = ca_row[1]
                         else:
                             care_area_details = {}
                     else:

@@ -26,6 +26,53 @@ let clientList = [];
 // Selected client filter (PersonId)
 let selectedClientId = null;
 
+/**
+ * Single source of truth for Reporting Period options (nursing system: no hardcoded values in HTML).
+ * First entry = default period (cached API used only for first visit / All Clients + this period).
+ * To change default to 2 weeks: put { value: 14, label: '2 weeks' } first, or set DEFAULT_PERIOD_DAYS = 14.
+ */
+const PERIOD_OPTIONS = [
+    { value: 7, label: '1 week' },
+    { value: 14, label: '2 weeks' },
+    { value: 21, label: '3 weeks' },
+    { value: 28, label: '4 weeks' }
+];
+
+/** Default period in days (must match first PERIOD_OPTIONS entry when that is the cached/default period). */
+const DEFAULT_PERIOD_DAYS = PERIOD_OPTIONS[0].value;
+
+/** Allowed period values for validation. */
+const PERIOD_VALUES = Object.freeze(PERIOD_OPTIONS.map(function (o) { return o.value; }));
+
+/** Period in days from Reporting Period dropdown. Max notes returned = within this range only. */
+function getPeriodDays() {
+    const el = document.getElementById('reportingPeriodFilter');
+    if (!el) return DEFAULT_PERIOD_DAYS;
+    const v = parseInt(el.value, 10);
+    return (PERIOD_VALUES.indexOf(v) >= 0) ? v : DEFAULT_PERIOD_DAYS;
+}
+
+/** True when client and/or period differ from default — pagination is client-side and we must never call the cached API. */
+function isFilterMode() {
+    return selectedClientId != null || getPeriodDays() !== DEFAULT_PERIOD_DAYS;
+}
+
+/** Populate #reportingPeriodFilter from PERIOD_OPTIONS. Call before any fetch that uses getPeriodDays(). */
+function populatePeriodFilter() {
+    const el = document.getElementById('reportingPeriodFilter');
+    if (!el) return;
+    el.innerHTML = '';
+    PERIOD_OPTIONS.forEach(function (opt) {
+        const option = document.createElement('option');
+        option.value = String(opt.value);
+        option.textContent = opt.label;
+        if (opt.value === DEFAULT_PERIOD_DAYS) {
+            option.selected = true;
+        }
+        el.appendChild(option);
+    });
+}
+
 // Performance monitoring variables
 let performanceMetrics = {
     startTime: null,
@@ -524,6 +571,23 @@ async function renderNotesTable() {
             console.warn(`[renderNotesTable] Client filter is active (${selectedClientId}) but no notes found in IndexedDB`);
         }
     
+        // Same pagination (50 per page) for both APIs: cached and fetch-progress-notes.
+        // Filter mode = client-side slice by currentPage/perPage. Non-filter = server pagination when from cached API.
+        let notesToShow;
+        let paginationData;
+        if (isFilterMode()) {
+            const totalCount = filteredNotes.length;
+            notesToShow = filteredNotes.slice((currentPage - 1) * perPage, currentPage * perPage);
+            paginationData = { page: currentPage, per_page: perPage, total_count: totalCount, total_pages: Math.ceil(totalCount / perPage) };
+        } else {
+            notesToShow = filteredNotes;
+            if (window.serverPagination && !selectedClientId) {
+                paginationData = window.serverPagination;
+            } else {
+                paginationData = { page: 1, per_page: perPage, total_count: filteredNotes.length, total_pages: Math.ceil(filteredNotes.length / perPage) };
+            }
+        }
+        
         // 전역 변수에 모든 노트 데이터 저장 (필터링용)
         window.allNotes = filteredNotes.map(note => mapNoteToRow(note));
         
@@ -545,10 +609,10 @@ async function renderNotesTable() {
             tr.appendChild(td);
             tbody.appendChild(tr);
         } else {
-            // Batch DOM operations for better performance
+            // Batch DOM operations for better performance (render only notesToShow)
             const fragment = document.createDocumentFragment();
             
-            filteredNotes.forEach((note, idx) => {
+            notesToShow.forEach((note, idx) => {
                 try {
                     const rowData = mapNoteToRow(note);
                     const tr = document.createElement('tr');
@@ -558,7 +622,7 @@ async function renderNotesTable() {
                         td.textContent = val || '';
                         tr.appendChild(td);
                     });
-                    tr.addEventListener('click', () => selectNote(idx, filteredNotes));
+                    tr.addEventListener('click', () => selectNote(idx, notesToShow));
                     fragment.appendChild(tr);
                 } catch (error) {
                     console.error('[renderNotesTable] Error mapping note to row:', error, note);
@@ -571,33 +635,17 @@ async function renderNotesTable() {
         // 페이지네이션 UI 강제 표시 (일반 목록 보기에서도)
         if (filteredNotes.length > 0 || (notes && notes.length > 0)) {
             console.log('강제로 페이지네이션 UI 표시 중...');
-            
-            // 서버에서 받은 페이지네이션 정보 사용 (우선순위)
-            let paginationData;
-            if (window.serverPagination && !selectedClientId) {
-                // 필터가 없을 때만 서버 페이지네이션 정보 사용
+            if (isFilterMode()) {
+                console.log('필터 모드: 클라이언트 페이지네이션', paginationData);
+            } else if (window.serverPagination && !selectedClientId) {
                 console.log('서버 페이지네이션 정보 사용:', window.serverPagination);
-                paginationData = window.serverPagination;
-            } else {
-                // 필터링된 결과에 맞게 페이지네이션 정보 생성
-                const totalCount = filteredNotes.length;
-                console.log('필터링된 노트 수 사용:', totalCount, '전체 노트 수:', notes ? notes.length : 0);
-                
-                paginationData = {
-                    page: 1,
-                    per_page: 50,
-                    total_count: totalCount,
-                    total_pages: Math.ceil(totalCount / 50)
-                };
             }
-            
-            console.log('최종 페이지네이션 데이터:', paginationData);
             updatePaginationUI(paginationData);
         }
         
         // Auto-select first visible row
-        if (filteredNotes.length > 0) {
-            selectNote(0, filteredNotes);
+        if (notesToShow.length > 0) {
+            selectNote(0, notesToShow);
         }
         
         logPerformance('Table rendering completed', { 
@@ -746,13 +794,13 @@ async function handleClientFilterChange() {
             
             const requestBody = {
                 site: currentSite,
-                days: 365,
+                days: getPeriodDays(),
                 client_service_id: selectedClient.MainClientServiceId,
                 per_page: 10000,
                 page: 1
             };
             
-            console.log('[FILTER] Request body:', JSON.stringify(requestBody, null, 2));
+            console.log('[FILTER] Request body (period days=', requestBody.days, '):', JSON.stringify(requestBody, null, 2));
             console.log('[FILTER] Making API call to /api/fetch-progress-notes');
             console.log('[FILTER] API call started at:', new Date().toISOString());
             
@@ -846,14 +894,35 @@ async function handleClientFilterChange() {
             return;
         }
     } else {
-        // "All Clients" selected - reload all data
-        console.log('[FILTER] All clients selected - reloading all data');
+        // "All Clients" selected. Cached API only when period equals DEFAULT_PERIOD_DAYS; otherwise fetch-progress-notes (no cache).
+        const days = getPeriodDays();
         await window.progressNoteDB.deleteProgressNotes(currentSite);
-        await fetchAndSaveProgressNotes();
+        if (days === DEFAULT_PERIOD_DAYS) {
+            console.log('[FILTER] All clients,', DEFAULT_PERIOD_DAYS, 'days (default) - using cached API');
+            await fetchAndSaveProgressNotes();
+        } else {
+            console.log('[FILTER] All clients, period', days, 'days - using fetch-progress-notes (no cache)');
+            const requestBody = { site: currentSite, days: days, per_page: 10000, page: 1 };
+            const response = await fetch('/api/fetch-progress-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            const result = await response.json();
+            if (!result.success) throw new Error(result.message || 'Fetch failed');
+            const notes = (result.data && Array.isArray(result.data)) ? result.data : [];
+            if (notes.length > 0) {
+                await window.progressNoteDB.saveProgressNotes(currentSite, notes);
+            }
+        }
     }
     
     // Render table with filtered data
     console.log('[FILTER] Rendering table with filtered data');
+    if (isFilterMode()) {
+        currentPage = 1;
+    }
     await renderNotesTable();
     console.log('[FILTER] Table rendering completed');
 }
@@ -961,6 +1030,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         } else {
             console.error('[DOMContentLoaded] clientFilter element not found when trying to add event listener');
         }
+        // Period filter: refetch when changed (max notes = within selected period only)
+        const periodFilterEl = document.getElementById('reportingPeriodFilter');
+        if (periodFilterEl) {
+            periodFilterEl.addEventListener('change', handleClientFilterChange);
+        }
         
         // Detect URL change (browser back/forward)
         window.addEventListener('popstate', handleSiteChange);
@@ -1031,14 +1105,18 @@ async function initializeForSite(site) {
         await loadClientListForFilter();
         console.log('[initializeForSite] Step 1.5 completed: Client list loaded');
         
+        // 1.6. Populate period filter from PERIOD_OPTIONS (single source of truth; no hardcoded values in HTML)
+        populatePeriodFilter();
+        console.log('[initializeForSite] Step 1.6 completed: Period filter populated, default=', DEFAULT_PERIOD_DAYS, 'days');
+        
         // 2. Initialize IndexedDB
         console.log('[initializeForSite] Step 2: Initializing IndexedDB');
         await window.progressNoteDB.init();
         console.log('[initializeForSite] Step 2 completed: IndexedDB initialized');
         
-        // 3. Clear existing data and fetch 1 week of data
+        // 3. Clear existing data and fetch default-period data (cached)
         console.log('[initializeForSite] Step 3: Clearing existing data and fetching progress notes');
-        logPerformance('Clearing existing data and fetching 1 week of data for site:', { site });
+        logPerformance('Clearing existing data and fetching default-period data for site:', { site, days: DEFAULT_PERIOD_DAYS });
         await window.progressNoteDB.deleteProgressNotes(site);
         console.log('[initializeForSite] Step 3.1: Existing data cleared');
         
@@ -1082,21 +1160,16 @@ async function initializeForSite(site) {
     }
 }
 
-// Fetch Progress Notes from server and save (full refresh)
+// Fetch Progress Notes from server and save (cached, DEFAULT_PERIOD_DAYS only). Use only for first visit or All Clients + default period. Other cases use /api/fetch-progress-notes (no cache).
 async function fetchAndSaveProgressNotes(eventTypes = null) {
     try {
-        console.log('[fetchAndSaveProgressNotes] Starting to fetch Progress Notes from server...', {
-            site: currentSite,
-            eventTypes: eventTypes
-        });
+        console.log('[fetchAndSaveProgressNotes] Cached fetch -', DEFAULT_PERIOD_DAYS, 'days, no client filter');
         
-        // Prepare request body
         const requestBody = {
             site: currentSite,
-            days: 7  // 1주일 데이터만 가져오기
+            days: DEFAULT_PERIOD_DAYS
         };
         
-        // Add event types if specified
         if (eventTypes && eventTypes.length > 0) {
             requestBody.event_types = eventTypes;
             console.log('[fetchAndSaveProgressNotes] Fetching progress notes with event type filtering:', eventTypes.join(', '));
@@ -1239,7 +1312,7 @@ async function refreshData() {
         // Refresh 버튼 비활성화
         disableRefreshButton();
         
-        // Clear existing data and fetch 1 week of data
+        // Clear existing data and fetch default-period data (cached)
         await window.progressNoteDB.deleteProgressNotes(currentSite);
         
         // 일반 프로그레스 노트 목록: 모든 노트 가져오기 (성능 최적화를 위해 기본 limit 사용)
@@ -1280,7 +1353,7 @@ function handleSiteChange() {
 
 // 증분 업데이트 함수는 제거됨 (항상 1주일 데이터를 가져옴)
 async function fetchIncrementalProgressNotes(lastUpdateTime) {
-    console.log('Incremental update is disabled. Fetching 1 week of data instead.');
+    console.log('Incremental update is disabled. Fetching default-period (' + DEFAULT_PERIOD_DAYS + ' days) data instead.');
     await fetchAndSaveProgressNotes();
 }
 
@@ -1535,6 +1608,10 @@ function goToPage(page) {
     
     console.log(`Changing to page: ${page}`);
     currentPage = page;
+    if (isFilterMode()) {
+        renderNotesTable();
+        return;
+    }
     loadProgressNotes();
 }
 
@@ -1542,6 +1619,10 @@ function changePerPage() {
     const select = document.getElementById('perPageSelect');
     perPage = parseInt(select.value);
     currentPage = 1; // Reset to first page
+    if (isFilterMode()) {
+        renderNotesTable();
+        return;
+    }
     loadProgressNotes();
 }
 
@@ -1584,13 +1665,13 @@ async function loadProgressNotes(forceRefresh = false) {
         
         const requestBody = {
             site: currentSite,
-            days: 7,
+            days: DEFAULT_PERIOD_DAYS,
             page: currentPage,
             per_page: perPage,
             force_refresh: forceRefresh
         };
         
-        console.log(`Loading progress notes - Page: ${currentPage}, Per Page: ${perPage}, Force Refresh: ${forceRefresh}`);
+        console.log(`Loading progress notes (cached ${DEFAULT_PERIOD_DAYS}-day) - Page: ${currentPage}, Per Page: ${perPage}, Force Refresh: ${forceRefresh}`);
         
         const response = await fetch('/api/fetch-progress-notes-cached', {
             method: 'POST',

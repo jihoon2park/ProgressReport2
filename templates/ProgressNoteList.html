@@ -458,12 +458,20 @@
 </div>
 <div class="container">
     <div class="left-panel">
-        <!-- Client Filter -->
-        <div class="client-filter-container" style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
-            <label for="clientFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Filter by Client:</label>
-            <select id="clientFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 250px; background-color: white;">
-                <option value="">All Clients</option>
-            </select>
+        <!-- Client + Period filters (same row); max notes returned = within selected period only -->
+        <div class="client-filter-container" style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px;">
+            <div style="display: flex; align-items: center;">
+                <label for="clientFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Filter by Client:</label>
+                <select id="clientFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 250px; background-color: white;">
+                    <option value="">All Clients</option>
+                </select>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <label for="reportingPeriodFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Period:</label>
+                <select id="reportingPeriodFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 120px; background-color: white;">
+                    <!-- Options populated by JS from PERIOD_OPTIONS (progressNoteList.js). Do not hardcode values here. -->
+                </select>
+            </div>
         </div>
         <table id="notesTable">
             <thead>
