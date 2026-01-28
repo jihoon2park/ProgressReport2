@@ -1,6 +1,6 @@
 """
-알람 서비스 모듈
-알람 템플릿, 수신자 관리, 에스컬레이션 기능을 담당합니다.
+Alarm Service Module
+Handles alarm templates, recipient management, and escalation functionality
 """
 
 import os
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AlarmTemplate:
-    """알람 템플릿 데이터 클래스"""
+    """Alarm Template Data Class"""
     id: str
     name: str
     title: str
@@ -24,13 +24,13 @@ class AlarmTemplate:
     category: str  # incident, maintenance, emergency, general
     escalation_enabled: bool
     escalation_delay_minutes: int
-    recipients: List[str]  # 사용자 ID 또는 팀 ID 리스트
+    recipients: List[str]  # List of user IDs or team IDs
     created_at: datetime
     updated_at: datetime
 
 @dataclass
 class AlarmRecipient:
-    """알람 수신자 데이터 클래스"""
+    """Alarm Recipient Data Class"""
     user_id: str
     name: str
     email: str
@@ -45,7 +45,7 @@ class AlarmRecipient:
 
 @dataclass
 class AlarmEscalation:
-    """알람 에스컬레이션 데이터 클래스"""
+    """Alarm Escalation Data Class"""
     alarm_id: str
     level: int  # 1, 2, 3...
     recipients: List[str]
@@ -57,7 +57,7 @@ class AlarmEscalation:
     acknowledged_at: Optional[datetime]
 
 class AlarmTemplateService:
-    """알람 템플릿 서비스 클래스"""
+    """Alarm Template Service Class"""
     
     def __init__(self, templates_file: str = "data/alarm_templates.json"):
         self.templates_file = templates_file
@@ -65,7 +65,7 @@ class AlarmTemplateService:
         self._load_templates()
     
     def _load_templates(self):
-        """템플릿 파일에서 템플릿들을 로드합니다."""
+        """Load templates from template file."""
         try:
             if os.path.exists(self.templates_file):
                 with open(self.templates_file, 'r', encoding='utf-8') as f:
@@ -85,21 +85,21 @@ class AlarmTemplateService:
                             updated_at=datetime.fromisoformat(template_data['updated_at'])
                         )
                         self.templates[template.id] = template
-                logger.info(f"알람 템플릿 {len(self.templates)}개 로드 완료")
+                logger.info(f"Loaded {len(self.templates)} alarm templates")
             else:
                 self._create_default_templates()
         except Exception as e:
-            logger.error(f"알람 템플릿 로드 실패: {e}")
+            logger.error(f"Failed to load alarm templates: {e}")
             self._create_default_templates()
     
     def _create_default_templates(self):
-        """기본 알람 템플릿들을 생성합니다."""
+        """Create default alarm templates."""
         default_templates = [
             {
                 "id": "incident_high_risk",
-                "name": "고위험 사고 알람",
-                "title": "🚨 고위험 사고 발생",
-                "body": "고위험 사고가 발생했습니다. 즉시 확인이 필요합니다.",
+                "name": "High Risk Incident Alarm",
+                "title": "🚨 High Risk Incident Occurred",
+                "body": "A high risk incident has occurred. Immediate attention is required.",
                 "priority": "urgent",
                 "category": "incident",
                 "escalation_enabled": True,
@@ -110,9 +110,9 @@ class AlarmTemplateService:
             },
             {
                 "id": "incident_normal",
-                "name": "일반 사고 알람",
-                "title": "⚠️ 사고 발생",
-                "body": "사고가 발생했습니다. 확인 후 조치해주세요.",
+                "name": "Normal Incident Alarm",
+                "title": "⚠️ Incident Occurred",
+                "body": "An incident has occurred. Please review and take action.",
                 "priority": "normal",
                 "category": "incident",
                 "escalation_enabled": False,
@@ -123,9 +123,9 @@ class AlarmTemplateService:
             },
             {
                 "id": "maintenance_scheduled",
-                "name": "정기 점검 알람",
-                "title": "🔧 정기 점검 예정",
-                "body": "정기 점검이 예정되어 있습니다. 준비해주세요.",
+                "name": "Scheduled Maintenance Alarm",
+                "title": "🔧 Scheduled Maintenance",
+                "body": "Scheduled maintenance is planned. Please prepare.",
                 "priority": "low",
                 "category": "maintenance",
                 "escalation_enabled": False,
@@ -153,10 +153,10 @@ class AlarmTemplateService:
             self.templates[template.id] = template
         
         self._save_templates()
-        logger.info("기본 알람 템플릿 생성 완료")
+        logger.info("Default alarm templates created")
     
     def _save_templates(self):
-        """템플릿들을 파일에 저장합니다."""
+        """Save templates to file."""
         try:
             os.makedirs(os.path.dirname(self.templates_file), exist_ok=True)
             with open(self.templates_file, 'w', encoding='utf-8') as f:
@@ -168,22 +168,22 @@ class AlarmTemplateService:
                     templates_data.append(template_dict)
                 json.dump(templates_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"알람 템플릿 저장 실패: {e}")
+            logger.error(f"Failed to save alarm templates: {e}")
     
     def get_template(self, template_id: str) -> Optional[AlarmTemplate]:
-        """템플릿 ID로 템플릿을 가져옵니다."""
+        """Get template by template ID."""
         return self.templates.get(template_id)
     
     def get_templates_by_category(self, category: str) -> List[AlarmTemplate]:
-        """카테고리별로 템플릿들을 가져옵니다."""
+        """Get templates by category."""
         return [t for t in self.templates.values() if t.category == category]
     
     def get_templates_by_priority(self, priority: str) -> List[AlarmTemplate]:
-        """우선순위별로 템플릿들을 가져옵니다."""
+        """Get templates by priority."""
         return [t for t in self.templates.values() if t.priority == priority]
     
     def create_template(self, template_data: Dict[str, Any]) -> AlarmTemplate:
-        """새로운 템플릿을 생성합니다."""
+        """Create new template."""
         template_id = f"template_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         template = AlarmTemplate(
             id=template_id,
@@ -201,11 +201,11 @@ class AlarmTemplateService:
         
         self.templates[template_id] = template
         self._save_templates()
-        logger.info(f"새로운 알람 템플릿 생성: {template_id}")
+        logger.info(f"Created new alarm template: {template_id}")
         return template
     
     def update_template(self, template_id: str, template_data: Dict[str, Any]) -> Optional[AlarmTemplate]:
-        """기존 템플릿을 업데이트합니다."""
+        """Update existing template."""
         if template_id not in self.templates:
             return None
         
@@ -216,20 +216,20 @@ class AlarmTemplateService:
         
         template.updated_at = datetime.now()
         self._save_templates()
-        logger.info(f"알람 템플릿 업데이트: {template_id}")
+        logger.info(f"Updated alarm template: {template_id}")
         return template
     
     def delete_template(self, template_id: str) -> bool:
-        """템플릿을 삭제합니다."""
+        """Delete template."""
         if template_id in self.templates:
             del self.templates[template_id]
             self._save_templates()
-            logger.info(f"알람 템플릿 삭제: {template_id}")
+            logger.info(f"Deleted alarm template: {template_id}")
             return True
         return False
 
 class AlarmRecipientService:
-    """알람 수신자 서비스 클래스"""
+    """Alarm Recipient Service Class"""
     
     def __init__(self, recipients_file: str = "data/alarm_recipients.json"):
         self.recipients_file = recipients_file
@@ -237,7 +237,7 @@ class AlarmRecipientService:
         self._load_recipients()
     
     def _load_recipients(self):
-        """수신자 파일에서 수신자들을 로드합니다."""
+        """Load recipients from recipient file."""
         try:
             if os.path.exists(self.recipients_file):
                 with open(self.recipients_file, 'r', encoding='utf-8') as f:
@@ -261,19 +261,19 @@ class AlarmRecipientService:
                             updated_at=datetime.fromisoformat(recipient_data['updated_at'])
                         )
                         self.recipients[recipient.user_id] = recipient
-                logger.info(f"알람 수신자 {len(self.recipients)}명 로드 완료")
+                logger.info(f"Loaded {len(self.recipients)} alarm recipients")
             else:
                 self._create_default_recipients()
         except Exception as e:
-            logger.error(f"알람 수신자 로드 실패: {e}")
+            logger.error(f"Failed to load alarm recipients: {e}")
             self._create_default_recipients()
     
     def _create_default_recipients(self):
-        """기본 수신자들을 생성합니다."""
+        """Create default recipients."""
         default_recipients = [
             {
                 "user_id": "emergency_team",
-                "name": "긴급 대응팀",
+                "name": "Emergency Response Team",
                 "email": "emergency@company.com",
                 "phone": "010-0000-0000",
                 "fcm_token": None,
@@ -286,7 +286,7 @@ class AlarmRecipientService:
             },
             {
                 "user_id": "management",
-                "name": "관리팀",
+                "name": "Management Team",
                 "email": "management@company.com",
                 "phone": "010-0000-0001",
                 "fcm_token": None,
@@ -299,7 +299,7 @@ class AlarmRecipientService:
             },
             {
                 "user_id": "supervisors",
-                "name": "감독관",
+                "name": "Supervisors",
                 "email": "supervisors@company.com",
                 "phone": "010-0000-0002",
                 "fcm_token": None,
@@ -329,10 +329,10 @@ class AlarmRecipientService:
             self.recipients[recipient.user_id] = recipient
         
         self._save_recipients()
-        logger.info("기본 알람 수신자 생성 완료")
+        logger.info("Default alarm recipients created")
     
     def _save_recipients(self):
-        """수신자들을 파일에 저장합니다."""
+        """Save recipients to file."""
         try:
             os.makedirs(os.path.dirname(self.recipients_file), exist_ok=True)
             with open(self.recipients_file, 'w', encoding='utf-8') as f:
@@ -344,26 +344,26 @@ class AlarmRecipientService:
                     recipients_data.append(recipient_dict)
                 json.dump(recipients_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"알람 수신자 저장 실패: {e}")
+            logger.error(f"Failed to save alarm recipients: {e}")
     
     def get_recipient(self, user_id: str) -> Optional[AlarmRecipient]:
-        """사용자 ID로 수신자를 가져옵니다."""
+        """Get recipient by user ID."""
         return self.recipients.get(user_id)
     
     def get_recipients_by_team(self, team: str) -> List[AlarmRecipient]:
-        """팀별로 수신자들을 가져옵니다."""
+        """Get recipients by team."""
         return [r for r in self.recipients.values() if r.team == team and r.is_active]
     
     def get_recipients_by_role(self, role: str) -> List[AlarmRecipient]:
-        """역할별로 수신자들을 가져옵니다."""
+        """Get recipients by role."""
         return [r for r in self.recipients.values() if r.role == role and r.is_active]
     
     def get_active_recipients(self) -> List[AlarmRecipient]:
-        """활성화된 수신자들을 가져옵니다."""
+        """Get active recipients."""
         return [r for r in self.recipients.values() if r.is_active]
     
     def add_recipient(self, recipient_data: Dict[str, Any]) -> AlarmRecipient:
-        """새로운 수신자를 추가합니다."""
+        """Add new recipient."""
         recipient = AlarmRecipient(
             user_id=recipient_data['user_id'],
             name=recipient_data['name'],
@@ -384,11 +384,11 @@ class AlarmRecipientService:
         
         self.recipients[recipient.user_id] = recipient
         self._save_recipients()
-        logger.info(f"새로운 알람 수신자 추가: {recipient.user_id}")
+        logger.info(f"Added new alarm recipient: {recipient.user_id}")
         return recipient
     
     def update_recipient(self, user_id: str, recipient_data: Dict[str, Any]) -> Optional[AlarmRecipient]:
-        """기존 수신자를 업데이트합니다."""
+        """Update existing recipient."""
         if user_id not in self.recipients:
             return None
         
@@ -399,31 +399,31 @@ class AlarmRecipientService:
         
         recipient.updated_at = datetime.now()
         self._save_recipients()
-        logger.info(f"알람 수신자 업데이트: {user_id}")
+        logger.info(f"Updated alarm recipient: {user_id}")
         return recipient
     
     def update_fcm_token(self, user_id: str, fcm_token: str) -> bool:
-        """사용자의 FCM 토큰을 업데이트합니다."""
+        """Update user's FCM token."""
         if user_id in self.recipients:
             self.recipients[user_id].fcm_token = fcm_token
             self.recipients[user_id].updated_at = datetime.now()
             self._save_recipients()
-            logger.info(f"FCM 토큰 업데이트: {user_id}")
+            logger.info(f"Updated FCM token: {user_id}")
             return True
         return False
     
     def deactivate_recipient(self, user_id: str) -> bool:
-        """수신자를 비활성화합니다."""
+        """Deactivate recipient."""
         if user_id in self.recipients:
             self.recipients[user_id].is_active = False
             self.recipients[user_id].updated_at = datetime.now()
             self._save_recipients()
-            logger.info(f"알람 수신자 비활성화: {user_id}")
+            logger.info(f"Deactivated alarm recipient: {user_id}")
             return True
         return False
 
 class AlarmEscalationService:
-    """알람 에스컬레이션 서비스 클래스"""
+    """Alarm Escalation Service Class"""
     
     def __init__(self, escalations_file: str = "data/alarm_escalations.json"):
         self.escalations_file = escalations_file
@@ -431,7 +431,7 @@ class AlarmEscalationService:
         self._load_escalations()
     
     def _load_escalations(self):
-        """에스컬레이션 파일에서 에스컬레이션들을 로드합니다."""
+        """Load escalations from escalation file."""
         try:
             if os.path.exists(self.escalations_file):
                 with open(self.escalations_file, 'r', encoding='utf-8') as f:
@@ -452,12 +452,12 @@ class AlarmEscalationService:
                             )
                             escalations.append(escalation)
                         self.escalations[alarm_id] = escalations
-                logger.info(f"알람 에스컬레이션 로드 완료")
+                logger.info(f"Alarm escalations loaded")
         except Exception as e:
-            logger.error(f"알람 에스컬레이션 로드 실패: {e}")
+            logger.error(f"Failed to load alarm escalations: {e}")
     
     def _save_escalations(self):
-        """에스컬레이션들을 파일에 저장합니다."""
+        """Save escalations to file."""
         try:
             os.makedirs(os.path.dirname(self.escalations_file), exist_ok=True)
             with open(self.escalations_file, 'w', encoding='utf-8') as f:
@@ -472,7 +472,7 @@ class AlarmEscalationService:
                         escalations_data[alarm_id].append(escalation_dict)
                 json.dump(escalations_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"알람 에스컬레이션 저장 실패: {e}")
+            logger.error(f"Failed to save alarm escalations: {e}")
     
     def create_escalation_plan(
         self,
@@ -480,7 +480,7 @@ class AlarmEscalationService:
         template: AlarmTemplate,
         base_recipients: List[str]
     ) -> List[AlarmEscalation]:
-        """템플릿을 기반으로 에스컬레이션 계획을 생성합니다."""
+        """Create escalation plan based on template."""
         if not template.escalation_enabled:
             return []
         
@@ -497,7 +497,7 @@ class AlarmEscalationService:
                 level=level_info["level"],
                 recipients=level_info["recipients"],
                 delay_minutes=level_info["delay"],
-                message=f"에스컬레이션 레벨 {level_info['level']}: {template.name}",
+                message=f"Escalation Level {level_info['level']}: {template.name}",
                 status="pending",
                 created_at=datetime.now(),
                 sent_at=None,
@@ -510,55 +510,55 @@ class AlarmEscalationService:
         self.escalations[alarm_id].extend(escalations)
         self._save_escalations()
         
-        logger.info(f"알람 {alarm_id}에 대한 에스컬레이션 계획 생성: {len(escalations)}개 레벨")
+        logger.info(f"Created escalation plan for alarm {alarm_id}: {len(escalations)} levels")
         return escalations
     
     def get_pending_escalations(self) -> List[AlarmEscalation]:
-        """대기 중인 에스컬레이션들을 가져옵니다."""
+        """Get pending escalations."""
         pending = []
         for escalations in self.escalations.values():
             for escalation in escalations:
                 if escalation.status == "pending":
-                    # 지연 시간이 지났는지 확인
+                    # Check if delay time has passed
                     if datetime.now() >= escalation.created_at + timedelta(minutes=escalation.delay_minutes):
                         pending.append(escalation)
         return pending
     
     def mark_escalation_sent(self, alarm_id: str, level: int) -> bool:
-        """에스컬레이션이 전송되었음을 표시합니다."""
+        """Mark escalation as sent."""
         if alarm_id in self.escalations:
             for escalation in self.escalations[alarm_id]:
                 if escalation.level == level:
                     escalation.status = "sent"
                     escalation.sent_at = datetime.now()
                     self._save_escalations()
-                    logger.info(f"에스컬레이션 전송 완료: {alarm_id} 레벨 {level}")
+                    logger.info(f"Escalation sent: {alarm_id} level {level}")
                     return True
         return False
     
     def mark_escalation_acknowledged(self, alarm_id: str, level: int) -> bool:
-        """에스컬레이션이 확인되었음을 표시합니다."""
+        """Mark escalation as acknowledged."""
         if alarm_id in self.escalations:
             for escalation in self.escalations[alarm_id]:
                 if escalation.level == level:
                     escalation.status = "acknowledged"
                     escalation.acknowledged_at = datetime.now()
                     self._save_escalations()
-                    logger.info(f"에스컬레이션 확인 완료: {alarm_id} 레벨 {level}")
+                    logger.info(f"Escalation acknowledged: {alarm_id} level {level}")
                     return True
         return False
     
     def get_escalations_for_alarm(self, alarm_id: str) -> List[AlarmEscalation]:
-        """특정 알람의 에스컬레이션들을 가져옵니다."""
+        """Get escalations for specific alarm."""
         return self.escalations.get(alarm_id, [])
 
-# 전역 서비스 인스턴스들
+# Global service instances
 template_service = AlarmTemplateService()
 recipient_service = AlarmRecipientService()
 escalation_service = AlarmEscalationService()
 
 def get_alarm_services():
-    """알람 관련 서비스들을 반환합니다."""
+    """Return alarm-related services."""
     return template_service, recipient_service, escalation_service
 
 

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-CIMS 테이블 생성 스크립트 (간단 버전)
-필요한 테이블만 직접 생성합니다.
+CIMS table creation script (simple version)
+Create only necessary tables directly.
 """
 
 import sqlite3
 import os
 import sys
 
-# Windows에서 UTF-8 출력을 위한 설정
+# Configure UTF-8 output for Windows
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
 
 def create_cims_tables():
-    """CIMS 테이블들을 생성합니다."""
+    """Create CIMS tables"""
     db_path = 'progress_report.db'
     
     if not os.path.exists(db_path):
@@ -24,14 +24,14 @@ def create_cims_tables():
     cursor = conn.cursor()
     
     try:
-        # 기존 테이블 확인
+        # Check existing tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cims%'")
         existing_tables = [row[0] for row in cursor.fetchall()]
         print(f"Existing CIMS tables: {existing_tables if existing_tables else 'none'}")
         
         created_tables = []
         
-        # 1. cims_policies 테이블
+        # 1. cims_policies table
         if 'cims_policies' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_policies (
@@ -55,7 +55,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_policies table already exists")
         
-        # 2. cims_incidents 테이블
+        # 2. cims_incidents table
         if 'cims_incidents' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_incidents (
@@ -87,7 +87,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_incidents table already exists")
         
-        # 3. cims_tasks 테이블
+        # 3. cims_tasks table
         if 'cims_tasks' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_tasks (
@@ -119,7 +119,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_tasks table already exists")
         
-        # 4. cims_progress_notes 테이블
+        # 4. cims_progress_notes table
         if 'cims_progress_notes' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_progress_notes (
@@ -145,7 +145,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_progress_notes table already exists")
         
-        # 5. cims_audit_logs 테이블
+        # 5. cims_audit_logs table
         if 'cims_audit_logs' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_audit_logs (
@@ -167,7 +167,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_audit_logs table already exists")
         
-        # 6. cims_task_assignments 테이블
+        # 6. cims_task_assignments table
         if 'cims_task_assignments' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_task_assignments (
@@ -188,7 +188,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_task_assignments table already exists")
         
-        # 7. cims_notifications 테이블
+        # 7. cims_notifications table
         if 'cims_notifications' not in existing_tables:
             cursor.execute("""
                 CREATE TABLE cims_notifications (
@@ -215,7 +215,7 @@ def create_cims_tables():
         else:
             print("⏭️  cims_notifications table already exists")
         
-        # 인덱스 생성
+        # Create indexes
         indexes = [
             ("idx_cims_incidents_type", "cims_incidents", "incident_type"),
             ("idx_cims_incidents_severity", "cims_incidents", "severity"),
@@ -239,7 +239,7 @@ def create_cims_tables():
         
         conn.commit()
         
-        # 생성된 테이블 확인
+        # Check created tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cims%'")
         all_cims_tables = [row[0] for row in cursor.fetchall()]
         

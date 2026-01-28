@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-CIMS 테이블 생성 스크립트
-cims_incidents 및 관련 테이블들을 생성합니다.
+CIMS Table Creation Script
+Creates cims_incidents and related tables.
 """
 
 import sqlite3
 import os
 import sys
 
-# Windows에서 UTF-8 출력을 위한 설정
+# Configure UTF-8 output for Windows
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
 
 def create_cims_tables():
-    """CIMS 테이블들을 생성합니다."""
+    """Create CIMS tables"""
     db_path = 'progress_report.db'
     
     if not os.path.exists(db_path):
@@ -24,12 +24,12 @@ def create_cims_tables():
     cursor = conn.cursor()
     
     try:
-        # 기존 테이블 확인
+        # Check existing tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cims%'")
         existing_tables = [row[0] for row in cursor.fetchall()]
         print(f"Existing CIMS tables: {existing_tables if existing_tables else 'none'}")
         
-        # cims_database_schema.sql 파일 읽기
+        # Read cims_database_schema.sql file
         schema_file = 'cims_database_schema.sql'
         if not os.path.exists(schema_file):
             print(f"❌ Schema file not found: {schema_file}")
@@ -38,20 +38,20 @@ def create_cims_tables():
         with open(schema_file, 'r', encoding='utf-8') as f:
             schema_sql = f.read()
         
-        # 주석 제거 및 정리
+        # Remove comments and clean up
         lines = []
         for line in schema_sql.split('\n'):
             line = line.strip()
-            # 주석 제거
+            # Remove comments
             if line.startswith('--'):
                 continue
             if line:
                 lines.append(line)
         
-        # 전체 SQL을 하나의 문자열로 합치기
+        # Combine all SQL into one string
         clean_sql = ' '.join(lines)
         
-        # SQL 문들을 세미콜론으로 분리
+        # Split SQL statements by semicolon
         statements = []
         current = []
         in_string = False
@@ -73,21 +73,21 @@ def create_cims_tables():
                     statements.append(statement)
                 current = []
         
-        # 남은 문장 처리
+        # Process remaining statement
         if current:
             statement = ''.join(current).strip()
             if statement:
                 statements.append(statement)
         
-        # 각 SQL 문 실행
+        # Execute each SQL statement
         created_tables = []
         for statement in statements:
             try:
                 statement_upper = statement.upper().strip()
                 
-                # CREATE TABLE 문 처리
+                # Handle CREATE TABLE statements
                 if statement_upper.startswith('CREATE TABLE'):
-                    # 테이블 이름 추출
+                    # Extract table name
                     table_name = None
                     parts = statement.split()
                     for i, part in enumerate(parts):
@@ -96,7 +96,7 @@ def create_cims_tables():
                             break
                     
                     if table_name:
-                        # 테이블이 이미 존재하는지 확인
+                        # Check if table already exists
                         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
                         if cursor.fetchone():
                             print(f"⏭️  Table already exists: {table_name}")
@@ -107,7 +107,7 @@ def create_cims_tables():
                         created_tables.append(table_name)
                         print(f"✅ Table created: {table_name}")
                 
-                # CREATE INDEX 문 처리
+                # Handle CREATE INDEX statements
                 elif statement_upper.startswith('CREATE INDEX'):
                     try:
                         cursor.execute(statement)
@@ -118,7 +118,7 @@ def create_cims_tables():
                         else:
                             print(f"⚠️  Index creation error: {str(e)[:100]}")
                 
-                # INSERT 문 처리
+                # Handle INSERT statements
                 elif statement_upper.startswith('INSERT'):
                     try:
                         cursor.execute(statement)
@@ -129,7 +129,7 @@ def create_cims_tables():
                         else:
                             print(f"⚠️  Data insert error: {str(e)[:100]}")
                 
-                # 기타 SQL 문
+                # Handle other SQL statements
                 else:
                     try:
                         cursor.execute(statement)
@@ -144,7 +144,7 @@ def create_cims_tables():
         
         conn.commit()
         
-        # 생성된 테이블 확인
+        # Verify created tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cims%'")
         all_cims_tables = [row[0] for row in cursor.fetchall()]
         

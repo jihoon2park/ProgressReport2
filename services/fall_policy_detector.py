@@ -1,6 +1,6 @@
 """
 Fall Type Detection Service
-Progress Note에서 Fall 유형 감지 (Witnessed vs Unwitnessed)
+Detect Fall type from Progress Note (Witnessed vs Unwitnessed)
 """
 import logging
 from typing import List, Dict, Optional
@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class FallPolicyDetector:
-    """Fall incident 유형 감지 및 Policy 선택"""
+    """Fall incident type detection and Policy selection"""
     
-    # Priority 1: Explicit keywords (가장 명확한 지표)
+    # Priority 1: Explicit keywords (most clear indicators)
     EXPLICIT_UNWITNESSED = [
         "unwitnessed fall",
         "unwitnessed",
-        "unwithnessed",  # 오타 포함
+        "unwithnessed",  # Including typo
         "not witnessed",
         "un-witnessed"
     ]
@@ -25,18 +25,18 @@ class FallPolicyDetector:
     EXPLICIT_WITNESSED = [
         "witnessed fall",
         "witnessed",
-        "guided fall",  # Staff가 의도적으로 guide한 경우
+        "guided fall",  # Staff intentionally guided
         "guided down",
         "guided to",
         "assisted fall",
         "assisted down"
     ]
     
-    # Priority 2: Strong Unwitnessed Indicators (99% 확률)
+    # Priority 2: Strong Unwitnessed Indicators (99% probability)
     STRONG_UNWITNESSED = [
-        "found",  # 가장 강력한 지표 (found + sitting/lying/on floor = 99% unwitnessed)
+        "found",  # Strongest indicator (found + sitting/lying/on floor = 99% unwitnessed)
         "discovered",
-        "heard",  # 소리를 듣고 확인 = 미목격
+        "heard",  # Heard sound and confirmed = unwitnessed
         "buzzer",
         "call bell",
         "alarm",
@@ -86,16 +86,16 @@ class FallPolicyDetector:
     @classmethod
     def detect_fall_type_from_notes(cls, progress_notes: List[str]) -> str:
         """
-        Progress Notes에서 Fall 유형 감지 (우선순위 기반)
+        Detect Fall type from Progress Notes (priority-based)
         
-        우선순위:
-        1. Explicit keywords (unwitnessed/witnessed 명시)
-        2. Strong Unwitnessed Indicators (found, heard, buzzer - 99% 확률)
+        Priority:
+        1. Explicit keywords (unwitnessed/witnessed explicitly stated)
+        2. Strong Unwitnessed Indicators (found, heard, buzzer - 99% probability)
         3. Unwitnessed Context
         4. Witnessed Indicators
         
         Args:
-            progress_notes: Progress Note 텍스트 리스트
+            progress_notes: List of Progress Note text
             
         Returns:
             'unwitnessed' | 'witnessed' | 'unknown'
@@ -103,29 +103,29 @@ class FallPolicyDetector:
         if not progress_notes:
             return 'unknown'
         
-        # 모든 노트를 하나의 텍스트로 결합
+        # Combine all notes into a single text
         combined_text = ' '.join([note for note in progress_notes if note])
         text_lower = combined_text.lower()
         
-        # Priority 1: Explicit Unwitnessed (가장 명확)
+        # Priority 1: Explicit Unwitnessed (most clear)
         for pattern in cls.EXPLICIT_UNWITNESSED:
             if pattern in text_lower:
                 logger.info(f"✅ EXPLICIT Unwitnessed detected: '{pattern}'")
                 return 'unwitnessed'
         
-        # Priority 1: Explicit Witnessed (가장 명확)
+        # Priority 1: Explicit Witnessed (most clear)
         for pattern in cls.EXPLICIT_WITNESSED:
             if pattern in text_lower:
                 logger.info(f"✅ EXPLICIT Witnessed detected: '{pattern}'")
                 return 'witnessed'
         
-        # Priority 2: Strong Unwitnessed Indicators (99% 확률)
+        # Priority 2: Strong Unwitnessed Indicators (99% probability)
         for pattern in cls.STRONG_UNWITNESSED:
             if pattern in text_lower:
                 logger.info(f"✅ STRONG Unwitnessed indicator: '{pattern}' (99% confidence)")
                 return 'unwitnessed'
         
-        # Special: "saw" 문맥 분석
+        # Special: "saw" context analysis
         if " saw " in text_lower or text_lower.startswith("saw "):
             # saw + fall action words = Witnessed
             for action_word in cls.FALL_ACTION_WORDS:
@@ -158,18 +158,18 @@ class FallPolicyDetector:
     @lru_cache(maxsize=1000)
     def _cached_detect_fall_type(cls, incident_id: int, description: str, notes_hash: int) -> str:
         """
-        캐시된 Fall 유형 감지 (메모리 캐싱)
+        Cached Fall type detection (memory caching)
         
         Args:
             incident_id: CIMS Incident DB ID
             description: Incident description
-            notes_hash: Progress notes의 해시값
+            notes_hash: Hash value of Progress notes
             
         Returns:
             'unwitnessed' | 'witnessed' | 'unknown'
         """
-        # 실제 감지 로직은 description을 사용
-        # notes_hash는 캐시 키로만 사용
+        # Actual detection logic uses description
+        # notes_hash is only used as cache key
         if description:
             fall_type = cls.detect_fall_type_from_notes([description])
             if fall_type != 'unknown':
@@ -183,8 +183,8 @@ class FallPolicyDetector:
         cursor: sqlite3.Cursor
     ) -> str:
         """
-        Incident ID로부터 Progress Notes 및 Description을 조회하여 Fall 유형 감지
-        (메모리 캐싱 적용)
+        Detect Fall type by querying Progress Notes and Description from Incident ID
+        (memory caching applied)
         
         Args:
             incident_id: CIMS Incident DB ID
@@ -194,7 +194,7 @@ class FallPolicyDetector:
             'unwitnessed' | 'witnessed' | 'unknown'
         """
         try:
-            # 1. DB에 저장된 fall_type 먼저 확인 (가장 빠름)
+            # 1. Check stored fall_type in DB first (fastest)
             cursor.execute("""
                 SELECT fall_type, description
                 FROM cims_incidents
@@ -203,16 +203,16 @@ class FallPolicyDetector:
             
             incident_row = cursor.fetchone()
             
-            # DB에 fall_type이 있으면 바로 반환
+            # Return immediately if fall_type exists in DB
             if incident_row and incident_row[0]:
                 logger.debug(f"✅ Fall type from DB cache: {incident_row[0]}")
                 return incident_row[0]
             
-            # 2. Description으로 감지 (캐싱 적용)
+            # 2. Detect from Description (with caching)
             if incident_row and incident_row[1]:
                 description = incident_row[1]
                 
-                # Progress notes 해시 계산 (캐시 키용)
+                # Calculate Progress notes hash (for cache key)
                 cursor.execute("""
                     SELECT COUNT(*), MAX(created_at)
                     FROM cims_progress_notes
@@ -221,13 +221,13 @@ class FallPolicyDetector:
                 notes_info = cursor.fetchone()
                 notes_hash = hash((notes_info[0] or 0, notes_info[1] or ''))
                 
-                # 캐시된 감지 사용
+                # Use cached detection
                 fall_type = cls._cached_detect_fall_type(incident_id, description, notes_hash)
                 if fall_type != 'unknown':
                     logger.debug(f"✅ Fall type detected from description (cached): {fall_type}")
                     return fall_type
             
-            # 2. Progress Notes 조회 (Description에 정보 없으면)
+            # 2. Query Progress Notes (if no info in Description)
             cursor.execute("""
                 SELECT pn.content, pn.note_type
                 FROM cims_progress_notes pn
@@ -241,7 +241,7 @@ class FallPolicyDetector:
                 logger.debug(f"ℹ️  No progress notes or clear info for incident {incident_id}")
                 return 'unknown'
             
-            # Post Fall Assessment Note를 우선 검색
+            # Search Post Fall Assessment Note first
             post_fall_notes = [
                 note[0] for note in notes 
                 if note[1] and 'post fall' in note[1].lower()
@@ -252,7 +252,7 @@ class FallPolicyDetector:
                 if fall_type != 'unknown':
                     return fall_type
             
-            # 모든 Note에서 검색
+            # Search all Notes
             all_notes = [note[0] for note in notes if note[0]]
             return cls.detect_fall_type_from_notes(all_notes)
             
@@ -267,19 +267,19 @@ class FallPolicyDetector:
         cursor: sqlite3.Cursor
     ) -> Optional[Dict]:
         """
-        Fall 유형에 맞는 Policy 조회
+        Query Policy matching Fall type
         
         Args:
             fall_type: 'unwitnessed' | 'witnessed' | 'unknown'
             cursor: DB cursor
             
         Returns:
-            Policy 정보 dict 또는 None
+            Policy information dict or None
         """
         import json
         
         try:
-            # Policy ID 결정 (unknown은 unwitnessed로 처리 - 안전 우선)
+            # Determine Policy ID (treat unknown as unwitnessed - safety first)
             if fall_type == 'witnessed':
                 policy_id = 'FALL-002-WITNESSED'
             else:  # unwitnessed or unknown
@@ -301,7 +301,7 @@ class FallPolicyDetector:
                     'rules': json.loads(policy_row[3])
                 }
             
-            # 해당 Policy가 없으면 기본 Fall Policy 조회
+            # Query default Fall Policy if the specific Policy doesn't exist
             logger.warning(f"⚠️  Policy {policy_id} not found, using default")
             cursor.execute("""
                 SELECT id, policy_id, name, rules_json
@@ -333,20 +333,20 @@ class FallPolicyDetector:
         cursor: sqlite3.Cursor
     ) -> Optional[Dict]:
         """
-        Incident에 적합한 Policy 자동 선택
+        Automatically select appropriate Policy for Incident
         
         Args:
             incident_id: CIMS Incident DB ID
             cursor: DB cursor
             
         Returns:
-            선택된 Policy 정보
+            Selected Policy information
         """
-        # 1. Fall 유형 감지
+        # 1. Detect Fall type
         fall_type = cls.detect_fall_type_from_incident(incident_id, cursor)
         logger.info(f"📋 Incident {incident_id}: Fall type = {fall_type}")
         
-        # 2. 적합한 Policy 조회
+        # 2. Query appropriate Policy
         policy = cls.get_policy_for_fall_type(fall_type, cursor)
         
         if policy:
@@ -357,6 +357,6 @@ class FallPolicyDetector:
         return policy
 
 
-# 전역 인스턴스
+# Global instance
 fall_detector = FallPolicyDetector()
 

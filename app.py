@@ -28,16 +28,16 @@ from dotenv import load_dotenv
 import uuid
 from dataclasses import asdict
 
-# .env 파일에서 환경변수 로딩
+# Load environment variables from .env file
 load_dotenv()
 
-# 호주 동부 표준시 (AEST, UTC+10) 헬퍼 함수
+# Helper function for Australian Eastern Standard Time (AEST, UTC+10)
 def get_australian_time():
-    """호주 동부 표준시 반환"""
+    """Return Australian Eastern Standard Time"""
     aest = timezone(timedelta(hours=10))
     return datetime.now(aest)
 
-# 내부 모듈 임포트
+# Import internal modules
 from api_client import APIClient
 from api_carearea import APICareArea
 from api_eventtype import APIEventType
@@ -52,11 +52,11 @@ from alarm_service import get_alarm_services
 from fcm_service import get_fcm_service
 from fcm_token_manager import get_fcm_token_manager
 
-# SITE_SERVERS 안전성 체크 및 폴백 처리
+# SITE_SERVERS safety check and fallback handling
 def get_safe_site_servers():
-    """안전한 사이트 서버 정보 반환 (폴백 포함)"""
+    """Return safe site server information (with fallback)"""
     try:
-        # config에서 SITE_SERVERS 가져오기
+        # Get SITE_SERVERS from config
         if SITE_SERVERS and len(SITE_SERVERS) > 0:
             logger.info(f"SITE_SERVERS loaded successfully: {list(SITE_SERVERS.keys())}")
             return SITE_SERVERS
@@ -67,32 +67,32 @@ def get_safe_site_servers():
         logger.error(f"Failed to load SITE_SERVERS: {e}, using fallback")
         return get_fallback_site_servers()
 
-# IIS 환경 감지 및 설정
+# IIS environment detection and configuration
 def is_iis_environment():
-    """IIS 환경인지 확인"""
+    """Check if running in IIS environment"""
     return 'IIS' in os.environ.get('SERVER_SOFTWARE', '') or 'IIS' in os.environ.get('HTTP_HOST', '')
 
 def get_application_path():
-    """애플리케이션 경로 반환 (IIS 환경 고려)"""
+    """Return application path (considering IIS environment)"""
     if is_iis_environment():
-        # IIS 환경에서는 현재 작업 디렉토리 사용
+        # Use current working directory in IIS environment
         return os.getcwd()
     else:
-        # 개발 환경에서는 스크립트 디렉토리 사용
+        # Use script directory in development environment
         return os.path.dirname(os.path.abspath(__file__))
 
-# 전역 변수로 안전한 사이트 서버 정보 캐시
+# Cache safe site server information as global variable
 _cached_site_servers = None
 
 def get_cached_site_servers():
-    """캐시된 안전한 사이트 서버 정보 반환"""
+    """Return cached safe site server information"""
     global _cached_site_servers
     if _cached_site_servers is None:
         _cached_site_servers = get_safe_site_servers()
     return _cached_site_servers
 
 def get_fallback_site_servers():
-    """폴백 사이트 서버 정보"""
+    """Fallback site server information"""
     return {
         'Parafield Gardens': '192.168.1.11:8080',
         'Nerrilda': '192.168.21.12:8080',
@@ -101,26 +101,26 @@ def get_fallback_site_servers():
         'Yankalilla': '192.168.51.12:8080'
     }
 
-# 환경별 설정 로딩
+# Load environment-specific configuration
 flask_config = get_flask_config()
 
-# 로깅 설정
+# Configure logging
 log_level = getattr(logging, flask_config['LOG_LEVEL'].upper())
 
 
-# 로그 디렉토리 생성
+# Create log directory
 log_dir = 'logs'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
-# 파일 핸들러와 콘솔 핸들러 설정
+# Configure file handler and console handler
 logging.basicConfig(
     level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        # 콘솔 출력 (개발 환경에서만)
+        # Console output (development environment only)
         logging.StreamHandler(),
-        # 파일 출력 (최대 50MB, 10개 파일 로테이션) - 운영 서버용
+        # File output (max 50MB, 10 file rotation) - for production server
         logging.handlers.RotatingFileHandler(
             f'{log_dir}/app.log',
             maxBytes=50*1024*1024,  # 50MB
@@ -131,11 +131,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 운영 서버용 추가 로깅 설정
+# Additional logging configuration for production server
 def setup_production_logging():
-    """운영 서버용 로깅 설정"""
+    """Configure logging for production server"""
     try:
-        # 에러 전용 로그 파일
+        # Error-only log file
         error_handler = logging.handlers.RotatingFileHandler(
             f'{log_dir}/error.log',
             maxBytes=20*1024*1024,  # 20MB
@@ -147,7 +147,7 @@ def setup_production_logging():
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
         
-        # 액세스 로그 파일
+        # Access log file
         access_handler = logging.handlers.RotatingFileHandler(
             f'{log_dir}/access.log',
             maxBytes=30*1024*1024,  # 30MB
@@ -159,7 +159,7 @@ def setup_production_logging():
             '%(asctime)s - %(message)s'
         ))
         
-        # 루트 로거에 핸들러 추가
+        # Add handlers to root logger
         root_logger = logging.getLogger()
         root_logger.addHandler(error_handler)
         root_logger.addHandler(access_handler)
@@ -169,35 +169,35 @@ def setup_production_logging():
     except Exception as e:
         logger.error(f"Error while configuring logging: {str(e)}")
 
-# 운영 서버용 로깅 설정 적용
+# Apply production logging configuration
 setup_production_logging()
 
-# 현재 설정 출력
+# Print current configuration
 print_current_config()
 
-# 플라스크 앱 초기화
+# Initialize Flask app
 app = Flask(__name__, static_url_path='/static')
 
-# 환경별 설정 적용
+# Apply environment-specific configuration
 app.secret_key = flask_config['SECRET_KEY']
 app.config['DEBUG'] = flask_config['DEBUG']
 
-# 세션 타임아웃 설정 (모든 사용자에게 동일하게 적용)
+# Session timeout configuration (applied equally to all users)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(minutes=10)
 
 def set_session_permanent(user_role):
-    """모든 사용자에게 동일한 세션 설정 적용"""
+    """Apply same session configuration to all users"""
     try:
-        # 모든 사용자에게 동일하게 적용
+        # Apply equally to all users
         session.permanent = True
         logger.info(f"User session configured: {user_role}")
     except Exception as e:
         logger.error(f"Error while configuring session: {e}")
-        # 오류 발생 시 기본값으로 설정
+        # Set to default value on error
         session.permanent = False
 
-# Flask-Login 설정
+# Flask-Login configuration
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'home'
@@ -206,7 +206,7 @@ login_manager.login_message_category = 'warning'
 
 @login_manager.user_loader
 def user_loader(user_id):
-    """Flask-Login의 user_loader 콜백"""
+    """Flask-Login user_loader callback"""
     return load_user(user_id)
 
 @login_manager.unauthorized_handler
@@ -222,26 +222,26 @@ def unauthorized_callback():
     logger.info(f"Web page authentication failed, redirecting to home: {request.path}")
     return redirect(url_for('home'))
 
-# 설정 검증 로그
+# Configuration validation log
 if flask_config['ENVIRONMENT'] == 'production' and flask_config['DEBUG']:
     logger.warning("⚠️  DEBUG mode is enabled in production!")
 
 if flask_config['SECRET_KEY'] == 'fallback-secret-key':
     logger.warning("⚠️  Using fallback SECRET_KEY. This is insecure!")
 
-# 데이터 디렉토리 확인 및 생성
+# Check and create data directory
 if not os.path.exists('data'):
     os.makedirs('data')
     logger.info("`data` directory created")
 
-# Note: Policy Scheduler와 Unified Data Sync Manager는 JSON 기반 시스템용이므로
-# CIMS (DB 기반) 시스템에서는 사용하지 않습니다.
-# - Policy Scheduler → CIMS Policy Engine으로 대체
-# - Unified Data Sync → CIMS 증분 동기화 + 클라이언트 캐싱으로 대체
+# Note: Policy Scheduler and Unified Data Sync Manager are for JSON-based systems
+# Not used in CIMS (DB-based) system.
+# - Policy Scheduler → Replaced by CIMS Policy Engine
+# - Unified Data Sync → Replaced by CIMS incremental sync + client caching
 
 # ==============================
-# Database Schema Migration (자동 실행)
-# Production과 Development 환경의 데이터베이스 스키마 차이를 자동으로 해결
+# Database Schema Migration (Auto-execution)
+# Automatically resolve database schema differences between Production and Development environments
 # ==============================
 try:
     from migrate_cims_schema import run_migration
@@ -253,18 +253,18 @@ try:
         logger.warning("⚠️ Database schema migration did not complete successfully (app will continue)")
 except Exception as e:
     logger.warning(f"⚠️ Database schema migration failed: {e}")
-    # 마이그레이션 실패해도 앱은 계속 실행
+    # App continues to run even if migration fails
 
 # ==============================
-# 인증 관련 기능 (Flask-Login 사용)
+# Authentication-related functions (using Flask-Login)
 # ==============================
 
 def _is_authenticated():
-    """사용자 인증 상태 확인 (Flask-Login 사용)"""
+    """Check user authentication status (using Flask-Login)"""
     return current_user.is_authenticated
 
 def require_authentication(wrapped_function):
-    """인증이 필요한 라우트에 사용할 데코레이터 (Flask-Login 사용)"""
+    """Decorator for routes requiring authentication (using Flask-Login)"""
     @wraps(wrapped_function)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
@@ -273,11 +273,11 @@ def require_authentication(wrapped_function):
     return decorated_function
 
 # ==============================
-# 데이터 처리 기능
+# Data Processing Functions
 # ==============================
 
 def process_client_information(client_info):
-    """클라이언트 정보를 가공하여 필요한 정보만 추출"""
+    """Process client information and extract only necessary data"""
     if not client_info:
         logger.warning("No client info to process.")
         return []
@@ -286,20 +286,20 @@ def process_client_information(client_info):
     try:
         for client in client_info:
             processed_client = {
-                'PersonId': client.get('MainClientServiceId'),  # MainClientServiceId를 PersonId로 사용
+                'PersonId': client.get('MainClientServiceId'),  # Use MainClientServiceId as PersonId
                 'ClientName': f"{client.get('Title', '')} {client.get('FirstName', '')} {client.get('LastName', '')}".strip(),
                 'PreferredName': client.get('PreferredName', ''),
                 'Gender': client.get('Gender', ''),
                 'BirthDate': client.get('BirthDate'),
                 'WingName': client.get('WingName'),
                 'RoomName': client.get('RoomName'),
-                'MainClientServiceId': client.get('MainClientServiceId'),  # ClientServiceId로 사용
-                'OriginalPersonId': client.get('PersonId'),  # 원본 PersonId도 보관
-                'ClientRecordId': client.get('Id')  # 클라이언트 레코드 ID (ClientId로 사용)
+                'MainClientServiceId': client.get('MainClientServiceId'),  # Use as ClientServiceId
+                'OriginalPersonId': client.get('PersonId'),  # Also preserve original PersonId
+                'ClientRecordId': client.get('Id')  # Client record ID (use as ClientId)
             }
             processed_clients.append(processed_client)
 
-        # 가공된 데이터를 파일로 저장
+        # Save processed data to file
         save_json_file('data/Client_list.json', processed_clients)
         
         return processed_clients
@@ -307,16 +307,16 @@ def process_client_information(client_info):
         logger.error(f"Error processing client info: {str(e)}")
         return []
 
-# fetch_client_information 함수는 api_client.py에서 통합 관리
-# 이 함수는 제거되었습니다. api_client.fetch_client_information을 사용하세요.
+# fetch_client_information function is managed in api_client.py
+# This function has been removed. Use api_client.fetch_client_information instead.
 
 def fetch_care_area_information(site):
-    """Care Area 정보를 가져오고 처리 (비활성화 - DB 사용)"""
+    """Fetch and process Care Area information (disabled - using DB)"""
     logger.info(f"Skipping Care Area fetch - retrieved from DB (site: {site})")
-    return True, None  # DB에서 조회하므로 API 호출 불필요
+    return True, None  # No API call needed as data is queried from DB
 
 def fetch_event_type_information(site):
-    """Event Type 정보를 가져오고 처리 (ROD 대시보드용 활성화)"""
+    """Fetch and process Event Type information (enabled for ROD dashboard)"""
     try:
         from api_eventtype import APIEventType
         logger.info(f"Starting Event Type fetch - site: {site}")
@@ -325,7 +325,7 @@ def fetch_event_type_information(site):
         event_type_data = api_eventtype.get_event_type_information()
         
         if event_type_data:
-            # Event Type 데이터가 리스트 형태로 직접 반환됨
+            # Event Type data is returned directly as a list
             if isinstance(event_type_data, list):
                 logger.info(f"Event Type fetch succeeded - site: {site}, {len(event_type_data)} items")
                 return True, event_type_data
@@ -344,7 +344,7 @@ def fetch_event_type_information(site):
         return False, None
 
 def save_json_file(filepath, data):
-    """JSON 데이터를 파일로 저장"""
+    """Save JSON data to file"""
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
@@ -355,24 +355,24 @@ def save_json_file(filepath, data):
         return False
 
 def save_client_data(username, site, client_info):
-    """클라이언트 데이터를 JSON 파일로 저장 (비활성화 - DB 사용)"""
+    """Save client data to JSON file (disabled - using DB)"""
     logger.info(f"Skipping client data save - stored in DB (site: {site})")
-    return None  # DB에 저장되므로 JSON 파일 생성 불필요
+    return None  # No need to create JSON file as data is stored in DB
 
 def create_progress_note_json(form_data):
-    """사용자 입력 데이터를 Progress Note JSON 형식으로 변환 (값이 있는 필드만 포함)"""
+    """Convert user input data to Progress Note JSON format (only include fields with values)"""
     try:
         logger.info(f"Starting Progress Note JSON generation - input data: {form_data}")
         
-        # 필수 필드들
+        # Required fields
         progress_note = {}
         
-        # ClientId와 ClientServiceId 처리 (필수)
+        # Handle ClientId and ClientServiceId (required)
         if form_data.get('clientId'):
             try:
                 selected_client_id = int(form_data.get('clientId'))
                 
-                # Client_list.json에서 선택된 클라이언트 정보 찾기
+                # Find selected client information from Client_list.json
                 import json
                 try:
                     with open('data/Client_list.json', 'r', encoding='utf-8') as f:
@@ -385,8 +385,8 @@ def create_progress_note_json(form_data):
                             break
                     
                     if selected_client:
-                        # 성공한 조합: ClientId = 클라이언트 레코드 ID, ClientServiceId = MainClientServiceId
-                        progress_note["ClientId"] = selected_client.get('ClientRecordId', selected_client_id)  # 클라이언트 레코드 ID
+                        # Successful combination: ClientId = client record ID, ClientServiceId = MainClientServiceId
+                        progress_note["ClientId"] = selected_client.get('ClientRecordId', selected_client_id)  # Client record ID
                         progress_note["ClientServiceId"] = selected_client.get('MainClientServiceId', selected_client_id)  # MainClientServiceId
                         
                         logger.info(f"ClientId set: {progress_note['ClientId']} (client record ID)")
@@ -397,8 +397,8 @@ def create_progress_note_json(form_data):
                         
                 except Exception as e:
                     logger.error(f"Failed to read Client_list.json: {e}")
-                    # 기본값으로 설정 - 클라이언트 레코드 ID를 알 수 없으므로 MainClientServiceId 사용
-                    progress_note["ClientId"] = selected_client_id  # MainClientServiceId를 ClientId로 사용 (fallback)
+                    # Set default - use MainClientServiceId as client record ID is unknown
+                    progress_note["ClientId"] = selected_client_id  # Use MainClientServiceId as ClientId (fallback)
                     progress_note["ClientServiceId"] = selected_client_id  # MainClientServiceId
                     logger.warning(
                         "Using fallback - unable to find exact client record ID, using MainClientServiceId"
@@ -411,16 +411,16 @@ def create_progress_note_json(form_data):
             logger.error("ClientId is missing - required field")
             return None
             
-        # EventDate (필수)
+        # EventDate (required)
         if form_data.get('eventDate'):
             progress_note["EventDate"] = form_data.get('eventDate')
             logger.info(f"EventDate set: {progress_note['EventDate']}")
         else:
-            # EventDate가 없으면 현재 시간 사용
+            # Use current time if EventDate is missing
             progress_note["EventDate"] = get_australian_time().isoformat()
             logger.info(f"EventDate default set: {progress_note['EventDate']}")
             
-        # ProgressNoteEventType (필수)
+        # ProgressNoteEventType (required)
         if form_data.get('eventType'):
             try:
                 event_type_id = int(form_data.get('eventType'))
@@ -435,25 +435,25 @@ def create_progress_note_json(form_data):
             logger.error("EventType is missing - required field")
             return None
             
-        # NotesPlainText (필수)
+        # NotesPlainText (required)
         notes_text = form_data.get('notes', '').strip()
         if notes_text:
             progress_note["NotesPlainText"] = notes_text
             logger.info(f"NotesPlainText set: {len(notes_text)}")
         else:
-            # 빈 노트라도 빈 문자열로 설정
+            # Set to empty string even for empty notes
             progress_note["NotesPlainText"] = ""
             logger.info("NotesPlainText set to empty string")
             
-        # 선택적 필드들 (값이 있을 때만 추가)
+        # Optional fields (add only if value exists)
         
-        # CreatedByUser (ExternalUserDto 형식)
+        # CreatedByUser (ExternalUserDto format)
         username = current_user.username
         first_name = current_user.first_name
         last_name = current_user.last_name
         position = current_user.position
         
-        # 세션에 정보가 없으면 사용자 DB에서 다시 가져오기 - 이부분 나중에 다시 확인해야 함...... Jay 2025-06-05
+        # Refetch from user DB if info is missing in session - need to review this later...... Jay 2025-06-05
         if username and (not first_name or not last_name or not position):
             logger.warning(f"Missing user info in session - refetching from user DB: {username}")
             user_data = get_user(username)
@@ -472,15 +472,15 @@ def create_progress_note_json(form_data):
             }
             logger.info(f"CreatedByUser set: {first_name} {last_name} ({username}) - {position}")
             
-            # 디버깅용 - 각 필드 상태 확인
+            # For debugging - check each field state
             logger.debug(f"CreatedByUser field state: FirstName='{first_name}', LastName='{last_name}', UserName='{username}', Position='{position}'")
             
-        # CreatedDate (선택적)
+        # CreatedDate (optional)
         if form_data.get('createDate'):
             progress_note["CreatedDate"] = form_data.get('createDate')
             logger.info(f"CreatedDate set: {progress_note['CreatedDate']}")
             
-        # CareAreas (선택한 경우만)
+        # CareAreas (only if selected)
         if form_data.get('careArea'):
             try:
                 care_area_id = int(form_data.get('careArea'))
@@ -491,11 +491,11 @@ def create_progress_note_json(form_data):
             except (ValueError, TypeError) as e:
                 logger.error(f"Failed to convert CareArea: {form_data.get('careArea')}, error: {e}")
                 
-        # ProgressNoteRiskRating (선택한 경우만)
+        # ProgressNoteRiskRating (only if selected)
         if form_data.get('riskRating'):
             risk_rating_value = form_data.get('riskRating')
             
-            # 문자열 ID를 숫자로 매핑
+            # Map string ID to number
             risk_rating_mapping = {
                 'rr1': 1,  # Extreme
                 'rr2': 2,  # High
@@ -515,7 +515,7 @@ def create_progress_note_json(form_data):
                 }
                 logger.info(f"ProgressNoteRiskRating set: {risk_rating_id}")
                 
-        # Boolean 필드들 (true인 경우만 추가)
+        # Boolean fields (add only if true)
         if form_data.get('lateEntry'):
             progress_note["IsLateEntry"] = True
             logger.info("IsLateEntry set: True")
@@ -528,8 +528,8 @@ def create_progress_note_json(form_data):
             progress_note["IsArchived"] = True
             logger.info("IsArchived set: True")
             
-        # ClientServiceId는 API에서 필요한 경우에만 추가
-        # progress_note["ClientServiceId"] = 26  # 임시 제거
+        # Add ClientServiceId only if needed by API
+        # progress_note["ClientServiceId"] = 26  # Temporarily removed
         
         logger.info(f"Progress Note JSON generated: {progress_note}")
         return progress_note
@@ -539,29 +539,29 @@ def create_progress_note_json(form_data):
         return None
 
 def save_prepare_send_json(progress_note_data):
-    """prepare_send.json 파일에 데이터 저장 (매번 새 파일로 생성, 기존 파일은 백업)"""
+    """Save data to prepare_send.json file (create new file each time, backup existing file)"""
     try:
         filepath = 'data/prepare_send.json'
         
-        # 기존 파일이 있으면 백업 생성
+        # Create backup if existing file exists
         if os.path.exists(filepath):
-            # 순환 백업 시스템 (최대 1000개)
+            # Circular backup system (max 1000 files)
             MAX_BACKUP_COUNT = 1000
             
-            # 기존 백업 파일들 확인
+            # Check existing backup files
             existing_backups = []
             for i in range(1, MAX_BACKUP_COUNT + 1):
                 backup_filepath = f'data/prepare_send_backup{i}.json'
                 if os.path.exists(backup_filepath):
                     existing_backups.append(i)
             
-            # 다음 백업 번호 결정
+            # Determine next backup number
             if len(existing_backups) < MAX_BACKUP_COUNT:
-                # 아직 최대 개수에 도달하지 않았으면 다음 번호 사용
+                # Use next number if max count not reached yet
                 backup_number = len(existing_backups) + 1
                 logger.info(f"Creating new backup file: backup{backup_number}.json")
             else:
-                # 최대 개수에 도달했으면 가장 오래된 파일 찾아서 덮어쓰기
+                # Find oldest file and overwrite if max count reached
                 oldest_backup = 1
                 oldest_time = None
                 
@@ -578,7 +578,7 @@ def save_prepare_send_json(progress_note_data):
             
             backup_filepath = f'data/prepare_send_backup{backup_number}.json'
             
-            # 기존 파일을 백업으로 이동 (덮어쓰기)
+            # Move existing file to backup (overwrite)
             try:
                 import shutil
                 shutil.move(filepath, backup_filepath)
@@ -588,9 +588,9 @@ def save_prepare_send_json(progress_note_data):
                 )
             except Exception as e:
                 logger.error(f"Failed to create backup: {str(e)}")
-                # 백업 실패해도 새 파일은 저장 계속 진행
+                # Continue saving new file even if backup fails
         
-        # 새 파일로 저장
+        # Save as new file
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(progress_note_data, f, ensure_ascii=False, indent=4)
         
@@ -602,11 +602,11 @@ def save_prepare_send_json(progress_note_data):
         return False
 
 # ==============================
-# API 서버 상태 체크 기능
+# API Server Status Check Functions
 # ==============================
 
 def check_api_server_health(server_ip):
-    """API 서버 상태 체크"""
+    """Check API server status"""
     try:
         url = f"http://{server_ip}/api/system/canconnect"
         response = requests.get(url, timeout=5)
@@ -617,9 +617,9 @@ def check_api_server_health(server_ip):
 
 @app.route('/api/server-status')
 def get_server_status():
-    """모든 사이트의 API 서버 상태를 반환"""
+    """Return API server status for all sites"""
     try:
-        # 안전한 사이트 서버 정보 사용
+        # Use safe site server information
         safe_site_servers = get_safe_site_servers()
         status = {}
         
@@ -635,12 +635,12 @@ def get_server_status():
         return jsonify(status)
     except Exception as e:
         logger.error(f"Server status API error: {e}")
-        # 오류 시 빈 상태 반환
+        # Return empty status on error
         return jsonify({})
 
 @app.route('/api/debug/site-servers')
 def debug_site_servers_api():
-    """사이트 서버 정보 디버깅 API (IIS 문제 진단용)"""
+    """Site server information debugging API (for IIS issue diagnosis)"""
     try:
         debug_info = {
             'timestamp': get_australian_time().isoformat(),
@@ -660,7 +660,7 @@ def debug_site_servers_api():
 
         
         logger.info(f"debug_info: {debug_info}")
-        # config 모듈 상태 확인
+        # Check config module status
         try:
             import config
             debug_info['config_loaded'] = True
@@ -669,7 +669,7 @@ def debug_site_servers_api():
         except Exception as e:
             debug_info['errors'].append(f"Failed to load config: {str(e)}")
         
-        # 안전한 사이트 서버 정보 확인
+        # Check safe site server information
         try:
             safe_servers = get_safe_site_servers()
             debug_info['safe_site_servers'] = safe_servers
@@ -679,7 +679,7 @@ def debug_site_servers_api():
             debug_info['safe_site_servers'] = get_fallback_site_servers()
             debug_info['fallback_used'] = True
         
-        # API 키 매니저 상태 확인
+        # Check API key manager status
         try:
             from api_key_manager import get_api_key_manager
             manager = get_api_key_manager()
@@ -687,23 +687,23 @@ def debug_site_servers_api():
             debug_info['api_keys_count'] = len(api_keys)
             debug_info['api_keys'] = [{'site': key['site_name'], 'server': f"{key['server_ip']}:{key['server_port']}"} for key in api_keys]
         except Exception as e:
-            debug_info['errors'].append(f"API 키 매니저 확인 실패: {str(e)}")
+            debug_info['errors'].append(f"Failed to check API key manager: {str(e)}")
             debug_info['api_keys_count'] = 0
         
         return jsonify(debug_info)
     except Exception as e:
         return jsonify({
-            'error': f"디버깅 API 오류: {str(e)}",
+            'error': f"Debugging API error: {str(e)}",
             'timestamp': get_australian_time().isoformat()
         }), 500
 
 @app.route('/api/logs')
 def get_logs():
-    """로그 파일 목록 및 내용 조회 API"""
+    """API to query log file list and content"""
     try:
         log_files = []
         
-        # 1. 일반 로그 파일 (logs 디렉토리) - 의미없는 로그 파일 제외
+        # 1. General log files (logs directory) - exclude meaningless log files
         log_dir = "logs"
         excluded_files = ['test.log', 'app.log', 'usage_system.log']
         
@@ -720,7 +720,7 @@ def get_logs():
                         'path': filepath
                     })
         
-        # 2. Usage 로그 파일 (UsageLog 디렉토리)
+        # 2. Usage log files (UsageLog directory)
         usage_log_dir = "UsageLog"
         if os.path.exists(usage_log_dir):
             for root, dirs, files in os.walk(usage_log_dir):
@@ -728,7 +728,7 @@ def get_logs():
                     if filename.endswith('.json'):
                         filepath = os.path.join(root, filename)
                         stat = os.stat(filepath)
-                        # 상대 경로로 표시 (Windows 경로 구분자를 슬래시로 통일)
+                        # Display as relative path (unify Windows path separators to slashes)
                         rel_path = os.path.relpath(filepath, usage_log_dir).replace('\\', '/')
                         log_files.append({
                             'name': f"UsageLog/{rel_path}",
@@ -743,39 +743,39 @@ def get_logs():
             'timestamp': get_australian_time().isoformat()
         })
     except Exception as e:
-        return jsonify({'error': f"로그 조회 실패: {str(e)}"}), 500
+        return jsonify({'error': f"Failed to query logs: {str(e)}"}), 500
 
 @app.route('/api/logs/<path:filename>')
 def get_log_content(filename):
-    """특정 로그 파일 내용 조회"""
+    """Query specific log file content"""
     try:
-        # 보안: 파일명에 경로 조작 방지
+        # Security: prevent path manipulation in filename
         if '..' in filename or filename.startswith('/') or filename.startswith('\\'):
-            return jsonify({'error': '잘못된 파일명'}), 400
+            return jsonify({'error': 'Invalid filename'}), 400
         
-        # UsageLog 파일인지 확인
+        # Check if UsageLog file
         if filename.startswith('UsageLog/'):
-            # Windows 경로 구분자를 실제 경로로 변환
+            # Convert Windows path separators to actual path
             filepath = filename.replace('/', os.sep)
         else:
             filepath = os.path.join("logs", filename)
         
         if not os.path.exists(filepath):
-            return jsonify({'error': '파일을 찾을 수 없습니다'}), 404
+            return jsonify({'error': 'File not found'}), 404
         
-        # JSON 파일인지 확인
+        # Check if JSON file
         if filename.endswith('.json'):
-            # JSON 파일인 경우 파싱하여 보기 좋게 표시
+            # Parse and display JSON file nicely
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # JSON을 보기 좋게 포맷팅
+            # Format JSON nicely
             formatted_json = json.dumps(data, indent=2, ensure_ascii=False)
             content_lines = formatted_json.split('\n')
             
-            # 마지막 N줄 읽기
+            # Read last N lines
             lines = request.args.get('lines', 100, type=int)
-            lines = min(lines, 1000)  # 최대 1000줄로 제한
+            lines = min(lines, 1000)  # Limit to max 1000 lines
             
             if len(content_lines) > lines:
                 content_lines = content_lines[-lines:]
@@ -789,9 +789,9 @@ def get_log_content(filename):
                 'timestamp': get_australian_time().isoformat()
             })
         else:
-            # 일반 로그 파일인 경우
+            # General log file case
             lines = request.args.get('lines', 100, type=int)
-            lines = min(lines, 1000)  # 최대 1000줄로 제한
+            lines = min(lines, 1000)  # Limit to max 1000 lines
             
             with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                 all_lines = f.readlines()
@@ -806,31 +806,31 @@ def get_log_content(filename):
                 'timestamp': get_australian_time().isoformat()
             })
     except Exception as e:
-        return jsonify({'error': f"로그 내용 조회 실패: {str(e)}"}), 500
+        return jsonify({'error': f"Failed to query log content: {str(e)}"}), 500
 
 @app.route('/logs')
 def logs_page():
-    """로그 뷰어 페이지"""
+    """Log viewer page"""
     return render_template('LogViewer.html')
 
 @app.route('/api/health')
 def health_check():
-    """서버 상태 확인 API (모바일 앱용)"""
+    """Server status check API (for mobile app)"""
     try:
-        # 데이터베이스 연결 테스트
+        # Test database connection
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM users")
         user_count = cursor.fetchone()[0]
         conn.close()
         
-        # FCM 서비스 상태 확인
+        # Check FCM service status
         fcm_service = get_fcm_service()
         fcm_status = fcm_service is not None
         
-        # Task Manager 상태 확인 - JSON 전용 시스템으로 변경되어 비활성화
+        # Task Manager status check - disabled due to change to JSON-only system
         # task_manager = get_task_manager()
-        task_manager_status = False  # 비활성화됨
+        task_manager_status = False  # Disabled
         
         return jsonify({
             'success': True,
@@ -855,7 +855,7 @@ def health_check():
         }), 500
 
 # ==============================
-# 라우트 정의
+# Route Definitions
 # ==============================
 
 @app.route('/')
@@ -942,7 +942,7 @@ def login():
         
         logger.info(f"Login attempt - User: {username}, Site: {site}")
         
-        # 접속 로그 기록
+        # Log access
         user_info = {
             "username": username,
             "display_name": username,
@@ -951,12 +951,12 @@ def login():
         }
         usage_logger.log_access(user_info)
 
-        # 입력값 검증
+        # Validate input values
         if not all([username, password, site]):
             flash('{Please fill in all fields}', 'error')
             return redirect(url_for('home'))
 
-        # 인증 검증
+        # Verify authentication
         auth_success, user_info = authenticate_user(username, password)
         
         if auth_success:
@@ -994,7 +994,7 @@ def login():
                     flash(f'You are not allowed to access {site}.', 'error')
                     return redirect(url_for('home'))
 
-                # 1. Data 폴더 정리를 먼저 실행 (기존 파일들 삭제)
+                # Step 1: Clean up Data folder first (delete existing files)
                 cache_policy = get_cache_policy()
                 if cache_policy['cleanup_data_on_login']:
                     cleanup_success = cleanup_data_folder()
@@ -1005,14 +1005,14 @@ def login():
                 else:
                     logger.info("Skipping data folder cleanup due to cache policy")
 
-                # 2. DB에서 데이터 조회 (JSON 파일 생성 제거)
-                # 매일 새벽 3시에 DB 업데이트되므로 로그인 시 API 호출 불필요
+                # Step 2: Query data from DB (removed JSON file creation)
+                # DB is updated daily at 3 AM, so API calls on login are unnecessary
                 logger.info(f"Auto-collecting site data on login - site: {site}")
                 
-                # 3. 사이트별 데이터 자동 수집
+                # Step 3: Auto-collect site-specific data
                 try:
-                    # 3-1. 클라이언트 데이터 수집 (매번)
-                    logger.info(f"🔍 DEBUG: About to call fetch_client_information for site: {site}")
+                    # 3-1. Collect client data (every time)
+
                     from api_client import fetch_client_information
                     logger.info(f"🔍 DEBUG: fetch_client_information imported, calling now...")
                     import time
@@ -1025,8 +1025,8 @@ def login():
                     else:
                         logger.warning(f"Client data collection failed - {site}")
                     
-                    # 3-2. Progress Notes 데이터 수집 (DB 직접 접속 모드에서는 캐시 불필요)
-                    # DB 직접 접속 모드 확인
+                    # 3-2. Collect Progress Notes data (cache not needed in DB direct access mode)
+                    # Check DB direct access mode
                     import sqlite3
                     import os
                     
@@ -1046,10 +1046,10 @@ def login():
                         use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
                     
                     if use_db_direct:
-                        # DB 직접 접속 모드: 캐시 불필요 - 필요할 때마다 직접 조회
+                        # DB direct access mode: cache not needed - query directly when needed
                         logger.info(f"🔌 Direct DB access mode: Progress Notes are fetched in real time (no cache) - {site}")
                     else:
-                        # API 모드: 캐시 사용 (API 호출 비용 절감)
+                        # API mode: use cache (reduce API call costs)
                         from progress_notes_json_cache import json_cache
                         from api_progressnote_fetch import fetch_progress_notes_for_site
                         logger.info(f"🌐 API mode: Fetch and cache Progress Notes - {site}")
@@ -1060,20 +1060,20 @@ def login():
                         else:
                             logger.warning(f"Progress Notes fetch failed - {site}")
                     
-                    # 3-3. Care Area 및 Event Type 데이터 수집 (DB 직접 접속)
+                    # 3-3. Collect Care Area and Event Type data (DB direct access)
                     if use_db_direct:
-                        # DB 직접 접속 모드
+                        # DB direct access mode
                         try:
                             from manad_db_connector import MANADDBConnector
                             import json
                             
                             connector = MANADDBConnector(site)
                             
-                            # Care Area 조회
+                            # Query Care Area
                             logger.info(f"🔌 Direct DB access mode: Fetching Care Area - {site}")
                             care_success, care_areas = connector.fetch_care_areas()
                             if care_success and care_areas:
-                                # JSON 파일로 저장 (기존 형식 유지)
+                                # Save as JSON file (maintain existing format)
                                 os.makedirs('data', exist_ok=True)
                                 with open('data/carearea.json', 'w', encoding='utf-8') as f:
                                     json.dump(care_areas, f, ensure_ascii=False, indent=4)
@@ -1083,11 +1083,11 @@ def login():
                                 logger.error(error_msg)
                                 raise Exception(error_msg)
                             
-                            # Event Type 조회
+                            # Query Event Type
                             logger.info(f"🔌 Direct DB access mode: Fetching Event Types - {site}")
                             event_success, event_types = connector.fetch_event_types()
                             if event_success and event_types:
-                                # JSON 파일로 저장 (기존 형식 유지)
+                                # Save as JSON file (maintain existing format)
                                 os.makedirs('data', exist_ok=True)
                                 site_filename = f'data/eventtype_{site}.json'
                                 with open(site_filename, 'w', encoding='utf-8') as f:
@@ -1107,7 +1107,7 @@ def login():
                             logger.error(error_msg)
                             raise Exception(error_msg)
                     else:
-                        # API 모드
+                        # API mode
                         from daily_data_manager import daily_data_manager
                         daily_results = daily_data_manager.collect_daily_data_if_needed(site)
                         if daily_results['care_area']:
@@ -1117,32 +1117,30 @@ def login():
                     
                     logger.info(f"Site data collection completed - site: {site}")
                     
-                    # 4. Flask-Login을 사용한 로그인 처리
-                    logger.info(f"🔍 DEBUG: Starting session creation for user: {username}")
+                    # Step 4: Login processing using Flask-Login
                     user = User(username, user_info)
                     user_role = user_info.get('role', 'USER').upper()
                     logger.info(f"🔍 DEBUG: User object created, role: {user_role}")
+                   
                     
-                    # 모든 사용자에게 동일한 세션 설정 적용
-                    logger.info(f"🔍 DEBUG: About to call login_user()")
-                    login_user(user, remember=False)  # 모든 사용자: 브라우저 닫으면 세션 만료
-                    logger.info(f"🔍 DEBUG: login_user() completed")
+                    # Apply same session settings to all users
+                    login_user(user, remember=False)  # All users: session expires when browser closes
                     session.permanent = False
                     logger.info(f"User login: remember=False, session.permanent=False (role: {user_role})")
                     
-                    # 사용자 역할에 따라 세션 타임아웃 설정
-                    logger.info(f"🔍 DEBUG: About to set session permanent for role: {user_role}")
+                    # Set session timeout based on user role
+
                     set_session_permanent(user_role)
                     logger.info(f"🔍 DEBUG: Session permanent set")
                     
-                    # 세션 생성 시간 기록
-                    logger.info(f"🔍 DEBUG: Setting session variables")
+                    # Record session creation time
+
                     session['_created'] = get_australian_time().isoformat()
-                    session['user_role'] = user_role  # 사용자 역할을 세션에 저장
+                    session['user_role'] = user_role  # Store user role in session
                     
-                    # 세션에 추가 정보 저장
+                    # Store additional information in session
                     session['site'] = site
-                    session['allowed_sites'] = allowed_sites # 허용된 사이트 정보 저장
+                    session['allowed_sites'] = allowed_sites # Store allowed site information
                     
                     logger.info(f"Session saved: site={site}, allowed_sites={allowed_sites}")
                     logger.info(f"Full session contents after login: {dict(session)}")
@@ -1151,7 +1149,7 @@ def login():
                     logger.info(f"Login succeeded - user: {username}, site: {site}")
                     logger.info(f"🔍 DEBUG: About to determine redirect destination")
                     
-                    # 로그인 성공 로그 기록
+                    # Log successful login
                     success_user_info = {
                         "username": username,
                         "display_name": user_info.get('display_name', username),
@@ -1160,14 +1158,14 @@ def login():
                     }
                     usage_logger.log_access(success_user_info)
                     
-                    # landing_page가 설정된 사용자는 해당 페이지로 이동
+                    # Redirect users with landing_page set to that page
                     landing_page = user_info.get('landing_page')
                     if landing_page:
                         logger.info(f"🔍 DEBUG: Landing page found: {landing_page}, redirecting...")
                         logger.info(f"Login succeeded - user {username}, landing_page set: {landing_page}")
                         return redirect(landing_page)
                     
-                    # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
+                    # Redirect ROD users to dedicated dashboard (case-insensitive)
                     username_upper = username.upper()
                     logger.info(f"Login username check: {username} -> {username_upper}")
                     logger.info(f"🔍 DEBUG: Checking user type for redirect - username_upper: {username_upper}, user_role: {user_role}")
@@ -1243,27 +1241,27 @@ def login():
                         return redirect(url_for('home'))
             except Exception as e:
                 logger.error(f"Error during API call: {str(e)}")
-                # API 오류 시에도 로그인 허용
+                # Allow login even on API error
                 try:
-                    # Flask-Login을 사용한 로그인 처리
+                    # Login processing using Flask-Login
                     user = User(username, user_info)
                     user_role = user_info.get('role', 'USER').upper()
                     
-                    # 모든 사용자에게 동일한 세션 설정 적용
-                    login_user(user, remember=False)  # 모든 사용자: 브라우저 닫으면 세션 만료
+                    # Apply same session settings to all users
+                    login_user(user, remember=False)  # All users: session expires when browser closes
                     session.permanent = False
                     logger.info(f"User login (with API error): remember=False, session.permanent=False (role: {user_role})")
                     
-                    # 사용자 역할에 따라 세션 타임아웃 설정
+                    # Set session timeout based on user role
                     set_session_permanent(user_role)
                     
-                    # 세션 생성 시간 기록
+                    # Record session creation time
                     session['_created'] = get_australian_time().isoformat()
-                    session['user_role'] = user_role  # 사용자 역할을 세션에 저장
+                    session['user_role'] = user_role  # Store user role in session
                     
-                    # 세션에 추가 정보 저장
+                    # Store additional information in session
                     session['site'] = site
-                    session['allowed_sites'] = allowed_sites # 허용된 사이트 정보 저장
+                    session['allowed_sites'] = allowed_sites # Store allowed site information
                     
                     logger.info(f"Session saved (with API error): site={site}, allowed_sites={allowed_sites}")
                     logger.info(f"Full session contents after login (with API error): {dict(session)}")
@@ -1271,7 +1269,7 @@ def login():
                     flash('Login successful! (Some data may not be available)', 'success')
                     logger.info(f"Login succeeded (with API error) - user: {username}, site: {site}")
                     
-                    # ROD 사용자인 경우 전용 대시보드로 이동 (대소문자 구분 안함)
+                    # Redirect ROD users to dedicated dashboard (case-insensitive)
                     username_upper = username.upper()
                     logger.info(f"Login username check (with API error): {username} -> {username_upper}")
                     if username_upper == 'ROD':
@@ -1338,9 +1336,9 @@ def login():
 
 @app.route('/logout')
 def logout():
-    """로그아웃 처리"""
+    """Logout processing"""
     try:
-        # 로그아웃 전 세션 상태 로깅
+        # Log session state before logout
         if current_user.is_authenticated:
             logger.info(f"Logout started - user: {current_user.username}, role: {current_user.role}")
             user_info = {
@@ -1353,15 +1351,15 @@ def logout():
         else:
             logger.info("Logout started - unauthenticated user")
         
-        # Flask-Login 로그아웃
+        # Flask-Login logout
         logout_user()
         logger.info("Flask-Login logout_user() completed")
         
-        # 세션 완전 정리
+        # Complete session cleanup
         session.clear()
         logger.info("session.clear() completed")
         
-        # 추가 세션 정리 (Flask-Login 관련)
+        # Additional session cleanup (Flask-Login related)
         if '_user_id' in session:
             del session['_user_id']
             logger.info("_user_id removed from session")
@@ -1382,7 +1380,7 @@ def logout():
             del session['site']
             logger.info("site removed from session")
         
-        # Flask-Login 관련 추가 세션 정리
+        # Additional Flask-Login related session cleanup
         if '_fresh' in session:
             del session['_fresh']
             logger.info("_fresh removed from session")
@@ -1391,11 +1389,11 @@ def logout():
             del session['_permanent']
             logger.info("_permanent removed from session")
         
-        # 세션 수정 표시
+        # Mark session as modified
         session.modified = True
         logger.info("Session update completed")
         
-        # Flask-Login 세션 쿠키도 정리
+        # Clear Flask-Login session cookies as well
         response = make_response(redirect(url_for('home')))
         response.delete_cookie('remember_token')
         response.delete_cookie('session')
@@ -1408,7 +1406,7 @@ def logout():
         
     except Exception as e:
         logger.error(f"Error during logout: {str(e)}")
-        # 오류 발생 시에도 세션 정리 시도
+        # Try to clean up session even on error
         try:
             session.clear()
             logout_user()
@@ -1420,7 +1418,7 @@ def logout():
 @app.route('/api/clear-database', methods=['POST'])
 @login_required
 def clear_database():
-    """데이터베이스 초기화"""
+    """Database initialization"""
     try:
         return jsonify({
             'success': True,
@@ -1436,15 +1434,15 @@ def clear_database():
 @app.route('/index')
 @login_required
 def index():
-    """Progress Note 입력 페이지"""
+    """Progress Note input page"""
     site = request.args.get('site', session.get('site', 'Parafield Gardens'))
     return render_template('index.html', selected_site=site, current_user=current_user)
 
 @app.route('/rod-dashboard')
 @login_required
 def rod_dashboard():
-    """ROD 전용 대시보드"""
-    # ROD 사용자가 아닌 경우 접근 제한 (대소문자 구분 안함)
+    """ROD dedicated dashboard"""
+    # Restrict access if not ROD user (case-insensitive)
     username_upper = current_user.username.upper()
     logger.info(f"ROD dashboard access attempt - username check: {current_user.username} -> {username_upper}")
     if username_upper not in ['ROD', 'YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
@@ -1454,7 +1452,7 @@ def rod_dashboard():
     allowed_sites = session.get('allowed_sites', [])
     site = request.args.get('site', session.get('site', 'Parafield Gardens'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -1463,13 +1461,13 @@ def rod_dashboard():
     }
     usage_logger.log_access(user_info)
     
-    # 사이트 정보 가져오기 (사이트 전용 ROD 사용자는 자신의 사이트만)
+    # Get site information (site-specific ROD users see only their site)
     sites_info = []
     safe_site_servers = get_safe_site_servers()
     
-    # 사이트 전용 ROD 사용자인 경우 자신의 사이트만 표시
+    # Show only their site for site-specific ROD users
     if username_upper in ['YKROD', 'WPROD', 'NROD']:
-        # 단일 사이트 전용 사용자
+        # Single site dedicated user
         allowed_sites = session.get('allowed_sites', [])
         if allowed_sites:
             site_name = allowed_sites[0]
@@ -1479,7 +1477,7 @@ def rod_dashboard():
                 'is_selected': True
             })
     elif username_upper in ['PGROD', 'RSROD']:
-        # 다중 사이트 접근 가능 사용자
+        # Multi-site access enabled user
         allowed_sites = session.get('allowed_sites', [])
         for site_name in allowed_sites:
             if site_name in safe_site_servers:
@@ -1489,7 +1487,7 @@ def rod_dashboard():
                     'is_selected': site_name == site
                 })
     else:
-        # 일반 ROD 사용자는 모든 사이트 표시
+        # General ROD users see all sites
         for site_name in safe_site_servers.keys():
             sites_info.append({
                 'name': site_name,
@@ -1508,8 +1506,8 @@ def rod_dashboard():
 @login_required
 def edenfield_dashboard():
     """
-    Edenfield Dashboard - 경영진용 종합 대시보드
-    5개 사이트 전체 현황을 한눈에 보여줌
+    Edenfield Dashboard - Executive comprehensive dashboard
+    Shows overall status of 5 sites at a glance
     """
     try:
         sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla']
@@ -1525,22 +1523,22 @@ def edenfield_dashboard():
 @login_required
 def get_edenfield_stats():
     """
-    Edenfield 전체 통계 API
-    - 5개 사이트 통합 데이터
-    - Resident, Incident, Progress Note 통계
-    - 기간 필터: today, week, month (기본값)
+    Edenfield overall statistics API
+    - Integrated data from 5 sites
+    - Resident, Incident, Progress Note statistics
+    - Period filter: today, week, month (default)
     """
     try:
-        # 기간 파라미터 처리
+        # Process period parameter
         period = request.args.get('period', 'month')
         
         if period == 'today':
-            days = 0  # 오늘만
+            days = 0  # Today only
             date_filter = "CAST(GETDATE() AS DATE)"
         elif period == 'week':
             days = 7
             date_filter = "DATEADD(day, -7, GETDATE())"
-        else:  # month (기본값)
+        else:  # month (default)
             days = 30
             date_filter = "DATEADD(day, -30, GETDATE())"
         
@@ -1557,7 +1555,7 @@ def get_edenfield_stats():
                     
                     site_stats = {'site': site_name}
                     
-                    # 1. Client 수 (현재 입주자만 - ClientService.EndDate가 NULL인 활성 Client)
+                    # 1. Client count (current residents only - active Clients where ClientService.EndDate is NULL)
                     cursor.execute("""
                         SELECT COUNT(DISTINCT c.Id) 
                         FROM Client c
@@ -1568,7 +1566,7 @@ def get_edenfield_stats():
                     """)
                     site_stats['total_persons'] = cursor.fetchone()[0]
                     
-                    # 2. AdverseEvent (Incident) 통계 - 선택된 기간 내
+                    # 2. AdverseEvent (Incident) statistics - within selected period
                     # StatusEnumId: 0=Open, 1=InProgress, 2=Closed
                     if period == 'today':
                         cursor.execute("""
@@ -1602,9 +1600,9 @@ def get_edenfield_stats():
                         'ambulance': row[3] or 0,
                         'hospital': row[4] or 0
                     }
-                    site_stats['incidents_30days'] = row[0] or 0  # 선택된 기간 내 incident
+                    site_stats['incidents_30days'] = row[0] or 0  # Incidents within selected period
                     
-                    # 3. Fall 사고 수 - 선택된 기간 내
+                    # 3. Fall incident count - within selected period
                     if period == 'today':
                         cursor.execute("""
                             SELECT COUNT(*) FROM AdverseEvent ae
@@ -1623,7 +1621,7 @@ def get_edenfield_stats():
                         """)
                     site_stats['fall_count'] = cursor.fetchone()[0]
                     
-                    # 3-1. Skin & Wound 사고 수 - 선택된 기간 내
+                    # 3-1. Skin & Wound incident count - within selected period
                     if period == 'today':
                         cursor.execute("""
                             SELECT COUNT(*) FROM AdverseEvent ae
@@ -1642,7 +1640,7 @@ def get_edenfield_stats():
                         """)
                     site_stats['skin_wound_count'] = cursor.fetchone()[0]
                     
-                    # 4. Progress Note 수 - 선택된 기간 내
+                    # 4. Progress Note count - within selected period
                     if period == 'today':
                         cursor.execute("""
                             SELECT COUNT(*) FROM ProgressNote 
@@ -1657,7 +1655,7 @@ def get_edenfield_stats():
                         """)
                     site_stats['progress_notes_30days'] = cursor.fetchone()[0]
                     
-                    # 5. Activity 수 - 선택된 기간 내
+                    # 5. Activity count - within selected period
                     if period == 'today':
                         cursor.execute("""
                             SELECT COUNT(*) FROM ActivityEvent 
@@ -1672,7 +1670,7 @@ def get_edenfield_stats():
                         """)
                     site_stats['activities_30days'] = cursor.fetchone()[0]
                     
-                    # 6. Activity 종류별 분포 (상위 5개) - 선택된 기간 내
+                    # 6. Activity distribution by type (top 5) - within selected period
                     if period == 'today':
                         cursor.execute("""
                             SELECT TOP 5 a.Description, COUNT(ae.Id) as cnt
@@ -1722,7 +1720,7 @@ def get_edenfield_stats():
                     'activity_types': []
                 })
         
-        # 전체 합계 계산
+        # Calculate total sums
         totals = {
             'total_persons': sum(s.get('total_persons', 0) for s in all_stats),
             'total_incidents': sum(s.get('incidents', {}).get('total', 0) for s in all_stats),
@@ -1737,7 +1735,7 @@ def get_edenfield_stats():
             'activities_30days': sum(s.get('activities_30days', 0) for s in all_stats)
         }
         
-        # Activity 종류별 전체 합계
+        # Total sums by activity type
         activity_totals = {}
         for site in all_stats:
             for at in site.get('activity_types', []):
@@ -1750,7 +1748,7 @@ def get_edenfield_stats():
             [{'name': k, 'count': v} for k, v in activity_totals.items()],
             key=lambda x: x['count'],
             reverse=True
-        )[:10]  # 상위 10개
+        )[:10]  # Top 10
         
         return jsonify({
             'success': True,
@@ -1776,15 +1774,15 @@ def progress_notes():
         logger.info(f"progress_notes full session contents: {dict(session)}")
         logger.info(f"progress_notes request.args: {dict(request.args)}")
         
-        # allowed_sites가 비어있으면 기본 사이트 목록에서 선택
+        # If allowed_sites is empty, select from default site list
         if not allowed_sites:
             safe_site_servers = get_safe_site_servers()
             allowed_sites = list(safe_site_servers.keys())
-            # 세션에 다시 저장
+            # Save back to session
             session['allowed_sites'] = allowed_sites
             logger.warning(f"allowed_sites is empty, using default site list: {allowed_sites}")
         
-        # location이 1개면 무조건 그 사이트로 강제
+        # If only one location, force that site
         if isinstance(allowed_sites, list) and len(allowed_sites) == 1:
             forced_site = allowed_sites[0]
             if site != forced_site:
@@ -1792,7 +1790,7 @@ def progress_notes():
                 return redirect(url_for('progress_notes', site=forced_site))
             site = forced_site
         
-        # 접속 로그 기록
+        # Record access log
         try:
             user_info = {
                 "username": current_user.username,
@@ -1809,16 +1807,16 @@ def progress_notes():
     
     except Exception as e:
         logger.error(f"progress_notes error: {e}")
-        # 오류 발생 시 로그인 페이지로 리다이렉트
+        # Redirect to login page on error
         flash('An error occurred while loading the page. Please log in again.', 'error')
         return redirect(url_for('login_page'))
 
 @app.route('/save_progress_note', methods=['POST'])
 @login_required
 def save_progress_note():
-    """Progress Note 데이터 저장 및 API 전송"""
+    """Save Progress Note data and send to API"""
     try:
-        # JSON 데이터 받기
+        # Receive JSON data
         form_data = request.get_json()
         
         if not form_data:
@@ -1826,7 +1824,7 @@ def save_progress_note():
         
         logger.info(f"Received form data: {form_data}")
         
-        # 사용자 정보 수집
+        # Collect user information
         user_info = {
             "username": current_user.username if current_user else None,
             "display_name": current_user.display_name if current_user else None,
@@ -1834,30 +1832,30 @@ def save_progress_note():
             "position": current_user.position if current_user else None
         }
         
-        # Progress Note JSON 형식으로 변환
+        # Convert to Progress Note JSON format
         progress_note = create_progress_note_json(form_data)
         
         if not progress_note:
             return jsonify({'success': False, 'message': 'Failed to generate JSON.'})
         
-        # prepare_send.json에 저장
+        # Save to prepare_send.json
         if not save_prepare_send_json(progress_note):
             return jsonify({'success': False, 'message': 'Failed to save file.'})
         
         logger.info("prepare_send.json saved, starting API transmission...")
         
-        # API로 Progress Note 전송
+        # Send Progress Note to API
         try:
             from api_progressnote import send_progress_note_to_api
             
-            # 세션에서 선택된 사이트 정보 가져오기
-            selected_site = session.get('site', 'Parafield Gardens')  # 기본값: Parafield Gardens
+            # Get selected site information from session
+            selected_site = session.get('site', 'Parafield Gardens')  # Default: Parafield Gardens
             
             api_success, api_response = send_progress_note_to_api(selected_site)
             
             if api_success:
                 logger.info("Progress Note API transmission succeeded")
-                # 성공 로그 기록
+                # Record success log
                 usage_logger.log_progress_note(form_data, user_info, success=True)
                 return jsonify({
                     'success': True, 
@@ -1867,11 +1865,11 @@ def save_progress_note():
                 })
             else:
                 logger.warning(f"Progress Note API transmission failed: {api_response}")
-                # 실패 로그 기록
+                # Record failure log
                 usage_logger.log_progress_note(form_data, user_info, success=False, error_message=api_response)
-                # 파일 저장은 성공했지만 API 전송 실패
+                # File save succeeded but API transmission failed
                 return jsonify({
-                    'success': True,  # 파일 저장은 성공
+                    'success': True,  # File save succeeded
                     'message': 'Progress Note saved but API transmission failed.',
                     'data': progress_note,
                     'api_error': api_response,
@@ -1879,20 +1877,20 @@ def save_progress_note():
                 })
         except ImportError as e:
             logger.error(f"API module import error: {str(e)}")
-            # 실패 로그 기록
+            # Record failure log
             usage_logger.log_progress_note(form_data, user_info, success=False, error_message=f"Import error: {str(e)}")
             return jsonify({
-                'success': True,  # 파일 저장은 성공
+                'success': True,  # File save succeeded
                 'message': 'Progress Note saved but API module not available.',
                 'data': progress_note,
                 'warning': 'API transmission module not found. The file was saved successfully.'
             })
         except Exception as e:
             logger.error(f"Unexpected error during API transmission: {str(e)}")
-            # 실패 로그 기록
+            # Record failure log
             usage_logger.log_progress_note(form_data, user_info, success=False, error_message=str(e))
             return jsonify({
-                'success': True,  # 파일 저장은 성공
+                'success': True,  # File save succeeded
                 'message': 'Progress Note saved but API transmission failed.',
                 'data': progress_note,
                 'api_error': str(e),
@@ -1901,7 +1899,7 @@ def save_progress_note():
             
     except Exception as e:
         logger.error(f"Progress Note saving error: {str(e)}")
-        # 전체 실패 로그 기록
+        # Record complete failure log
         user_info = {
             "username": current_user.username if current_user else None,
             "display_name": current_user.display_name if current_user else None,
@@ -1912,12 +1910,12 @@ def save_progress_note():
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
 
 # ==============================
-# API 엔드포인트
+# API Endpoints
 # ==============================
 
 @app.route('/data/Client_list.json')
 def get_client_list():
-    """클라이언트 목록 JSON 반환"""
+    """Return client list JSON"""
     try:
         data_dir = os.path.join(app.root_path, 'data')
         return send_from_directory(data_dir, 'Client_list.json')
@@ -1927,7 +1925,7 @@ def get_client_list():
 @app.route('/api/clients/<site>')
 @login_required
 def get_clients_for_site(site):
-    """특정 사이트의 클라이언트 목록 반환"""
+    """Return client list for specific site"""
     try:
         from api_client import fetch_client_information
         
@@ -1937,20 +1935,20 @@ def get_clients_for_site(site):
             logger.warning(f"Unable to fetch client data: {site}")
             return jsonify([]), 404
         
-        # 클라이언트 데이터 형식 변환 (API 형식에 맞게)
+        # Convert client data format (to match API format)
         clients = []
         if isinstance(client_data, list):
             for client in client_data:
-                # ClientName 생성 (FirstName + LastName)
+                # Create ClientName (FirstName + LastName)
                 first_name = client.get('FirstName', '')
                 last_name = client.get('LastName', '')
                 client_name = f"{first_name} {last_name}".strip() if first_name or last_name else 'Unknown'
                 
-                # PersonId/ClientId 가져오기 (Id 필드가 Client ID)
+                # Get PersonId/ClientId (Id field is Client ID)
                 client_id = client.get('Id') or client.get('PersonId') or client.get('ClientId')
                 
                 if client_id:
-                    # BirthDate 처리
+                    # Process BirthDate
                     birth_date = client.get('BirthDate')
                     birth_date_str = None
                     age = None
@@ -1960,7 +1958,7 @@ def get_clients_for_site(site):
                         else:
                             birth_date_str = birth_date.isoformat() if hasattr(birth_date, 'isoformat') else str(birth_date)
                         
-                        # Age 계산
+                        # Calculate age
                         try:
                             from datetime import datetime
                             if isinstance(birth_date, str):
@@ -1972,7 +1970,7 @@ def get_clients_for_site(site):
                         except:
                             pass
                     
-                    # AdmissionDate 처리
+                    # Process AdmissionDate
                     admission_date = client.get('AdmissionDate')
                     admission_date_str = None
                     admission_duration = None
@@ -1982,7 +1980,7 @@ def get_clients_for_site(site):
                         else:
                             admission_date_str = admission_date.isoformat() if hasattr(admission_date, 'isoformat') else str(admission_date)
                         
-                        # Admission duration 계산
+                        # Calculate admission duration
                         try:
                             from datetime import datetime, timedelta
                             if isinstance(admission_date, str):
@@ -2004,12 +2002,12 @@ def get_clients_for_site(site):
                             pass
                     
                     clients.append({
-                        'PersonId': client_id,  # Client ID를 PersonId로 사용 (드롭다운에서 사용)
+                        'PersonId': client_id,  # Use Client ID as PersonId (used in dropdown)
                         'ClientName': client_name,
                         'FirstName': first_name,
                         'MiddleName': client.get('MiddleName', ''),
                         'LastName': last_name,
-                        'Surname': last_name,  # LastName을 Surname으로도 제공
+                        'Surname': last_name,  # Also provide LastName as Surname
                         'PreferredName': client.get('PreferredName', ''),
                         'BirthDate': birth_date_str,
                         'Age': age,
@@ -2034,7 +2032,7 @@ def get_clients_for_site(site):
 @app.route('/data/carearea.json')
 @login_required
 def get_care_area_list():
-    """Care Area 목록 JSON 반환"""
+    """Return Care Area list JSON"""
     try:
         data_dir = os.path.join(app.root_path, 'data')
         return send_from_directory(data_dir, 'carearea.json')
@@ -2044,7 +2042,7 @@ def get_care_area_list():
 @app.route('/data/eventtype.json')
 @login_required
 def get_event_type_list():
-    """Event Type 목록 JSON 반환"""
+    """Return Event Type list JSON"""
     try:
         data_dir = os.path.join(app.root_path, 'data')
         return send_from_directory(data_dir, 'eventtype.json')
@@ -2054,7 +2052,7 @@ def get_event_type_list():
 @app.route('/api/rod-residence-status')
 @login_required
 def get_rod_residence_status():
-    """Resident of the day 현황을 가져옵니다."""
+    """Get Resident of the day status"""
     try:
         site = request.args.get('site', 'Parafield Gardens')
         year = int(request.args.get('year', get_australian_time().year))
@@ -2062,7 +2060,7 @@ def get_rod_residence_status():
         
         logger.info(f"Fetching Resident of the day status for {site} - {year}/{month}")
         
-        # Resident of the day 노트와 클라이언트 데이터 가져오기
+        # Get Resident of the day notes and client data
         from api_progressnote_fetch import fetch_residence_of_day_notes_with_client_data
         residence_status = fetch_residence_of_day_notes_with_client_data(site, year, month)
         
@@ -2070,17 +2068,17 @@ def get_rod_residence_status():
             logger.warning(f"No residence status data found for {site}")
             return jsonify({'error': 'No data found'}), 404
         
-        # 통계 계산
+        # Calculate statistics
         total_residences = len(residence_status)
         total_rn_en_notes = sum(1 for status in residence_status.values() if status.get('rn_en_has_note', False))
         total_pca_notes = sum(1 for status in residence_status.values() if status.get('pca_has_note', False))
         
-        # 전체 노트 개수 계산
+        # Calculate total note count
         total_rn_en_count = sum(status.get('rn_en_count', 0) for status in residence_status.values())
         total_pca_count = sum(status.get('pca_count', 0) for status in residence_status.values())
         total_notes_count = total_rn_en_count + total_pca_count
         
-        # 전체 완료율 계산 (RN/EN과 PCA 모두 완료된 Residence 비율)
+        # Calculate overall completion rate (ratio of Residences with both RN/EN and PCA completed)
         completed_residences = sum(1 for status in residence_status.values() 
                                 if status.get('rn_en_has_note', False) and status.get('pca_has_note', False))
         overall_completion_rate = round((completed_residences / total_residences * 100) if total_residences > 0 else 0, 1)
@@ -2106,9 +2104,9 @@ def get_rod_residence_status():
 @app.route('/api/rod-residence-list', methods=['POST'])
 @login_required
 def get_rod_residence_list():
-    """ROD 전용 Residence 목록 반환 (빈 테이블용)"""
+    """Return ROD-only Residence list (for empty table)"""
     try:
-        # ROD 사용자만 접근 가능
+        # Only ROD users can access
         if current_user.username.upper() != 'ROD':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
 
@@ -2118,7 +2116,7 @@ def get_rod_residence_list():
         try:
             from api_client import fetch_client_information
             
-            # 클라이언트 데이터 가져오기
+            # Get client data
             client_success, client_data = fetch_client_information(site)
             
             if not client_success:
@@ -2127,7 +2125,7 @@ def get_rod_residence_list():
                     'message': 'Failed to fetch client data'
                 }), 500
 
-            # 클라이언트 데이터에서 Residence 목록 추출
+            # Extract Residence list from client data
             residences = []
             if isinstance(client_data, list):
                 residences = client_data
@@ -2136,13 +2134,13 @@ def get_rod_residence_list():
             elif isinstance(client_data, dict) and 'data' in client_data:
                 residences = client_data['data']
             else:
-                # 기본 Residence 목록 사용
+                # Use default Residence list
                 residences = [
                     "Residence A", "Residence B", "Residence C", "Residence D", "Residence E",
                     "Residence F", "Residence G", "Residence H", "Residence I", "Residence J"
                 ]
 
-            # Residence 정보 추출
+            # Extract Residence information
             residence_status = []
             for residence in residences:
                 residence_name = None
@@ -2150,14 +2148,14 @@ def get_rod_residence_list():
                 wing_name = None
                 
                 if isinstance(residence, dict):
-                    # 실제 클라이언트 데이터 필드 사용
+                    # Use actual client data fields
                     first_name = residence.get('FirstName', '')
                     surname = residence.get('Surname', '')
                     last_name = residence.get('LastName', '')
                     preferred_name = residence.get('PreferredName', '')
                     wing_name = residence.get('WingName', '')
                     
-                    # Residence Name에는 FirstName + Surname 조합 사용
+                    # Use FirstName + Surname combination for Residence Name
                     if first_name and surname:
                         residence_name = f"{first_name} {surname}"
                     elif first_name and last_name:
@@ -2167,7 +2165,7 @@ def get_rod_residence_list():
                     else:
                         residence_name = ''
                     
-                    # ID를 사용한 fallback
+                    # Fallback using ID
                     if not residence_name and 'PersonId' in residence:
                         residence_name = f"Client_{residence['PersonId']}"
                     elif not residence_name and 'id' in residence:
@@ -2177,14 +2175,14 @@ def get_rod_residence_list():
                     residence_name = residence
                 
                 if residence_name:
-                    # MainClientServiceId 필드 추가
+                    # Add MainClientServiceId field
                     main_client_service_id = residence.get('MainClientServiceId') or residence.get('ClientServiceId') or residence.get('Id')
                     
                     residence_status.append({
                         'residence_name': residence_name,
                         'preferred_name': preferred_name or '',
                         'wing_name': wing_name or '',
-                        'MainClientServiceId': main_client_service_id,  # 매칭용 ID 추가
+                        'MainClientServiceId': main_client_service_id,  # Add ID for matching
                         'rn_en_has_note': False,
                         'pca_has_note': False,
                         'rn_en_authors': [],
@@ -2215,16 +2213,16 @@ def get_rod_residence_list():
 @app.route('/api/rod-stats', methods=['POST'])
 @login_required
 def get_rod_stats():
-    """ROD 전용 통계 정보 반환"""
+    """Return ROD-only statistics information"""
     try:
-        # ROD 사용자만 접근 가능
+        # Only ROD users can access
         if current_user.username.upper() not in ['ROD', 'YKROD', 'PGROD', 'WPROD', 'RSROD', 'NROD']:
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
         data = request.get_json()
         site = data.get('site', 'Parafield Gardens')
         
-        # 실제 통계 데이터를 가져오는 로직 (현재는 모의 데이터)
+        # Logic to get actual statistics data (currently mock data)
         stats = {
             'totalNotes': 0,
             'todayNotes': 0,
@@ -2233,27 +2231,27 @@ def get_rod_stats():
         }
         
         try:
-            # 프로그레스 노트 수 가져오기
+            # Get progress note count
             from api_progressnote_fetch import fetch_progress_notes_for_site
-            success, progress_notes = fetch_progress_notes_for_site(site, 30)  # 30일간
+            success, progress_notes = fetch_progress_notes_for_site(site, 30)  # 30 days
             
             if success and progress_notes:
                 stats['totalNotes'] = len(progress_notes)
                 
-                # 오늘 날짜의 노트 수 계산
+                # Calculate note count for today's date
                 today = get_australian_time().date()
                 today_notes = [note for note in progress_notes 
                              if note.get('EventDate') and 
                              datetime.fromisoformat(note['EventDate'].replace('Z', '+00:00')).date() == today]
                 stats['todayNotes'] = len(today_notes)
             
-            # 활성 사용자 수 (모의 데이터)
+            # Active user count (mock data)
             stats['activeUsers'] = len([user for user in ['admin', 'PaulVaska', 'walgampola', 'ROD'] 
                                       if user != current_user.username])
             
         except Exception as e:
             logger.error(f"Error fetching statistics data: {str(e)}")
-            # 오류 시에도 기본 통계 반환
+            # Return default statistics even on error
             stats['totalNotes'] = 0
             stats['todayNotes'] = 0
             stats['activeUsers'] = 1
@@ -2276,7 +2274,7 @@ def get_rod_stats():
 @app.route('/api/user-info')
 @login_required
 def get_user_info():
-    """현재 로그인한 사용자 정보 반환"""
+    """Return currently logged-in user information"""
     try:
         user_info = {
             'username': current_user.username,
@@ -2294,35 +2292,35 @@ def get_user_info():
 @app.route('/api/refresh-session', methods=['POST'])
 @login_required
 def refresh_session():
-    """현재 세션 새로고침 - 사용자 정보 다시 로딩"""
+    """Refresh current session - reload user information"""
     try:
         username = current_user.username
         if not username:
             return jsonify({'success': False, 'message': 'No username in session'}), 400
             
-        # 사용자 정보 다시 가져오기
+        # Get user information again
         user_data = get_user(username)
         if not user_data:
             return jsonify({'success': False, 'message': 'User not found'}), 404
             
-        # 새로운 User 객체 생성하여 로그인 갱신
+        # Create new User object and refresh login
         user = User(username, user_data)
         user_role = user_data.get('role', 'USER').upper()
         
-        # ADMIN 사용자는 remember=True로 설정하여 세션 유지
+        # Set ADMIN users to remember=True to maintain session
         if user_role == 'ADMIN':
-            login_user(user, remember=True)  # ADMIN: 브라우저 닫아도 세션 유지
+            login_user(user, remember=True)  # ADMIN: Maintain session even when browser closes
             session.permanent = True
             logger.info("Admin session refresh: remember=True, session.permanent=True")
         else:
-            login_user(user, remember=False)  # 일반 사용자: 브라우저 닫으면 세션 만료
+            login_user(user, remember=False)  # Regular users: Session expires when browser closes
             session.permanent = False
             logger.info("Regular user session refresh: remember=False, session.permanent=False")
         
-        # 사용자 역할에 따라 세션 타임아웃 설정
+        # Set session timeout according to user role
         set_session_permanent(user_role)
         
-        # 사용자 역할을 세션에 저장
+        # Save user role to session
         session['user_role'] = user_role
         
         logger.info(f"Session refresh completed: {username}")
@@ -2345,9 +2343,9 @@ def refresh_session():
 @app.route('/api/session-status')
 @login_required
 def get_session_status():
-    """세션 상태 확인"""
+    """Check session status"""
     try:
-        # 모든 사용자에게 동일한 세션 타임아웃 적용
+        # Apply same session timeout to all users
         session_lifetime = timedelta(minutes=10)
         session_created = session.get('_created', get_australian_time())
         
@@ -2357,7 +2355,7 @@ def get_session_status():
         session_expires = session_created + session_lifetime
         now = get_australian_time()
         
-        # 남은 시간 계산 (초 단위)
+        # Calculate remaining time (in seconds)
         remaining_seconds = (session_expires - now).total_seconds()
         
         return jsonify({
@@ -2374,12 +2372,12 @@ def get_session_status():
 @app.route('/api/extend-session', methods=['POST'])
 @login_required
 def extend_session():
-    """세션 연장"""
+    """Extend session"""
     try:
-        # 모든 사용자에게 동일한 세션 연장 적용
+        # Apply same session extension to all users
         session['_created'] = get_australian_time().isoformat()
         
-        # Flask-Login 세션 갱신 (재귀 방지를 위해 직접 세션 갱신)
+        # Refresh Flask-Login session (direct session refresh to prevent recursion)
         session.permanent = True
         session.modified = True
         
@@ -2397,6 +2395,7 @@ def extend_session():
 @app.route('/api/fetch-progress-notes', methods=['POST'])
 @login_required
 def fetch_progress_notes():
+<<<<<<< HEAD
     """프로그레스 노트를 사이트에서 가져오기. days from request; default = DEFAULT_PERIOD_DAYS (matches frontend PERIOD_OPTIONS)."""
     try:
         data = request.get_json()
@@ -2409,6 +2408,20 @@ def fetch_progress_notes():
         year = data.get('year')  # 년도
         month = data.get('month')  # 월
         client_service_id = data.get('client_service_id')  # 클라이언트 서비스 ID 필터
+=======
+    """Fetch progress notes from site (cache-based)"""
+    try:
+        data = request.get_json()
+        site = data.get('site')
+        days = data.get('days', 7)  # Default: 7 days
+        page = data.get('page', 1)  # Page number
+        per_page = data.get('per_page', 50)  # Items per page
+        force_refresh = data.get('force_refresh', False)  # Force refresh
+        event_types = data.get('event_types', [])  # Event type filter
+        year = data.get('year')  # Year
+        month = data.get('month')  # Month
+        client_service_id = data.get('client_service_id')  # Client service ID filter
+>>>>>>> main
         
         if not site:
             logger.error("Site parameter is missing in request")
@@ -2421,7 +2434,7 @@ def fetch_progress_notes():
         else:
             logger.info("🔍 [FILTER] No client filter - fetching all clients")
         
-        # 사이트 서버 설정 확인
+        # Check site server configuration
         safe_site_servers = get_safe_site_servers()
         if site not in safe_site_servers:
             logger.error(f"Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}")
@@ -2430,7 +2443,7 @@ def fetch_progress_notes():
                 'message': f'Unknown site: {site}. Available sites: {list(safe_site_servers.keys())}'
             }), 400
         
-        # DB 직접 접속 모드 확인
+        # Check DB direct access mode
         use_db_direct = False
         try:
             conn = sqlite3.connect('progress_report.db', timeout=10)
@@ -2448,7 +2461,7 @@ def fetch_progress_notes():
         
         from api_progressnote_fetch import fetch_progress_notes_for_site
         
-        # Progress Notes 조회 (DB 직접 접속 또는 API)
+        # Fetch Progress Notes (DB direct access or API)
         if use_db_direct:
             logger.info(f"🔌 Direct DB access mode: Progress Notes fetched in real time (no cache) - {site}")
         else:
@@ -2479,6 +2492,7 @@ def fetch_progress_notes():
                 from progress_notes_json_cache import json_cache
                 json_cache.update_cache(site, notes)
             # Return ALL in one page — no slice (filter endpoint; frontend does client-side paging if needed)
+
             result = {
                 'success': True,
                 'notes': notes,
@@ -2491,7 +2505,7 @@ def fetch_progress_notes():
                 'cache_age_hours': 0
             }
         
-        # 응답 데이터 구성
+        # Build response data
         response_data = {
             'success': True,
             'data': result['notes'],
@@ -2511,12 +2525,12 @@ def fetch_progress_notes():
             'fetched_at': get_australian_time().isoformat()
         }
         
-        # ROD 대시보드 요청인지 확인 (year, month가 제공되고 event_types가 None이거나 빈 배열인 경우)
+        # Check if ROD dashboard request (when year, month are provided and event_types is None or empty array)
         if year is not None and month is not None and (not event_types or len(event_types) == 0):
             logger.info(f"ROD Dashboard request detected for {site} - {year}/{month}")
             from api_progressnote_fetch import fetch_residence_of_day_notes_with_client_data
             
-            # 실시간 클라이언트 데이터와 함께 ROD 로직 사용
+            # Use ROD logic with real-time client data
             residence_status = fetch_residence_of_day_notes_with_client_data(site, year, month)
             
             if residence_status and 'residence_status' in residence_status:
@@ -2541,7 +2555,7 @@ def fetch_progress_notes():
                     'fetched_at': get_australian_time().isoformat()
                 })
         else:
-            # 일반 Progress Notes 요청
+            # Regular Progress Notes request
             logger.info(f"Regular Progress Notes request for {site}")
             logger.info(
                 f"Progress notes fetch succeeded - {site}: {result['total_count']} items (page {page}/{result['total_pages']})"
@@ -2561,7 +2575,7 @@ def fetch_progress_notes():
 @app.route('/api/fetch-progress-notes-incremental', methods=['POST'])
 @login_required
 def fetch_progress_notes_incremental():
-    """증분 업데이트 API - 항상 7일간 데이터 반환 (단순화됨)"""
+    """Incremental update API - always returns 7 days of data (simplified)"""
     try:
         data = request.get_json()
         site = data.get('site')
@@ -2574,7 +2588,7 @@ def fetch_progress_notes_incremental():
         try:
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
-            # 항상 7일간 데이터 가져오기
+            # Always fetch 7 days of data
             success, progress_notes = fetch_progress_notes_for_site(site, 7)
             
             if success:
@@ -2614,9 +2628,9 @@ def fetch_progress_notes_incremental():
 @app.route('/api/progress-notes-db-info')
 @login_required
 def get_progress_notes_db_info():
-    """IndexedDB 정보 조회 (클라이언트에서 호출)"""
+    """Query IndexedDB information (called from client)"""
     try:
-        # 클라이언트에서 IndexedDB 정보를 조회하도록 안내
+        # Guide client to query IndexedDB information
         return jsonify({
             'success': True,
             'message': 'Use client-side IndexedDB API to get database info',
@@ -2634,18 +2648,18 @@ def get_progress_notes_db_info():
 
 @app.route('/data/<filename>')
 def serve_data_file(filename):
-    """data 디렉토리의 JSON 파일들을 서빙"""
-    # 허용된 파일 확장자
+    """Serve JSON files from data directory"""
+    # Allowed file extensions
     allowed_extensions = {'.json'}
     
-    # 파일 확장자 확인
+    # Check file extension
     if not any(filename.endswith(ext) for ext in allowed_extensions):
         return jsonify({'error': 'Invalid file type'}), 400
     
     data_dir = os.path.join(app.root_path, 'data')
     file_path = os.path.join(data_dir, filename)
     
-    # 파일 존재 확인
+    # Check if file exists
     if not os.path.exists(file_path):
         return jsonify({'error': 'File not found'}), 404
     
@@ -2654,18 +2668,18 @@ def serve_data_file(filename):
 @app.route('/incident-viewer')
 @login_required
 def incident_viewer():
-    """Incident Viewer 페이지"""
-    # 관리자와 사이트 관리자만 접근 허용
+    """Incident Viewer page"""
+    # Allow access only to admin and site admin
     if current_user.role not in ['admin', 'site_admin']:
         flash('Access denied. This page is for admin users only.', 'error')
         return redirect(url_for('home'))
     
-    # 사이트 파라미터 가져오기 (등록된 사이트 중 첫 번째를 기본값으로)
+    # Get site parameter (use first registered site as default)
     safe_site_servers = get_safe_site_servers()
     default_site = list(safe_site_servers.keys())[0] if safe_site_servers else 'Parafield Gardens'
     site = request.args.get('site', default_site)
     
-    # 사이트 목록 생성
+    # Create site list
     sites = []
     for site_name, server_info in safe_site_servers.items():
         sites.append({
@@ -2674,7 +2688,7 @@ def incident_viewer():
             'is_selected': site_name == site
         })
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -2691,12 +2705,12 @@ def incident_viewer():
 @app.route('/log-viewer')
 @login_required
 def log_viewer():
-    """로그 뷰어 페이지"""
-    # 관리자만 접근 허용
+    """Log viewer page"""
+    # Allow access only to admin
     if current_user.role != 'admin':
         return redirect(url_for('home'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -2710,12 +2724,12 @@ def log_viewer():
 @app.route('/usage-log-viewer')
 @login_required
 def usage_log_viewer():
-    """사용자 활동 로그 전용 뷰어 페이지"""
-    # 관리자만 접근 허용
+    """User activity log viewer page"""
+    # Allow access only to admin
     if current_user.role != 'admin':
         return redirect(url_for('home'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -2729,16 +2743,16 @@ def usage_log_viewer():
 @app.route('/log_viewer/progress_notes')
 @login_required
 def progress_note_logs_viewer():
-    """Progress Note Logs 전용 뷰어 페이지"""
-    # 관리자만 접근 허용
+    """Progress Note Logs viewer page"""
+    # Allow access only to admin
     if current_user.role != 'admin':
         return redirect(url_for('home'))
     
-    # URL 파라미터에서 날짜 가져오기
+    # Get date from URL parameter
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -2752,9 +2766,9 @@ def progress_note_logs_viewer():
 @app.route('/api/logs/summary')
 @login_required
 def get_log_summary():
-    """로그 요약 정보 반환"""
+    """Return log summary information"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -2793,9 +2807,9 @@ def get_log_summary():
 @app.route('/api/fetch-incidents', methods=['POST'])
 @login_required
 def fetch_incidents():
-    """Incident 데이터를 사이트에서 가져오기"""
+    """Fetch Incident data from site"""
     try:
-        # 관리자와 사이트 관리자만 접근 허용
+        # Allow access only to admin and site admin
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -2809,7 +2823,7 @@ def fetch_incidents():
         
         logger.info(f"Fetching incidents for {site} from {start_date} to {end_date}")
         
-        # 사이트 서버 설정 확인
+        # Check site server configuration
         safe_site_servers = get_safe_site_servers()
         if site not in safe_site_servers:
             return jsonify({
@@ -2821,7 +2835,7 @@ def fetch_incidents():
         logger.info(f"Target server for {site}: {server_ip}")
         
         try:
-            # Incident 데이터와 클라이언트 데이터 가져오기 (DB 직접 접속)
+            # Fetch Incident data and client data (DB direct access)
             from manad_db_connector import fetch_incidents_with_client_data_from_db
             
             logger.info(f"🔌 Direct DB access mode: {site}")
@@ -2865,9 +2879,9 @@ def fetch_incidents():
 @app.route('/api/logs/access-hourly-summary')
 @login_required
 def get_access_hourly_summary():
-    """Access log의 시간별 사용자 활동 요약 반환"""
+    """Return hourly user activity summary from access log"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -2905,9 +2919,9 @@ def get_access_hourly_summary():
 @app.route('/api/logs/daily-access-summary')
 @login_required
 def get_daily_access_summary():
-    """일별 접속 현황 요약"""
+    """Daily access status summary"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -2945,9 +2959,9 @@ def get_daily_access_summary():
 @app.route('/api/logs/user-daily-activity')
 @login_required
 def get_user_daily_activity():
-    """특정 사용자의 일별 접속 현황"""
+    """Daily access status for specific user"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -2989,9 +3003,9 @@ def get_user_daily_activity():
 @app.route('/api/logs/date-user-activity')
 @login_required
 def get_date_user_activity():
-    """특정 날짜의 사용자별 접속시간 및 사용시간"""
+    """Access time and usage time per user for specific date"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3057,9 +3071,9 @@ def log_rod_debug():
 @app.route('/api/logs/details')
 @login_required
 def get_log_details():
-    """로그 상세 정보 반환"""
+    """Return log details"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3069,25 +3083,25 @@ def get_log_details():
         if not date_str:
             return jsonify({'success': False, 'message': 'Date parameter is required'}), 400
         
-        # 해당 날짜의 로그 파일 경로
+        # Log file path for that date
         log_file = usage_logger.get_daily_log_file(log_type, datetime.fromisoformat(date_str))
         
         if not log_file.exists():
             return jsonify({'success': False, 'message': 'No logs found for this date'}), 404
         
-        # 로그 파일 읽기
+        # Read log file
         with open(log_file, 'r', encoding='utf-8') as f:
             logs = json.load(f)
         
-        # progress_notes 로그인 경우 상세 정보 포함
+        # Include details for progress_notes logs
         if log_type == 'progress_notes':
             for log_entry in logs:
-                # 성공/실패 상태에 따른 스타일 클래스 추가
+                # Add style class based on success/failure status
                 success = log_entry.get('result', {}).get('success', True)
                 log_entry['status_class'] = 'success' if success else 'error'
                 log_entry['status_text'] = 'Success' if success else 'Failed'
                 
-                # 타임스탬프를 읽기 쉬운 형식으로 변환
+                # Convert timestamp to readable format
                 timestamp = log_entry.get('timestamp', '')
                 if timestamp:
                     try:
@@ -3113,9 +3127,9 @@ def get_log_details():
 @app.route('/api/logs/app-log')
 @login_required
 def get_app_log():
-    """app.log 파일 내용 조회 (운영 서버용)"""
+    """Query app.log file contents (for production server)"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3124,7 +3138,7 @@ def get_app_log():
         if not os.path.exists(log_file):
             return jsonify({'success': False, 'message': 'app.log file not found'}), 404
         
-        # 최근 1000줄만 읽기 (성능 최적화)
+        # Read only recent 1000 lines (performance optimization)
         with open(log_file, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             recent_lines = lines[-1000:] if len(lines) > 1000 else lines
@@ -3143,9 +3157,9 @@ def get_app_log():
 @app.route('/api/logs/error-log')
 @login_required
 def get_error_log():
-    """error.log 파일 내용 조회 (운영 서버용)"""
+    """Query error.log file contents (for production server)"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3154,7 +3168,7 @@ def get_error_log():
         if not os.path.exists(log_file):
             return jsonify({'success': False, 'message': 'error.log file not found'}), 404
         
-        # 최근 500줄만 읽기
+        # Read only recent 500 lines
         with open(log_file, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             recent_lines = lines[-500:] if len(lines) > 500 else lines
@@ -3173,9 +3187,9 @@ def get_error_log():
 @app.route('/api/logs/access-log')
 @login_required
 def get_access_log():
-    """access.log 파일 내용 조회 (운영 서버용)"""
+    """Query access.log file contents (for production server)"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3184,7 +3198,7 @@ def get_access_log():
         if not os.path.exists(log_file):
             return jsonify({'success': False, 'message': 'access.log file not found'}), 404
         
-        # 최근 500줄만 읽기
+        # Read only recent 500 lines
         with open(log_file, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             recent_lines = lines[-500:] if len(lines) > 500 else lines
@@ -3203,25 +3217,25 @@ def get_access_log():
 @app.route('/api/usage-logs')
 @login_required
 def get_usage_logs():
-    """사용자 활동 로그 분석 데이터 반환"""
+    """Return user activity log analysis data"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
-        # 날짜 범위 파라미터
+        # Date range parameters
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         
-        # UsageLog 디렉토리에서 로그 파일들 수집
+        # Collect log files from UsageLog directory
         usage_log_dir = "UsageLog"
         if not os.path.exists(usage_log_dir):
             return jsonify({'success': True, 'logs': [], 'summary': {}})
         
         all_logs = []
-        login_sessions = {}  # 사용자별 로그인 세션 추적
+        login_sessions = {}  # Track login sessions per user
         
-        # 모든 JSON 로그 파일 읽기
+        # Read all JSON log files
         for root, dirs, files in os.walk(usage_log_dir):
             for filename in files:
                 if filename.endswith('.json'):
@@ -3230,7 +3244,7 @@ def get_usage_logs():
                         with open(filepath, 'r', encoding='utf-8') as f:
                             logs = json.load(f)
                             
-                        # 날짜 필터링
+                        # Date filtering
                         if start_date or end_date:
                             filtered_logs = []
                             for log in logs:
@@ -3247,10 +3261,10 @@ def get_usage_logs():
                         logger.error(f"Failed to read log file {filepath}: {str(e)}")
                         continue
         
-        # 시간순 정렬
+        # Sort by time
         all_logs.sort(key=lambda x: x.get('timestamp', ''))
         
-        # 로그인/로그아웃 세션 분석
+        # Analyze login/logout sessions
         for log in all_logs:
             username = log.get('user', {}).get('username', 'Unknown')
             timestamp = log.get('timestamp', '')
@@ -3259,7 +3273,7 @@ def get_usage_logs():
             if username not in login_sessions:
                 login_sessions[username] = []
             
-            # 로그인 감지 (홈 페이지나 로그인 페이지 접근)
+            # Detect login (access to home page or login page)
             if page in ['/', '/login'] or 'login' in page.lower():
                 login_sessions[username].append({
                     'type': 'login',
@@ -3267,7 +3281,7 @@ def get_usage_logs():
                     'page': page
                 })
             
-            # 로그아웃 감지
+            # Detect logout
             if page == '/logout':
                 login_sessions[username].append({
                     'type': 'logout',
@@ -3275,7 +3289,7 @@ def get_usage_logs():
                     'page': page
                 })
         
-        # 요약 통계
+        # Summary statistics
         summary = {
             'total_logs': len(all_logs),
             'unique_users': len(set(log.get('user', {}).get('username', 'Unknown') for log in all_logs)),
@@ -3288,7 +3302,7 @@ def get_usage_logs():
         
         return jsonify({
             'success': True,
-            'logs': all_logs[-1000:],  # 최근 1000개만 반환
+            'logs': all_logs[-1000:],  # Return only recent 1000
             'summary': summary
         })
         
@@ -3299,9 +3313,9 @@ def get_usage_logs():
 @app.route('/api/usage-logs/months')
 @login_required
 def get_usage_log_months():
-    """사용 가능한 월 목록 반환"""
+    """Return available month list"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3312,7 +3326,7 @@ def get_usage_log_months():
             for root, dirs, files in os.walk(usage_log_dir):
                 for filename in files:
                     if filename.endswith('.json'):
-                        # 파일명에서 월 정보 추출 (예: access_2025-09-26.json)
+                        # Extract month information from filename (e.g., access_2025-09-26.json)
                         if 'access_' in filename:
                             try:
                                 date_part = filename.replace('access_', '').replace('.json', '')
@@ -3333,9 +3347,9 @@ def get_usage_log_months():
 @app.route('/api/usage-logs/month/<month>')
 @login_required
 def get_usage_logs_by_month(month):
-    """특정 월의 사용자 활동 로그 반환"""
+    """Return user activity logs for specific month"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3358,16 +3372,16 @@ def get_usage_logs_by_month(month):
                                     log_date = timestamp.split('T')[0]
                                     if log_date.startswith(month):
                                         all_logs.append(log)
-                                        day = log_date.split('-')[2]  # 일자 추출
+                                        day = log_date.split('-')[2]  # Extract day
                                         days.add(day)
                         except Exception as e:
                             logger.error(f"Failed to read log file {filepath}: {str(e)}")
                             continue
         
-        # 시간순 정렬
+        # Sort by time
         all_logs.sort(key=lambda x: x.get('timestamp', ''))
         
-        # 통계 계산
+        # Calculate statistics
         unique_users = len(set(log.get('user', {}).get('username', 'Unknown') for log in all_logs))
         active_days = len(days)
         avg_daily_access = len(all_logs) / active_days if active_days > 0 else 0
@@ -3393,9 +3407,9 @@ def get_usage_logs_by_month(month):
 @app.route('/api/usage-logs/all')
 @login_required
 def get_all_usage_logs():
-    """전체 사용자 활동 로그 반환"""
+    """Return all user activity logs"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3415,10 +3429,10 @@ def get_all_usage_logs():
                             logger.error(f"Failed to read log file {filepath}: {str(e)}")
                             continue
         
-        # 시간순 정렬
+        # Sort by time
         all_logs.sort(key=lambda x: x.get('timestamp', ''))
         
-        # 통계 계산
+        # Calculate statistics
         unique_users = len(set(log.get('user', {}).get('username', 'Unknown') for log in all_logs))
         
         stats = {
@@ -3430,7 +3444,7 @@ def get_all_usage_logs():
         
         return jsonify({
             'success': True,
-            'logs': all_logs[-2000:],  # 최근 2000개만 반환
+            'logs': all_logs[-2000:],  # Return only recent 2000
             'stats': stats
         })
         
@@ -3441,9 +3455,9 @@ def get_all_usage_logs():
 @app.route('/api/usage-logs/monthly-stats')
 @login_required
 def get_monthly_usage_stats():
-    """월별 통계 반환"""
+    """Return monthly statistics"""
     try:
-        # 관리자만 접근 허용
+        # Allow access only to admin
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -3472,7 +3486,7 @@ def get_monthly_usage_stats():
                             logger.error(f"Failed to read log file {filepath}: {str(e)}")
                             continue
         
-        # 월별 통계를 리스트로 변환
+        # Convert monthly statistics to list
         monthly_list = [{'month': month, 'totalAccess': count} for month, count in monthly_stats.items()]
         monthly_list.sort(key=lambda x: x['month'], reverse=True)
         
@@ -3488,23 +3502,23 @@ def get_monthly_usage_stats():
 @app.route('/api/send-alarm', methods=['POST'])
 @login_required
 def send_alarm():
-    """모바일 앱으로 알람을 전송하는 API"""
+    """API to send alarm to mobile app"""
     try:
         data = request.get_json()
         
         if not data:
             return jsonify({'success': False, 'message': 'No data provided'}), 400
         
-        # 필수 필드 검증
+        # Validate required fields
         required_fields = ['incident_id', 'event_type', 'client_name', 'site', 'risk_rating']
         for field in required_fields:
             if field not in data:
                 return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
         
-        # 알람 매니저 가져오기
+        # Get alarm manager
         alarm_manager = get_alarm_manager()
         
-        # 알람 전송
+        # Send alarm
         result = alarm_manager.send_alarm(
             incident_id=data['incident_id'],
             event_type=data['event_type'],
@@ -3534,9 +3548,9 @@ def send_alarm():
 @app.route('/api/alarm-history')
 @login_required
 def get_alarm_history():
-    """알람 전송 히스토리를 반환하는 API"""
+    """API to return alarm send history"""
     try:
-        # 알람 로그 파일 경로
+        # Alarm log file path
         logs_dir = os.path.join(os.getcwd(), 'logs')
         alarm_log_file = os.path.join(logs_dir, 'alarm_logs.json')
         
@@ -3546,11 +3560,11 @@ def get_alarm_history():
                 'alarms': []
             })
         
-        # 알람 로그 읽기
+        # Read alarm log
         with open(alarm_log_file, 'r', encoding='utf-8') as f:
             alarm_logs = json.load(f)
         
-        # 최근 20개 알람만 반환 (최신순)
+        # Return only recent 20 alarms (newest first)
         recent_alarms = sorted(alarm_logs, key=lambda x: x.get('timestamp', ''), reverse=True)[:20]
         
         return jsonify({
@@ -3566,22 +3580,22 @@ def get_alarm_history():
         }), 500
 
 # ==============================
-# 고급 알람 관리 API 엔드포인트
+# Advanced alarm management API endpoints
 # ==============================
 
 @app.route('/api/alarm-templates', methods=['GET'])
 @login_required
 def get_alarm_templates():
-    """알람 템플릿 목록을 반환하는 API (SQLite 기반)"""
+    """API to return alarm template list (SQLite based)"""
     try:
-        # 관리자와 사이트 관리자 권한 확인
+        # Check admin and site admin permissions
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
                 'message': 'Admin privileges are required.'
             }), 403
         
-        # SQLite에서 실제 데이터 조회
+        # Query actual data from SQLite
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
@@ -3623,7 +3637,7 @@ def get_alarm_templates():
 @app.route('/api/alarm-templates', methods=['POST'])
 @login_required
 def create_alarm_template():
-    """새로운 알람 템플릿을 생성하는 API"""
+    """API to create new alarm template"""
     try:
         data = request.get_json()
         
@@ -3654,16 +3668,16 @@ def create_alarm_template():
 @app.route('/api/alarm-recipients', methods=['GET'])
 @login_required
 def get_alarm_recipients():
-    """알람 수신자 목록을 반환하는 API (SQLite 기반)"""
+    """API to return alarm recipient list (SQLite based)"""
     try:
-        # 관리자와 사이트 관리자 권한 확인
+        # Check admin and site admin permissions
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
                 'message': 'Admin privileges are required.'
             }), 403
         
-        # SQLite에서 실제 데이터 조회
+        # Query actual data from SQLite
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
@@ -3707,7 +3721,7 @@ def get_alarm_recipients():
 @app.route('/api/alarm-recipients', methods=['POST'])
 @login_required
 def add_alarm_recipient():
-    """새로운 알람 수신자를 추가하는 API"""
+    """API to add new alarm recipient"""
     try:
         data = request.get_json()
         
@@ -3738,7 +3752,7 @@ def add_alarm_recipient():
 @app.route('/api/alarm-recipients/<user_id>/fcm-token', methods=['PUT'])
 @login_required
 def update_fcm_token(user_id):
-    """사용자의 FCM 토큰을 업데이트하는 API"""
+    """API to update user's FCM token"""
     try:
         data = request.get_json()
         
@@ -3769,7 +3783,7 @@ def update_fcm_token(user_id):
 @app.route('/api/alarms/<alarm_id>/acknowledge', methods=['POST'])
 @login_required
 def acknowledge_alarm(alarm_id):
-    """알람을 확인 처리하는 API"""
+    """API to acknowledge alarm"""
     try:
         data = request.get_json()
         user_id = data.get('user_id') if data else None
@@ -3795,7 +3809,7 @@ def acknowledge_alarm(alarm_id):
 @app.route('/api/alarms/escalations', methods=['GET'])
 @login_required
 def get_pending_escalations():
-    """대기 중인 에스컬레이션 목록을 반환하는 API"""
+    """API to return pending escalation list"""
     try:
         alarm_manager = get_alarm_manager()
         pending_count = alarm_manager.get_pending_escalations_count()
@@ -3815,12 +3829,12 @@ def get_pending_escalations():
 @app.route('/api/alarms/<alarm_id>/escalations', methods=['GET'])
 @login_required
 def get_alarm_escalations(alarm_id):
-    """특정 알람의 에스컬레이션 정보를 반환하는 API"""
+    """API to return escalation information for specific alarm"""
     try:
         _, _, escalation_service = get_alarm_services()
         escalations = escalation_service.get_escalations_for_alarm(alarm_id)
         
-        # datetime 객체를 문자열로 변환
+        # Convert datetime objects to strings
         for escalation in escalations:
             escalation.created_at = escalation.created_at.isoformat()
             if escalation.sent_at:
@@ -3840,29 +3854,29 @@ def get_alarm_escalations(alarm_id):
             'message': f'Error getting alarm escalations: {str(e)}'
         }), 500
 
-# 로그인 성공 후 data 폴더 정리 함수 추가
+# Add data folder cleanup function after login success
 def cleanup_data_folder():
-    """로그인시 data 폴더의 progress note 관련 JSON 파일들을 정리합니다."""
+    """Clean up progress note related JSON files in data folder on login."""
     try:
         data_dir = os.path.join(app.root_path, 'data')
         if os.path.exists(data_dir):
-            # JSON 파일들 중 progress note 관련 파일만 찾기 (client 데이터는 보존)
+            # Find only progress note related files among JSON files (preserve client data)
             all_json_files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
             
-            # 보존할 파일들 (client 데이터)
+            # Files to preserve (client data)
             preserve_files = [
                 'Client_list.json',
                 'carearea.json', 
                 'eventtype.json'
             ]
             
-            # 사이트별 client 파일도 보존
+            # Also preserve site-specific client files
             safe_site_servers = get_safe_site_servers()
             for site in safe_site_servers.keys():
                 site_name = site.replace(' ', '_').lower()
                 preserve_files.append(f"{site_name}_client.json")
             
-            # 삭제할 파일들 (progress note 관련)
+            # Files to delete (progress note related)
             files_to_delete = []
             for json_file in all_json_files:
                 if json_file not in preserve_files and not json_file.startswith('prepare_send'):
@@ -3875,7 +3889,7 @@ def cleanup_data_folder():
                 logger.info(f"Files to preserve: {preserve_files}")
                 logger.info(f"Files to delete: {files_to_delete}")
                 
-                # progress note 관련 JSON 파일들을 직접 삭제
+                # Directly delete progress note related JSON files
                 deleted_count = 0
                 for json_file in files_to_delete:
                     try:
@@ -3902,12 +3916,12 @@ def cleanup_data_folder():
         return False
 
 # ==============================
-# FCM (Firebase Cloud Messaging) API 엔드포인트
+# FCM (Firebase Cloud Messaging) API endpoints
 # ==============================
 
 @app.route('/api/fcm/register-token', methods=['POST'])
 def register_fcm_token():
-    """FCM 토큰을 등록하는 API"""
+    """API to register FCM token"""
     try:
         logger.info(
             f"FCM token registration request - user: {current_user.username if current_user.is_authenticated else 'Anonymous'}"
@@ -3917,7 +3931,7 @@ def register_fcm_token():
         data = request.get_json()
         logger.info(f"Request data: {data}")
         
-        # 모바일 앱 호환: 'token' 또는 'fcm_token' 필드 모두 지원
+        # Mobile app compatible: support both 'token' and 'fcm_token' fields
         token = data.get('token') or data.get('fcm_token')
         
         if not data or not token:
@@ -3927,23 +3941,23 @@ def register_fcm_token():
                 'message': 'Token or fcm_token is required.'
             }), 400
         
-        # device_info 처리 (문자열 또는 객체 모두 지원)
+        # Process device_info (support both string and object)
         device_info_raw = data.get('device_info', 'Unknown Device')
         if isinstance(device_info_raw, dict):
-            # 모바일 앱에서 객체로 전송한 경우
+            # When mobile app sends as object
             platform = device_info_raw.get('platform', 'unknown')
             version = device_info_raw.get('version', '1.0.0')
             device_info = f"{platform.title()} App v{version}"
         else:
             device_info = str(device_info_raw)
         
-        user_id = data.get('user_id', 'unknown_user')  # 모바일 앱에서 user_id 제공
+        user_id = data.get('user_id', 'unknown_user')  # user_id provided from mobile app
         platform = data.get('platform', 'unknown')
         app_version = data.get('app_version', '1.0.0')
         
         logger.info(f"Attempting FCM token registration: user={user_id}, device={device_info}, token={token[:20]}...")
         
-        # 사용자의 토큰 등록
+        # Register user's token
         token_manager = get_fcm_token_manager()
         logger.info(f"FCM token manager type: {type(token_manager)}")
         
@@ -3978,7 +3992,7 @@ def register_fcm_token():
 
 @app.route('/api/fcm/unregister-token', methods=['POST'])
 def unregister_fcm_token():
-    """FCM 토큰을 제거하는 API"""
+    """API to remove FCM token"""
     try:
         data = request.get_json()
         if not data or 'token' not in data:
@@ -3988,11 +4002,11 @@ def unregister_fcm_token():
             }), 400
         
         token = data['token']
-        user_id = data.get('user_id')  # 모바일 앱에서 user_id 제공 (선택사항)
+        user_id = data.get('user_id')  # user_id provided from mobile app (optional)
         
         logger.info(f"Attempting to unregister FCM token: user={user_id}, token={token[:20]}...")
         
-        # 토큰 제거 (user_id 있으면 함께 사용, 없으면 토큰만으로 제거)
+        # Remove token (use with user_id if available, otherwise remove by token only)
         token_manager = get_fcm_token_manager()
         success = token_manager.unregister_token(user_id, token)
         
@@ -4016,7 +4030,7 @@ def unregister_fcm_token():
 
 @app.route('/api/fcm/send-notification', methods=['POST'])
 def send_fcm_notification():
-    """FCM을 통해 푸시 알림을 전송하는 API"""
+    """API to send push notification via FCM"""
     try:
         data = request.get_json()
         if not data:
@@ -4025,7 +4039,7 @@ def send_fcm_notification():
                 'message': 'Request data is required.'
             }), 400
         
-        # 필수 필드 확인
+        # Check required fields
         required_fields = ['title', 'body']
         for field in required_fields:
             if field not in data:
@@ -4036,10 +4050,10 @@ def send_fcm_notification():
         
         title = data['title']
         body = data['body']
-        user_ids = data.get('user_ids', [])  # 특정 사용자들에게만 전송
-        topic = data.get('topic')  # 토픽으로 전송
-        custom_data = data.get('data', {})  # 추가 데이터
-        image_url = data.get('image_url')  # 이미지 URL
+        user_ids = data.get('user_ids', [])  # Send only to specific users
+        topic = data.get('topic')  # Send to topic
+        custom_data = data.get('data', {})  # Additional data
+        image_url = data.get('image_url')  # Image URL
         
         fcm_service = get_fcm_service()
         if fcm_service is None:
@@ -4051,10 +4065,10 @@ def send_fcm_notification():
         token_manager = get_fcm_token_manager()
         
         if topic:
-            # 토픽으로 전송
+            # Send to topic
             result = fcm_service.send_topic_message(topic, title, body, custom_data)
         elif user_ids:
-            # 특정 사용자들에게 전송
+            # Send to specific users
             all_tokens = []
             for user_id in user_ids:
                 user_tokens = token_manager.get_user_token_strings(user_id)
@@ -4068,7 +4082,7 @@ def send_fcm_notification():
                     'message': 'No FCM tokens available to send.'
                 }), 400
         else:
-            # 모든 사용자에게 전송
+            # Send to all users
             all_tokens = token_manager.get_all_tokens()
             if all_tokens:
                 result = fcm_service.send_notification_to_tokens(all_tokens, title, body, custom_data, image_url)
@@ -4100,7 +4114,7 @@ def send_fcm_notification():
 @app.route('/api/fcm/tokens', methods=['GET'])
 @login_required
 def get_fcm_tokens():
-    """현재 사용자의 FCM 토큰 정보를 반환하는 API"""
+    """API to return current user's FCM token information"""
     try:
         token_manager = get_fcm_token_manager()
         user_tokens = token_manager.get_user_tokens(current_user.id)
@@ -4122,9 +4136,9 @@ def get_fcm_tokens():
 @app.route('/api/fcm/stats', methods=['GET'])
 @login_required
 def get_fcm_stats():
-    """FCM 토큰 통계를 반환하는 API (관리자 및 사이트 관리자 전용)"""
+    """API to return FCM token statistics (admin and site admin only)"""
     try:
-        # 관리자와 사이트 관리자 권한 확인
+        # Check admin and site admin permissions
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
@@ -4149,20 +4163,20 @@ def get_fcm_stats():
 @app.route('/api/fcm/export-tokens', methods=['GET'])
 @login_required
 def export_fcm_tokens():
-    """FCM 토큰 매니저에서 토큰 데이터를 내보내는 API (관리자 및 사이트 관리자 전용)"""
+    """API to export token data from FCM token manager (admin and site admin only)"""
     try:
-        # 관리자와 사이트 관리자 권한 확인
+        # Check admin and site admin permissions
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
                 'message': 'Admin permission required.'
             }), 403
         
-        # FCM 토큰 매니저에서 통계 가져오기
+        # Get statistics from FCM token manager
         token_manager = get_fcm_token_manager()
         stats = token_manager.get_token_stats()
         
-        # Policy Management에서 사용할 수 있는 형태로 변환
+        # Convert to format usable by Policy Management
         tokens_data = []
         for user_id, user_tokens in stats.get('user_tokens', {}).items():
             for token_info in user_tokens:
@@ -4192,12 +4206,12 @@ def export_fcm_tokens():
 
 @app.route('/api/active-users', methods=['GET'])
 def get_active_users():
-    """현재 로그인된 사용자들을 사이트별로 반환하는 API"""
+    """API to return currently logged-in users by site"""
     try:
         token_manager = get_fcm_token_manager()
         stats = token_manager.get_token_stats()
         
-        # 사이트별로 사용자 그룹화
+        # Group users by site
         site_users = {
             'Parafield Gardens': [],
             'Nerrilda': [],
@@ -4205,15 +4219,15 @@ def get_active_users():
             'Yankalilla': []
         }
         
-        # 사용자별 토큰 정보 처리
+        # Process token information per user
         for user_id, user_tokens in stats.get('user_tokens', {}).items():
             active_tokens = [token for token in user_tokens if token.get('is_active', True)]
             
             if active_tokens:
-                # 가장 최근에 사용된 토큰 정보 사용
+                # Use most recently used token information
                 latest_token = max(active_tokens, key=lambda x: x.get('last_used', ''))
                 
-                # 사용자 정보 구성
+                # Build user information
                 user_info = {
                     'user_id': user_id,
                     'device_info': latest_token.get('device_info', 'Unknown Device'),
@@ -4222,9 +4236,9 @@ def get_active_users():
                     'token_count': len(active_tokens)
                 }
                 
-                # 사이트별로 분류 (사용자 ID나 디바이스 정보 기반으로 추정)
-                # 실제로는 사용자 테이블에서 사이트 정보를 가져와야 하지만, 
-                # 현재는 간단히 사용자 ID 패턴으로 분류
+                # Classify by site (estimated based on user ID or device information)
+                # Actually should get site information from user table,
+                # but currently simply classify by user ID pattern
                 if 'pg' in user_id.lower() or 'parafield' in user_id.lower():
                     site_users['Parafield Gardens'].append(user_info)
                 elif 'nerrilda' in user_id.lower():
@@ -4234,10 +4248,10 @@ def get_active_users():
                 elif 'yankalilla' in user_id.lower():
                     site_users['Yankalilla'].append(user_info)
                 else:
-                    # 기본적으로 Parafield Gardens에 배치
+                    # Default to Parafield Gardens
                     site_users['Parafield Gardens'].append(user_info)
         
-        # 각 사이트별 통계 계산
+        # Calculate statistics per site
         site_stats = {}
         total_active_devices = 0
         for site, users in site_users.items():
@@ -4266,9 +4280,9 @@ def get_active_users():
 @app.route('/api/fcm/cleanup', methods=['POST'])
 @login_required
 def cleanup_fcm_tokens():
-    """비활성 FCM 토큰을 정리하는 API (관리자 및 사이트 관리자 전용)"""
+    """API to clean up inactive FCM tokens (admin and site admin only)"""
     try:
-        # 관리자와 사이트 관리자 권한 확인
+        # Check admin and site admin permissions
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
@@ -4321,13 +4335,13 @@ def admin_settings():
 @app.route('/user-management')
 @login_required
 def user_management():
-    """사용자 관리 페이지 (ADMIN 전용)"""
-    # 관리자 권한 확인
+    """User management page (ADMIN only)"""
+    # Check admin permissions
     if current_user.role != 'admin':
         flash('Access denied. This page is for admin users only.', 'error')
         return redirect(url_for('home'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -4341,7 +4355,7 @@ def user_management():
 @app.route('/api/users', methods=['GET'])
 @login_required
 def get_all_users_api():
-    """모든 사용자 목록 조회 API"""
+    """API to query all user list"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
@@ -4356,14 +4370,14 @@ def get_all_users_api():
 @app.route('/api/users/<username>', methods=['GET'])
 @login_required
 def get_user_api(username):
-    """특정 사용자 정보 조회 API"""
+    """API to query specific user information"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
         user_data = get_user(username)
         if user_data:
-            # 패스워드 해시는 제외
+            # Exclude password hash
             safe_user = {k: v for k, v in user_data.items() if k != "password_hash"}
             from config_users import get_username_by_lowercase
             actual_username = get_username_by_lowercase(username)
@@ -4378,16 +4392,19 @@ def get_user_api(username):
 @app.route('/api/users', methods=['POST'])
 @login_required
 def add_user_api():
-    """새 사용자 추가 API"""
+    """API to add new user"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
         data = request.get_json()
         
-        # Use validation from user_management.py
-        from user_management import validate_user_data, create_new_user
-        from config_users import USERS_DB
+
+        # Check required fields
+        required_fields = ['username', 'password', 'first_name', 'last_name', 'role', 'position', 'location']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
         
         # Validate user data (includes admin role check)
         is_valid, error_msg = validate_user_data(data)
@@ -4410,7 +4427,7 @@ def add_user_api():
 @app.route('/api/users/<username>', methods=['PUT'])
 @login_required
 def update_user_api(username):
-    """사용자 정보 수정 API"""
+    """API to update user information"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
@@ -4442,14 +4459,16 @@ def update_user_api(username):
 @app.route('/api/users/<username>', methods=['DELETE'])
 @login_required
 def delete_user_api(username):
-    """사용자 삭제 API"""
+    """API to delete user"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
-        # Use delete_user from user_management.py (includes admin check and self-deletion prevention)
-        from user_management import delete_user
-        from config_users import USERS_DB
+        # Cannot delete own account
+        from config_users import get_username_by_lowercase
+        actual_username = get_username_by_lowercase(username)
+        if actual_username and actual_username.lower() == current_user.username.lower():
+            return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
         
         success, message = delete_user(username, USERS_DB)
         
@@ -4466,7 +4485,7 @@ def delete_user_api(username):
 @app.route('/api/users/options', methods=['GET'])
 @login_required
 def get_user_options_api():
-    """사용자 옵션 조회 API (role, position, location 목록)"""
+    """API to query user options (role, position, location list)"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
@@ -4486,13 +4505,13 @@ def get_user_options_api():
 @app.route('/fcm-admin-dashboard')
 @login_required
 def fcm_admin_dashboard():
-    """FCM 관리자 대시보드 (ADMIN 및 SITE_ADMIN 전용)"""
-    # 관리자와 사이트 관리자 권한 확인
+    """FCM admin dashboard (ADMIN and SITE_ADMIN only)"""
+    # Check admin and site admin permissions
     if current_user.role not in ['admin', 'site_admin']:
         flash('Access denied. This dashboard is for admin users only.', 'error')
         return redirect(url_for('home'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -4508,7 +4527,7 @@ def fcm_admin_dashboard():
 @app.route('/api/fcm/update-token', methods=['POST'])
 @login_required
 def update_fcm_token_info():
-    """FCM 토큰 정보를 업데이트하는 API (필드 기반 업데이트)"""
+    """API to update FCM token information (field-based update)"""
     try:
         data = request.get_json()
         if not data:
@@ -4517,7 +4536,7 @@ def update_fcm_token_info():
                 'message': 'Request data is required.'
             }), 400
         
-        # 필수 필드 확인
+        # Check required fields
         required_fields = ['token', 'field', 'value']
         for field in required_fields:
             if field not in data:
@@ -4530,7 +4549,7 @@ def update_fcm_token_info():
         field = data['field']
         value = data['value'].strip()
         
-        # 값이 비어있지 않은지 확인
+        # Check if value is not empty
         if not value:
             return jsonify({
                 'success': False,
@@ -4539,13 +4558,13 @@ def update_fcm_token_info():
         
         token_manager = get_fcm_token_manager()
         
-        # 필드에 따라 업데이트할 정보 결정
+        # Determine information to update based on field
         if field == 'user_id':
             success = token_manager.update_token_info(token, value, None)
         elif field == 'device_info':
             success = token_manager.update_token_info(token, None, value)
         elif field == 'token':
-            # 토큰 자체를 변경하는 경우 (새로운 토큰으로 교체)
+            # When changing token itself (replace with new token)
             success = token_manager.update_token_value(token, value)
         else:
             return jsonify({
@@ -4575,16 +4594,16 @@ def update_fcm_token_info():
 @app.route('/api/alarm-escalation-status', methods=['GET'])
 @login_required
 def get_alarm_escalation_status():
-    """알람 에스컬레이션 상태를 반환하는 API (SQLite 기반)"""
+    """API to return alarm escalation status (SQLite based)"""
     try:
-        # 관리자와 사이트 관리자 권한 확인
+        # Check admin and site admin permissions
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({
                 'success': False,
                 'message': 'Admin privileges are required.'
             }), 403
         
-        # SQLite에서 실제 에스컬레이션 정책 조회
+        # Query actual escalation policies from SQLite
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
@@ -4638,13 +4657,13 @@ def get_alarm_escalation_status():
 @app.route('/policy-management')
 @login_required
 def unified_policy_management():
-    """통합 Policy & Recipients 관리 페이지 (ADMIN 및 SITE_ADMIN 전용)"""
-    # 관리자와 사이트 관리자 권한 확인
+    """Unified Policy & Recipients management page (ADMIN and SITE_ADMIN only)"""
+    # Check admin and site admin permissions
     if current_user.role not in ['admin', 'site_admin']:
         flash('Access denied. This page is for admin users only.', 'error')
         return redirect(url_for('home'))
     
-    # 접속 로그 기록
+    # Log access
     user_info = {
         "username": current_user.username,
         "display_name": current_user.display_name,
@@ -4655,23 +4674,23 @@ def unified_policy_management():
     
     return render_template('UnifiedPolicyManagement.html', current_user=current_user)
 
-# 기존 페이지들을 새 통합 페이지로 리다이렉트
+# Redirect existing pages to new unified page
 @app.route('/escalation-policy-management')
 @login_required
 def escalation_policy_management():
-    """에스컬레이션 정책 관리 페이지 (통합 페이지로 리다이렉트)"""
+    """Escalation policy management page (redirects to unified page)"""
     return redirect(url_for('unified_policy_management'))
 
 @app.route('/policy-alarm-management')
 @login_required
 def policy_alarm_management():
-    """Policy & Alarm Management 페이지 (통합 페이지로 리다이렉트)"""
+    """Policy & Alarm Management page (redirects to unified page)"""
     return redirect(url_for('unified_policy_management'))
 
 @app.route('/api/escalation-policies', methods=['GET'])
 @login_required
 def get_escalation_policies():
-    """에스컬레이션 정책 목록 조회 (SQLite 기반)"""
+    """Query escalation policy list (SQLite based)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -4679,7 +4698,7 @@ def get_escalation_policies():
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
-        # 정책과 단계 정보를 함께 조회
+        # Query policy and step information together
         cursor.execute('''
             SELECT ep.id, ep.policy_name, ep.description, ep.event_type, ep.priority,
                    ep.is_active, ep.created_at,
@@ -4718,7 +4737,7 @@ def get_escalation_policies():
 @app.route('/api/escalation-policies/<int:policy_id>', methods=['GET'])
 @login_required
 def get_escalation_policy_detail(policy_id):
-    """특정 에스컬레이션 정책 상세 조회"""
+    """Query specific escalation policy details"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -4726,7 +4745,7 @@ def get_escalation_policy_detail(policy_id):
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
-        # 정책 기본 정보
+        # Policy basic information
         cursor.execute('''
             SELECT id, policy_name, description, event_type, priority, is_active, created_at
             FROM escalation_policies
@@ -4747,7 +4766,7 @@ def get_escalation_policy_detail(policy_id):
             'created_at': policy_row[6]
         }
         
-        # 에스컬레이션 단계 정보
+        # Escalation step information
         cursor.execute('''
             SELECT step_number, delay_minutes, repeat_count, recipients, message_template
             FROM escalation_steps
@@ -4779,16 +4798,16 @@ def get_escalation_policy_detail(policy_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
-# 클라이언트 동기화 API 엔드포인트
+# Client synchronization API endpoints
 # ==============================
 
 @app.route('/api/clients/refresh/<site>', methods=['POST'])
 def refresh_clients_api(site):
-    """클라이언트 데이터 수동 새로고침 API"""
+    """API for manual client data refresh"""
     try:
-        # 내부 시스템용 - 인증 불필요
+        # For internal system use - authentication not required
         
-        # 통합 데이터 동기화 매니저 import
+        # Import unified data sync manager
         try:
             from unified_data_sync_manager import get_unified_sync_manager
             manager = get_unified_sync_manager()
@@ -4799,7 +4818,7 @@ def refresh_clients_api(site):
                 'message': 'Unable to initialize the sync manager.'
             }), 500
         
-        # 새로고침 실행 (클라이언트 데이터만)
+        # Execute refresh (client data only)
         result = manager.sync_clients_data()
         
         if result['success'] > 0:
@@ -4825,9 +4844,9 @@ def refresh_clients_api(site):
 
 @app.route('/api/clients/sync-status', methods=['GET'])
 def get_client_sync_status():
-    """클라이언트 동기화 상태 조회 API"""
+    """API to query client synchronization status"""
     try:
-        # 내부 시스템용 - 인증 불필요
+        # For internal system use - authentication not required
         
         try:
             from unified_data_sync_manager import get_unified_sync_manager
@@ -4838,7 +4857,7 @@ def get_client_sync_status():
                 'message': 'Sync manager not found.'
             }), 500
         
-        # 동기화 상태 조회 (클라이언트 데이터만)
+        # Query synchronization status (client data only)
         status = {}
         conn = manager.get_db_connection()
         cursor = conn.cursor()
@@ -4875,9 +4894,9 @@ def get_client_sync_status():
 
 @app.route('/api/clients/refresh-all', methods=['POST'])
 def refresh_all_clients_api():
-    """모든 사이트 클라이언트 데이터 새로고침 API"""
+    """API to refresh client data for all sites"""
     try:
-        # 내부 시스템용 - 인증 불필요
+        # For internal system use - authentication not required
         
         try:
             from unified_data_sync_manager import get_unified_sync_manager
@@ -4888,7 +4907,7 @@ def refresh_all_clients_api():
                 'message': 'Sync manager not found.'
             }), 500
         
-        # 전체 데이터 새로고침 (모든 데이터)
+        # Full data refresh (all data)
         results = manager.run_full_sync()
         
         return jsonify({
@@ -4905,13 +4924,13 @@ def refresh_all_clients_api():
         }), 500
 
 # ==============================
-# 통합 Policy & Recipients 관리 API
+# Unified Policy & Recipients Management API
 # ==============================
 
 @app.route('/api/escalation-policies', methods=['POST'])
 @login_required
 def create_escalation_policy_unified():
-    """통합 에스컬레이션 정책 생성 (FCM 디바이스 기반)"""
+    """Create unified escalation policy (FCM device based)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -4922,7 +4941,7 @@ def create_escalation_policy_unified():
         cursor = conn.cursor()
         
         try:
-            # 정책 기본 정보 삽입
+            # Insert policy basic information
             cursor.execute('''
                 INSERT INTO escalation_policies 
                 (policy_name, description, event_type, priority, created_by)
@@ -4937,7 +4956,7 @@ def create_escalation_policy_unified():
             
             policy_id = cursor.lastrowid
             
-            # 에스컬레이션 단계 삽입
+            # Insert escalation steps
             for step in data['steps']:
                 cursor.execute('''
                     INSERT INTO escalation_steps 
@@ -4948,7 +4967,7 @@ def create_escalation_policy_unified():
                     step['step_number'],
                     step['delay_minutes'],
                     step['repeat_count'],
-                    json.dumps(step['recipients']),  # FCM 디바이스 ID 배열
+                    json.dumps(step['recipients']),  # FCM device ID array
                     step['message_template']
                 ))
             
@@ -4974,7 +4993,7 @@ def create_escalation_policy_unified():
 @app.route('/api/escalation-policies/<int:policy_id>', methods=['PUT'])
 @login_required
 def update_escalation_policy_unified(policy_id):
-    """통합 에스컬레이션 정책 업데이트"""
+    """Update unified escalation policy"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -4985,7 +5004,7 @@ def update_escalation_policy_unified(policy_id):
         cursor = conn.cursor()
         
         try:
-            # 정책 기본 정보 업데이트
+            # Update policy basic information
             cursor.execute('''
                 UPDATE escalation_policies 
                 SET policy_name = ?, description = ?, event_type = ?, priority = ?, updated_at = ?
@@ -4999,10 +5018,10 @@ def update_escalation_policy_unified(policy_id):
                 policy_id
             ))
             
-            # 기존 단계 삭제
+            # Delete existing steps
             cursor.execute('DELETE FROM escalation_steps WHERE policy_id = ?', (policy_id,))
             
-            # 새 단계 삽입
+            # Insert new steps
             for step in data['steps']:
                 cursor.execute('''
                     INSERT INTO escalation_steps 
@@ -5038,7 +5057,7 @@ def update_escalation_policy_unified(policy_id):
 @app.route('/api/escalation-policies/<int:policy_id>', methods=['DELETE'])
 @login_required
 def delete_escalation_policy_unified(policy_id):
-    """통합 에스컬레이션 정책 삭제"""
+    """Delete unified escalation policy"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -5047,14 +5066,14 @@ def delete_escalation_policy_unified(policy_id):
         cursor = conn.cursor()
         
         try:
-            # 정책 비활성화 (실제 삭제 대신)
+            # Deactivate policy (instead of actual deletion)
             cursor.execute('''
                 UPDATE escalation_policies 
                 SET is_active = 0, updated_at = ?
                 WHERE id = ?
             ''', (get_australian_time().isoformat(), policy_id))
             
-            # 관련 단계도 비활성화
+            # Also deactivate related steps
             cursor.execute('''
                 UPDATE escalation_steps 
                 SET is_active = 0
@@ -5081,14 +5100,14 @@ def delete_escalation_policy_unified(policy_id):
 @app.route('/api/escalation-policies/test', methods=['POST'])
 @login_required
 def test_escalation_policy_unified():
-    """통합 에스컬레이션 정책 테스트"""
+    """Test unified escalation policy"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
         
         data = request.get_json()
         
-        # 정책 실행 시뮬레이션
+        # Simulate policy execution
         total_notifications = 0
         total_duration = 0
         device_count = len(data.get('steps', [{}])[0].get('recipients', []))
@@ -5097,7 +5116,7 @@ def test_escalation_policy_unified():
             step_notifications = step['repeat_count'] * device_count
             total_notifications += step_notifications
             
-            # 누적 시간 계산
+            # Calculate cumulative time
             step_duration = step['delay_minutes'] + (step['repeat_count'] - 1) * step['delay_minutes']
             total_duration = max(total_duration, step_duration)
         
@@ -5116,7 +5135,7 @@ def test_escalation_policy_unified():
 @app.route('/api/recipient-groups', methods=['POST'])
 @login_required
 def save_recipient_group():
-    """수신자 그룹 저장 (FCM 디바이스 기반)"""
+    """Save recipient group (FCM device based)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -5128,7 +5147,7 @@ def save_recipient_group():
         if not group_name or not devices:
             return jsonify({'success': False, 'message': 'Please select a group name and devices.'}), 400
         
-        # 수신자 그룹 테이블이 없다면 생성
+        # Create recipient group table if it doesn't exist
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
@@ -5143,7 +5162,7 @@ def save_recipient_group():
             )
         ''')
         
-        # 그룹 저장
+        # Save group
         cursor.execute('''
             INSERT OR REPLACE INTO recipient_groups 
             (group_name, devices, created_by)
@@ -5165,7 +5184,7 @@ def save_recipient_group():
 @app.route('/api/test-group-notification', methods=['POST'])
 @login_required
 def test_group_notification():
-    """그룹 알림 테스트"""
+    """Test group notification"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
@@ -5177,7 +5196,7 @@ def test_group_notification():
         if not devices:
             return jsonify({'success': False, 'message': 'Please select devices to test.'}), 400
         
-        # FCM 토큰 조회
+        # Query FCM tokens
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
@@ -5194,10 +5213,10 @@ def test_group_notification():
         if not tokens:
             return jsonify({'success': False, 'message': 'No active tokens found.'}), 404
         
-        # 실제 FCM 전송 (여기서는 시뮬레이션)
+        # Actual FCM send (simulation here)
         sent_count = len(tokens)
         
-        # 실제 구현 시:
+        # In actual implementation:
         # fcm_result = send_fcm_notification(tokens, message)
         
         return jsonify({
@@ -5212,26 +5231,26 @@ def test_group_notification():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
-# Workflow API 엔드포인트 (Mobile App 호환)
+# Workflow API endpoints (Mobile App compatible)
 # ==============================
 
 @app.route('/api/workflow/create', methods=['POST'])
 def create_workflow_mobile():
-    """워크플로우 생성 (모바일 앱 호환 경로)"""
+    """Create workflow (mobile app compatible route)"""
     return create_task_workflow()
 
 @app.route('/api/workflow/status', methods=['GET'])
 def get_workflow_status():
-    """워크플로우 상태 조회"""
+    """Query workflow status"""
     try:
         incident_id = request.args.get('incident_id')
         if not incident_id:
             return jsonify({'success': False, 'message': 'incident_id required'}), 400
         
-        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # Task Manager disabled - JSON-only system
         # return get_incident_workflow_status(incident_id)
         
-        # 임시 응답 (기능 비활성화)
+        # Temporary response (feature disabled)
         return jsonify({
             'success': False,
             'message': 'Task Manager is disabled because it is part of the JSON-only system.',
@@ -5244,7 +5263,7 @@ def get_workflow_status():
 
 @app.route('/api/workflow/tasks/complete', methods=['POST'])
 def complete_workflow_task():
-    """워크플로우 작업 완료 (모바일 앱 호환)"""
+    """Complete workflow task (mobile app compatible)"""
     try:
         data = request.get_json()
         if not data or 'task_id' not in data:
@@ -5259,7 +5278,7 @@ def complete_workflow_task():
 
 @app.route('/api/workflow/tasks/details', methods=['GET'])
 def get_workflow_task_details():
-    """워크플로우 작업 상세 정보 (모바일 앱 호환)"""
+    """Workflow task details (mobile app compatible)"""
     try:
         task_id = request.args.get('task_id')
         if not task_id:
@@ -5273,7 +5292,7 @@ def get_workflow_task_details():
 
 @app.route('/api/workflow/tasks/status', methods=['PUT'])
 def update_workflow_task_status():
-    """워크플로우 작업 상태 업데이트"""
+    """Update workflow task status"""
     try:
         data = request.get_json()
         if not data or 'task_id' not in data or 'status' not in data:
@@ -5283,11 +5302,11 @@ def update_workflow_task_status():
         new_status = data['status']
         notes = data.get('notes', '')
         
-        # 상태에 따라 처리
+        # Process based on status
         if new_status == 'completed':
             return complete_task_api(task_id)
         else:
-            # 다른 상태 업데이트
+            # Update other status
             
             conn = sqlite3.connect('progress_report.db')
             cursor = conn.cursor()
@@ -5317,7 +5336,7 @@ def update_workflow_task_status():
 
 @app.route('/api/policies/details', methods=['GET'])
 def get_policy_details_mobile():
-    """정책 상세 정보 (모바일 앱 호환)"""
+    """Policy details (mobile app compatible)"""
     try:
         policy_id = request.args.get('policy_id')
         if not policy_id:
@@ -5331,7 +5350,7 @@ def get_policy_details_mobile():
 
 @app.route('/api/incidents/details', methods=['GET'])
 def get_incident_details_mobile():
-    """인시던트 상세 정보 (모바일 앱 호환)"""
+    """Incident details (mobile app compatible)"""
     try:
         incident_id = request.args.get('incident_id')
         if not incident_id:
@@ -5340,7 +5359,7 @@ def get_incident_details_mobile():
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
-        # 인시던트 상세 정보 조회
+        # Query incident details
         cursor.execute('''
             SELECT incident_id, client_id, client_name, incident_type, 
                    incident_date, description, severity, status, site, 
@@ -5354,7 +5373,7 @@ def get_incident_details_mobile():
         if not incident_row:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
         
-        # 관련 작업들 조회
+        # Query related tasks
         cursor.execute('''
             SELECT task_id, task_type, task_description, status, 
                    priority, assigned_role, scheduled_time, due_time,
@@ -5416,12 +5435,12 @@ def get_incident_details_mobile():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
-# Task Management API 엔드포인트
+# Task Management API endpoints
 # ==============================
 
 @app.route('/api/tasks/create-workflow', methods=['POST'])
 def create_task_workflow():
-    """인시던트 기반 작업 워크플로우 생성"""
+    """Create incident-based task workflow"""
     try:
         data = request.get_json()
         required_fields = ['incident_id', 'policy_id', 'client_name', 'client_id', 'site', 'event_type', 'risk_rating']
@@ -5430,11 +5449,11 @@ def create_task_workflow():
             if field not in data:
                 return jsonify({'success': False, 'message': f'Missing field: {field}'}), 400
         
-        created_by = data.get('created_by', 'system')  # 모바일 앱에서 제공하거나 기본값
+        created_by = data.get('created_by', 'system')  # Provided from mobile app or default value
         
         logger.info(f"Workflow creation requested: incident_id={data['incident_id']}, created_by={created_by}")
         
-        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # Task Manager disabled - JSON-only system
         # task_manager = get_task_manager()
         # result = task_manager.create_incident_workflow(
         #     incident_id=data['incident_id'],
@@ -5447,7 +5466,7 @@ def create_task_workflow():
         #     created_by=created_by
         # )
         
-        # 임시 응답 (기능 비활성화)
+        # Temporary response (feature disabled)
         result = {
             'success': False,
             'message': 'Task Manager is disabled because it is part of the JSON-only system.'
@@ -5464,15 +5483,15 @@ def create_task_workflow():
 
 @app.route('/api/tasks/<task_id>/complete', methods=['POST'])
 def complete_task_api(task_id):
-    """작업 완료 처리 API"""
+    """API to process task completion"""
     try:
         data = request.get_json() or {}
         notes = data.get('notes', '')
-        completed_by = data.get('completed_by', 'mobile_user')  # 모바일 앱에서 제공
+        completed_by = data.get('completed_by', 'mobile_user')  # Provided by mobile app
         
         logger.info(f"Task completion requested: task_id={task_id}, completed_by={completed_by}")
         
-        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # Task Manager disabled - JSON-only system
         # task_manager = get_task_manager()
         # result = task_manager.complete_task(
         #     task_id=task_id,
@@ -5480,7 +5499,7 @@ def complete_task_api(task_id):
         #     notes=notes
         # )
         
-        # 임시 응답 (기능 비활성화)
+        # Temporary response (feature disabled)
         result = {
             'success': False,
             'message': 'Task Manager is disabled because it is part of the JSON-only system.'
@@ -5497,27 +5516,27 @@ def complete_task_api(task_id):
 
 @app.route('/api/tasks/my-tasks', methods=['GET'])
 def get_my_tasks():
-    """사용자의 할당된 작업 목록 조회"""
+    """API to query user's assigned task list"""
     try:
         status = request.args.get('status')  # pending, in_progress, completed
         site = request.args.get('site', 'Parafield Gardens')
-        user_role = request.args.get('user_role', 'RN')  # 모바일 앱에서 제공
+        user_role = request.args.get('user_role', 'RN')  # Provided from mobile app
         
-        # 사용자 역할에 따른 작업 조회
+        # Query tasks based on user role
         if user_role == 'doctor':
             assigned_role = 'doctor'
         elif user_role == 'physiotherapist':
             assigned_role = 'physiotherapist'
         else:
-            assigned_role = 'RN'  # 기본값
+            assigned_role = 'RN'  # Default value
         
         logger.info(f"Fetching user tasks: user_role={user_role}, assigned_role={assigned_role}, site={site}, status={status}")
         
-        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # Task Manager disabled - JSON-only system
         # task_manager = get_task_manager()
         # tasks = task_manager.get_user_tasks(assigned_role, site, status)
         
-        # 임시 응답 (기능 비활성화)
+        # Temporary response (feature disabled)
         tasks = []
         
         return jsonify({
@@ -5533,7 +5552,7 @@ def get_my_tasks():
 
 @app.route('/api/tasks/<task_id>', methods=['GET'])
 def get_task_detail(task_id):
-    """작업 상세 정보 조회"""
+    """API to query task details"""
     try:
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
@@ -5550,7 +5569,7 @@ def get_task_detail(task_id):
         if not task_row:
             return jsonify({'success': False, 'message': 'Task not found'}), 404
         
-        # 작업 실행 로그 조회
+        # Query task execution logs
         cursor.execute('''
             SELECT action, performed_by, performed_at, details
             FROM task_execution_logs
@@ -5607,16 +5626,16 @@ def get_task_detail(task_id):
 @app.route('/api/tasks/send-notifications', methods=['POST'])
 @login_required
 def send_task_notifications():
-    """스케줄된 작업 알림 전송 (관리자 전용)"""
+    """Send scheduled task notifications (admin only)"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
-        # Task Manager 비활성화됨 - JSON 전용 시스템
+        # Task Manager disabled - JSON-only system
         # task_manager = get_task_manager()
         # result = task_manager.send_scheduled_notifications()
         
-        # 임시 응답 (기능 비활성화)
+        # Temporary response (feature disabled)
         result = {
             'success': False,
             'message': 'Task Manager is disabled because it is part of the JSON-only system.',
@@ -5637,13 +5656,13 @@ def send_task_notifications():
 from cims_policy_engine import PolicyEngine
 from app_locks import write_lock
 
-# CIMS 정책 엔진 인스턴스
+# CIMS policy engine instance
 policy_engine = PolicyEngine()
 
-# CIMS용 데이터베이스 연결 함수
+# Database connection function for CIMS
 def get_db_connection(read_only: bool = False):
-    """CIMS용 데이터베이스 연결"""
-    # 절대 경로 사용하여 working directory 문제 방지
+    """Database connection for CIMS"""
+    # Use absolute path to prevent working directory issues
     import os
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'progress_report.db')
     
@@ -5661,13 +5680,13 @@ def get_db_connection(read_only: bool = False):
     return conn
 
 def optional_login_required(f):
-    """개발 환경에서는 인증 없이 접근 가능, 운영 환경에서는 로그인 필요"""
+    """Accessible without authentication in development, login required in production"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 개발 환경에서는 인증 없이 접근 가능
+        # Accessible without authentication in development
         if app.config.get('DEBUG', False):
             return f(*args, **kwargs)
-        # 운영 환경에서는 로그인 필요
+        # Login required in production
         if not current_user.is_authenticated:
             return jsonify({
                 'success': False,
@@ -5680,7 +5699,7 @@ def optional_login_required(f):
 @app.route('/api/memory/status', methods=['GET'])
 @optional_login_required
 def get_memory_status():
-    """메모리 사용량 상태 반환 (개발 환경에서는 인증 없이 접근 가능)"""
+    """Return memory usage status (accessible without authentication in development)"""
     try:
         monitor = get_memory_monitor()
         summary = monitor.get_summary()
@@ -5698,7 +5717,7 @@ def get_memory_status():
 @app.route('/api/memory/history', methods=['GET'])
 @optional_login_required
 def get_memory_history():
-    """메모리 사용량 히스토리 반환 (개발 환경에서는 인증 없이 접근 가능)"""
+    """Return memory usage history (accessible without authentication in development)"""
     try:
         monitor = get_memory_monitor()
         limit = request.args.get('limit', 50, type=int)
@@ -5717,7 +5736,7 @@ def get_memory_history():
 @app.route('/api/memory/gc', methods=['POST'])
 @optional_login_required
 def force_garbage_collection():
-    """가비지 컬렉션 강제 실행 (개발 환경에서는 인증 없이 접근 가능)"""
+    """Force garbage collection (accessible without authentication in development)"""
     try:
         monitor = get_memory_monitor()
         result = monitor.force_gc()
@@ -5739,7 +5758,7 @@ def get_cache_status_current():
     """Return latest cache/sync status for dashboard indicator"""
     conn = None
     try:
-        # read_only 대신 일반 연결 사용 (WAL 모드 호환성)
+        # Use regular connection instead of read_only (WAL mode compatibility)
         conn = get_db_connection(read_only=False)
         cursor = conn.cursor()
         cursor.execute("""
@@ -5750,7 +5769,7 @@ def get_cache_status_current():
         """)
         row = cursor.fetchone()
         
-        # 마지막 동기화 시간 조회
+        # Query last sync time
         cursor.execute("""
             SELECT value FROM system_settings 
             WHERE key = 'last_incident_sync_time'
@@ -5758,7 +5777,7 @@ def get_cache_status_current():
         last_sync_result = cursor.fetchone()
         last_sync_time = last_sync_result[0] if last_sync_result else None
         
-        # 동기화 완료 이벤트 조회 (프론트엔드가 감지할 수 있도록)
+        # Query sync completion event (so frontend can detect it)
         cursor.execute("""
             SELECT value FROM system_settings 
             WHERE key = 'sync_completion_event'
@@ -5766,7 +5785,7 @@ def get_cache_status_current():
         sync_event_result = cursor.fetchone()
         sync_completion_event = sync_event_result[0] if sync_event_result else None
         
-        # 데이터 중 가장 최신 인시던트 날짜 조회
+        # Query latest incident date from data
         cursor.execute("""
             SELECT MAX(incident_date) as latest_date
             FROM cims_incidents
@@ -5787,27 +5806,27 @@ def get_cache_status_current():
             'status': status, 
             'last_processed': last,
             'last_sync_time': last_sync_time,
-            'sync_completion_event': sync_completion_event,  # 동기화 완료 이벤트 타임스탬프
+            'sync_completion_event': sync_completion_event,  # Sync completion event timestamp
             'latest_incident_date': latest_incident_date
         })
     except Exception as e:
-        # 테이블이 없거나 접근할 수 없을 때 조용히 처리 (경고만 기록)
-        # 이 API는 UI 인디케이터용이므로 실패해도 앱 기능에 영향 없음
+        # Handle quietly when table doesn't exist or is inaccessible (only log warning)
+        # This API is for UI indicator, so failure doesn't affect app functionality
         if 'no such table' in str(e):
-            # 테이블이 없는 경우 첫 실행이므로 debug 레벨로 처리
+            # If table doesn't exist, treat as first run at debug level
             logger.debug(f"cims_cache_management table not found (first run?): {e}")
         else:
-            # 다른 에러는 warning으로 기록
+            # Log other errors as warning
             logger.warning(f"get_cache_status_current error: {e}")
         
-        # 에러 발생 시에도 last_sync_time과 latest_incident_date를 조회 시도
+        # Try to query last_sync_time and latest_incident_date even on error
         try:
             if conn:
                 conn.close()
             conn = get_db_connection(read_only=True)
             cursor = conn.cursor()
             
-            # 마지막 동기화 시간 조회
+            # Query last sync time
             cursor.execute("""
                 SELECT value FROM system_settings 
                 WHERE key = 'last_incident_sync_time'
@@ -5815,7 +5834,7 @@ def get_cache_status_current():
             last_sync_result = cursor.fetchone()
             last_sync_time = last_sync_result[0] if last_sync_result else None
             
-            # 데이터 중 가장 최신 인시던트 날짜 조회
+            # Query latest incident date from data
             cursor.execute("""
                 SELECT MAX(incident_date) as latest_date
                 FROM cims_incidents
@@ -5848,12 +5867,12 @@ def get_cache_status_current():
 @app.route('/api/cims/incidents/<int:incident_db_id>/tasks', methods=['GET'], endpoint='get_incident_tasks_v2')
 @login_required
 def get_incident_tasks_v2(incident_db_id):
-    """주어진 인시던트의 태스크 목록과 요약 카운트 반환"""
+    """Return task list and summary count for given incident"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Incident 존재 확인 및 기본 정보
+        # Check incident existence and get basic information
         cursor.execute(
             """
             SELECT id, incident_id, resident_name, site, incident_date, status
@@ -5866,7 +5885,7 @@ def get_incident_tasks_v2(incident_db_id):
         if not incident:
             return jsonify({'success': False, 'message': 'Incident not found'}), 404
 
-        # 태스크 목록 조회
+        # Query task list
         cursor.execute(
             """
             SELECT id, task_id, task_name, description, assigned_role,
@@ -5911,9 +5930,9 @@ def get_incident_tasks_v2(incident_db_id):
             elif status in ('in_progress', 'in progress'):
                 counts['in_progress'] += 1
             else:
-                # pending 등
+                # pending, etc.
                 counts['pending'] += 1
-                # overdue 계산: due_date < now and not completed
+                # Calculate overdue: due_date < now and not completed
                 try:
                     if r['due_date'] and r['completed_at'] is None and datetime.fromisoformat(r['due_date']) < datetime.fromisoformat(now_iso):
                         counts['overdue'] += 1
@@ -5945,24 +5964,24 @@ def get_incident_tasks_v2(incident_db_id):
 @app.route('/incident_dashboard2')
 @login_required
 def incident_dashboard2():
-    """기존 CIMS 대시보드 - 통합 대시보드로 리다이렉트"""
+    """Legacy CIMS dashboard - redirects to integrated dashboard"""
     return redirect(url_for('integrated_dashboard'))
 
 @app.route('/api/cims/tasks')
 @login_required
 def get_cims_tasks():
-    """사용자 태스크 조회 API"""
+    """API to query user tasks"""
     try:
-        # 사용자 역할에 따른 태스크 조회
+        # Query tasks based on user role
         if current_user.is_admin() or current_user.is_clinical_manager():
-            # 관리자는 모든 태스크 조회
+            # Admin queries all tasks
             tasks = policy_engine.get_user_tasks(
                 user_id=current_user.id, 
                 role='admin', 
                 status_filter=request.args.get('status')
             )
         else:
-            # 일반 사용자는 자신에게 할당된 태스크만 조회
+            # Regular users query only tasks assigned to them
             tasks = policy_engine.get_user_tasks(
                 user_id=current_user.id, 
                 role=current_user.role, 
@@ -5981,7 +6000,7 @@ def get_cims_tasks():
 @app.route('/api/cims/incidents', methods=['GET', 'POST'])
 @login_required
 def cims_incidents():
-    """인시던트 조회/생성 API"""
+    """API to query/create incidents"""
     if request.method == 'GET':
         return get_cims_incidents()
     else:
@@ -5990,7 +6009,7 @@ def cims_incidents():
 @app.route('/api/cims/fall-statistics', methods=['GET'])
 @login_required
 def get_fall_statistics():
-    """Fall Policy별 통계 조회 API"""
+    """API to query Fall Policy statistics"""
     conn = None
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
@@ -5999,7 +6018,7 @@ def get_fall_statistics():
         conn = get_db_connection(read_only=True)
         cursor = conn.cursor()
         
-        # Fall detector 임포트 (안전하게)
+        # Import fall detector (safely)
         fall_detector = None
         try:
             from services.fall_policy_detector import fall_detector
@@ -6007,7 +6026,7 @@ def get_fall_statistics():
             logger.warning(f"Unable to import fall_policy_detector module: {e}")
             fall_detector = None
         
-        # Fall incidents 조회 (최근 30일) - fall_type 포함
+        # Query Fall incidents (last 30 days) - including fall_type
         thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
         cursor.execute("""
             SELECT id, incident_id, incident_type, incident_date, site, fall_type
@@ -6019,7 +6038,7 @@ def get_fall_statistics():
         
         fall_incidents = cursor.fetchall()
         
-        # 통계 집계
+        # Aggregate statistics
         stats = {
             'total_falls': len(fall_incidents),
             'witnessed': 0,
@@ -6037,24 +6056,24 @@ def get_fall_statistics():
             incident_type = incident[2]
             incident_date = incident[3]
             site = incident[4] or 'Unknown'
-            fall_type = incident[5]  # DB에서 직접 조회
+            fall_type = incident[5]  # Directly queried from DB
             
-            # fall_type이 없으면 계산 (레거시 데이터 처리)
-            # 주의: 읽기 전용 모드이므로 DB에 저장하지 않고 메모리에서만 사용
+            # Calculate if fall_type is missing (legacy data handling)
+            # Note: Read-only mode, so don't save to DB, use only in memory
             if not fall_type and fall_detector:
                 try:
                     fall_type = fall_detector.detect_fall_type_from_incident(incident_id, cursor)
-                    # 읽기 전용 모드이므로 DB에 저장하지 않음 (메모리에서만 사용)
-                    # DB 업데이트는 동기화 프로세스에서 처리됨
+                    # Don't save to DB in read-only mode (use only in memory)
+                    # DB updates are handled by sync process
                 except Exception as detect_error:
                     logger.debug(f"Failed to detect fall_type for incident {incident_id}: {detect_error}")
                     fall_type = None
             
-            # fall_type 검증 및 기본값 설정
+            # Validate fall_type and set default
             if fall_type not in ['witnessed', 'unwitnessed', 'unknown']:
                 fall_type = 'unknown'
             
-            # 통계 업데이트
+            # Update statistics
             if fall_type == 'witnessed':
                 stats['witnessed'] += 1
                 stats['visits_scheduled'] += 1
@@ -6066,7 +6085,7 @@ def get_fall_statistics():
                 stats['unknown'] += 1
                 stats['visits_scheduled'] += 36  # Default to unwitnessed
             
-            # 사이트별 통계
+            # Statistics by site
             if site not in stats['by_site']:
                 stats['by_site'][site] = {
                     'total': 0,
@@ -6076,9 +6095,9 @@ def get_fall_statistics():
                 }
             
             stats['by_site'][site]['total'] += 1
-            stats['by_site'][site][fall_type] += 1  # 이제 안전하게 접근 가능
+            stats['by_site'][site][fall_type] += 1  # Now safe to access
             
-            # 최근 5개 Fall만 상세 정보 포함
+            # Include details for only recent 5 Falls
             if len(stats['recent_falls']) < 5:
                 stats['recent_falls'].append({
                     'incident_id': incident_manad_id,
@@ -6088,7 +6107,7 @@ def get_fall_statistics():
                     'site': site
                 })
         
-        # 비율 계산
+        # Calculate percentages
         if stats['total_falls'] > 0:
             stats['witnessed_percentage'] = round(stats['witnessed'] / stats['total_falls'] * 100, 1)
             stats['unwitnessed_percentage'] = round(stats['unwitnessed'] / stats['total_falls'] * 100, 1)
@@ -6254,10 +6273,10 @@ def get_integrator_status():
 @login_required
 def trigger_progress_note_sync():
     """
-    Progress Note 동기화 수동 트리거 (Admin only)
+    Manual trigger for Progress Note synchronization (Admin only)
     
-    ⚠️ 일시적으로 비활성화됨 (2025-11-25)
-    - 나중에 DB 직접 접속으로 재구현 예정
+    ⚠️ Temporarily disabled (2025-11-25)
+    - Will be reimplemented with DB direct access later
     """
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager']):
@@ -6401,25 +6420,25 @@ def generate_real_schedule(site_name):
 
 def _cache_clients_to_db(clients: list, site_name: str, cursor) -> None:
     """
-    [사용 중지] 클라이언트 데이터를 clients_cache 테이블에 저장
+    [DEPRECATED] Save client data to clients_cache table
     
-    DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 불필요.
-    이 함수는 더 이상 사용되지 않습니다.
+    Cache is unnecessary in DB direct access mode as latest data is queried each time.
+    This function is no longer used.
     
     Args:
-        clients: MANAD API에서 받은 클라이언트 리스트
-        site_name: 사이트 이름
-        cursor: DB 커서
+        clients: Client list received from MANAD API
+        site_name: Site name
+        cursor: DB cursor
     """
     try:
-        # 기존 사이트 클라이언트 비활성화
+        # Deactivate existing site clients
         cursor.execute("""
             UPDATE clients_cache 
             SET is_active = 0 
             WHERE site = ?
         """, (site_name,))
         
-        # 새 클라이언트 데이터 삽입
+        # Insert new client data
         for client in clients:
             try:
                 client_id = client.get('Id', 0)
@@ -6469,7 +6488,7 @@ def _cache_clients_to_db(clients: list, site_name: str, cursor) -> None:
         logger.error(f"Client cache update error: {e}")
 
 def get_api_config_for_site(site_name):
-    """사이트별 API 설정 생성"""
+    """Create API configuration for site"""
     try:
         from config import get_server_info, get_api_headers
         server_info = get_server_info(site_name)
@@ -6489,21 +6508,21 @@ def get_api_config_for_site(site_name):
 
 def sync_progress_notes_from_manad_to_cims():
     """
-    MANAD Plus에서 Post Fall Progress Notes를 동기화하여 Task 완료 상태 업데이트
+    Synchronize Post Fall Progress Notes from MANAD Plus to update Task completion status
     
-    ⚠️ 일시적으로 비활성화됨 (2025-11-25)
-    - 나중에 DB 직접 접속으로 재구현 예정
-    - 현재는 스케줄만 표시, Task 완료 체크 로직은 제거
+    ⚠️ Temporarily disabled (2025-11-25)
+    - Will be reimplemented with DB direct access later
+    - Currently only shows schedule, Task completion check logic removed
     """
-    # TODO: 나중에 DB 직접 접속으로 Post Fall Progress Note 조회 및 Task 완료 처리 재구현
-    # - manad_db_connector에서 Post Fall Progress Note 조회 메서드 추가
-    # - Task와 매칭하여 자동 완료 처리
+    # TODO: Reimplement Post Fall Progress Note query and Task completion processing with DB direct access later
+    # - Add Post Fall Progress Note query method in manad_db_connector
+    # - Match with Tasks and auto-complete
     logger.info("⚠️ Progress Note sync is disabled (paused; will be reimplemented with direct DB access)")
     return {'success': True, 'matched': 0, 'message': 'Progress Note sync temporarily disabled'}
 
 def ensure_fall_policy_exists():
     """
-    Fall Policy가 DB에 존재하는지 확인하고 없으면 기본 Policy 생성
+    Check if Fall Policy exists in DB and create default Policy if not
     """
     import json
     
@@ -6585,43 +6604,43 @@ def ensure_fall_policy_exists():
 
 def auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor):
     """
-    Fall incident에 대해 자동으로 task 생성
-    (CIMSService.auto_generate_fall_tasks를 래핑)
+    Automatically generate tasks for Fall incident
+    (Wraps CIMSService.auto_generate_fall_tasks)
     
     Args:
-        incident_db_id: CIMS DB의 incident ID (integer)
-        incident_date_iso: Incident 발생 시간 (ISO format string)
+        incident_db_id: Incident ID in CIMS DB (integer)
+        incident_date_iso: Incident occurrence time (ISO format string)
         cursor: DB cursor
         
     Returns:
-        생성된 task 수
+        Number of tasks created
     """
     from services.cims_service import CIMSService
     return CIMSService.auto_generate_fall_tasks(incident_db_id, incident_date_iso, cursor)
 
 def sync_incidents_from_manad_to_cims(full_sync=False):
     """
-    MANAD DB에서 최신 인시던트를 가져와 CIMS DB에 동기화 (DB 직접 접속)
+    Synchronize latest incidents from MANAD DB to CIMS DB (DB direct access)
     
     Args:
-        full_sync: True면 전체 동기화 (30일), False면 증분 동기화 (마지막 동기화 이후)
+        full_sync: True for full sync (30 days), False for incremental sync (since last sync)
     """
     try:
         safe_site_servers = get_safe_site_servers()
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 첫 동기화 여부 확인 (DB에 인시던트가 있는지 체크)
+        # Check if first sync (check if incidents exist in DB)
         cursor.execute("SELECT COUNT(*) FROM cims_incidents")
         incident_count = cursor.fetchone()[0]
         is_first_sync = incident_count == 0 or full_sync
         
         if is_first_sync:
-            # 첫 동기화: 최근 30일 (또는 더 많이)
+            # First sync: last 30 days (or more)
             logger.info("🔄 Initial sync starting: last 30 days of data")
             start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         else:
-            # 증분 동기화: 마지막 동기화 시간 이후
+            # Incremental sync: since last sync time
             cursor.execute("""
                 SELECT value FROM system_settings 
                 WHERE key = 'last_incident_sync_time'
@@ -6629,12 +6648,12 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             last_sync_result = cursor.fetchone()
             
             if last_sync_result:
-                # 마지막 동기화 시간 사용 (약간의 중복 허용을 위해 1시간 전부터)
+                # Use last sync time (from 1 hour before to allow slight overlap)
                 last_sync_dt = datetime.fromisoformat(last_sync_result[0])
                 start_date = (last_sync_dt - timedelta(hours=1)).strftime('%Y-%m-%d')
                 logger.info(f"📥 Incremental sync: changes since {last_sync_result[0]}")
             else:
-                # 동기화 기록 없으면 최근 7일
+                # If no sync record, use last 7 days
                 start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
                 logger.info("🔄 No sync record: last 7 days of data")
         
@@ -6648,7 +6667,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             try:
                 logger.info(f"Syncing incidents from {site_name}...")
                 
-                # MANAD 데이터 가져오기 (항상 DB 직접 접속 사용)
+                # Get MANAD data (always use DB direct access)
                 try:
                     from manad_db_connector import fetch_incidents_with_client_data_from_db
                     logger.info(f"🔌 Direct DB access mode: {site_name}")
@@ -6656,13 +6675,13 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                         site_name, start_date, end_date, 
                         fetch_clients=is_first_sync
                     )
-                    # DB 조회 결과가 None인 경우에만 에러 (빈 리스트는 정상)
+                    # Error only if DB query result is None (empty list is normal)
                     if incidents_data is None:
-                        error_msg = f"❌ DB 직접 접속 실패: {site_name} - DB 연결에 실패했습니다."
+                        error_msg = f"❌ DB direct access failed: {site_name} - DB connection failed."
                         logger.error(error_msg)
                         raise Exception(error_msg)
                     
-                    # Incident가 0개인 경우는 정상 (해당 기간에 Incident가 없을 수 있음)
+                    # 0 incidents is normal (no incidents in that period)
                     incident_count = len(incidents_data.get('incidents', []))
                     if incident_count == 0:
                         logger.info(
@@ -6671,7 +6690,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                             f"days (OK)"
                         )
                 except Exception as db_error:
-                    error_msg = f"❌ DB 직접 접속 실패: {site_name} - {str(db_error)}. DB 연결 설정 및 드라이버 설치를 확인하세요."
+                    error_msg = f"❌ DB direct access failed: {site_name} - {str(db_error)}. Please check DB connection settings and driver installation."
                     logger.error(error_msg)
                     raise Exception(error_msg)
                 
@@ -6682,8 +6701,8 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 incidents = incidents_data.get('incidents', [])
                 clients = incidents_data.get('clients', [])
                 
-                # 클라이언트 데이터를 딕셔너리로 변환 (빠른 검색용)
-                # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 불필요
+                # Convert client data to dictionary (for fast lookup)
+                # In DB direct access mode, latest data is queried each time, so cache is unnecessary
                 clients_dict = {client.get('id', client.get('Id', '')): client for client in clients}
                 
                 logger.info(f"📋 Client mapping completed: {len(clients_dict)} clients (latest data)")
@@ -6693,12 +6712,12 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 
                 for incident in incidents:
                     try:
-                        # 인시던트 ID 추출 (MANAD API uses capital 'Id')
+                        # Extract incident ID (MANAD API uses capital 'Id')
                         incident_id = str(incident.get('Id', ''))
                         if not incident_id:
                             continue
                         
-                        # 거주자 정보 가져오기
+                        # Get resident information
                         resident_id = incident.get('ClientId', '')
                         resident_name = 'Unknown'
                         
@@ -6715,10 +6734,10 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                             if first or last:
                                 resident_name = f"{first} {last}".strip()
                         
-                        # 인시던트 날짜 파싱
+                        # Parse incident date
                         incident_date_str = incident.get('Date', incident.get('ReportedDate', ''))
                         try:
-                            # ISO 형식으로 변환
+                            # Convert to ISO format
                             if incident_date_str:
                                 incident_date = datetime.fromisoformat(incident_date_str.replace('Z', '+00:00'))
                                 incident_date_iso = incident_date.isoformat()
@@ -6727,7 +6746,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                         except:
                             incident_date_iso = datetime.now().isoformat()
                         
-                        # 이미 존재하는지 확인 (MANAD incident ID 기준)
+                        # Check if already exists (based on MANAD incident ID)
                         cursor.execute("""
                             SELECT id, status FROM cims_incidents 
                             WHERE manad_incident_id = ?
@@ -6736,11 +6755,11 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                         existing = cursor.fetchone()
                         
                         if existing:
-                            # 기존 인시던트 업데이트
+                            # Update existing incident
                             existing_db_id = existing[0]
                             existing_status = existing[1]
                             
-                            # MANAD에서 가져온 인시던트 상태 확인
+                            # Check incident status from MANAD
                             manad_status = incident.get('Status', 'Open')
                             is_closed = manad_status.lower() in ['closed', 'close'] or incident.get('StatusEnumId') == 2
                             
@@ -6748,9 +6767,9 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                             event_types = incident.get('EventTypeNames', [])
                             incident_type_str = ', '.join(event_types) if isinstance(event_types, list) else str(event_types)
                             
-                            # Incident 상태가 Closed로 변경되는 경우
+                            # When incident status changes to Closed
                             if is_closed and existing_status != 'Closed':
-                                # Incident 상태를 Closed로 업데이트
+                                # Update incident status to Closed
                                 cursor.execute("""
                                     UPDATE cims_incidents
                                     SET incident_type = ?,
@@ -6775,7 +6794,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                     incident_id
                                 ))
                                 
-                                # 모든 Task를 Completed로 변경
+                                # Change all Tasks to Completed
                                 cursor.execute("""
                                     UPDATE cims_tasks
                                     SET status = 'completed',
@@ -6794,7 +6813,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                 
                                 total_updated += 1
                             
-                            # Open 상태인 경우만 업데이트 및 Task 생성
+                            # Update and create tasks only for Open status
                             elif existing_status == 'Open' and not is_closed:
                                 cursor.execute("""
                                     UPDATE cims_incidents
@@ -6818,9 +6837,9 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                 ))
                                 total_updated += 1
                                 
-                                # 🚀 Fall incident인 경우 타스크가 없으면 자동 생성
+                                # 🚀 Auto-generate tasks if Fall incident has no tasks
                                 if 'fall' in incident_type_str.lower():
-                                    # 타스크 존재 여부 확인
+                                    # Check if tasks exist
                                     cursor.execute("""
                                         SELECT COUNT(*) FROM cims_tasks 
                                         WHERE incident_id = ?
@@ -6835,17 +6854,17 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                                         except Exception as task_error:
                                             logger.error(f"Failed to auto-generate tasks for existing incident {existing_db_id}: {str(task_error)}")
                         else:
-                            # 새 인시던트 생성
+                            # Create new incident
                             cims_incident_id = f"INC-{incident_id}"
                             
-                            # 방 정보 추출
+                            # Extract room information
                             room = incident.get('RoomName', '')
                             wing = incident.get('WingName', '')
                             department = incident.get('DepartmentName', '')
                             location_parts = [p for p in [room, wing, department] if p]
                             location = ', '.join(location_parts) if location_parts else 'Unknown'
                             
-                            # 인시던트 타입 처리 (리스트일 수 있음)
+                            # Process incident type (may be a list)
                             event_types = incident.get('EventTypeNames', [])
                             incident_type = ', '.join(event_types) if isinstance(event_types, list) else str(event_types)
                             
@@ -6885,7 +6904,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                             ))
                             total_synced += 1
                             
-                            # 🚀 NEW: Fall incident인 경우 자동으로 task 생성
+                            # 🚀 NEW: Auto-generate tasks if Fall incident
                             new_incident_db_id = cursor.lastrowid
                             if 'fall' in incident_type.lower():
                                 try:
@@ -6901,7 +6920,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
                 
                 conn.commit()
                 
-                # 사이트별 마지막 동기화 시간 업데이트
+                # Update last sync time per site
                 cursor.execute("""
                     INSERT OR REPLACE INTO system_settings (key, value, updated_at)
                     VALUES (?, ?, ?)
@@ -6921,7 +6940,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
         
         logger.info(f"Incident sync completed: {total_synced} new, {total_updated} updated")
         
-        # 전체 마지막 동기화 시간 업데이트 (프론트엔드 이벤트 트리거용)
+        # Update overall last sync time (for frontend event trigger)
         sync_completion_time = datetime.now().isoformat()
         try:
             conn = get_db_connection()
@@ -6932,7 +6951,7 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
             """, (sync_completion_time, sync_completion_time))
             conn.commit()
             
-            # 동기화 완료 이벤트 플래그 설정 (프론트엔드가 감지할 수 있도록)
+            # Set sync completion event flag (so frontend can detect it)
             cursor.execute("""
                 INSERT OR REPLACE INTO system_settings (key, value, updated_at)
                 VALUES ('sync_completion_event', ?, ?)
@@ -6946,12 +6965,12 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
         except Exception as e:
             logger.error(f"❌ Failed to update last_incident_sync_time: {e}")
         
-        # 🚀 백그라운드 싱크 완료 후 타스크가 없는 Fall 인시던트에 대해 타스크 생성
+        # 🚀 Generate tasks for Fall incidents without tasks after background sync completes
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 타스크가 없는 Open 상태의 Fall 인시던트 조회
+            # Query Open status Fall incidents without tasks
             cursor.execute("""
                 SELECT i.id, i.incident_id, i.incident_date, i.incident_type
                 FROM cims_incidents i
@@ -7005,13 +7024,13 @@ def sync_incidents_from_manad_to_cims(full_sync=False):
 @login_required
 def force_sync_all():
     """
-    Force Synchronization - 전체 DB 강제 동기화
-    - 모든 사이트에서 incident 동기화
-    - Fall incident에 대해 누락된 task 자동 생성
-    - Progress note 동기화
-    - Incident status 업데이트
+    Force Synchronization - Full DB forced synchronization
+    - Synchronize incidents from all sites
+    - Auto-generate missing tasks for Fall incidents
+    - Progress note synchronization
+    - Incident status update
     
-    Admin/Clinical Manager만 사용 가능
+    Available only to Admin/Clinical Manager
     """
     try:
         if not (current_user.is_admin() or current_user.role == 'clinical_manager'):
@@ -7056,7 +7075,7 @@ def force_sync_all():
         
         # 3. Progress note sync
         logger.info("3️⃣  Progress note sync...")
-        # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
+        # Progress Note synchronization is temporarily disabled (will be reimplemented with DB direct access later)
         # pn_sync_result = sync_progress_notes_from_manad_to_cims()
         
         # 4. Update incident statuses
@@ -7102,20 +7121,20 @@ def force_sync_all():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def get_cims_incidents():
-    """인시던트 목록 조회 (모든 상태 포함, 자동 동기화 포함)"""
+    """Query incident list (all statuses included, with auto synchronization)"""
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
             return jsonify({'error': 'Access denied'}), 403
         
-        # 요청 파라미터 확인
+        # Check request parameters
         force_sync = request.args.get('sync', 'false').lower() == 'true'
-        full_sync = request.args.get('full', 'false').lower() == 'true'  # 전체 동기화 (30일)
+        full_sync = request.args.get('full', 'false').lower() == 'true'  # Full sync (30 days)
         
-        # 마지막 동기화 시간 확인 (읽기 전용 연결로 잠금 충돌 방지)
+        # Check last sync time (use read-only connection to prevent lock conflicts)
         conn = get_db_connection(read_only=True)
         cursor = conn.cursor()
         
-        # 인시던트 개수 확인 (초기 로드 감지)
+        # Check incident count (detect initial load)
         cursor.execute("SELECT COUNT(*) FROM cims_incidents")
         incident_count = cursor.fetchone()[0]
         
@@ -7125,20 +7144,20 @@ def get_cims_incidents():
         """)
         last_sync_result = cursor.fetchone()
         
-        # 자동 초기 동기화 조건:
-        # 1. Force sync 요청
-        # 2. 또는 인시던트가 하나도 없고 한 번도 동기화하지 않았을 때
+        # Auto initial sync conditions:
+        # 1. Force sync request
+        # 2. Or when there are no incidents and sync has never been performed
         should_sync = force_sync or (incident_count == 0 and not last_sync_result)
         
-        # 초기 동기화인 경우 전체 동기화로 전환
+        # Switch to full sync if initial sync
         if incident_count == 0 and not last_sync_result and should_sync:
             full_sync = True
             logger.info(f"🆕 Initial load detected - starting automatic full sync (incidents: {incident_count})")
         
-        # 필요시 동기화 실행 (백그라운드로)
+        # Execute sync if needed (in background)
         if should_sync:
-            # 동기화 시간 먼저 업데이트 (중복 실행 방지)
-            # 쓰기가 필요한 시점에만 쓰기 연결 사용
+            # Update sync time first (prevent duplicate execution)
+            # Use write connection only when write is needed
             conn.close()
             conn = get_db_connection(read_only=False)
             cursor = conn.cursor()
@@ -7149,15 +7168,15 @@ def get_cims_incidents():
                 """, (datetime.now().isoformat(), datetime.now().isoformat()))
                 conn.commit()
             
-            # 백그라운드 스레드로 동기화 실행 (페이지 로딩 차단하지 않음)
+            # Execute sync in background thread (doesn't block page loading)
             import threading
             def background_sync():
                 try:
-                    sync_type = "전체 동기화 (30일)" if full_sync else "증분 동기화"
+                    sync_type = "Full sync (30 days)" if full_sync else "Incremental sync"
                     logger.info(f"🔄 Starting background sync: {sync_type}")
                     sync_result = sync_incidents_from_manad_to_cims(full_sync=full_sync)
                     
-                    # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
+                    # Progress Note synchronization is temporarily disabled (will be reimplemented with DB direct access later)
                     # logger.info("🔄 Starting Progress Note sync...")
                     # pn_sync_result = sync_progress_notes_from_manad_to_cims()
                     
@@ -7169,16 +7188,16 @@ def get_cims_incidents():
             sync_thread.start()
             logger.info("⚡ Background sync started (page load continues immediately...)")
         
-        # 필터 파라미터 확인
+        # Check filter parameters
         site_filter = request.args.get('site')
         date_filter = request.args.get('date')
         
-        # 🔧 수정: KPI와 일치시키기 위해 MANAD DB에서 직접 쿼리
-        # 대시보드 KPI가 MANAD DB 직접 쿼리를 사용하므로, 인시던트 목록도 동일하게 처리
-        # 이렇게 하면 프로덕션/개발 서버 간 데이터 일치 보장
-        use_db_direct = True  # MANAD DB 직접 쿼리 사용 (KPI와 일치)
+        # 🔧 Modified: Query directly from MANAD DB to match KPI
+        # Dashboard KPI uses direct MANAD DB queries, so incident list is handled the same way
+        # This ensures data consistency between production/development servers
+        use_db_direct = True  # Use direct MANAD DB query (matches KPI)
         
-        # 주석 처리: 원래 DB 직접 접속 모드 확인 로직 (현재는 사용하지 않음)
+        # Commented out: Original DB direct access mode check logic (not currently used)
         # try:
         #     conn_check = get_db_connection(read_only=True)
         #     cursor_check = conn_check.cursor()
@@ -7196,14 +7215,14 @@ def get_cims_incidents():
         incidents = []
         
         if use_db_direct:
-            # 🔌 DB 직접 접속 모드: MANAD DB에서 최신 인시던트 조회
-            # ⚠️ 주의: 이 모드는 KPI와 데이터 소스가 달라서 불일치 발생 가능
+            # 🔌 DB direct access mode: Query latest incidents from MANAD DB
+            # ⚠️ Note: This mode may cause inconsistencies as data source differs from KPI
             logger.info("🔌 Direct DB access mode: integrated_dashboard incident query")
             
             try:
                 from manad_db_connector import fetch_incidents_with_client_data_from_db
                 
-                # 날짜 범위 설정 (최근 30일, 또는 필터에 따라)
+                # Set date range (last 30 days, or according to filter)
                 if date_filter:
                     date_obj = datetime.fromisoformat(date_filter)
                     five_days_before = date_obj - timedelta(days=5)
@@ -7212,7 +7231,7 @@ def get_cims_incidents():
                     start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
                 end_date = datetime.now().strftime('%Y-%m-%d')
                 
-                # 사이트별로 조회
+                # Query by site
                 safe_site_servers = get_safe_site_servers()
                 sites_to_query = [site_filter] if site_filter else list(safe_site_servers.keys())
                 
@@ -7228,7 +7247,7 @@ def get_cims_incidents():
                         
                         if incidents_data and incidents_data.get('incidents'):
                             for inc in incidents_data['incidents']:
-                                # MANAD 인시던트를 CIMS 형식으로 변환
+                                # Convert MANAD incident to CIMS format
                                 incident_date_str = inc.get('Date', inc.get('ReportedDate', ''))
                                 if incident_date_str:
                                     try:
@@ -7239,7 +7258,7 @@ def get_cims_incidents():
                                 else:
                                     incident_date_iso = datetime.now().isoformat()
                                 
-                                # CIMS DB에서 기존 인시던트 조회 (Task 정보 포함)
+                                # Query existing incident from CIMS DB (includes Task information)
                                 conn_cims = get_db_connection(read_only=True)
                                 cursor_cims = conn_cims.cursor()
                                 cursor_cims.execute("""
@@ -7250,36 +7269,36 @@ def get_cims_incidents():
                                 existing = cursor_cims.fetchone()
                                 conn_cims.close()
                                 
-                                # Status 결정: CIMS DB에 있으면 그 상태 사용, 없으면 Open
+                                # Determine status: Use status from CIMS DB if exists, otherwise Open
                                 status = existing[2] if existing else 'Open'
                                 cims_id = existing[0] if existing else None
                                 fall_type = existing[3] if existing and len(existing) > 3 else None
                                 
-                                # 모든 상태 포함 (KPI와 일치시키기 위해)
-                                # Open, Closed, In Progress, Overdue 모두 표시
+                                # Include all statuses (to match KPI)
+                                # Display Open, Closed, In Progress, Overdue
                                 
-                                # 인시던트 타입 처리
+                                # Process incident type
                                 event_type = inc.get('EventTypeNames', '')
                                 if isinstance(event_type, list):
                                     incident_type = ', '.join(event_type)
                                 else:
                                     incident_type = str(event_type) if event_type else 'Unknown'
                                 
-                                # 위치 정보
+                                # Location information
                                 room = inc.get('RoomName', '')
                                 wing = inc.get('WingName', '')
                                 dept = inc.get('DepartmentName', '')
                                 location_parts = [p for p in [room, wing, dept] if p]
                                 location = ', '.join(location_parts) if location_parts else 'Unknown'
                                 
-                                # 거주자 이름
+                                # Resident name
                                 resident_name = f"{inc.get('FirstName', '')} {inc.get('LastName', '')}".strip()
                                 if not resident_name:
                                     resident_name = 'Unknown'
                                 
-                                # CIMS 형식의 튜플로 변환 (기존 코드와 호환)
+                                # Convert to CIMS format tuple (compatible with existing code)
                                 incidents.append((
-                                    cims_id,  # id (CIMS DB ID, 없으면 None)
+                                    cims_id,  # id (CIMS DB ID, None if not exists)
                                     f"INC-{inc.get('Id', '')}",  # incident_id
                                     str(inc.get('ClientId', '')),  # resident_id
                                     resident_name,  # resident_name
@@ -7290,7 +7309,7 @@ def get_cims_incidents():
                                     location,  # location
                                     inc.get('Description', ''),  # description
                                     site_name,  # site
-                                    datetime.now().isoformat()  # created_at (임시)
+                                    datetime.now().isoformat()  # created_at (temporary)
                                 ))
                     except Exception as site_error:
                         logger.error(f"❌ Incident query failed for {site_name}: {site_error}")
@@ -7300,14 +7319,14 @@ def get_cims_incidents():
                 
             except Exception as db_error:
                 logger.error(f"❌ Direct DB access failed: {db_error}")
-                # Fallback: CIMS DB에서 조회
+                # Fallback: Query from CIMS DB
                 use_db_direct = False
         
         if not use_db_direct:
-            # ✅ CIMS DB에서 조회 (KPI와 동일한 데이터 소스 사용)
-            # 모든 상태 포함 (KPI와 일치시키기 위해)
-            # 날짜 필터는 제거 (클라이언트에서 필터링)
-            # KPI와 일치시키기 위해 동일한 데이터 소스 사용
+            # ✅ Query from CIMS DB (use same data source as KPI)
+            # Include all statuses (to match KPI)
+            # Remove date filter (filter on client side)
+            # Use same data source to match KPI
             query = """
                 SELECT id, incident_id, resident_id, resident_name, incident_type, severity, status, 
                        incident_date, location, description, site, created_at
@@ -7320,11 +7339,11 @@ def get_cims_incidents():
                 query += " AND site = ?"
                 params.append(site_filter)
             
-            # 날짜 필터 제거: 클라이언트에서 필터링 (KPI와 일치)
+            # Remove date filter: filter on client side (matches KPI)
             
             query += " ORDER BY incident_date DESC LIMIT 1000"
             
-            # 조회는 읽기 전용 연결로 재수행 + 간단 재시도
+            # Re-execute query with read-only connection + simple retry
             try:
                 conn.close()
             except Exception:
@@ -7345,31 +7364,31 @@ def get_cims_incidents():
             incidents = cursor.fetchall()
             conn.close()
         
-        # Convert to list of dictionaries (프론트엔드 호환 필드명 사용)
+        # Convert to list of dictionaries (use frontend-compatible field names)
         result = []
         
-        # Fall 유형 감지를 위한 cursor 생성
+        # Create cursor for Fall type detection
         conn_fall = get_db_connection(read_only=True)
         try:
             cursor_fall = conn_fall.cursor()
             
             for incident in incidents:
-                # incident_type을 EventTypeNames 배열로 변환
+                # Convert incident_type to EventTypeNames array
                 incident_types = incident[4].split(', ') if incident[4] else []
                 
-                # Fall 유형 감지 (Fall incident인 경우만)
+                # Detect Fall type (only for Fall incidents)
                 fall_type = None
                 if incident[4] and 'fall' in incident[4].lower():
                     from services.fall_policy_detector import fall_detector
                     
-                    # CIMS DB ID가 있는 경우 DB에서 조회
-                    if incident[0] is not None:  # cims_id가 있는 경우
+                    # Query from DB if CIMS DB ID exists
+                    if incident[0] is not None:  # if cims_id exists
                         fall_type = fall_detector.detect_fall_type_from_incident(
                             incident[0],  # incident_id (CIMS DB ID)
                             cursor_fall
                         )
                         
-                        # 계산된 fall_type을 DB에 저장
+                        # Save calculated fall_type to DB
                         if fall_type and fall_type != 'unknown':
                             try:
                                 cursor_fall.execute("""
@@ -7381,8 +7400,8 @@ def get_cims_incidents():
                             except:
                                 pass
                     else:
-                        # CIMS DB ID가 없는 경우 (DB 직접 접속 모드에서 새 인시던트)
-                        # Description에서 직접 감지
+                        # If CIMS DB ID doesn't exist (new incident in DB direct access mode)
+                        # Detect directly from Description
                         description = incident[9] if len(incident) > 9 else ''
                         fall_type = fall_detector.detect_fall_type_from_notes(description) if description else 'unknown'
                 
@@ -7391,17 +7410,17 @@ def get_cims_incidents():
                     'incident_id': incident[1],
                     'resident_id': incident[2],
                     'resident_name': incident[3],
-                    'incident_type': incident[4],  # 하위 호환성
-                    'EventTypeNames': incident_types,  # 프론트엔드가 기대하는 형식
+                    'incident_type': incident[4],  # Backward compatibility
+                    'EventTypeNames': incident_types,  # Format expected by frontend
                     'severity': incident[5],
                     'status': incident[6],
                     'incident_date': incident[7],
                     'location': incident[8],
                     'description': incident[9],
-                    'site': incident[10],  # 하위 호환성
-                    'SiteName': incident[10],  # 프론트엔드가 기대하는 형식
+                    'site': incident[10],  # Backward compatibility
+                    'SiteName': incident[10],  # Format expected by frontend
                     'created_at': incident[11],
-                    'fall_type': fall_type  # Fall 유형 정보 추가
+                    'fall_type': fall_type  # Add Fall type information
                 })
         finally:
             conn_fall.close()
@@ -7414,14 +7433,14 @@ def get_cims_incidents():
         return jsonify({'error': 'Internal server error'}), 500
 
 def create_cims_incident():
-    """새 인시던트 생성 API"""
+    """API to create new incident"""
     try:
         if not current_user.can_manage_incidents():
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
         data = request.get_json()
         
-        # 필수 필드 검증
+        # Validate required fields
         required_fields = ['resident_id', 'resident_name', 'incident_type', 'severity', 'description']
         for field in required_fields:
             if not data.get(field):
@@ -7430,10 +7449,10 @@ def create_cims_incident():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 인시던트 ID 생성
+        # Generate incident ID
         incident_id = f"INC-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
         
-        # 인시던트 저장
+        # Save incident
         cursor.execute("""
             INSERT INTO cims_incidents (
                 incident_id, resident_id, resident_name, incident_type, severity,
@@ -7460,7 +7479,7 @@ def create_cims_incident():
         incident_db_id = cursor.lastrowid
         conn.commit()
         
-        # 인시던트 데이터 준비
+        # Prepare incident data
         incident_data = {
             'id': incident_db_id,
             'incident_id': incident_id,
@@ -7471,10 +7490,10 @@ def create_cims_incident():
             'resident_name': data['resident_name']
         }
         
-        # 정책 엔진을 통해 태스크 자동 생성
+        # Auto-generate tasks through policy engine
         generated_tasks = policy_engine.apply_policies_to_incident(incident_data)
         
-        # 감사 로그 추가
+        # Add audit log
         cursor.execute("""
             INSERT INTO cims_audit_logs (
                 log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -7509,7 +7528,7 @@ def create_cims_incident():
 @app.route('/api/cims/tasks/<int:task_id>/complete', methods=['POST'])
 @login_required
 def complete_cims_task(task_id):
-    """태스크 완료 API"""
+    """API to complete task"""
     try:
         if not current_user.can_complete_tasks():
             return jsonify({'success': False, 'message': 'Access denied'}), 403
@@ -7517,7 +7536,7 @@ def complete_cims_task(task_id):
         data = request.get_json()
         completion_notes = data.get('notes', '')
         
-        # 태스크 완료 처리
+        # Process task completion
         success = policy_engine.complete_task(task_id, current_user.id, completion_notes)
         
         if success:
@@ -7538,14 +7557,14 @@ def complete_cims_task(task_id):
 @app.route('/api/cims/progress-notes', methods=['POST'])
 @login_required
 def create_cims_progress_note():
-    """진행 노트 생성 API"""
+    """API to create progress note"""
     try:
         if not current_user.can_complete_tasks():
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
         data = request.get_json()
         
-        # 필수 필드 검증
+        # Validate required fields
         required_fields = ['incident_id', 'content']
         for field in required_fields:
             if not data.get(field):
@@ -7554,10 +7573,10 @@ def create_cims_progress_note():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 진행 노트 ID 생성
+        # Generate progress note ID
         note_id = f"NOTE-{uuid.uuid4().hex[:8].upper()}"
         
-        # 진행 노트 저장
+        # Save progress note
         cursor.execute("""
             INSERT INTO cims_progress_notes (
                 note_id, incident_id, task_id, author_id, content, note_type,
@@ -7578,7 +7597,7 @@ def create_cims_progress_note():
         
         note_db_id = cursor.lastrowid
         
-        # task_id가 있으면 해당 태스크를 완료 처리
+        # Mark task as completed if task_id exists
         if data.get('task_id'):
             completed_at = datetime.now().isoformat()
             cursor.execute("""
@@ -7592,7 +7611,7 @@ def create_cims_progress_note():
             
             logger.info(f"✅ Task {data['task_id']} marked as completed via progress note")
         
-        # 감사 로그 추가
+        # Add audit log
         cursor.execute("""
             INSERT INTO cims_audit_logs (
                 log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -7613,7 +7632,7 @@ def create_cims_progress_note():
         conn.commit()
         conn.close()
         
-        # 인시던트 상태 업데이트 체크
+        # Check and update incident status
         if data.get('task_id'):
             check_and_update_incident_status(data['incident_id'])
         
@@ -7629,24 +7648,24 @@ def create_cims_progress_note():
 
 def check_and_update_incident_status(incident_id):
     """
-    인시던트의 모든 태스크 상태를 확인하고 인시던트 상태를 업데이트
-    - 모든 태스크가 완료되면 'Closed'로 변경
-    - 마지막 태스크 마감 시간이 지났는데 미완료 태스크가 있으면 'Overdue'로 변경
-    - DB 잠금 시 재시도 로직 포함
+    Check all task statuses for incident and update incident status
+    - Change to 'Closed' if all tasks are completed
+    - Change to 'Overdue' if last task due time has passed but there are incomplete tasks
+    - Includes retry logic for DB locks
     """
     import time
     import sqlite3
     
     max_retries = 3
-    retry_delay = 0.5  # 0.5초부터 시작
+    retry_delay = 0.5  # Start from 0.5 seconds
     
     for attempt in range(max_retries):
         try:
             conn = get_db_connection()
-            conn.execute("PRAGMA busy_timeout = 5000")  # 5초 타임아웃 설정
+            conn.execute("PRAGMA busy_timeout = 5000")  # Set 5 second timeout
             cursor = conn.cursor()
             
-            # 해당 인시던트의 모든 태스크 조회
+            # Query all tasks for that incident
             cursor.execute("""
                 SELECT id, status, due_date
                 FROM cims_tasks
@@ -7659,14 +7678,14 @@ def check_and_update_incident_status(incident_id):
                 conn.close()
                 return
             
-            # 태스크 상태 분석
+            # Analyze task status
             all_completed = all(task[1] == 'completed' for task in tasks)
             now = datetime.now()
             last_task_due = datetime.fromisoformat(tasks[0][2]) if tasks[0][2] else None
             
-            # 인시던트 상태 업데이트
+            # Update incident status
             if all_completed:
-                # 모든 태스크 완료 → Closed
+                # All tasks completed → Closed
                 cursor.execute("""
                     UPDATE cims_incidents
                     SET status = 'Closed'
@@ -7674,7 +7693,7 @@ def check_and_update_incident_status(incident_id):
                 """, (incident_id,))
                 logger.info(f"✅ Incident {incident_id} closed: All tasks completed")
             elif last_task_due and now > last_task_due and not all_completed:
-                # 마지막 태스크 마감 시간 지났는데 미완료 → Overdue
+                # Last task due time passed but incomplete → Overdue
                 cursor.execute("""
                     UPDATE cims_incidents
                     SET status = 'Overdue'
@@ -7684,7 +7703,7 @@ def check_and_update_incident_status(incident_id):
             
             conn.commit()
             conn.close()
-            return  # 성공 시 종료
+            return  # Exit on success
             
         except sqlite3.OperationalError as e:
             if 'database is locked' in str(e) and attempt < max_retries - 1:
@@ -7692,7 +7711,7 @@ def check_and_update_incident_status(incident_id):
                     f"⏳ Retrying incident status update ({attempt + 1}/{max_retries}): Incident {incident_id} - DB locked"
                 )
                 time.sleep(retry_delay)
-                retry_delay *= 2  # 지수 백오프
+                retry_delay *= 2  # Exponential backoff
                 continue
             else:
                 logger.error(f"Incident status update error: Incident {incident_id} - {str(e)}")
@@ -7705,12 +7724,12 @@ def check_and_update_incident_status(incident_id):
 @login_required
 def get_dashboard_kpis():
     """
-    대시보드 KPI 계산 API - MANAD DB 직접 쿼리
+    Dashboard KPI calculation API - Direct query from MANAD DB
     
-    변경사항:
-    - CIMS DB 대신 MANAD DB에서 직접 쿼리
-    - 실시간 데이터 보장
-    - 개발/운영 서버 간 데이터 일치 보장
+    Changes:
+    - Query directly from MANAD DB instead of CIMS DB
+    - Ensure real-time data
+    - Ensure data consistency between development/production servers
     """
     try:
         # Check permissions
@@ -7723,13 +7742,13 @@ def get_dashboard_kpis():
             logger.warning(f"Access denied for user {current_user.username if current_user.is_authenticated else 'Anonymous'} with role {user_role}")
             return jsonify({'error': 'Access denied', 'user_role': user_role}), 403
         
-        # 필터 파라미터
+        # Filter parameters
         period = request.args.get('period', 'week')  # today, week, month
         incident_type = request.args.get('incident_type', 'all')  # all, Fall, Wound/Skin, etc.
         
         logger.info(f"Fetching KPI data from MANAD DB: period={period}, incident_type={incident_type}")
         
-        # 기간 필터
+        # Period filter
         now = datetime.now()
         if period == 'today':
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -7743,7 +7762,7 @@ def get_dashboard_kpis():
         
         logger.info(f"Date filter: period={period}, start_date={start_date_str}, end_date={end_date_str}")
         
-        # MANAD DB에서 모든 사이트의 인시던트 조회
+        # Query incidents from all sites in MANAD DB
         from manad_db_connector import MANADDBConnector
         safe_site_servers = get_safe_site_servers()
         
@@ -7753,7 +7772,7 @@ def get_dashboard_kpis():
                 connector = MANADDBConnector(site_name)
                 success, incidents = connector.fetch_incidents(start_date_str, end_date_str)
                 if success and incidents:
-                    # 사이트 정보 추가
+                    # Add site information
                     for incident in incidents:
                         incident['site'] = site_name
                     all_incidents.extend(incidents)
@@ -7764,7 +7783,7 @@ def get_dashboard_kpis():
         
         logger.info(f"📊 Total incidents from MANAD DB: {len(all_incidents)}")
         
-        # 인시던트 유형 필터 적용
+        # Apply incident type filter
         if incident_type != 'all':
             filtered_incidents = []
             for incident in all_incidents:
@@ -7782,7 +7801,7 @@ def get_dashboard_kpis():
                         filtered_incidents.append(incident)
             all_incidents = filtered_incidents
         
-        # 날짜 필터 적용 (MANAD DB에서 가져온 데이터는 이미 필터링되어 있지만, 추가 확인)
+        # Apply date filter (data from MANAD DB is already filtered, but double-check)
         filtered_by_date = []
         for incident in all_incidents:
             incident_date = incident.get('Date') or incident.get('ReportedDate')
@@ -7795,15 +7814,15 @@ def get_dashboard_kpis():
                     if incident_dt >= start_date:
                         filtered_by_date.append(incident)
                 except:
-                    # 날짜 파싱 실패 시 포함
+                    # Include if date parsing fails
                     filtered_by_date.append(incident)
             else:
-                # 날짜가 없으면 포함하지 않음
+                # Don't include if no date
                 pass
         all_incidents = filtered_by_date
         
         # ==========================================
-        # 1. Incident 상태 통계 (StatusEnumId 기반)
+        # 1. Incident status statistics (based on StatusEnumId)
         # StatusEnumId: 0=Open, 1=In Progress, 2=Closed
         # ==========================================
         total_incidents = len(all_incidents)
@@ -7826,7 +7845,7 @@ def get_dashboard_kpis():
         logger.info(f"KPI Query Result: total={total_incidents}, open={open_incidents}, in_progress={in_progress_incidents}, closed={closed_incidents}, other={other_status_incidents}")
         
         # ==========================================
-        # 2. Fall 카운트
+        # 2. Fall count
         # ==========================================
         fall_count = 0
         for incident in all_incidents:
@@ -7837,7 +7856,7 @@ def get_dashboard_kpis():
         logger.info(f"Fall count query result: {fall_count}")
         
         # ==========================================
-        # 3. Compliance Rate 계산 (Closed / Total * 100)
+        # 3. Calculate Compliance Rate (Closed / Total * 100)
         # ==========================================
         if total_incidents > 0:
             compliance_rate = round((closed_incidents / total_incidents) * 100, 1)
@@ -7845,7 +7864,7 @@ def get_dashboard_kpis():
             compliance_rate = 0
         
         # ==========================================
-        # 4. 응답 반환
+        # 4. Return response
         # ==========================================
         return jsonify({
             'total_incidents': total_incidents,
@@ -7874,17 +7893,17 @@ def get_dashboard_kpis():
 @login_required
 def get_dashboard_stats():
     """
-    Dashboard 통계 API - 차트용 데이터 (MANAD DB 직접 쿼리)
+    Dashboard statistics API - Chart data (Direct query from MANAD DB)
     
-    변경사항:
-    - CIMS DB 대신 MANAD DB에서 직접 쿼리
-    - 실시간 데이터 보장
-    - 개발/운영 서버 간 데이터 일치 보장
+    Changes:
+    - Query directly from MANAD DB instead of CIMS DB
+    - Ensure real-time data
+    - Ensure data consistency between development/production servers
     
-    반환 데이터:
-    - 전체 사이트 통계: 이벤트 유형, Risk Rating, Severity Rating 분포
-    - 사이트별 통계: Open/Closed, Reviewed 현황
-    - 추가 KPI: Ambulance, Hospital, Major Injury 등
+    Return data:
+    - All sites statistics: Event type, Risk Rating, Severity Rating distribution
+    - Per-site statistics: Open/Closed, Reviewed status
+    - Additional KPIs: Ambulance, Hospital, Major Injury, etc.
     """
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
@@ -7892,7 +7911,7 @@ def get_dashboard_stats():
         
         period = request.args.get('period', 'week')
         
-        # 기간 필터
+        # Period filter
         now = datetime.now()
         if period == 'today':
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -7906,7 +7925,7 @@ def get_dashboard_stats():
         
         logger.info(f"Fetching dashboard stats from MANAD DB: period={period}, start_date={start_date_str}")
         
-        # MANAD DB에서 모든 사이트의 인시던트 조회
+        # Query incidents from all sites in MANAD DB
         from manad_db_connector import MANADDBConnector
         safe_site_servers = get_safe_site_servers()
         
@@ -7916,7 +7935,7 @@ def get_dashboard_stats():
                 connector = MANADDBConnector(site_name)
                 success, incidents = connector.fetch_incidents(start_date_str, end_date_str)
                 if success and incidents:
-                    # 사이트 정보 추가
+                    # Add site information
                     for incident in incidents:
                         incident['site'] = site_name
                     all_incidents.extend(incidents)
@@ -7926,7 +7945,7 @@ def get_dashboard_stats():
         
         logger.info(f"📊 Total incidents from MANAD DB: {len(all_incidents)}")
         
-        # 날짜 필터 적용
+        # Apply date filter
         filtered_incidents = []
         for incident in all_incidents:
             incident_date = incident.get('Date') or incident.get('ReportedDate')
@@ -7943,7 +7962,7 @@ def get_dashboard_stats():
         all_incidents = filtered_incidents
         
         # ==========================================
-        # 1. 이벤트 유형 분포 (Event Type Distribution)
+        # 1. Event type distribution (Event Type Distribution)
         # ==========================================
         event_type_counts = {}
         for incident in all_incidents:
@@ -7965,7 +7984,7 @@ def get_dashboard_stats():
         event_type_distribution = [{'name': k, 'value': v} for k, v in sorted(event_type_counts.items(), key=lambda x: x[1], reverse=True)]
         
         # ==========================================
-        # 2. Risk Rating 분포
+        # 2. Risk Rating distribution
         # ==========================================
         risk_counts = {}
         for incident in all_incidents:
@@ -7975,7 +7994,7 @@ def get_dashboard_stats():
         risk_distribution = [{'name': k, 'value': v} for k, v in sorted(risk_counts.items(), key=lambda x: x[1], reverse=True)]
         
         # ==========================================
-        # 3. Severity Rating 분포
+        # 3. Severity Rating distribution
         # ==========================================
         severity_counts = {}
         for incident in all_incidents:
@@ -7985,7 +8004,7 @@ def get_dashboard_stats():
         severity_distribution = [{'name': k, 'value': v} for k, v in sorted(severity_counts.items(), key=lambda x: x[1], reverse=True)]
         
         # ==========================================
-        # 4. 사이트별 Open/Closed 통계
+        # 4. Per-site Open/Closed statistics
         # ==========================================
         site_stats = {}
         for incident in all_incidents:
@@ -8006,7 +8025,7 @@ def get_dashboard_stats():
                             for k, v in sorted(site_stats.items(), key=lambda x: x[1]['total'], reverse=True)]
         
         # ==========================================
-        # 5. 사이트별 Review 통계
+        # 5. Per-site Review statistics
         # ==========================================
         site_review = {}
         for incident in all_incidents:
@@ -8028,7 +8047,7 @@ def get_dashboard_stats():
                             for k, v in sorted(site_review.items(), key=lambda x: x[1]['total'], reverse=True)]
         
         # ==========================================
-        # 6. 추가 KPI 통계
+        # 6. Additional KPI statistics
         # ==========================================
         ambulance_called = sum(1 for i in all_incidents if i.get('IsAmbulanceCalled', False))
         hospital_admitted = sum(1 for i in all_incidents if i.get('IsAdmittedToHospital', False))
@@ -8047,7 +8066,7 @@ def get_dashboard_stats():
         }
         
         # ==========================================
-        # 7. Fall 전용 통계 (Witnessed vs Unwitnessed)
+        # 7. Fall-specific statistics (Witnessed vs Unwitnessed)
         # ==========================================
         fall_stats = {'witnessed': 0, 'unwitnessed': 0, 'unknown': 0}
         for incident in all_incidents:
@@ -8086,10 +8105,10 @@ def get_dashboard_stats():
 @login_required
 def reset_cims_database():
     """
-    CIMS DB 초기화 API
-    - 모든 CIMS 관련 테이블 데이터 삭제
-    - 불필요한 컬럼 검색 및 정리
-    - 초기 강제 동기화 실행
+    CIMS DB initialization API
+    - Delete all CIMS-related table data
+    - Search and clean up unnecessary columns
+    - Execute initial forced synchronization
     """
     try:
         if not (current_user.is_admin() or current_user.role == 'clinical_manager'):
@@ -8107,7 +8126,7 @@ def reset_cims_database():
             'sync_result': None
         }
         
-        # 1. CIMS 관련 테이블 데이터 삭제 (순서 중요: 외래키 참조 고려)
+        # 1. Delete CIMS-related table data (order matters: consider foreign key references)
         cims_tables = [
             'cims_audit_logs',
             'cims_progress_notes',
@@ -8125,15 +8144,15 @@ def reset_cims_database():
         
         for table in cims_tables:
             try:
-                # 테이블 존재 확인
+                # Check if table exists
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
                 if cursor.fetchone():
-                    # 데이터 개수 확인
+                    # Check data count
                     cursor.execute(f"SELECT COUNT(*) FROM {table}")
                     count = cursor.fetchone()[0]
                     
                     if count > 0:
-                        # 데이터 삭제
+                        # Delete data
                         cursor.execute(f"DELETE FROM {table}")
                         reset_info['tables_cleared'].append(table)
                         reset_info['rows_deleted'][table] = count
@@ -8146,15 +8165,15 @@ def reset_cims_database():
                 logger.error(f"❌ Error clearing {table}: {e}")
                 reset_info['rows_deleted'][table] = f"Error: {str(e)}"
         
-        # 2. 불필요한 컬럼 검색 및 정리 (cims_incidents 테이블)
+        # 2. Search and clean up unnecessary columns (cims_incidents table)
         try:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cims_incidents'")
             if cursor.fetchone():
-                # 테이블 스키마 확인
+                # Check table schema
                 cursor.execute("PRAGMA table_info(cims_incidents)")
                 columns = cursor.fetchall()
                 
-                # 예상되는 컬럼 목록 (필수 컬럼)
+                # Expected column list (required columns)
                 expected_columns = {
                     'id', 'incident_id', 'manad_incident_id', 'resident_id', 'resident_name',
                     'incident_type', 'severity', 'status', 'incident_date', 'location', 'description',
@@ -8182,7 +8201,7 @@ def reset_cims_database():
             logger.error(f"❌ Error checking columns: {e}")
             reset_info['columns_checked'] = {'error': str(e)}
         
-        # 3. system_settings에서 CIMS 관련 동기화 시간 초기화
+        # 3. Initialize CIMS-related sync times in system_settings
         try:
             cursor.execute("""
                 DELETE FROM system_settings 
@@ -8194,13 +8213,13 @@ def reset_cims_database():
         except Exception as e:
             logger.error(f"❌ Error clearing sync settings: {e}")
         
-        # 4. 커밋
+        # 4. Commit
         conn.commit()
         conn.close()
         
         logger.info("✅ CIMS DB reset completed")
         
-        # 5. 초기 강제 동기화 실행
+        # 5. Execute initial forced synchronization
         try:
             logger.info("🔄 Starting initial force sync after reset...")
             sync_result = sync_incidents_from_manad_to_cims(full_sync=True)
@@ -8233,11 +8252,11 @@ def reset_cims_database():
 @login_required
 def get_schedule_batch(site, date):
     """
-    🚀 Phase 2: Batch API - 한 번의 호출로 전체 스케줄 반환
+    🚀 Phase 2: Batch API - Return full schedule in a single call
     
-    Incidents + Tasks + Policy를 한 번에 조회하여 반환
-    - Mobile Dashboard 최적화용
-    - DB 쿼리 99.9% 감소 (2328 → 3회)
+    Query and return Incidents + Tasks + Policy in one go
+    - Optimized for Mobile Dashboard
+    - 99.9% reduction in DB queries (2328 → 3 calls)
     """
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'nurse', 'carer']):
@@ -8246,7 +8265,7 @@ def get_schedule_batch(site, date):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 1. Incidents + Tasks를 JOIN으로 한 번에 조회
+        # 1. Query Incidents + Tasks together using JOIN
         date_obj = datetime.fromisoformat(date)
         five_days_before = (date_obj - timedelta(days=5)).isoformat()
         
@@ -8268,7 +8287,7 @@ def get_schedule_batch(site, date):
         
         rows = cursor.fetchall()
         
-        # 2. Incidents별로 그룹화
+        # 2. Group by incidents
         incidents_map = {}
         for row in rows:
             incident_id = row[0]
@@ -8285,38 +8304,38 @@ def get_schedule_batch(site, date):
                     'status': row[8],
                     'location': row[9],
                     'site': row[10],
-                    'fall_type': row[11],  # Fall type 추가
+                    'fall_type': row[11],  # Add Fall type
                     'tasks': []
                 }
             
-            # Task가 있으면 추가 (인덱스가 1씩 증가)
+            # Add task if exists (index increases by 1)
             if row[12] is not None:  # task_db_id
                 task_data = {
                     'id': row[12],
                     'task_id': row[13],
                     'task_name': row[14],
                     'due_date': row[15],
-                    'status': row[16] or 'pending',  # NULL이면 'pending'
+                    'status': row[16] or 'pending',  # 'pending' if NULL
                     'completed_at': row[17],
                     'completed_by': row[18]
                 }
                 incidents_map[incident_id]['tasks'].append(task_data)
-                # 디버깅: task 추가 로그
-                if len(incidents_map[incident_id]['tasks']) <= 3:  # 처음 3개만 로그
+                # Debug: task addition log
+                if len(incidents_map[incident_id]['tasks']) <= 3:  # Log only first 3
                     logger.debug(f"Task added to incident {incident_id}: {task_data['task_id']} (due_date={task_data['due_date']}, status={task_data['status']})")
         
-        # 2.5. Fall type 계산 및 업데이트 (NULL이거나 비어있는 경우)
+        # 2.5. Calculate and update Fall type (if NULL or empty)
         from services.fall_policy_detector import fall_detector
         
         for incident_data in incidents_map.values():
             if not incident_data['fall_type']:
-                # Fall type 계산 (올바른 시그니처: incident_id, cursor)
+                # Calculate Fall type (correct signature: incident_id, cursor)
                 fall_type = fall_detector.detect_fall_type_from_incident(
                     incident_data['id'],  # incident DB ID
                     cursor  # DB cursor
                 )
                 
-                # DB 업데이트
+                # Update DB
                 try:
                     cursor.execute("""
                         UPDATE cims_incidents 
@@ -8325,13 +8344,13 @@ def get_schedule_batch(site, date):
                     """, (fall_type, incident_data['id']))
                     conn.commit()
                     
-                    # incidents_map 업데이트
+                    # Update incidents_map
                     incident_data['fall_type'] = fall_type
                     logger.info(f"📝 Incident {incident_data['incident_id']}: fall_type={fall_type} (calculated)")
                 except Exception as update_err:
                     logger.warning(f"⚠️ Failed to update fall_type for incident {incident_data['incident_id']}: {update_err}")
         
-        # 3. Fall Policy 조회 (모든 Fall policies 반환)
+        # 3. Query Fall Policy (return all Fall policies)
         cursor.execute("""
             SELECT id, policy_id, name, rules_json
             FROM cims_policies
@@ -8357,7 +8376,7 @@ def get_schedule_batch(site, date):
                 logger.warning(f"Failed to parse policy {policy_row[1]}: {e}")
                 continue
         
-        # Backwards compatibility: fall_policy는 첫 번째 policy
+        # Backwards compatibility: fall_policy is the first policy
         fall_policy = list(fall_policies.values())[0] if fall_policies else None
         
         logger.info(f"📋 Policies loaded: {list(fall_policies.keys())}")
@@ -8370,11 +8389,11 @@ def get_schedule_batch(site, date):
         total_tasks = sum(len(i['tasks']) for i in incidents_map.values())
         logger.info(f"🚀 Batch API: {site}/{date} - {len(incidents_map)} incidents, {total_tasks} tasks")
         
-        # 디버깅: 각 incident의 task 수 로그
-        for inc_id, inc_data in list(incidents_map.items())[:5]:  # 처음 5개만
+        # Debug: log task count per incident
+        for inc_id, inc_data in list(incidents_map.items())[:5]:  # Only first 5
             logger.debug(f"  Incident {inc_data['incident_id']}: {len(inc_data['tasks'])} tasks")
         
-        # Tasks가 없고 Fall incidents가 있으면 자동 생성 시도
+        # Attempt auto-generation if no tasks and Fall incidents exist
         if len(incidents_map) > 0 and total_tasks == 0 and fall_policy:
             logger.info("💡 No tasks found - attempting auto-generation...")
             conn_gen = None
@@ -8383,7 +8402,7 @@ def get_schedule_batch(site, date):
                 cursor_gen = conn_gen.cursor()
                 
                 tasks_generated = 0
-                # 각 incident에 대해 tasks 생성
+                # Generate tasks for each incident
                 for incident_data in incidents_map.values():
                     try:
                         num_tasks = auto_generate_fall_tasks(
@@ -8414,7 +8433,7 @@ def get_schedule_batch(site, date):
                     except:
                         pass
         
-        # 디버깅: policies 키 확인
+        # Debug: check policies keys
         logger.debug(f"📋 Policies keys in response: {list(fall_policies.keys())}")
         logger.debug(f"📋 Policies count: {len(fall_policies)}")
         
@@ -8425,9 +8444,9 @@ def get_schedule_batch(site, date):
             'policies': fall_policies,  # All Fall policies by policy_id (dict with policy_id as key)
             'site': site,
             'date': date,
-            'cached': False,  # Server-side 캐싱 시 True로 변경
+            'cached': False,  # Change to True when server-side caching is enabled
             'timestamp': datetime.now().isoformat(),
-            'auto_generated': total_tasks == 0 and len(incidents_map) > 0 and fall_policy  # Tasks 자동 생성 여부
+            'auto_generated': total_tasks == 0 and len(incidents_map) > 0 and fall_policy  # Whether tasks were auto-generated
         })
         
     except Exception as e:
@@ -8437,7 +8456,7 @@ def get_schedule_batch(site, date):
 @app.route('/api/cims/incident/<int:incident_id>/tasks')
 @login_required
 def get_incident_tasks(incident_id):
-    """인시던트의 모든 태스크와 완료 상태 조회 API"""
+    """API to query all tasks and completion status for incident"""
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'nurse', 'carer']):
             return jsonify({'error': 'Access denied'}), 403
@@ -8477,7 +8496,7 @@ def get_incident_tasks(incident_id):
 @app.route('/api/cims/overdue-tasks')
 @login_required
 def get_overdue_tasks():
-    """기한 초과 태스크 조회 API (관리자 전용)"""
+    """API to query overdue tasks (admin only)"""
     try:
         if not (current_user.is_admin() or current_user.is_clinical_manager()):
             return jsonify({'success': False, 'message': 'Access denied'}), 403
@@ -8496,7 +8515,7 @@ def get_overdue_tasks():
 @app.route('/api/cims/upcoming-tasks')
 @login_required
 def get_upcoming_tasks():
-    """곧 마감될 태스크 조회 API"""
+    """API to query tasks due soon"""
     try:
         hours_ahead = request.args.get('hours', 2, type=int)
         upcoming_tasks = policy_engine.get_upcoming_tasks(hours_ahead)
@@ -8511,10 +8530,10 @@ def get_upcoming_tasks():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================
-# CIMS API Blueprint 등록
+# Register CIMS API Blueprint
 # ==============================
 
-# CIMS API Blueprint 등록
+# Register CIMS API Blueprint
 from cims_api_endpoints import cims_api
 from cims_cache_api import cache_api
 from cims_background_processor import start_background_processing, stop_background_processing
@@ -8523,21 +8542,21 @@ app.register_blueprint(cims_api)
 app.register_blueprint(cache_api)
 
 # ==============================
-# CIMS 관리자 대시보드 라우트
+# CIMS Admin Dashboard Routes
 # ==============================
 
 @app.route('/admin_dashboard')
 @login_required
 def admin_dashboard():
-    """기존 관리자 대시보드 - 통합 대시보드로 리다이렉트"""
+    """Legacy admin dashboard - redirects to integrated dashboard"""
     return redirect(url_for('integrated_dashboard'))
 
 @app.route('/policy_admin')
 @login_required
 def policy_admin():
-    """정책 관리 인터페이스"""
+    """Policy management interface"""
     try:
-        # 관리자 권한 확인
+        # Check admin permissions
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
             flash('Access denied. Administrator privileges required.', 'error')
             return redirect(url_for('rod_dashboard'))
@@ -8552,37 +8571,37 @@ def policy_admin():
 @app.route('/mobile_dashboard')
 @login_required
 def mobile_dashboard():
-    """모바일 최적화 태스크 대시보드"""
+    """Mobile-optimized task dashboard"""
     try:
-        # 사용자 권한 확인
+        # Check user permissions
         if not current_user.can_complete_tasks() and not current_user.is_admin():
             flash('Access denied. You do not have permission to access the task dashboard.', 'error')
             return redirect(url_for('rod_dashboard'))
         
-        # 초기 로드 시 Policy 및 Tasks 확인
+        # Check Policy and Tasks on initial load
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Active Fall Policy 확인
+        # Check Active Fall Policy
         cursor.execute("""
             SELECT COUNT(*) FROM cims_policies WHERE is_active = 1
         """)
         policy_count = cursor.fetchone()[0]
         
-        # Fall incidents 확인
+        # Check Fall incidents
         cursor.execute("""
             SELECT COUNT(*) FROM cims_incidents 
             WHERE incident_type LIKE '%Fall%' AND status IN ('Open', 'Overdue')
         """)
         fall_incident_count = cursor.fetchone()[0]
         
-        # Tasks 확인
+        # Check Tasks
         cursor.execute("SELECT COUNT(*) FROM cims_tasks")
         task_count = cursor.fetchone()[0]
         
         conn.close()
         
-        # Policy가 없거나 Fall incidents가 있는데 tasks가 없으면 초기화 필요
+        # Initialization needed if no policy or Fall incidents exist but no tasks
         needs_init = (policy_count == 0) or (fall_incident_count > 0 and task_count == 0)
         
         if needs_init:
@@ -8605,9 +8624,9 @@ def mobile_dashboard():
 @app.route('/task_confirmation')
 @login_required
 def task_confirmation():
-    """태스크 완료 확인 페이지"""
+    """Task completion confirmation page"""
     try:
-        # 사용자 권한 확인
+        # Check user permissions
         if not current_user.can_complete_tasks() and not current_user.is_admin():
             flash('Access denied. You do not have permission to complete tasks.', 'error')
             return redirect(url_for('rod_dashboard'))
@@ -8620,13 +8639,13 @@ def task_confirmation():
         return redirect(url_for('rod_dashboard'))
 
 # ==============================
-# CIMS 정책 관리 API 엔드포인트
+# CIMS Policy Management API Endpoints
 # ==============================
 
 @app.route('/api/cims/policies', methods=['GET'])
 @login_required
 def get_policies():
-    """정책 목록 조회"""
+    """Query policy list"""
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
             return jsonify({'error': 'Access denied'}), 403
@@ -8653,7 +8672,7 @@ def get_policies():
 @app.route('/api/cims/policies/<int:policy_id>', methods=['GET'])
 @login_required
 def get_policy(policy_id):
-    """특정 정책 조회"""
+    """Query specific policy"""
     try:
         if not (current_user.is_admin() or current_user.role in ['clinical_manager', 'doctor']):
             return jsonify({'error': 'Access denied'}), 403
@@ -8677,14 +8696,14 @@ def get_policy(policy_id):
 @app.route('/api/cims/policies', methods=['POST'])
 @login_required
 def create_policy():
-    """새 정책 생성"""
+    """Create new policy"""
     try:
         if not current_user.is_admin():
             return jsonify({'error': 'Access denied'}), 403
         
         data = request.get_json()
         
-        # 필수 필드 검증
+        # Validate required fields
         required_fields = ['name', 'version', 'rules_json']
         for field in required_fields:
             if not data.get(field):
@@ -8693,7 +8712,7 @@ def create_policy():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 정책 ID 생성
+        # Generate policy ID
         policy_id = f"POL-{uuid.uuid4().hex[:6].upper()}"
         
         cursor.execute("""
@@ -8729,7 +8748,7 @@ def create_policy():
 @app.route('/api/cims/policies/<int:policy_id>', methods=['PUT'])
 @login_required
 def update_policy(policy_id):
-    """정책 업데이트"""
+    """Update policy"""
     try:
         if not current_user.is_admin():
             return jsonify({'error': 'Access denied'}), 403
@@ -8739,12 +8758,12 @@ def update_policy(policy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 정책 존재 확인
+        # Check if policy exists
         cursor.execute("SELECT id FROM cims_policies WHERE id = ?", (policy_id,))
         if not cursor.fetchone():
             return jsonify({'error': 'Policy not found'}), 404
         
-        # 정책 업데이트
+        # Update policy
         cursor.execute("""
             UPDATE cims_policies 
             SET name = ?, description = ?, version = ?, rules_json = ?, is_active = ?
@@ -8770,7 +8789,7 @@ def update_policy(policy_id):
 @app.route('/api/cims/policies/<int:policy_id>', methods=['DELETE'])
 @login_required
 def delete_policy(policy_id):
-    """정책 삭제"""
+    """Delete policy"""
     try:
         if not current_user.is_admin():
             return jsonify({'error': 'Access denied'}), 403
@@ -8778,7 +8797,7 @@ def delete_policy(policy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 정책 존재 확인
+        # Check if policy exists
         cursor.execute("SELECT id, policy_id, name FROM cims_policies WHERE id = ?", (policy_id,))
         policy = cursor.fetchone()
         
@@ -8786,8 +8805,8 @@ def delete_policy(policy_id):
             conn.close()
             return jsonify({'error': 'Policy not found'}), 404
         
-        # 정책 삭제 (실제로는 is_active를 False로 설정하는 것이 안전)
-        # 하지만 완전 삭제를 원하면 DELETE 사용
+        # Delete policy (actually safer to set is_active to False)
+        # But use DELETE if complete deletion is desired
         cursor.execute("DELETE FROM cims_policies WHERE id = ?", (policy_id,))
         
         conn.commit()
@@ -8801,18 +8820,18 @@ def delete_policy(policy_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 # ==============================
-# 통합 대시보드 라우트
+# Integrated Dashboard Routes
 # ==============================
 
 @app.route('/integrated_dashboard')
 @login_required
 def integrated_dashboard():
-    """통합 대시보드 - 역할별 자동 전환"""
+    """Integrated dashboard - auto-switch by role"""
     try:
-        # 사용자 역할 확인
+        # Check user role
         user_role = current_user.role if hasattr(current_user, 'role') else 'nurse'
         
-        # 역할별 권한 확인
+        # Check permissions by role
         if user_role not in ['admin', 'clinical_manager', 'registered_nurse', 'nurse', 'carer']:
             flash('You do not have permission to access this page.', 'error')
             return redirect(url_for('rod_dashboard'))
@@ -8827,27 +8846,27 @@ def integrated_dashboard():
         return redirect(url_for('rod_dashboard'))
 
 # ==============================
-# Blueprint 등록
+# Blueprint Registration
 # ==============================
 
-# Admin API Blueprint 등록
+# Register Admin API Blueprint
 app.register_blueprint(admin_api)
-
 # Progress Notes Cached API Blueprint 등록 (DEFAULT_PERIOD_DAYS = default period for cached API; must match frontend PERIOD_OPTIONS[0])
 from fetch_progress_notes_cached import progress_notes_cached_bp, DEFAULT_PERIOD_DAYS
+
 app.register_blueprint(progress_notes_cached_bp)
 
 # ==============================
-# 앱 실행
+# App Execution
 # ==============================
 
 def start_periodic_sync():
-    """주기적 백그라운드 동기화 스케줄러 시작 (5분마다 증분 동기화)"""
+    """Start periodic background synchronization scheduler (incremental sync every 5 minutes)"""
     
     def initial_sync_job():
-        """서버 시작 시 초기 동기화 (전체 30일)"""
+        """Initial synchronization on server start (full 30 days)"""
         try:
-            # 5초 대기 후 초기 동기화 시작 (서버 완전 시작 대기)
+            # Start initial sync after 5 second wait (wait for server to fully start)
             time.sleep(5)
             
             logger.info("=" * 60)
@@ -8862,7 +8881,7 @@ def start_periodic_sync():
             logger.error(f"❌ Initial data sync error: {e}")
     
     def periodic_sync_job():
-        """10분마다 실행되는 증분 동기화 작업"""
+        """Incremental synchronization job that runs every 10 minutes"""
         try:
             logger.info("=" * 60)
             logger.info("🔄 [PERIODIC SYNC] Starting periodic background sync (incremental)")
@@ -8871,7 +8890,7 @@ def start_periodic_sync():
             
             sync_result = sync_incidents_from_manad_to_cims(full_sync=False)
             
-            # Progress Note 동기화는 일시적으로 비활성화됨 (나중에 DB 직접 접속으로 재구현 예정)
+            # Progress Note synchronization is temporarily disabled (will be reimplemented with DB direct access later)
             # logger.info("🔄 Starting Progress Note sync...")
             # pn_sync_result = sync_progress_notes_from_manad_to_cims()
             
@@ -8884,23 +8903,23 @@ def start_periodic_sync():
             logger.error(f"❌ [PERIODIC SYNC] Periodic background sync error: {e}")
             logger.error("=" * 60)
     
-    # 서버 시작 시 초기 동기화 (백그라운드에서)
+    # Initial synchronization on server start (in background)
     initial_thread = threading.Thread(target=initial_sync_job, daemon=True)
     initial_thread.start()
     logger.info("🚀 Initial data sync thread started (runs after 5 seconds)")
     
-    # 10분마다 증분 동기화 실행
+    # Execute incremental sync every 10 minutes
     schedule.every(10).minutes.do(periodic_sync_job)
     
     def run_scheduler():
-        """스케줄러 실행 루프"""
+        """Scheduler execution loop"""
         logger.info("🔄 Periodic background sync scheduler started (every 10 minutes)")
         last_log_time = None
         while True:
             try:
                 schedule.run_pending()
                 
-                # 다음 동기화 시간 로그 (1분마다 한 번씩만)
+                # Log next sync time (once per minute)
                 current_time = datetime.now()
                 if last_log_time is None or (current_time - last_log_time).total_seconds() >= 60:
                     jobs = schedule.get_jobs()
@@ -8915,46 +8934,46 @@ def start_periodic_sync():
                             )
                     last_log_time = current_time
                 
-                time.sleep(30)  # 30초마다 스케줄 확인
+                time.sleep(30)  # Check schedule every 30 seconds
             except Exception as e:
                 logger.error(f"Scheduler error: {e}")
-                time.sleep(60)  # 오류 시 1분 대기
+                time.sleep(60)  # Wait 1 minute on error
     
-    # 백그라운드 스레드로 실행
+    # Run in background thread
     sync_thread = threading.Thread(target=run_scheduler, daemon=True)
     sync_thread.start()
     logger.info("✅ Periodic background sync scheduler started (every 10 minutes)")
 
 if __name__ == '__main__':
-    # CIMS Background Data Processor (선택적)
-    # 기능: Dashboard KPI 캐시 생성 (10분마다) → 성능 향상
-    # 개발 환경: 비활성화 (즉시 응답 확인 가능)
-    # 운영 환경: 활성화 추천 (.env에 PROD_ENABLE_BACKGROUND_PROCESSOR=True)
+    # CIMS Background Data Processor (optional)
+    # Function: Generate Dashboard KPI cache (every 10 minutes) → Performance improvement
+    # Development environment: Disabled (can check immediate response)
+    # Production environment: Recommended to enable (set PROD_ENABLE_BACKGROUND_PROCESSOR=True in .env)
     if flask_config.get('ENABLE_BACKGROUND_PROCESSOR', False):
         try:
             start_background_processing()
             logger.info("✅ CIMS Background Processor started (improves dashboard performance)")
         except Exception as e:
             logger.warning(f"⚠️ Background Processor failed to start: {e}")
-    # else: 개발 환경에서는 불필요한 메시지 출력 안 함
+    # else: Don't output unnecessary messages in development environment
     
-    # 메모리 모니터링 시작 (개발 환경에서 메모리 누수 감지)
+    # Start memory monitoring (detect memory leaks in development environment)
     try:
         start_memory_monitoring()
         logger.info("✅ Memory monitoring started")
     except Exception as e:
         logger.warning(f"⚠️ Failed to start memory monitoring: {e}")
     
-    # 주기적 백그라운드 동기화 시작 (5분마다 증분 동기화)
+    # Start periodic background synchronization (incremental sync every 5 minutes)
     try:
         start_periodic_sync()
     except Exception as e:
         logger.warning(f"⚠️ Failed to start periodic background sync: {e}")
     
-    # MANAD Plus Integrator (백그라운드 폴링 - 선택적)
-    # 현재: 증분 동기화로 충분 (API 호출 시 5분마다 자동 동기화)
-    # 향후: 실시간 폴링 필요 시 system_settings에서 'manad_integrator_enabled'=true 설정
-    # Note: 대부분의 경우 불필요 (증분 동기화가 더 효율적)
+    # MANAD Plus Integrator (background polling - optional)
+    # Current: Incremental sync is sufficient (auto-syncs every 5 minutes on API calls)
+    # Future: If real-time polling is needed, set 'manad_integrator_enabled'=true in system_settings
+    # Note: Mostly unnecessary (incremental sync is more efficient)
     
     try:
         app.run(

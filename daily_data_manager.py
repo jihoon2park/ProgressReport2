@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Daily Data Manager
-매일 최초 접속시에만 Care Area와 Event Type 데이터를 수집하는 매니저
+Manager that collects Care Area and Event Type data only on first access each day
 """
 
 import json
@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DailyDataManager:
-    """일일 데이터 수집 관리자"""
+    """Daily Data Collection Manager"""
     
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
@@ -21,11 +21,11 @@ class DailyDataManager:
         self._ensure_directories()
     
     def _ensure_directories(self):
-        """필요한 디렉토리 생성"""
+        """Create necessary directories"""
         os.makedirs(self.data_dir, exist_ok=True)
     
     def _load_daily_status(self) -> Dict[str, Any]:
-        """일일 상태 로드"""
+        """Load daily status"""
         try:
             if not os.path.exists(self.daily_status_file):
                 return {}
@@ -33,27 +33,27 @@ class DailyDataManager:
             with open(self.daily_status_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"일일 상태 로드 실패: {e}")
+            logger.error(f"Failed to load daily status: {e}")
             return {}
     
     def _save_daily_status(self, status: Dict[str, Any]) -> bool:
-        """일일 상태 저장"""
+        """Save daily status"""
         try:
             with open(self.daily_status_file, 'w', encoding='utf-8') as f:
                 json.dump(status, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
-            logger.error(f"일일 상태 저장 실패: {e}")
+            logger.error(f"Failed to save daily status: {e}")
             return False
     
     def is_first_access_today(self) -> bool:
-        """오늘 최초 접속인지 확인"""
+        """Check if this is the first access today"""
         today = date.today().isoformat()
         status = self._load_daily_status()
         
         last_access = status.get('last_access_date')
         if last_access != today:
-            # 오늘 최초 접속
+            # First access today
             status['last_access_date'] = today
             status['care_area_collected'] = False
             status['event_type_collected'] = False
@@ -63,21 +63,21 @@ class DailyDataManager:
         return False
     
     def mark_care_area_collected(self):
-        """Care Area 수집 완료 표시"""
+        """Mark Care Area collection as complete"""
         status = self._load_daily_status()
         status['care_area_collected'] = True
         self._save_daily_status(status)
-        logger.info("Care Area 수집 완료 표시")
+        logger.info("Care Area collection marked as complete")
     
     def mark_event_type_collected(self):
-        """Event Type 수집 완료 표시"""
+        """Mark Event Type collection as complete"""
         status = self._load_daily_status()
         status['event_type_collected'] = True
         self._save_daily_status(status)
-        logger.info("Event Type 수집 완료 표시")
+        logger.info("Event Type collection marked as complete")
     
     def should_collect_care_area(self) -> bool:
-        """Care Area를 수집해야 하는지 확인"""
+        """Check if Care Area should be collected"""
         if self.is_first_access_today():
             return True
         
@@ -85,7 +85,7 @@ class DailyDataManager:
         return not status.get('care_area_collected', False)
     
     def should_collect_event_type(self) -> bool:
-        """Event Type을 수집해야 하는지 확인"""
+        """Check if Event Type should be collected"""
         if self.is_first_access_today():
             return True
         
@@ -93,63 +93,63 @@ class DailyDataManager:
         return not status.get('event_type_collected', False)
     
     def collect_care_area_data(self, site: str) -> bool:
-        """Care Area 데이터 수집"""
+        """Collect Care Area data"""
         try:
             from api_carearea import APICareArea
             
-            logger.info(f"Care Area 데이터 수집 시작 - 사이트: {site}")
+            logger.info(f"Starting Care Area data collection - Site: {site}")
             api_carearea = APICareArea(site)
             care_area_data = api_carearea.get_care_area_information()
             
             if care_area_data:
                 self.mark_care_area_collected()
-                logger.info(f"Care Area 데이터 수집 완료 - 사이트: {site}")
+                logger.info(f"Care Area data collection completed - Site: {site}")
                 return True
             else:
-                logger.warning(f"Care Area 데이터 수집 실패 - 사이트: {site}")
+                logger.warning(f"Care Area data collection failed - Site: {site}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Care Area 데이터 수집 중 오류 - 사이트: {site}, 오류: {e}")
+            logger.error(f"Error during Care Area data collection - Site: {site}, Error: {e}")
             return False
     
     def collect_event_type_data(self, site: str) -> bool:
-        """Event Type 데이터 수집"""
+        """Collect Event Type data"""
         try:
             from api_eventtype import APIEventType
             
-            logger.info(f"Event Type 데이터 수집 시작 - 사이트: {site}")
+            logger.info(f"Starting Event Type data collection - Site: {site}")
             api_eventtype = APIEventType(site)
             event_type_data = api_eventtype.get_event_type_information()
             
             if event_type_data:
                 self.mark_event_type_collected()
-                logger.info(f"Event Type 데이터 수집 완료 - 사이트: {site}")
+                logger.info(f"Event Type data collection completed - Site: {site}")
                 return True
             else:
-                logger.warning(f"Event Type 데이터 수집 실패 - 사이트: {site}")
+                logger.warning(f"Event Type data collection failed - Site: {site}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Event Type 데이터 수집 중 오류 - 사이트: {site}, 오류: {e}")
+            logger.error(f"Error during Event Type data collection - Site: {site}, Error: {e}")
             return False
     
     def collect_daily_data_if_needed(self, site: str) -> Dict[str, bool]:
-        """필요시 일일 데이터 수집"""
+        """Collect daily data if needed"""
         results = {
             'care_area': False,
             'event_type': False
         }
         
-        # Care Area 수집 확인
+        # Check Care Area collection
         if self.should_collect_care_area():
             results['care_area'] = self.collect_care_area_data(site)
         
-        # Event Type 수집 확인
+        # Check Event Type collection
         if self.should_collect_event_type():
             results['event_type'] = self.collect_event_type_data(site)
         
         return results
 
-# 전역 인스턴스
+# Global instance
 daily_data_manager = DailyDataManager()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-데이터 소스 진단 스크립트
-인시던트 로드와 KPI가 서로 다른 데이터 소스를 사용하는지 확인
+Data source diagnosis script
+Check if incident loading and KPI use different data sources
 """
 
 import sqlite3
@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timedelta
 
 def diagnose_data_source():
-    """데이터 소스 진단"""
+    """Diagnose data source"""
     
     db_path = 'progress_report.db'
     
@@ -22,7 +22,7 @@ def diagnose_data_source():
     cursor = conn.cursor()
     
     try:
-        # 1. USE_DB_DIRECT_ACCESS 설정 확인
+        # 1. Check USE_DB_DIRECT_ACCESS setting
         cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
         result = cursor.fetchone()
         use_db_direct = result[0].lower() == 'true' if result and result[0] else False
@@ -43,7 +43,7 @@ def diagnose_data_source():
             print("   → KPI calculation: query CIMS SQLite DB")
             print("   → Data sources are the same")
         
-        # 2. 최근 30일 인시던트 수 (CIMS DB)
+        # 2. Incident count for last 30 days (CIMS DB)
         month_ago = (datetime.now() - timedelta(days=30)).isoformat()
         cursor.execute("""
             SELECT COUNT(*) as cnt
@@ -55,7 +55,7 @@ def diagnose_data_source():
         cims_month_count = cursor.fetchone()[0]
         print(f"\n📅 CIMS DB incidents (last 30 days): {cims_month_count}")
         
-        # 3. 상태별 분포 (최근 30일)
+        # 3. Status distribution (last 30 days)
         cursor.execute("""
             SELECT status, COUNT(*) as cnt
             FROM cims_incidents
@@ -71,7 +71,7 @@ def diagnose_data_source():
         for row in status_dist:
             print(f"   - {row[0]}: {row[1]}")
         
-        # 4. 마지막 동기화 시간
+        # 4. Last sync time
         cursor.execute("""
             SELECT value FROM system_settings 
             WHERE key = 'last_incident_sync_time'
@@ -88,7 +88,7 @@ def diagnose_data_source():
         else:
             print("\n⚠️  No sync record found")
         
-        # 5. 문제 진단
+        # 5. Issue diagnosis
         print(f"\n{'='*60}")
         print("Issue diagnosis")
         print(f"{'='*60}")

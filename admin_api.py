@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Admin API 엔드포인트 - API 키 관리 및 시스템 설정
+Admin API Endpoints - API Key Management and System Settings
 """
 
 from flask import Blueprint, request, jsonify, current_app
@@ -11,7 +11,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-# API 키 관리자 import
+# Import API key manager
 try:
     from api_key_manager_json import APIKeyManagerJSON
     API_KEY_MANAGER_AVAILABLE = True
@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
 admin_api = Blueprint('admin_api', __name__)
 
 def admin_required(f):
-    """Admin 권한이 필요한 함수 데코레이터"""
+    """Decorator for functions requiring admin privileges"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+            return jsonify({'success': False, 'message': 'Login required.'}), 401
         
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': 'Admin 권한이 필요합니다.'}), 403
+            return jsonify({'success': False, 'message': 'Admin privileges required.'}), 403
         
         return f(*args, **kwargs)
     return decorated_function
@@ -40,18 +40,18 @@ def admin_required(f):
 @login_required
 @admin_required
 def get_api_keys():
-    """모든 API 키 목록 조회"""
+    """Query all API key list"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         manager = APIKeyManagerJSON()
         api_keys = manager.get_all_api_keys()
         
-        # 보안을 위해 API 키는 일부만 표시
+        # Display only part of API key for security
         for api_key in api_keys:
             if api_key['api_key']:
                 api_key['api_key'] = api_key['api_key'][:20] + '...'
@@ -62,22 +62,22 @@ def get_api_keys():
         })
         
     except Exception as e:
-        logger.error(f"API 키 목록 조회 실패: {e}")
+        logger.error(f"Failed to query API key list: {e}")
         return jsonify({
             'success': False,
-            'message': f'API 키 목록 조회 실패: {str(e)}'
+            'message': f'Failed to query API key list: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys/<site_name>', methods=['GET'])
 @login_required
 @admin_required
 def get_api_key(site_name):
-    """특정 사이트의 API 키 조회"""
+    """Query API key for specific site"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         manager = APIKeyManagerJSON()
@@ -86,7 +86,7 @@ def get_api_key(site_name):
         if not api_key:
             return jsonify({
                 'success': False,
-                'message': f'API 키를 찾을 수 없습니다: {site_name}'
+                'message': f'API key not found: {site_name}'
             }), 404
         
         return jsonify({
@@ -95,33 +95,33 @@ def get_api_key(site_name):
         })
         
     except Exception as e:
-        logger.error(f"API 키 조회 실패 ({site_name}): {e}")
+        logger.error(f"Failed to query API key ({site_name}): {e}")
         return jsonify({
             'success': False,
-            'message': f'API 키 조회 실패: {str(e)}'
+            'message': f'Failed to query API key: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys', methods=['POST'])
 @login_required
 @admin_required
 def add_api_key():
-    """새 API 키 추가"""
+    """Add new API key"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         data = request.get_json()
         
-        # 필수 필드 검증
+        # Validate required fields
         required_fields = ['siteName', 'apiUsername', 'apiKey', 'serverIp']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({
                     'success': False,
-                    'message': f'필수 필드가 누락되었습니다: {field}'
+                    'message': f'Missing required field: {field}'
                 }), 400
         
         manager = APIKeyManagerJSON()
@@ -136,40 +136,40 @@ def add_api_key():
         )
         
         if success:
-            logger.info(f"API 키 추가됨: {data['siteName']} by {current_user.username}")
+            logger.info(f"API key added: {data['siteName']} by {current_user.username}")
             return jsonify({
                 'success': True,
-                'message': f'API 키가 성공적으로 추가되었습니다: {data["siteName"]}'
+                'message': f'API key successfully added: {data["siteName"]}'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': 'API 키 추가에 실패했습니다.'
+                'message': 'Failed to add API key.'
             }), 500
             
     except Exception as e:
-        logger.error(f"API 키 추가 실패: {e}")
+        logger.error(f"Failed to add API key: {e}")
         return jsonify({
             'success': False,
-            'message': f'API 키 추가 실패: {str(e)}'
+            'message': f'Failed to add API key: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys/<site_name>', methods=['PUT'])
 @login_required
 @admin_required
 def update_api_key(site_name):
-    """API 키 업데이트"""
+    """Update API key"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         data = request.get_json()
         manager = APIKeyManagerJSON()
         
-        # 업데이트할 필드들
+        # Fields to update
         update_data = {}
         if 'apiUsername' in data:
             update_data['api_username'] = data['apiUsername']
@@ -185,68 +185,68 @@ def update_api_key(site_name):
         success = manager.update_api_key(site_name, **update_data)
         
         if success:
-            logger.info(f"API 키 업데이트됨: {site_name} by {current_user.username}")
+            logger.info(f"API key updated: {site_name} by {current_user.username}")
             return jsonify({
                 'success': True,
-                'message': f'API 키가 성공적으로 업데이트되었습니다: {site_name}'
+                'message': f'API key successfully updated: {site_name}'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': 'API 키 업데이트에 실패했습니다.'
+                'message': 'Failed to update API key.'
             }), 500
             
     except Exception as e:
-        logger.error(f"API 키 업데이트 실패 ({site_name}): {e}")
+        logger.error(f"Failed to update API key ({site_name}): {e}")
         return jsonify({
             'success': False,
-            'message': f'API 키 업데이트 실패: {str(e)}'
+            'message': f'Failed to update API key: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys/<site_name>', methods=['DELETE'])
 @login_required
 @admin_required
 def delete_api_key(site_name):
-    """API 키 삭제"""
+    """Delete API key"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         manager = APIKeyManagerJSON()
         success = manager.deactivate_api_key(site_name)
         
         if success:
-            logger.info(f"API 키 삭제됨: {site_name} by {current_user.username}")
+            logger.info(f"API key deleted: {site_name} by {current_user.username}")
             return jsonify({
                 'success': True,
-                'message': f'API 키가 성공적으로 삭제되었습니다: {site_name}'
+                'message': f'API key successfully deleted: {site_name}'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': 'API 키 삭제에 실패했습니다.'
+                'message': 'Failed to delete API key.'
             }), 500
             
     except Exception as e:
-        logger.error(f"API 키 삭제 실패 ({site_name}): {e}")
+        logger.error(f"Failed to delete API key ({site_name}): {e}")
         return jsonify({
             'success': False,
-            'message': f'API 키 삭제 실패: {str(e)}'
+            'message': f'Failed to delete API key: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys/<site_name>/toggle', methods=['POST'])
 @login_required
 @admin_required
 def toggle_api_key(site_name):
-    """API 키 활성화/비활성화"""
+    """Enable/Disable API key"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         data = request.get_json()
@@ -256,35 +256,35 @@ def toggle_api_key(site_name):
         success = manager.update_api_key(site_name, is_active=is_active)
         
         if success:
-            action = '활성화' if is_active else '비활성화'
-            logger.info(f"API 키 {action}됨: {site_name} by {current_user.username}")
+            action = 'enabled' if is_active else 'disabled'
+            logger.info(f"API key {action}: {site_name} by {current_user.username}")
             return jsonify({
                 'success': True,
-                'message': f'API 키가 성공적으로 {action}되었습니다: {site_name}'
+                'message': f'API key successfully {action}: {site_name}'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': f'API 키 {action}에 실패했습니다.'
+                'message': f'Failed to {action} API key.'
             }), 500
             
     except Exception as e:
-        logger.error(f"API 키 토글 실패 ({site_name}): {e}")
+        logger.error(f"Failed to toggle API key ({site_name}): {e}")
         return jsonify({
             'success': False,
-            'message': f'API 키 토글 실패: {str(e)}'
+            'message': f'Failed to toggle API key: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys/<site_name>/test', methods=['POST'])
 @login_required
 @admin_required
 def test_api_connection(site_name):
-    """API 연결 테스트"""
+    """Test API connection"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         manager = APIKeyManagerJSON()
@@ -293,10 +293,10 @@ def test_api_connection(site_name):
         if not api_data:
             return jsonify({
                 'success': False,
-                'message': f'API 키를 찾을 수 없습니다: {site_name}'
+                'message': f'API key not found: {site_name}'
             }), 404
         
-        # API 연결 테스트
+        # Test API connection
         import requests
         from config import get_api_headers
         
@@ -310,31 +310,31 @@ def test_api_connection(site_name):
             
             return jsonify({
                 'success': True,
-                'message': f'연결 성공 (상태 코드: {response.status_code})'
+                'message': f'Connection successful (status code: {response.status_code})'
             })
         except requests.RequestException as e:
             return jsonify({
                 'success': False,
-                'message': f'연결 실패: {str(e)}'
+                'message': f'Connection failed: {str(e)}'
             })
             
     except Exception as e:
-        logger.error(f"API 연결 테스트 실패 ({site_name}): {e}")
+        logger.error(f"API connection test failed ({site_name}): {e}")
         return jsonify({
             'success': False,
-            'message': f'연결 테스트 실패: {str(e)}'
+            'message': f'Connection test failed: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/api-keys/test-all', methods=['POST'])
 @login_required
 @admin_required
 def test_all_api_connections():
-    """모든 API 연결 테스트"""
+    """Test all API connections"""
     try:
         if not API_KEY_MANAGER_AVAILABLE:
             return jsonify({
                 'success': False, 
-                'message': 'API 키 관리자가 사용할 수 없습니다.'
+                'message': 'API key manager is not available.'
             }), 500
         
         manager = APIKeyManagerJSON()
@@ -361,7 +361,7 @@ def test_all_api_connections():
                 results.append({
                     'site_name': api_key['site_name'],
                     'status': 'success',
-                    'message': f'연결 성공 (상태 코드: {response.status_code})'
+                    'message': f'Connection successful (status code: {response.status_code})'
                 })
                 success_count += 1
                 
@@ -369,32 +369,32 @@ def test_all_api_connections():
                 results.append({
                     'site_name': api_key['site_name'],
                     'status': 'error',
-                    'message': f'연결 실패: {str(e)}'
+                    'message': f'Connection failed: {str(e)}'
                 })
         
         return jsonify({
             'success': True,
-            'message': f'테스트 완료: {success_count}/{len(results)} 성공',
+            'message': f'Test completed: {success_count}/{len(results)} successful',
             'results': results
         })
         
     except Exception as e:
-        logger.error(f"전체 API 연결 테스트 실패: {e}")
+        logger.error(f"All API connection test failed: {e}")
         return jsonify({
             'success': False,
-            'message': f'전체 연결 테스트 실패: {str(e)}'
+            'message': f'All connection test failed: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/system-status', methods=['GET'])
 @login_required
 @admin_required
 def get_system_status():
-    """시스템 상태 조회"""
+    """Query system status"""
     try:
-        # 데이터베이스 연결 상태 확인 - JSON 전용 시스템으로 변경됨
+        # Check database connection status - changed to JSON-only system
         db_status = {'connected': True, 'type': 'JSON'}
         try:
-            # JSON 파일 기반 시스템이므로 항상 연결됨으로 간주
+            # Consider always connected since it's a JSON file-based system
             data_dir = 'data'
             if os.path.exists(data_dir):
                 db_status['connected'] = True
@@ -405,15 +405,15 @@ def get_system_status():
         except Exception as e:
             db_status['error'] = str(e)
         
-        # 암호화 키 상태 확인
+        # Check encryption key status
         encryption_status = {'available': False}
         try:
             if API_KEY_MANAGER_AVAILABLE:
                 manager = APIKeyManagerJSON()
-                # 암호화 키 파일 존재 확인
+                # Check if encryption key file exists
                 encryption_status['available'] = os.path.exists('api_key_encryption.key')
             else:
-                encryption_status['error'] = 'API 키 관리자를 사용할 수 없습니다.'
+                encryption_status['error'] = 'API key manager is not available.'
         except Exception as e:
             encryption_status['error'] = str(e)
         
@@ -425,27 +425,27 @@ def get_system_status():
         })
         
     except Exception as e:
-        logger.error(f"시스템 상태 조회 실패: {e}")
+        logger.error(f"Failed to query system status: {e}")
         return jsonify({
             'success': False,
-            'message': f'시스템 상태 조회 실패: {str(e)}'
+            'message': f'Failed to query system status: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/system-logs', methods=['GET'])
 @login_required
 @admin_required
 def get_system_logs():
-    """시스템 로그 조회"""
+    """Query system logs"""
     try:
         log_file = 'logs/app.log'
         
         if not os.path.exists(log_file):
             return jsonify({
                 'success': False,
-                'message': '로그 파일을 찾을 수 없습니다.'
+                'message': 'Log file not found.'
             }), 404
         
-        # 최근 100줄만 읽기
+        # Read only last 100 lines
         with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
             recent_lines = lines[-100:] if len(lines) > 100 else lines
@@ -457,14 +457,14 @@ def get_system_logs():
         })
         
     except Exception as e:
-        logger.error(f"시스템 로그 조회 실패: {e}")
+        logger.error(f"Failed to query system logs: {e}")
         return jsonify({
             'success': False,
-            'message': f'시스템 로그 조회 실패: {str(e)}'
+            'message': f'Failed to query system logs: {str(e)}'
         }), 500
 
 def get_db_connection():
-    """데이터베이스 연결"""
+    """Database connection"""
     conn = sqlite3.connect('progress_report.db', timeout=60.0)
     conn.row_factory = sqlite3.Row
     try:
@@ -479,12 +479,12 @@ def get_db_connection():
 @login_required
 @admin_required
 def get_data_source_mode():
-    """데이터 소스 모드 조회 (DB 또는 API)"""
+    """Query data source mode (DB or API)"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # system_settings에서 조회
+        # Query from system_settings
         cursor.execute("""
             SELECT value FROM system_settings 
             WHERE key = 'USE_DB_DIRECT_ACCESS'
@@ -493,13 +493,13 @@ def get_data_source_mode():
         result = cursor.fetchone()
         conn.close()
         
-        # DB에 저장된 값이 있으면 사용, 없으면 환경 변수 확인, 둘 다 없으면 'api'
+        # Use value from DB if exists, otherwise check environment variable, default to 'api' if neither exists
         if result and result[0]:
             mode = result[0].lower()
         else:
             mode = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower()
         
-        # 'true'/'false' 문자열을 'db'/'api'로 변환
+        # Convert 'true'/'false' strings to 'db'/'api'
         if mode == 'true' or mode == 'db':
             mode = 'db'
         else:
@@ -511,8 +511,8 @@ def get_data_source_mode():
         })
         
     except Exception as e:
-        logger.error(f"데이터 소스 모드 조회 실패: {e}")
-        # 오류 시 기본값 반환
+        logger.error(f"Failed to query data source mode: {e}")
+        # Return default value on error
         mode = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower()
         return jsonify({
             'success': True,
@@ -523,7 +523,7 @@ def get_data_source_mode():
 @login_required
 @admin_required
 def set_data_source_mode():
-    """데이터 소스 모드 설정 (DB 또는 API)"""
+    """Set data source mode (DB or API)"""
     try:
         data = request.get_json()
         mode = data.get('mode', 'api')  # 'db' or 'api'
@@ -534,13 +534,13 @@ def set_data_source_mode():
                 'error': 'Invalid mode. Must be "db" or "api"'
             }), 400
         
-        # 'db'/'api'를 'true'/'false'로 변환하여 저장
+        # Convert 'db'/'api' to 'true'/'false' for storage
         value = 'true' if mode == 'db' else 'false'
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # system_settings에 저장
+        # Save to system_settings
         cursor.execute("""
             INSERT OR REPLACE INTO system_settings (key, value, updated_at)
             VALUES ('USE_DB_DIRECT_ACCESS', ?, ?)
@@ -549,49 +549,49 @@ def set_data_source_mode():
         conn.commit()
         conn.close()
         
-        # 환경 변수도 업데이트 (현재 프로세스에만 적용)
+        # Also update environment variable (applies only to current process)
         os.environ['USE_DB_DIRECT_ACCESS'] = value
         
-        logger.info(f"데이터 소스 모드 변경: {mode} (by {current_user.username})")
+        logger.info(f"Data source mode changed: {mode} (by {current_user.username})")
         
         return jsonify({
             'success': True,
             'mode': mode,
-            'message': f'데이터 소스 모드가 "{mode}" 모드로 변경되었습니다. 변경 사항 적용을 위해 서버 재시작을 권장합니다.'
+            'message': f'Data source mode changed to "{mode}" mode. Server restart is recommended to apply changes.'
         })
         
     except Exception as e:
-        logger.error(f"데이터 소스 모드 설정 실패: {e}")
+        logger.error(f"Failed to set data source mode: {e}")
         return jsonify({
             'success': False,
-            'error': f'데이터 소스 모드 설정 실패: {str(e)}'
+            'error': f'Failed to set data source mode: {str(e)}'
         }), 500
 
 @admin_api.route('/api/admin/restart-server', methods=['POST'])
 @login_required
 @admin_required
 def restart_server():
-    """서버 재시작 (배치 파일 실행)"""
+    """Restart server (execute batch file)"""
     import subprocess
     import os
     import sys
     from pathlib import Path
     
     try:
-        logger.info(f"서버 재시작 요청: {current_user.username}")
+        logger.info(f"Server restart requested: {current_user.username}")
         
-        # 프로젝트 루트 디렉토리 찾기
+        # Find project root directory
         project_root = Path(__file__).parent.absolute()
         restart_script = project_root / 'restart_server_simple.bat'
         
         if not restart_script.exists():
             return jsonify({
                 'success': False,
-                'error': '재시작 스크립트를 찾을 수 없습니다.'
+                'error': 'Restart script not found.'
             }), 404
         
-        # 배치 파일을 백그라운드에서 실행
-        # Windows에서는 CREATE_NEW_CONSOLE 플래그 사용
+        # Execute batch file in background
+        # Use CREATE_NEW_CONSOLE flag on Windows
         if sys.platform == 'win32':
             subprocess.Popen(
                 [str(restart_script)],
@@ -600,22 +600,22 @@ def restart_server():
                 shell=True
             )
         else:
-            # Linux/Mac의 경우
+            # For Linux/Mac
             subprocess.Popen(
                 ['bash', str(restart_script)],
                 cwd=str(project_root)
             )
         
-        logger.info("서버 재시작 스크립트 실행됨")
+        logger.info("Server restart script executed")
         
         return jsonify({
             'success': True,
-            'message': '서버 재시작이 시작되었습니다. 잠시 후 자동으로 연결됩니다.'
+            'message': 'Server restart has started. It will automatically reconnect shortly.'
         })
         
     except Exception as e:
-        logger.error(f"서버 재시작 실패: {e}")
+        logger.error(f"Server restart failed: {e}")
         return jsonify({
             'success': False,
-            'error': f'서버 재시작 실패: {str(e)}'
+            'error': f'Server restart failed: {str(e)}'
         }), 500

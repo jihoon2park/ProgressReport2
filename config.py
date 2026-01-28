@@ -1,15 +1,15 @@
 # config.py
 
 
-# 기존 하드코딩된 설정을 DB 기반으로 변경
+# Change hardcoded settings to DB-based
 
-# 기본 API 인증 헤더 (공통 부분)
+# Default API authentication headers (common part)
 API_HEADERS = {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
 }
 
-# 기본 사이트 서버 정보 (폴백용)
+# Default site server information (for fallback)
 SITE_SERVERS = {
     'Parafield Gardens': '192.168.1.11:8080',
     'Nerrilda': '192.168.21.12:8080',
@@ -18,30 +18,30 @@ SITE_SERVERS = {
     'Yankalilla': '192.168.51.12:8080'
 }
 
-# JSON 기반 API 키 관리자 사용
+# Use JSON-based API key manager
 try:
     from api_key_manager_json import get_api_headers, get_server_info, get_site_servers
     USE_DB_API_KEYS = True
     print("JSON API key manager loaded successfully")
 except ImportError as e:
-    # 폴백: 기본 설정 (개발/테스트용)
+    # Fallback: default settings (for development/testing)
     USE_DB_API_KEYS = False
     print(f"JSON API key manager load failed, using fallback: {e}")
 except Exception as e:
-    # 기타 오류도 폴백으로 처리
+    # Handle other errors with fallback
     USE_DB_API_KEYS = False
     print(f"JSON API key manager error, using fallback: {e}")
     
     def get_api_headers(site):
-        """사이트에 맞는 API 헤더 반환 (폴백)"""
+        """Return API headers for site (fallback)"""
         headers = API_HEADERS.copy()
         headers['x-api-username'] = 'ManadAPI'
-        # 폴백에서는 기본 키 사용
+        # Use default key in fallback
         headers['x-api-key'] = 'default-key'
         return headers
     
     def get_server_info(site):
-        """서버 정보 반환 (폴백)"""
+        """Return server information (fallback)"""
         server_info = SITE_SERVERS.get(site, SITE_SERVERS['Parafield Gardens'])
         ip, port = server_info.split(':')
         return {
@@ -51,11 +51,11 @@ except Exception as e:
         }
     
     def get_site_servers():
-        """사이트 서버 정보 반환 (폴백)"""
+        """Return site server information (fallback)"""
         return SITE_SERVERS
 
 def get_available_sites():
-    """사용 가능한 사이트 목록을 DB 또는 폴백에서 가져오기"""
+    """Get available site list from DB or fallback"""
     try:
         if USE_DB_API_KEYS:
             return list(get_site_servers().keys())
@@ -65,12 +65,12 @@ def get_available_sites():
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Failed to fetch site information: {e}")
-        return list(SITE_SERVERS.keys())  # 폴백
+        return list(SITE_SERVERS.keys())  # Fallback
 
-# SITE_SERVERS는 하위 호환성을 위해 유지 (DB에서 동적으로 생성)
+# SITE_SERVERS maintained for backward compatibility (dynamically generated from DB)
 if USE_DB_API_KEYS:
     def get_site_servers():
-        """DB에서 사이트 서버 정보 조회"""
+        """Query site server information from DB"""
         try:
             from api_key_manager_json import get_api_key_manager
             manager = get_api_key_manager()
@@ -83,11 +83,11 @@ if USE_DB_API_KEYS:
             return servers
         except Exception as e:
             print(f"JSON site server info load failed, using fallback: {e}")
-            return SITE_SERVERS  # 기본값 반환
+            return SITE_SERVERS  # Return default value
     
     try:
         SITE_SERVERS = get_site_servers()
-        # DB에서 로드된 사이트가 비어있으면 기본값 사용
+        # Use default values if DB-loaded sites are empty
         if not SITE_SERVERS:
             print("DB loaded sites empty, using default values")
             SITE_SERVERS = {
@@ -99,8 +99,8 @@ if USE_DB_API_KEYS:
             }
     except Exception as e:
         print(f"SITE_SERVERS initialization failed, using default: {e}")
-        # 기본값은 이미 위에서 정의됨
+        # Default value already defined above
 else:
-    # 기존 방식 사용
+    # Use existing method
     print("Fallback mode: using default SITE_SERVERS")
     pass

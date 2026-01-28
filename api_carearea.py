@@ -6,7 +6,7 @@ import os
 
 from flask import json
 
-# 로깅 설정
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -38,7 +38,7 @@ class APICareArea:
             response.raise_for_status()
             care_area_data = response.json()
             
-            # 데이터를 파일로 저장
+            # Save data to file
             self._save_care_area_data(care_area_data)
             
             return care_area_data
@@ -50,19 +50,19 @@ class APICareArea:
             raise e
 
     def _save_care_area_data(self, care_area_data: Dict[str, Any]):
-        """Care Area 데이터를 JSON 파일로 저장"""
+        """Save Care Area data to JSON file"""
         try:
-            # data 디렉토리가 없으면 생성
+            # Create data directory if it doesn't exist
             if not os.path.exists('data'):
                 os.makedirs('data')
-                logger.info("data 디렉토리 생성됨")
+                logger.info("data directory created")
 
-            # JSON 파일로 저장
+            # Save as JSON file
             with open('data/carearea.json', 'w', encoding='utf-8') as f:
                 json.dump(care_area_data, f, ensure_ascii=False, indent=4)
             
-            logger.info("Care Area 데이터가 성공적으로 저장됨: data/carearea.json")
+            logger.info("Care Area data saved successfully: data/carearea.json")
             
         except Exception as e:
-            logger.error(f"Care Area 데이터 저장 중 오류 발생: {str(e)}")
+            logger.error(f"Error saving Care Area data: {str(e)}")
             raise

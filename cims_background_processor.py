@@ -20,12 +20,12 @@ logger = logging.getLogger(__name__)
 
 class CIMSBackgroundProcessor:
     def __init__(self, db_path: str = None):
-        # 절대 경로 사용하여 working directory 문제 방지
+        # Use absolute path to prevent working directory issues
         import os
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'progress_report.db')
         elif not os.path.isabs(db_path):
-            # 상대 경로인 경우 스크립트 위치 기준으로 변환
+            # Convert relative path to absolute based on script location
             db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), db_path)
         self.db_path = db_path
         self.running = False

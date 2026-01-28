@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CIMS RESTful API Endpoints
-Mobile Application과 Web Dashboard를 위한 API 엔드포인트
+API endpoints for Mobile Application and Web Dashboard
 """
 
 from flask import Blueprint, request, jsonify, current_app
@@ -17,17 +17,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Blueprint 생성
+# Create Blueprint
 cims_api = Blueprint('cims_api', __name__, url_prefix='/api/v1')
 
 def get_db_connection():
-    """데이터베이스 연결"""
+    """Database connection"""
     conn = sqlite3.connect('progress_report.db', timeout=30.0)
     conn.row_factory = sqlite3.Row
     return conn
 
 def require_role(*allowed_roles):
-    """역할 기반 접근 제어 데코레이터"""
+    """Role-based access control decorator"""
     def decorator(f):
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
@@ -36,15 +36,15 @@ def require_role(*allowed_roles):
             user_role = current_user.role
             print(f"User role: {user_role}, Allowed roles: {allowed_roles}")
             
-            # admin은 모든 역할에 접근 가능
+            # admin can access all roles
             if user_role == 'admin':
                 return f(*args, **kwargs)
             
-            # 직접 역할 확인
+            # Direct role check
             if user_role in allowed_roles:
                 return f(*args, **kwargs)
             
-            # clinical_manager는 admin 권한도 가짐
+            # clinical_manager also has admin privileges
             if user_role == 'clinical_manager' and 'admin' in allowed_roles:
                 return f(*args, **kwargs)
             
@@ -63,12 +63,12 @@ def require_role(*allowed_roles):
 def create_incident():
     """
     POST /api/v1/incidents
-    새 인시던트 생성 및 정책 엔진 트리거
+    Create new incident and trigger policy engine
     """
     try:
         data = request.get_json()
         
-        # 필수 필드 검증
+        # Validate required fields
         required_fields = ['resident_id', 'type', 'severity', 'incident_time', 'brief_description']
         for field in required_fields:
             if not data.get(field):
@@ -77,20 +77,20 @@ def create_incident():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 인시던트 ID 생성
+        # Generate incident ID
         incident_id = f"I-{uuid.uuid4().hex[:6].upper()}"
         
-        # 사진 첨부파일 처리
+        # Process photo attachments
         photo_attachments = []
         if data.get('photo_attachments'):
             for i, photo_data in enumerate(data['photo_attachments']):
                 if photo_data.startswith('data:image'):
-                    # Base64 이미지 저장
+                    # Save Base64 image
                     photo_filename = f"incident_{incident_id}_{i+1}.jpg"
                     photo_path = save_base64_image(photo_data, photo_filename)
                     photo_attachments.append(photo_path)
         
-        # 인시던트 저장
+        # Save incident
         cursor.execute("""
             INSERT INTO cims_incidents (
                 incident_id, resident_id, resident_name, incident_type, severity,
@@ -117,7 +117,7 @@ def create_incident():
         incident_db_id = cursor.lastrowid
         conn.commit()
         
-        # 정책 엔진 트리거
+        # Trigger policy engine
         policy_engine = PolicyEngine()
         incident_data = {
             'id': incident_db_id,
@@ -131,7 +131,7 @@ def create_incident():
         
         generated_tasks = policy_engine.apply_policies_to_incident(incident_data)
         
-        # 감사 로그
+        # Audit log
         cursor.execute("""
             INSERT INTO cims_audit_logs (
                 log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -174,7 +174,7 @@ def create_incident():
 def get_my_tasks():
     """
     GET /api/v1/tasks/me
-    현재 사용자에게 할당된 태스크 조회
+    Query tasks assigned to current user
     """
     try:
         status_filter = request.args.get('status', 'active')
@@ -182,7 +182,7 @@ def get_my_tasks():
         
         policy_engine = PolicyEngine()
         
-        # 상태 필터 매핑
+        # Status filter mapping
         status_mapping = {
             'active': ['pending', 'in_progress'],
             'overdue': ['overdue'],
@@ -204,10 +204,10 @@ def get_my_tasks():
                 role=current_user.role
             )
         
-        # 태스크 포맷팅
+        # Format tasks
         formatted_tasks = []
         for task in tasks:
-            # 긴급도 계산
+            # Calculate urgency
             due_date = datetime.fromisoformat(task['due_date'].replace('Z', '+00:00'))
             now = datetime.now()
             time_diff = due_date - now
@@ -215,10 +215,10 @@ def get_my_tasks():
             if time_diff.total_seconds() < 0:
                 urgency = 'Overdue'
                 status = 'overdue'
-            elif time_diff.total_seconds() < 4 * 3600:  # 4시간 미만
+            elif time_diff.total_seconds() < 4 * 3600:  # Less than 4 hours
                 urgency = 'High'
                 status = 'active'
-            elif time_diff.total_seconds() < 24 * 3600:  # 24시간 미만
+            elif time_diff.total_seconds() < 24 * 3600:  # Less than 24 hours
                 urgency = 'Medium'
                 status = 'active'
             else:
@@ -239,7 +239,7 @@ def get_my_tasks():
             }
             formatted_tasks.append(formatted_task)
         
-        # 정렬
+        # Sort
         if sort_by == 'due_date':
             formatted_tasks.sort(key=lambda x: x['due_date'])
         elif sort_by == 'urgency':
@@ -262,7 +262,7 @@ def get_my_tasks():
 def complete_task(task_id):
     """
     POST /api/v1/tasks/{task_id}/complete
-    태스크 완료 및 진행 노트 제출
+    Complete task and submit progress note
     """
     try:
         data = request.get_json()
@@ -273,19 +273,19 @@ def complete_task(task_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 태스크 존재 확인
+        # Check if task exists
         cursor.execute("SELECT * FROM cims_tasks WHERE task_id = ?", (task_id,))
         task = cursor.fetchone()
         
         if not task:
             return jsonify({'error': 'Task not found'}), 404
         
-        # 권한 확인 (할당된 사용자 또는 같은 역할)
+        # Check permissions (assigned user or same role)
         if task['assigned_user_id'] and task['assigned_user_id'] != current_user.id:
             if not current_user.is_admin():
                 return jsonify({'error': 'Not authorized to complete this task'}), 403
         
-        # 진행 노트 저장
+        # Save progress note
         progress_note = data['progress_note']
         note_id = f"PN-{uuid.uuid4().hex[:8].upper()}"
         
@@ -307,7 +307,7 @@ def complete_task(task_id):
             datetime.now().isoformat()
         ))
         
-        # 태스크 완료 처리
+        # Process task completion
         completed_at = datetime.now()
         cursor.execute("""
             UPDATE cims_tasks 
@@ -318,11 +318,11 @@ def complete_task(task_id):
             WHERE id = ?
         """, (current_user.id, completed_at, completed_at, task['id']))
         
-        # 컴플라이언스 상태 확인
+        # Check compliance status
         due_date = datetime.fromisoformat(task['due_date'])
         compliance_status = "On Time" if completed_at <= due_date else "Late"
         
-        # 감사 로그
+        # Audit log
         cursor.execute("""
             INSERT INTO cims_audit_logs (
                 log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -365,12 +365,12 @@ def complete_task(task_id):
 def get_compliance_summary():
     """
     GET /api/v1/analytics/compliance-summary
-    컴플라이언스 요약 분석
+    Compliance summary analysis
     """
     try:
         period = request.args.get('period', 'last_30_days')
         
-        # 기간 계산
+        # Calculate period
         if period == 'last_7_days':
             start_date = datetime.now() - timedelta(days=7)
         elif period == 'last_30_days':
@@ -383,7 +383,7 @@ def get_compliance_summary():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 인시던트 통계
+        # Incident statistics
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_incidents,
@@ -395,7 +395,7 @@ def get_compliance_summary():
         
         incident_stats = cursor.fetchone()
         
-        # 컴플라이언스 메트릭
+        # Compliance metrics
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_tasks,
@@ -407,7 +407,7 @@ def get_compliance_summary():
         
         task_stats = cursor.fetchone()
         
-        # 기한 초과 직원 (CIMS 시스템에서는 assigned_user_id를 직접 사용)
+        # Overdue staff (CIMS system uses assigned_user_id directly)
         cursor.execute("""
             SELECT DISTINCT assigned_user_id as username
             FROM cims_tasks t
@@ -419,7 +419,7 @@ def get_compliance_summary():
         
         overdue_staff = cursor.fetchall()
         
-        # 인시던트 유형별 위험 영역
+        # Risk areas by incident type
         cursor.execute("""
             SELECT 
                 incident_type as type,
@@ -440,7 +440,7 @@ def get_compliance_summary():
         
         conn.close()
         
-        # 컴플라이언스 비율 계산
+        # Calculate compliance rate
         total_tasks = task_stats['total_tasks'] or 1
         compliance_rate = round((task_stats['on_time_tasks'] or 0) * 100.0 / total_tasks, 1)
         
@@ -455,7 +455,7 @@ def get_compliance_summary():
                 'overdue_tasks_count': task_stats['overdue_tasks'] or 0,
                 'total_tasks': total_tasks,
                 'overdue_staff': [f"User {staff['username']}" for staff in overdue_staff],
-                'avg_completion_time_min': 15.4  # 임시 값
+                'avg_completion_time_min': 15.4  # Temporary value
             },
             'top_risk_areas': [
                 {
@@ -475,11 +475,11 @@ def get_compliance_summary():
 @login_required
 @require_role('admin', 'clinical_manager')
 def get_incidents_by_type():
-    """인시던트 유형별 통계 조회"""
+    """Query statistics by incident type"""
     try:
         period = request.args.get('period', 'last_30_days')
         
-        # 기간 계산
+        # Calculate period
         if period == 'last_7_days':
             start_date = datetime.now() - timedelta(days=7)
         elif period == 'last_30_days':
@@ -530,7 +530,7 @@ def get_incidents_by_type():
 def get_overdue_tasks():
     """
     GET /api/v1/tasks/overdue
-    기한 초과 태스크 목록
+    List of overdue tasks
     """
     try:
         conn = get_db_connection()
@@ -582,7 +582,7 @@ def get_overdue_tasks():
 def confirm_task_completion(task_id):
     """
     POST /api/v1/tasks/{task_id}/confirm-completion
-    MANAD Plus에서 완료된 태스크 확인 (Progress Note 작성 완료 확인)
+    Confirm task completed in MANAD Plus (verify Progress Note completion)
     """
     try:
         data = request.get_json()
@@ -593,19 +593,19 @@ def confirm_task_completion(task_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 태스크 존재 확인
+        # Check if task exists
         cursor.execute("SELECT * FROM cims_tasks WHERE task_id = ?", (task_id,))
         task = cursor.fetchone()
         
         if not task:
             return jsonify({'error': 'Task not found'}), 404
         
-        # 권한 확인 (할당된 사용자 또는 같은 역할)
+        # Check permissions (assigned user or same role)
         if task['assigned_user_id'] and task['assigned_user_id'] != current_user.id:
             if not current_user.is_admin():
                 return jsonify({'error': 'Not authorized to complete this task'}), 403
         
-        # 태스크 완료 확인 처리 (Pending 상태로 변경 - 시스템 검증 대기)
+        # Process task completion confirmation (change to Pending status - awaiting system validation)
         confirmed_at = datetime.fromisoformat(data['confirmed_at'].replace('Z', '+00:00'))
         
         cursor.execute("""
@@ -618,11 +618,11 @@ def confirm_task_completion(task_id):
             WHERE id = ?
         """, (current_user.id, confirmed_at, confirmed_at, task['id']))
         
-        # 컴플라이언스 상태 확인
+        # Check compliance status
         due_date = datetime.fromisoformat(task['due_date'])
         compliance_status = "On Time" if confirmed_at <= due_date else "Late"
         
-        # 감사 로그 (MANAD Plus 통합 방식)
+        # Audit log (MANAD Plus integration method)
         cursor.execute("""
             INSERT INTO cims_audit_logs (
                 log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -663,7 +663,7 @@ def confirm_task_completion(task_id):
 def get_task_details(task_id):
     """
     GET /api/v1/tasks/{task_id}
-    특정 태스크 상세 정보 조회
+    Query detailed information for specific task
     """
     try:
         conn = get_db_connection()
@@ -682,12 +682,12 @@ def get_task_details(task_id):
         if not task:
             return jsonify({'error': 'Task not found'}), 404
         
-        # 권한 확인
+        # Check permissions
         if task['assigned_user_id'] and task['assigned_user_id'] != current_user.id:
             if not current_user.is_admin():
                 return jsonify({'error': 'Not authorized to view this task'}), 403
         
-        # 태스크 정보 포맷팅
+        # Format task information
         task_info = {
             'task_id': task['task_id'],
             'title': task['task_name'],
@@ -700,7 +700,7 @@ def get_task_details(task_id):
             'resident': {
                 'name': task['resident_name'],
                 'id': task.get('resident_id', 'Unknown'),
-                'room': 'Unknown'  # 거주자 상세 정보는 별도 API에서 조회
+                'room': 'Unknown'  # Resident details are queried from separate API
             },
             'assigned_role': task['assigned_role'],
             'note_type': task['note_type']
@@ -718,7 +718,7 @@ def get_task_details(task_id):
 def get_integrator_status():
     """
     GET /api/v1/integrator/status
-    MANAD Plus Integrator 상태 조회
+    Query MANAD Plus Integrator status
     """
     try:
         from manad_plus_integrator import get_manad_integrator
@@ -738,7 +738,7 @@ def get_integrator_status():
 def start_integrator():
     """
     POST /api/v1/integrator/start
-    MANAD Plus Integrator 시작
+    Start MANAD Plus Integrator
     """
     try:
         from manad_plus_integrator import get_manad_integrator
@@ -760,7 +760,7 @@ def start_integrator():
 def stop_integrator():
     """
     POST /api/v1/integrator/stop
-    MANAD Plus Integrator 중지
+    Stop MANAD Plus Integrator
     """
     try:
         from manad_plus_integrator import get_manad_integrator
@@ -779,17 +779,17 @@ def stop_integrator():
 # ==============================
 
 def save_base64_image(base64_data, filename):
-    """Base64 이미지를 파일로 저장"""
+    """Save Base64 image to file"""
     try:
-        # data:image/jpeg;base64, 부분 제거
+        # Remove data:image/jpeg;base64, part
         if ',' in base64_data:
             base64_data = base64_data.split(',')[1]
         
-        # 저장 디렉토리 생성
+        # Create save directory
         upload_dir = 'static/uploads/incidents'
         os.makedirs(upload_dir, exist_ok=True)
         
-        # 파일 저장
+        # Save file
         file_path = os.path.join(upload_dir, filename)
         with open(file_path, 'wb') as f:
             f.write(base64.b64decode(base64_data))

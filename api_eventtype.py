@@ -6,7 +6,7 @@ import os
 
 from flask import json
 
-# 로깅 설정
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -38,7 +38,7 @@ class APIEventType:
             response.raise_for_status()
             event_type_data = response.json()
             
-            # 데이터를 파일로 저장
+            # Save data to file
             self._save_event_type_data(event_type_data)
             
             return event_type_data
@@ -50,30 +50,30 @@ class APIEventType:
             raise e
 
     def _save_event_type_data(self, event_type_data: Dict[str, Any]):
-        """Event Type 데이터를 JSON 파일로 저장 (사이트별 + 통합)"""
+        """Save Event Type data to JSON file (site-specific + unified)"""
         try:
-            # data 디렉토리가 없으면 생성
+            # Create data directory if it doesn't exist
             if not os.path.exists('data'):
                 os.makedirs('data')
-                logger.info("data 디렉토리 생성됨")
+                logger.info("data directory created")
 
-            # 1. 사이트별 JSON 파일로 저장
+            # 1. Save as site-specific JSON file
             site_filename = f'data/eventtype_{self.site}.json'
             with open(site_filename, 'w', encoding='utf-8') as f:
                 json.dump(event_type_data, f, ensure_ascii=False, indent=4)
-            logger.info(f"Event Type 데이터가 사이트별로 저장됨: {site_filename}")
+            logger.info(f"Event Type data saved per site: {site_filename}")
             
-            # 2. 통합 JSON 파일로도 저장 (기존 호환성 유지)
+            # 2. Also save as unified JSON file (maintain backward compatibility)
             with open('data/eventtype.json', 'w', encoding='utf-8') as f:
                 json.dump(event_type_data, f, ensure_ascii=False, indent=4)
-            logger.info("Event Type 데이터가 통합 파일로 저장됨: data/eventtype.json")
+            logger.info("Event Type data saved to unified file: data/eventtype.json")
             
         except Exception as e:
-            logger.error(f"Event Type 데이터 저장 중 오류 발생: {str(e)}")
+            logger.error(f"Error saving Event Type data: {str(e)}")
             raise
 
 def fetch_all_sites_event_types():
-    """모든 사이트의 Event Type을 가져와서 사이트별로 저장"""
+    """Fetch Event Types from all sites and save per site"""
     from config import SITE_SERVERS
     
     results = {}
@@ -91,18 +91,18 @@ def fetch_all_sites_event_types():
     return results
 
 def get_site_event_types(site: str):
-    """특정 사이트의 Event Type을 JSON 파일에서 로드"""
+    """Load Event Types for specific site from JSON file"""
     try:
         site_filename = f'data/eventtype_{site}.json'
         
-        # 사이트별 파일이 있으면 로드
+        # Load if site-specific file exists
         if os.path.exists(site_filename):
             with open(site_filename, 'r', encoding='utf-8') as f:
                 event_types = json.load(f)
             logger.info(f"Loaded {len(event_types)} event types for site {site} from {site_filename}")
             return event_types
         
-        # 사이트별 파일이 없으면 통합 파일에서 로드
+        # Load from unified file if site-specific file doesn't exist
         elif os.path.exists('data/eventtype.json'):
             with open('data/eventtype.json', 'r', encoding='utf-8') as f:
                 event_types = json.load(f)

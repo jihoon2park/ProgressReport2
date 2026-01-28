@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Progress Report System - 클라이언트 동기화 매니저
-새로운 거주자 추가/변경 시 SQLite 캐시 자동 업데이트
+Progress Report System - Client Synchronization Manager
+Automatically update SQLite cache when new residents are added/changed
 """
 
 import sqlite3
@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import logging
 
-# api_client에서 통합 함수 import
+# Import unified function from api_client
 try:
     from api_client import fetch_client_information
 except ImportError:
@@ -24,26 +24,26 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class ClientSyncManager:
-    """클라이언트 데이터 동기화 매니저"""
+    """Client data synchronization manager"""
     
     def __init__(self, db_path='progress_report.db'):
         self.db_path = db_path
-        self.cache_expiry_minutes = 30  # 캐시 만료 시간 (30분)
-        self.sync_interval_minutes = 30  # 자동 동기화 간격 (30분)
+        self.cache_expiry_minutes = 30  # Cache expiry time (30 minutes)
+        self.sync_interval_minutes = 30  # Auto sync interval (30 minutes)
         self.sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'Yankalilla']
         
-        # 데이터베이스 존재 확인
+        # Check if database exists
         if not os.path.exists(self.db_path):
             raise FileNotFoundError(f"Database file not found: {self.db_path}")
     
     def get_db_connection(self):
-        """데이터베이스 연결"""
+        """Connect to database"""
         conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         return conn
     
     def is_cache_expired(self, site: str) -> bool:
-        """캐시가 만료되었는지 확인"""
+        """Check if cache is expired"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -57,7 +57,7 @@ class ClientSyncManager:
             conn.close()
             
             if not result or not result['last_sync_time']:
-                return True  # 동기화 기록이 없으면 만료된 것으로 간주
+                return True  # Consider expired if no sync record exists
             
             last_sync = datetime.fromisoformat(result['last_sync_time'])
             expiry_time = datetime.now() - timedelta(minutes=self.cache_expiry_minutes)
@@ -66,10 +66,10 @@ class ClientSyncManager:
             
         except Exception as e:
             logger.error(f"Failed to check cache expiry ({site}): {e}")
-            return True  # 오류 시 만료된 것으로 간주
+            return True  # Consider expired on error
     
     def get_cache_age(self, site: str) -> Optional[int]:
-        """캐시 나이를 분 단위로 반환"""
+        """Return cache age in minutes"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -88,7 +88,7 @@ class ClientSyncManager:
             last_sync = datetime.fromisoformat(result['last_sync_time'])
             age = datetime.now() - last_sync
             
-            return int(age.total_seconds() / 60)  # 분 단위
+            return int(age.total_seconds() / 60)  # In minutes
             
         except Exception as e:
             logger.error(f"Failed to check cache age ({site}): {e}")
@@ -96,10 +96,10 @@ class ClientSyncManager:
     
     def refresh_site_clients(self, site: str) -> Dict[str, Any]:
         """
-        특정 사이트의 거주자 데이터 새로고침 (단순화)
+        Refresh resident data for specific site (simplified)
         
-        DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로,
-        별도의 캐시 업데이트는 불필요합니다.
+        In direct DB access mode, latest data is queried each time,
+        so separate cache updates are unnecessary.
         """
         result = {
             'success': False,
@@ -111,7 +111,7 @@ class ClientSyncManager:
         try:
             logger.info(f"Starting resident data fetch for {site}")
             
-            # DB에서 최신 데이터 가져오기 (캐시 없이 직접 조회)
+            # Get latest data from DB (direct query without cache)
             api_success, latest_clients = fetch_client_information(site)
             
             if not api_success:
@@ -131,11 +131,11 @@ class ClientSyncManager:
         
         return result
     
-    # update_sqlite_cache 메서드 제거됨
-    # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 업데이트 불필요
+    # update_sqlite_cache method removed
+    # Cache updates unnecessary in direct DB access mode as latest data is queried each time
     
     def refresh_all_sites(self) -> Dict[str, Any]:
-        """모든 사이트의 거주자 데이터 새로고침"""
+        """Refresh resident data for all sites"""
         results = {}
         total_clients = 0
         
@@ -155,10 +155,10 @@ class ClientSyncManager:
     
     def get_clients_with_auto_refresh(self, site: str) -> List[Dict]:
         """
-        거주자 데이터 가져오기 (단순화)
+        Get resident data (simplified)
         
-        DB 직접 접속 모드에서는 매번 최신 데이터를 직접 조회합니다.
-        캐시를 사용하지 않습니다.
+        In direct DB access mode, latest data is queried directly each time.
+        Cache is not used.
         """
         from api_client import fetch_client_information
         
@@ -172,7 +172,7 @@ class ClientSyncManager:
             return []
     
     def get_sync_status_summary(self) -> Dict[str, Any]:
-        """동기화 상태 요약"""
+        """Get synchronization status summary"""
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
@@ -203,9 +203,9 @@ class ClientSyncManager:
             conn.close()
     
     def start_background_sync(self):
-        """백그라운드 동기화 시작"""
+        """Start background synchronization"""
         def daily_sync_job():
-            """매일 새벽 3시 동기화 작업"""
+            """Daily synchronization job at 3 AM"""
             logger.info("Starting daily 3 AM resident data check")
             results = self.refresh_all_sites()
             
@@ -218,37 +218,37 @@ class ClientSyncManager:
                 f"total {total_clients} residents"
             )
         
-        # 스케줄 설정 - 매일 새벽 3시만
+        # Set schedule - daily at 3 AM only
         schedule.every().day.at("03:00").do(daily_sync_job)
         
         def run_scheduler():
             while True:
                 schedule.run_pending()
-                time.sleep(60)  # 1분마다 스케줄 확인
+                time.sleep(60)  # Check schedule every minute
         
-        # 백그라운드 스레드로 실행
+        # Run in background thread
         sync_thread = threading.Thread(target=run_scheduler, daemon=False)
         sync_thread.start()
         
         logger.info("Background sync started (daily at 3 AM)")
 
 
-# Flask 앱에서 사용할 전역 인스턴스
+# Global instance for Flask app
 client_sync_manager = None
 
 def get_client_sync_manager():
-    """클라이언트 동기화 매니저 싱글톤 인스턴스"""
+    """Client synchronization manager singleton instance"""
     global client_sync_manager
     if client_sync_manager is None:
         client_sync_manager = ClientSyncManager()
     return client_sync_manager
 
 def init_client_sync(app=None):
-    """Flask 앱 초기화 시 호출"""
+    """Called when Flask app initializes"""
     try:
         manager = get_client_sync_manager()
         
-        # 백그라운드 동기화 시작
+        # Start background synchronization
         manager.start_background_sync()
         
         if app:
@@ -264,14 +264,14 @@ def init_client_sync(app=None):
         return False
 
 
-# 명령줄에서 직접 실행 시 테스트
+# Test when run directly from command line
 if __name__ == "__main__":
     print("Client Sync Manager test")
     
     try:
         manager = ClientSyncManager()
         
-        # 현재 동기화 상태 확인
+        # Check current sync status
         print("\nCurrent sync status:")
         status = manager.get_sync_status_summary()
         for site, info in status.items():
@@ -280,17 +280,16 @@ if __name__ == "__main__":
             expired = "expired" if info['is_expired'] else "valid"
             print(f"  {site}: {info['records']} residents, last sync {age_str} ({expired})")
         
-        # 테스트: 한 사이트 새로고침
+        # Test: refresh one site
         print("\nParafield Gardens refresh test...")
         result = manager.refresh_site_clients('Parafield Gardens')
         
         if result['success']:
-            changes = result['changes']
-            print(f"✅ Success: added {changes['added']}, updated {changes['updated']}, removed {changes['removed']}")
+            print(f"✅ Success: {result['client_count']} residents")
         else:
             print(f"❌ Failed: {result['message']}")
         
-        # 캐시된 클라이언트 조회 테스트
+        # Test cached client fetch
         print("\nCached client fetch test...")
         clients = manager.get_clients_with_auto_refresh('Parafield Gardens')
         print(f"Fetched clients: {len(clients)}")
@@ -298,7 +297,8 @@ if __name__ == "__main__":
         if clients:
             print("First 3:")
             for i, client in enumerate(clients[:3]):
-                print(f"  {i+1}. {client['client_name']} (Room: {client['room_number']})")
+                client_name = client.get('ClientName') or client.get('client_name', 'Unknown')
+                print(f"  {i+1}. {client_name}")
         
     except Exception as e:
         print(f"❌ Test failed: {e}")

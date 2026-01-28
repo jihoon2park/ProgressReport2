@@ -10,12 +10,12 @@ class UsageLogger:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(exist_ok=True)
         
-        # 로깅 설정
+        # Logging configuration
         self.setup_logging()
     
     def setup_logging(self):
-        """로깅 설정"""
-        # logs 디렉토리 생성 (스크립트 위치 기준)
+        """Logging configuration"""
+        # Create logs directory (relative to script location)
         script_dir = Path(__file__).parent
         logs_dir = script_dir / 'logs'
         logs_dir.mkdir(exist_ok=True)
@@ -32,33 +32,33 @@ class UsageLogger:
         self.logger = logging.getLogger(__name__)
     
     def get_adelaide_timezone(self):
-        """애들레이드 시간대 반환 (DST 고려)"""
+        """Return Adelaide timezone (considering DST)"""
         from datetime import datetime, timezone, timedelta
         
-        # 현재 UTC 시간
+        # Current UTC time
         utc_now = datetime.now(timezone.utc)
         year = utc_now.year
         
-        # 일광절약시간 시작: 10월 첫째 일요일 2:00 AM
+        # DST start: First Sunday of October at 2:00 AM
         dst_start = datetime(year, 10, 1, 2, 0, 0, tzinfo=timezone.utc)
-        while dst_start.weekday() != 6:  # 일요일 찾기
+        while dst_start.weekday() != 6:  # Find Sunday
             dst_start = dst_start + timedelta(days=1)
         
-        # 일광절약시간 종료: 4월 첫째 일요일 2:00 AM
+        # DST end: First Sunday of April at 2:00 AM
         dst_end = datetime(year, 4, 1, 2, 0, 0, tzinfo=timezone.utc)
-        while dst_end.weekday() != 6:  # 일요일 찾기
+        while dst_end.weekday() != 6:  # Find Sunday
             dst_end = dst_end + timedelta(days=1)
         
-        # DST 기간 확인 (10월 ~ 다음해 3월)
+        # Check DST period (October ~ March of next year)
         if utc_now >= dst_start or utc_now < dst_end:
-            # ACDT: UTC+10:30 (일광절약시간)
+            # ACDT: UTC+10:30 (Daylight Saving Time)
             return timezone(timedelta(hours=10, minutes=30))
         else:
-            # ACST: UTC+9:30 (표준시)
+            # ACST: UTC+9:30 (Standard Time)
             return timezone(timedelta(hours=9, minutes=30))
     
     def get_monthly_dir(self, target_date=None):
-        """월별 디렉토리 경로 반환"""
+        """Return monthly directory path"""
         if target_date is None:
             target_date = datetime.now()
         
@@ -69,7 +69,7 @@ class UsageLogger:
         return monthly_dir
     
     def get_daily_log_file(self, log_type, target_date=None):
-        """일별 로그 파일 경로 반환"""
+        """Return daily log file path"""
         if target_date is None:
             target_date = datetime.now()
         
@@ -80,14 +80,14 @@ class UsageLogger:
         return log_file
     
     def log_access(self, user_info=None, page_info=None):
-        """접속 로그 기록"""
+        """Record access log"""
         try:
-            # 애들레이드 시간대 사용 (ACST: UTC+9:30, ACDT: UTC+10:30)
+            # Use Adelaide timezone (ACST: UTC+9:30, ACDT: UTC+10:30)
             adelaide_tz = self.get_adelaide_timezone()
             now = datetime.now(adelaide_tz)
             log_file = self.get_daily_log_file("access", now)
             
-            # 접속 정보 수집
+            # Collect access information
             access_info = {
                 "timestamp": now.isoformat(),
                 "user": {
@@ -114,7 +114,7 @@ class UsageLogger:
                 }
             }
             
-            # 기존 로그 읽기
+            # Read existing logs
             existing_logs = []
             if log_file.exists():
                 try:
@@ -123,10 +123,10 @@ class UsageLogger:
                 except (json.JSONDecodeError, FileNotFoundError):
                     existing_logs = []
             
-            # 새 로그 추가
+            # Add new log
             existing_logs.append(access_info)
             
-            # 로그 파일 저장
+            # Save log file
             with open(log_file, 'w', encoding='utf-8') as f:
                 json.dump(existing_logs, f, ensure_ascii=False, indent=2)
             
@@ -136,14 +136,14 @@ class UsageLogger:
             self.logger.error(f"Error logging access: {str(e)}")
     
     def log_progress_note(self, note_data, user_info=None, success=True, error_message=None):
-        """Progress Note 로그 기록"""
+        """Record Progress Note log"""
         try:
-            # 애들레이드 시간대 사용 (ACST: UTC+9:30, ACDT: UTC+10:30)
+            # Use Adelaide timezone (ACST: UTC+9:30, ACDT: UTC+10:30)
             adelaide_tz = self.get_adelaide_timezone()
             now = datetime.now(adelaide_tz)
             log_file = self.get_daily_log_file("progress_notes", now)
             
-            # Progress Note 정보 수집
+            # Collect Progress Note information
             note_log = {
                 "timestamp": now.isoformat(),
                 "user": {
@@ -163,7 +163,7 @@ class UsageLogger:
                     "late_entry": note_data.get("lateEntry", False),
                     "notes_length": len(note_data.get("notes", "")),
                     "notes_preview": note_data.get("notes", "")[:200] + "..." if len(note_data.get("notes", "")) > 200 else note_data.get("notes", ""),
-                    "notes_full": note_data.get("notes", ""),  # 전체 노트 내용 저장
+                    "notes_full": note_data.get("notes", ""),  # Store full note content
                     "create_time": note_data.get("createTime"),
                     "event_time": note_data.get("eventTime"),
                     "site": note_data.get("site", "Unknown")
@@ -178,7 +178,7 @@ class UsageLogger:
                 }
             }
             
-            # 기존 로그 읽기
+            # Read existing logs
             existing_logs = []
             if log_file.exists():
                 try:
@@ -187,10 +187,10 @@ class UsageLogger:
                 except (json.JSONDecodeError, FileNotFoundError):
                     existing_logs = []
             
-            # 새 로그 추가
+            # Add new log
             existing_logs.append(note_log)
             
-            # 로그 파일 저장
+            # Save log file
             with open(log_file, 'w', encoding='utf-8') as f:
                 json.dump(existing_logs, f, ensure_ascii=False, indent=2)
             
@@ -201,14 +201,14 @@ class UsageLogger:
             self.logger.error(f"Error logging progress note: {str(e)}")
     
     def log_api_call(self, api_endpoint, request_data=None, response_data=None, user_info=None, success=True, error_message=None):
-        """API 호출 로그 기록"""
+        """Record API call log"""
         try:
-            # 애들레이드 시간대 사용 (ACST: UTC+9:30, ACDT: UTC+10:30)
+            # Use Adelaide timezone (ACST: UTC+9:30, ACDT: UTC+10:30)
             adelaide_tz = self.get_adelaide_timezone()
             now = datetime.now(adelaide_tz)
             log_file = self.get_daily_log_file("api_calls", now)
             
-            # API 호출 정보 수집
+            # Collect API call information
             api_log = {
                 "timestamp": now.isoformat(),
                 "user": {
@@ -234,7 +234,7 @@ class UsageLogger:
                 }
             }
             
-            # 기존 로그 읽기
+            # Read existing logs
             existing_logs = []
             if log_file.exists():
                 try:
@@ -243,10 +243,10 @@ class UsageLogger:
                 except (json.JSONDecodeError, FileNotFoundError):
                     existing_logs = []
             
-            # 새 로그 추가
+            # Add new log
             existing_logs.append(api_log)
             
-            # 로그 파일 저장
+            # Save log file
             with open(log_file, 'w', encoding='utf-8') as f:
                 json.dump(existing_logs, f, ensure_ascii=False, indent=2)
             
@@ -257,7 +257,7 @@ class UsageLogger:
             self.logger.error(f"Error logging API call: {str(e)}")
     
     def get_log_summary(self, start_date=None, end_date=None, log_type="access"):
-        """로그 요약 정보 반환"""
+        """Return log summary information"""
         try:
             if start_date is None:
                 start_date = datetime.now().replace(day=1)
@@ -294,7 +294,7 @@ class UsageLogger:
                             if username:
                                 summary["unique_users"].add(username)
                             
-                            # 에러 카운트 (progress_notes와 api_calls의 경우)
+                            # Error count (for progress_notes and api_calls)
                             if log_type in ["progress_notes", "api_calls"]:
                                 if not log_entry.get("result", {}).get("success", True):
                                     summary["error_count"] += 1
@@ -304,7 +304,7 @@ class UsageLogger:
                 
                 current_date = current_date + timedelta(days=1) # Increment date correctly
             
-            # set을 list로 변환
+            # Convert set to list
             summary["unique_users"] = list(summary["unique_users"])
             
             return summary
@@ -314,7 +314,7 @@ class UsageLogger:
             return None
 
     def get_access_log_hourly_summary(self, start_date=None, end_date=None):
-        """Access log의 시간별 사용자 활동 요약 반환"""
+        """Return hourly user activity summary for Access log"""
         try:
             if start_date is None:
                 start_date = datetime.now().replace(day=1)
@@ -328,9 +328,9 @@ class UsageLogger:
                 },
                 "total_entries": 0,
                 "unique_users": set(),
-                "hourly_activity": {},  # 시간별 활동
-                "user_activity": {},    # 사용자별 활동
-                "page_activity": {}     # 페이지별 활동
+                "hourly_activity": {},  # Hourly activity
+                "user_activity": {},    # User activity
+                "page_activity": {}     # Page activity
             }
             
             current_date = start_date
@@ -354,7 +354,7 @@ class UsageLogger:
                             if username:
                                 hourly_summary["unique_users"].add(username)
                             
-                            # 타임스탬프에서 시간 추출
+                            # Extract hour from timestamp
                             timestamp = log_entry.get("timestamp", "")
                             if timestamp:
                                 try:
@@ -362,7 +362,7 @@ class UsageLogger:
                                     hour_key = dt.strftime("%Y-%m-%d %H:00")
                                     date_hour_key = dt.strftime("%Y-%m-%d")
                                     
-                                    # 시간별 활동 카운트
+                                    # Count hourly activity
                                     if hour_key not in hourly_summary["hourly_activity"]:
                                         hourly_summary["hourly_activity"][hour_key] = {
                                             "total_visits": 0,
@@ -374,14 +374,14 @@ class UsageLogger:
                                     if username:
                                         hourly_summary["hourly_activity"][hour_key]["unique_users"].add(username)
                                     
-                                    # 페이지 정보
+                                    # Page information
                                     page_info = log_entry.get("page", {})
                                     page_path = page_info.get("path", "unknown")
                                     if page_path not in hourly_summary["hourly_activity"][hour_key]["pages"]:
                                         hourly_summary["hourly_activity"][hour_key]["pages"][page_path] = 0
                                     hourly_summary["hourly_activity"][hour_key]["pages"][page_path] += 1
                                     
-                                    # 사용자별 활동
+                                    # User activity
                                     if username:
                                         if username not in hourly_summary["user_activity"]:
                                             hourly_summary["user_activity"][username] = {
@@ -396,17 +396,17 @@ class UsageLogger:
                                         hourly_summary["user_activity"][username]["total_visits"] += 1
                                         hourly_summary["user_activity"][username]["last_visit"] = timestamp
                                         
-                                        # 사용자별 페이지 방문
+                                        # User page visits
                                         if page_path not in hourly_summary["user_activity"][username]["pages_visited"]:
                                             hourly_summary["user_activity"][username]["pages_visited"][page_path] = 0
                                         hourly_summary["user_activity"][username]["pages_visited"][page_path] += 1
                                         
-                                        # 사용자별 시간대별 방문
+                                        # User hourly visits
                                         if hour_key not in hourly_summary["user_activity"][username]["hourly_visits"]:
                                             hourly_summary["user_activity"][username]["hourly_visits"][hour_key] = 0
                                         hourly_summary["user_activity"][username]["hourly_visits"][hour_key] += 1
                                     
-                                    # 페이지별 활동
+                                    # Page activity
                                     if page_path not in hourly_summary["page_activity"]:
                                         hourly_summary["page_activity"][page_path] = {
                                             "total_visits": 0,
@@ -430,16 +430,16 @@ class UsageLogger:
                 
                 current_date = current_date + timedelta(days=1)
             
-            # set을 list로 변환
+            # Convert set to list
             hourly_summary["unique_users"] = list(hourly_summary["unique_users"])
             
-            # 시간별 활동에서 unique_users를 list로 변환
+            # Convert unique_users in hourly_activity to list
             for hour_key in hourly_summary["hourly_activity"]:
                 hourly_summary["hourly_activity"][hour_key]["unique_users"] = list(
                     hourly_summary["hourly_activity"][hour_key]["unique_users"]
                 )
             
-            # 페이지별 활동에서 unique_users를 list로 변환
+            # Convert unique_users in page_activity to list
             for page_path in hourly_summary["page_activity"]:
                 hourly_summary["page_activity"][page_path]["unique_users"] = list(
                     hourly_summary["page_activity"][page_path]["unique_users"]
@@ -452,7 +452,7 @@ class UsageLogger:
             return None
 
     def get_daily_access_summary(self, start_date=None, end_date=None):
-        """일별 접속 현황 요약"""
+        """Daily access status summary"""
         try:
             if start_date is None:
                 start_date = datetime.now().replace(day=1)
@@ -464,7 +464,7 @@ class UsageLogger:
                     "start": start_date.isoformat(),
                     "end": end_date.isoformat()
                 },
-                "daily_stats": {}  # 일별 통계
+                "daily_stats": {}  # Daily statistics
             }
             
             current_date = start_date
@@ -477,7 +477,7 @@ class UsageLogger:
                         with open(log_file, 'r', encoding='utf-8') as f:
                             daily_logs = json.load(f)
                         
-                        # 일별 통계 계산
+                        # Calculate daily statistics
                         daily_users = set()
                         daily_visits = len(daily_logs)
                         
@@ -496,7 +496,7 @@ class UsageLogger:
                     except Exception as e:
                         self.logger.error(f"Error reading log file {log_file}: {str(e)}")
                 else:
-                    # 로그가 없는 날도 기록
+                    # Record days without logs
                     daily_summary["daily_stats"][date_str] = {
                         "total_visits": 0,
                         "unique_users": 0,
@@ -512,7 +512,7 @@ class UsageLogger:
             return None
 
     def get_user_daily_activity(self, username, start_date=None, end_date=None):
-        """특정 사용자의 일별 접속 현황"""
+        """Daily access status for specific user"""
         try:
             if start_date is None:
                 start_date = datetime.now().replace(day=1)
@@ -525,7 +525,7 @@ class UsageLogger:
                     "start": start_date.isoformat(),
                     "end": end_date.isoformat()
                 },
-                "daily_activity": {}  # 일별 활동
+                "daily_activity": {}  # Daily activity
             }
             
             current_date = start_date
@@ -538,7 +538,7 @@ class UsageLogger:
                         with open(log_file, 'r', encoding='utf-8') as f:
                             daily_logs = json.load(f)
                         
-                        # 해당 사용자의 로그만 필터링
+                        # Filter only logs for this user
                         user_logs = []
                         for log_entry in daily_logs:
                             user_info = log_entry.get("user", {})
@@ -547,7 +547,7 @@ class UsageLogger:
                                 user_logs.append(log_entry)
                         
                         if user_logs:
-                            # 사용자의 일별 활동 계산
+                            # Calculate user's daily activity
                             first_visit = None
                             last_visit = None
                             total_visits = len(user_logs)
@@ -564,7 +564,7 @@ class UsageLogger:
                                     except:
                                         pass
                             
-                            # 사용 시간 계산 (분 단위)
+                            # Calculate usage time (in minutes)
                             usage_minutes = 0
                             if first_visit and last_visit:
                                 usage_minutes = int((last_visit - first_visit).total_seconds() / 60)
@@ -576,7 +576,7 @@ class UsageLogger:
                                 "usage_minutes": usage_minutes
                             }
                         else:
-                            # 해당 날짜에 활동이 없음
+                            # No activity on this date
                             user_activity["daily_activity"][date_str] = {
                                 "total_visits": 0,
                                 "first_visit": None,
@@ -587,7 +587,7 @@ class UsageLogger:
                     except Exception as e:
                         self.logger.error(f"Error reading log file {log_file}: {str(e)}")
                 else:
-                    # 로그 파일이 없는 날
+                    # Day without log file
                     user_activity["daily_activity"][date_str] = {
                         "total_visits": 0,
                         "first_visit": None,
@@ -604,7 +604,7 @@ class UsageLogger:
             return None
 
     def get_date_user_activity(self, target_date):
-        """특정 날짜의 사용자별 접속시간 및 사용시간"""
+        """User access time and usage time by user for specific date"""
         try:
             log_file = self.get_daily_log_file("access", target_date)
             
@@ -649,7 +649,7 @@ class UsageLogger:
                         except:
                             pass
             
-            # 각 사용자의 사용시간 계산
+            # Calculate usage time for each user
             for username, activity in user_activities.items():
                 if activity["first_visit"] and activity["last_visit"]:
                     activity["usage_minutes"] = int((activity["last_visit"] - activity["first_visit"]).total_seconds() / 60)
@@ -669,5 +669,5 @@ class UsageLogger:
             self.logger.error(f"Error getting date user activity: {str(e)}")
             return None
 
-# 전역 로거 인스턴스
+# Global logger instance
 usage_logger = UsageLogger() 

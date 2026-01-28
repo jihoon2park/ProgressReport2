@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Task 표시 문제 진단 스크립트
-- Task가 실제로 생성되었는지 확인
-- Task의 due_date 확인
-- 오늘 날짜의 task가 있는지 확인
+Task display issue diagnosis script
+- Check if tasks are actually created
+- Check task due_date
+- Check if there are tasks for today's date
 """
 import sqlite3
 import json
@@ -12,20 +12,20 @@ from datetime import datetime, timedelta
 import sys
 import io
 
-# Windows 콘솔 UTF-8 인코딩 설정
+# Configure UTF-8 encoding for Windows console
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-# DB 경로 설정
+# Database path configuration
 DB_PATH = 'progress_report.db'
 
 def get_db_connection():
-    """DB 연결"""
+    """Connect to database"""
     return sqlite3.connect(DB_PATH)
 
 def diagnose_task_display(site='Parafield Gardens'):
-    """Task 표시 문제 진단"""
+    """Diagnose task display issue"""
     print("=" * 60)
     print(f"[DIAGNOSE] Task Display Issue - {site}")
     print("=" * 60)
@@ -42,7 +42,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     print(f"   Today: {today_str}")
     print(f"   Yesterday: {yesterday_str}")
     
-    # 1. Parafield Gardens의 최근 Fall Incidents 확인
+    # 1. Check recent Fall Incidents for Parafield Gardens
     print(f"\n[2] Recent Fall Incidents ({site}):")
     cursor.execute("""
         SELECT 
@@ -70,7 +70,7 @@ def diagnose_task_display(site='Parafield Gardens'):
                 date_marker = " [YESTERDAY]"
         print(f"      - {inc[1]}: {inc_date} ({inc[4]}){date_marker}")
     
-    # 2. Task 확인
+    # 2. Check tasks
     print(f"\n[3] Tasks for {site}:")
     cursor.execute("""
         SELECT 
@@ -87,7 +87,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     print(f"   Total Tasks: {len(tasks)}")
     
     if tasks:
-        # 날짜별 분류
+        # Classify by date
         today_tasks = []
         yesterday_tasks = []
         other_tasks = []
@@ -124,7 +124,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     else:
         print("   [ERROR] No tasks found!")
     
-    # 3. 오늘 날짜의 Task가 있는 Incident 확인
+    # 3. Check incidents with tasks for today's date
     print(f"\n[4] Incidents with Tasks Today ({today_str}):")
     cursor.execute("""
         SELECT DISTINCT
@@ -149,7 +149,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     else:
         print("   [WARNING] No incidents with tasks due today!")
     
-    # 4. schedule-batch API 조건 시뮬레이션 (5일 전부터)
+    # 4. Simulate schedule-batch API conditions (from 5 days ago)
     print(f"\n[5] Schedule-Batch API Simulation (5 days before {today_str}):")
     five_days_before = (today - timedelta(days=5)).strftime('%Y-%m-%d')
     
@@ -170,7 +170,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     
     rows = cursor.fetchall()
     
-    # Incidents별로 그룹화
+    # Group by incidents
     incidents_map = {}
     for row in rows:
         incident_id = row[0]
@@ -191,7 +191,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     
     print(f"   API would return {len(incidents_map)} incidents")
     
-    # 오늘 날짜의 task가 있는 incident 확인
+    # Check incidents with tasks for today's date
     incidents_with_tasks_today_api = []
     for inc_id, inc_data in incidents_map.items():
         for task in inc_data['tasks']:
@@ -215,7 +215,7 @@ def diagnose_task_display(site='Parafield Gardens'):
     else:
         print(f"\n   [WARNING] No incidents with tasks due today in API simulation!")
     
-    # 6. Task 생성 로직 확인 - 최근 Fall Incident에 task가 있는지
+    # 6. Check task creation logic - check if recent Fall Incidents have tasks
     print(f"\n[6] Recent Fall Incidents Task Status:")
     cursor.execute("""
         SELECT 

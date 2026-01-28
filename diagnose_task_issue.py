@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Task가 보이지 않는 문제 진단 스크립트
+Task visibility issue diagnosis script
 """
 import sqlite3
 import json
@@ -10,20 +10,20 @@ import sys
 import os
 import io
 
-# Windows 콘솔 UTF-8 인코딩 설정
+# Configure UTF-8 encoding for Windows console
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-# DB 경로 설정
+# Database path configuration
 DB_PATH = 'progress_report.db'
 
 def get_db_connection():
-    """DB 연결"""
+    """Connect to database"""
     return sqlite3.connect(DB_PATH)
 
 def diagnose_task_issue():
-    """Task 문제 진단"""
+    """Diagnose task issue"""
     print("=" * 60)
     print("[DIAGNOSE] Task Problem Diagnosis")
     print("=" * 60)
@@ -31,7 +31,7 @@ def diagnose_task_issue():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 1. Policy 확인
+    # 1. Check policies
     print("\n[1] Fall Policy Check:")
     cursor.execute("""
         SELECT id, policy_id, name, is_active, rules_json
@@ -50,7 +50,7 @@ def diagnose_task_issue():
             status = "[ACTIVE]" if policy[3] == 1 else "[INACTIVE]"
             print(f"      - {policy[1]} ({policy[2]}): {status}")
     
-    # 2. Fall Incidents 확인
+    # 2. Check Fall Incidents
     print("\n[2] Fall Incidents Check:")
     cursor.execute("""
         SELECT 
@@ -68,46 +68,46 @@ def diagnose_task_issue():
     else:
         print(f"   [OK] Total {len(incidents)} Fall Incidents found")
         
-        # Status별 분류
+        # Classify by status
         status_count = {}
         for inc in incidents:
             status = inc[4] or 'NULL'
             status_count[status] = status_count.get(status, 0) + 1
         
-        print(f"   Status 분포:")
+        print(f"   Status distribution:")
         for status, count in status_count.items():
             marker = "[OK]" if status in ['Open', 'Overdue'] else "[WARN]"
-            print(f"      {marker} {status}: {count}개")
+            print(f"      {marker} {status}: {count}")
         
-        # Open/Overdue만 표시
+        # Show only Open/Overdue
         open_incidents = [inc for inc in incidents if inc[4] in ['Open', 'Overdue']]
         print(f"\n   [OK] Open/Overdue status: {len(open_incidents)} incidents")
         for inc in open_incidents[:5]:
             print(f"      - {inc[1]} ({inc[5]}): {inc[4]} - fall_type={inc[6]}")
     
-    # 3. Tasks 확인
+    # 3. Check tasks
     print("\n[3] Tasks Check:")
     cursor.execute("""
         SELECT COUNT(*) FROM cims_tasks
     """)
     total_tasks = cursor.fetchone()[0]
-    print(f"   총 Tasks: {total_tasks}개")
+    print(f"   Total Tasks: {total_tasks}")
     
     if total_tasks == 0:
         print("   [ERROR] No tasks found!")
     else:
-        # Task 상태별 분류
+        # Classify by task status
         cursor.execute("""
             SELECT status, COUNT(*) 
             FROM cims_tasks 
             GROUP BY status
         """)
         task_status = cursor.fetchall()
-        print(f"   Status 분포:")
+        print(f"   Status distribution:")
         for status, count in task_status:
-            print(f"      - {status}: {count}개")
+            print(f"      - {status}: {count}")
         
-        # Incident별 Task 수
+        # Task count per incident
         cursor.execute("""
             SELECT 
                 i.incident_id, i.status, i.site,
@@ -122,12 +122,12 @@ def diagnose_task_issue():
         """)
         incident_tasks = cursor.fetchall()
         
-        print(f"\n   Incident별 Task 수 (최소 Task부터):")
+        print(f"\n   Task count per incident (from minimum tasks):")
         for inc_id, inc_status, site, task_count in incident_tasks:
             marker = "[NO TASKS]" if task_count == 0 else "[HAS TASKS]"
-            print(f"      {marker} {inc_id} ({site}): {task_count}개 tasks")
+            print(f"      {marker} {inc_id} ({site}): {task_count} tasks")
     
-    # 4. Task가 없는 Fall Incident 확인
+    # 4. Check Fall Incidents without tasks
     print("\n[4] Fall Incidents Without Tasks:")
     cursor.execute("""
         SELECT 
@@ -150,10 +150,10 @@ def diagnose_task_issue():
         for inc in incidents_without_tasks:
             print(f"      - {inc[1]} ({inc[5]}): status={inc[4]}, fall_type={inc[6]}")
         print(f"\n   [SOLUTION]:")
-        print(f"      1. Mobile Dashboard를 새로고침 (자동 생성 시도)")
-        print(f"      2. Settings에서 Force Synchronization 실행")
+        print(f"      1. Refresh Mobile Dashboard (attempts automatic creation)")
+        print(f"      2. Run Force Synchronization from Settings")
     
-    # 5. 최근 5일 내 Incident 확인 (schedule-batch API 조건)
+    # 5. Check incidents in last 5 days (schedule-batch API conditions)
     print("\n[5] Recent 5 Days Fall Incidents (schedule-batch API conditions):")
     five_days_ago = (datetime.now() - timedelta(days=5)).isoformat()
     
@@ -178,14 +178,14 @@ def diagnose_task_issue():
         print("   [CONDITIONS]:")
         print("      - incident_type LIKE '%Fall%'")
         print("      - status IN ('Open', 'Overdue')")
-        print("      - incident_date >= 5일 전")
+        print("      - incident_date >= 5 days ago")
     else:
         print(f"   [OK] {len(recent_incidents)} incidents found:")
         for inc in recent_incidents[:10]:
             task_marker = "[NO TASKS]" if inc[7] == 0 else "[HAS TASKS]"
-            print(f"      {task_marker} {inc[1]} ({inc[5]}): {inc[7]}개 tasks, status={inc[4]}")
+            print(f"      {task_marker} {inc[1]} ({inc[5]}): {inc[7]} tasks, status={inc[4]}")
     
-    # 6. 사이트별 요약
+    # 6. Site summary
     print("\n[6] Site Summary:")
     sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla']
     
@@ -208,7 +208,7 @@ def diagnose_task_issue():
         
         if incident_count > 0:
             marker = "[OK]" if task_count > 0 else "[NO TASKS]"
-            print(f"   {marker} {site}: {incident_count}개 incidents, {task_count}개 tasks")
+            print(f"   {marker} {site}: {incident_count} incidents, {task_count} tasks")
     
     conn.close()
     

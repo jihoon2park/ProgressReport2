@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""거주자 검색 스크립트"""
+"""Resident search script"""
 import sqlite3
 import sys
 
 def search_resident_in_cache(name):
-    """SQLite 캐시에서 거주자 검색"""
+    """Search resident in SQLite cache"""
     try:
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
@@ -28,7 +28,7 @@ def search_resident_in_cache(name):
         return []
 
 def search_resident_in_manad(name, site=None):
-    """MANAD DB에서 거주자 검색 (직접 쿼리)"""
+    """Search resident in MANAD DB (direct query)"""
     try:
         from manad_db_connector import MANADDBConnector
         
@@ -42,7 +42,7 @@ def search_resident_in_manad(name, site=None):
                 with connector.get_connection() as conn:
                     cursor = conn.cursor()
                     
-                    # 이름으로 검색하는 쿼리 (대소문자 구분 없음)
+                    # Query to search by name (case-insensitive)
                     query = """
                         SELECT DISTINCT
                             c.Id,
@@ -96,14 +96,14 @@ def search_resident_in_manad(name, site=None):
 if __name__ == '__main__':
     import sys
     import io
-    # Windows 콘솔 인코딩 설정
+    # Configure Windows console encoding
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     
     search_name = sys.argv[1] if len(sys.argv) > 1 else 'RIAM'
     
     print(f"Searching for '{search_name}' resident...\n")
     
-    # 1. SQLite 캐시에서 검색
+    # 1. Search in SQLite cache
     print("SQLite Cache Search:")
     cache_results = search_resident_in_cache(search_name)
     if cache_results:
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     
     print("\n" + "="*60 + "\n")
     
-    # 2. MANAD DB에서 검색
+    # 2. Search in MANAD DB
     print("MANAD DB Search (All Sites):")
     manad_results = search_resident_in_manad(search_name)
     if manad_results:
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     else:
         print("  No results found")
         print("\n  Trying to list all residents to find similar names...")
-        # 모든 거주자 목록에서 유사한 이름 찾기
+        # Find similar names from all resident list
         try:
             from manad_db_connector import MANADDBConnector
             for site_name in ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'West Park', 'Yankalilla']:
@@ -132,7 +132,7 @@ if __name__ == '__main__':
                     connector = MANADDBConnector(site_name)
                     success, clients = connector.fetch_clients()
                     if success and clients:
-                        # RIAM이 포함된 이름 찾기
+                        # Find names containing RIAM
                         found = []
                         for client in clients:
                             first = client.get('FirstName', '')

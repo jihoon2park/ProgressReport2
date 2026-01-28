@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MANAD Plus Integrator Module
-CIMS와 MANAD Plus 시스템 간의 연동을 담당하는 모듈
+Module responsible for integration between CIMS and MANAD Plus systems
 """
 
 import requests
@@ -17,16 +17,16 @@ from cims_policy_engine import PolicyEngine
 logger = logging.getLogger(__name__)
 
 class MANADPlusIntegrator:
-    """MANAD Plus 시스템과의 연동을 처리하는 클래스"""
+    """Class that handles integration with MANAD Plus system"""
     
     def __init__(self, config: Dict = None):
         """
-        MANAD Plus Integrator 초기화
+        Initialize MANAD Plus Integrator
         
         Args:
-            config: MANAD Plus API 설정 정보
+            config: MANAD Plus API configuration information
         """
-        # 실제 MANAD Plus API 설정 (Parafield Gardens 서버 기준)
+        # Actual MANAD Plus API settings (based on Parafield Gardens server)
         if config is None:
             try:
                 from config import get_server_info, get_api_headers
@@ -39,13 +39,13 @@ class MANADPlusIntegrator:
                     'server_port': server_info['server_port'],
                     'api_username': api_headers.get('x-api-username', 'ManadAPI'),
                     'api_key': api_headers.get('x-api-key', ''),
-                    'polling_interval': 300,  # 5분마다 폴링
+                    'polling_interval': 300,  # Poll every 5 minutes
                     'timeout': 30
                 }
                 logger.info(f"MANAD Plus Integrator initialized with {server_info['base_url']}")
             except Exception as e:
                 logger.error(f"Failed to load server config: {e}")
-                # 폴백 설정
+                # Fallback settings
                 self.config = {
                     'base_url': 'http://192.168.1.11:8080',
                     'server_ip': '192.168.1.11',
@@ -66,15 +66,15 @@ class MANADPlusIntegrator:
         
     def authenticate(self) -> bool:
         """
-        MANAD Plus API 인증 확인
-        실제 MANAD API는 x-api-key 헤더 방식을 사용하므로 별도 인증 불필요
+        Verify MANAD Plus API authentication
+        Actual MANAD API uses x-api-key header method, so separate authentication is not required
         
         Returns:
-            bool: 인증 성공 여부
+            bool: Authentication success status
         """
         try:
-            # MANAD Plus API는 x-api-key 헤더 방식 사용
-            # /api/system/canconnect로 연결 테스트
+            # MANAD Plus API uses x-api-key header method
+            # Test connection with /api/system/canconnect
             test_url = f"{self.config['base_url']}/api/system/canconnect"
             
             headers = {
@@ -90,40 +90,40 @@ class MANADPlusIntegrator:
             )
             
             if response.status_code == 200:
-                logger.info("MANAD Plus API 연결 성공")
-                self.access_token = 'api_key_based_auth'  # 토큰 대신 API 키 사용
-                self.token_expires_at = datetime.now() + timedelta(days=365)  # API 키는 만료 없음
+                logger.info("MANAD Plus API connection successful")
+                self.access_token = 'api_key_based_auth'  # Use API key instead of token
+                self.token_expires_at = datetime.now() + timedelta(days=365)  # API key does not expire
                 return True
             else:
-                logger.error(f"MANAD Plus API 연결 실패: {response.status_code}")
+                logger.error(f"MANAD Plus API connection failed: {response.status_code}")
                 return False
                 
         except requests.exceptions.ConnectionError:
-            logger.warning("MANAD Plus API 서버에 연결할 수 없습니다.")
+            logger.warning("Unable to connect to MANAD Plus API server.")
             return False
         except Exception as e:
-            logger.error(f"MANAD Plus 인증 오류: {str(e)}")
+            logger.error(f"MANAD Plus authentication error: {str(e)}")
             return False
     
     def is_token_valid(self) -> bool:
         """
-        현재 토큰이 유효한지 확인
+        Check if current token is valid
         
         Returns:
-            bool: 토큰 유효성
+            bool: Token validity
         """
         if not self.access_token or not self.token_expires_at:
             return False
         
-        # 만료 5분 전에 갱신
+        # Renew 5 minutes before expiration
         return datetime.now() < (self.token_expires_at - timedelta(minutes=5))
     
     def ensure_authenticated(self) -> bool:
         """
-        인증 상태 확인 및 필요시 재인증
+        Check authentication status and re-authenticate if needed
         
         Returns:
-            bool: 인증 상태
+            bool: Authentication status
         """
         if not self.is_token_valid():
             return self.authenticate()
@@ -131,10 +131,10 @@ class MANADPlusIntegrator:
     
     def get_headers(self) -> Dict[str, str]:
         """
-        API 요청용 헤더 생성
+        Generate headers for API requests
         
         Returns:
-            Dict: HTTP 헤더
+            Dict: HTTP headers
         """
         return {
             'Authorization': f'Bearer {self.access_token}',
@@ -144,13 +144,13 @@ class MANADPlusIntegrator:
     
     def get_last_checked_time(self, full_sync=False) -> str:
         """
-        마지막 폴링 시간 조회
+        Query last polling time
         
         Args:
-            full_sync: 전체 동기화 여부 (True시 7일 전부터 시작)
+            full_sync: Whether full sync (starts from 7 days ago if True)
         
         Returns:
-            str: ISO 8601 형식의 마지막 체크 시간
+            str: Last check time in ISO 8601 format
         """
         try:
             conn = sqlite3.connect('progress_report.db')
@@ -167,7 +167,7 @@ class MANADPlusIntegrator:
             if result and not full_sync:
                 return result[0]
             else:
-                # 전체 동기화시 7일 전부터, 일반 폴링시 24시간 전부터 시작
+                # Start from 7 days ago for full sync, 24 hours ago for regular polling
                 if full_sync:
                     default_time = datetime.now() - timedelta(days=7)
                     logger.info("Performing full sync: fetching data from last 7 days")
@@ -177,23 +177,23 @@ class MANADPlusIntegrator:
                 return default_time.isoformat() + 'Z'
                 
         except Exception as e:
-            logger.error(f"마지막 체크 시간 조회 오류: {str(e)}")
-            # 오류 시 1시간 전부터 시작
+            logger.error(f"Error querying last check time: {str(e)}")
+            # Start from 1 hour ago on error
             fallback_time = datetime.now() - timedelta(hours=1)
             return fallback_time.isoformat() + 'Z'
     
     def update_last_checked_time(self, timestamp: str) -> None:
         """
-        마지막 폴링 시간 업데이트
+        Update last polling time
         
         Args:
-            timestamp: 업데이트할 시간 (ISO 8601)
+            timestamp: Time to update (ISO 8601)
         """
         try:
             conn = sqlite3.connect('progress_report.db')
             cursor = conn.cursor()
             
-            # system_settings 테이블이 없으면 생성
+            # Create system_settings table if it doesn't exist
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS system_settings (
                     key TEXT PRIMARY KEY,
@@ -211,27 +211,27 @@ class MANADPlusIntegrator:
             conn.close()
             
         except Exception as e:
-            logger.error(f"마지막 체크 시간 업데이트 오류: {str(e)}")
+            logger.error(f"Error updating last check time: {str(e)}")
     
     def extract_site_from_incident(self, incident_data: Dict) -> str:
         """
-        MANAD Plus 인시던트 데이터에서 사이트 정보 추출
+        Extract site information from MANAD Plus incident data
         
         Args:
-            incident_data: MANAD Plus 인시던트 데이터
+            incident_data: MANAD Plus incident data
             
         Returns:
-            str: 사이트 이름
+            str: Site name
         """
-        # MANAD Plus 데이터에서 사이트 정보 추출
-        # 실제 구현에서는 MANAD Plus API 응답 구조에 맞게 수정 필요
+        # Extract site information from MANAD Plus data
+        # In actual implementation, modify according to MANAD Plus API response structure
         
-        # 거주자 정보에서 사이트 추출 시도
+        # Try to extract site from resident information
         resident_info = self.get_resident_info(incident_data['resident_id'])
         if resident_info and 'facility_name' in resident_info:
             return resident_info['facility_name']
         
-        # 인시던트 데이터에서 직접 추출 시도
+        # Try to extract directly from incident data
         if 'facility_name' in incident_data:
             return incident_data['facility_name']
         if 'site_name' in incident_data:
@@ -241,8 +241,8 @@ class MANADPlusIntegrator:
             if isinstance(location, dict) and 'facility' in location:
                 return location['facility']
         
-        # 기본값: 거주자 ID 기반으로 사이트 할당
-        # 실제 구현에서는 거주자-사이트 매핑 테이블 사용
+        # Default: assign site based on resident ID
+        # In actual implementation, use resident-site mapping table
         site_mapping = {
             'Parafield Gardens': ['RES-001', 'RES-002', 'RES-003'],
             'Nerrilda': ['RES-004', 'RES-005', 'RES-006'],
@@ -256,28 +256,28 @@ class MANADPlusIntegrator:
             if resident_id in residents:
                 return site
         
-        # 기본값
+        # Default value
         return 'Parafield Gardens'
     
     def get_post_fall_progress_notes_optimized(self, client_id: int, fall_date: datetime, 
                                                 max_days: int = 7, max_hours: int = None) -> List[Dict]:
         """
-        최적화된 Post Fall Progress Notes 조회 (CIMS DB 데이터 활용)
+        Optimized Post Fall Progress Notes query (utilizes CIMS DB data)
         
-        ✅ 최적화:
-        - Fall Incident Progress Note 조회 건너뛰기 (1회 API 호출 절약)
-        - clientId 파라미터로 API 레벨 필터링 (네트워크 트래픽 감소)
-        - progressNoteEventTypeId로 Post Fall만 조회 (불필요한 데이터 제거)
-        - 날짜 범위를 필요한 만큼만 조회
+        ✅ Optimizations:
+        - Skip Fall Incident Progress Note query (saves 1 API call)
+        - API-level filtering with clientId parameter (reduces network traffic)
+        - Query only Post Fall with progressNoteEventTypeId (removes unnecessary data)
+        - Query only necessary date range
         
         Args:
-            client_id: MANAD ClientId (CIMS DB의 resident_manad_id)
-            fall_date: Fall 발생 시간 (CIMS DB의 incident_date)
-            max_days: 조회 기간 (기본 7일, max_hours가 설정되면 무시됨)
-            max_hours: 조회 기간 (시간 단위, 예: 28시간). 설정되면 max_days보다 우선
+            client_id: MANAD ClientId (resident_manad_id in CIMS DB)
+            fall_date: Fall occurrence time (incident_date in CIMS DB)
+            max_days: Query period (default 7 days, ignored if max_hours is set)
+            max_hours: Query period (in hours, e.g., 28 hours). Takes precedence over max_days if set
             
         Returns:
-            Post Fall Progress Notes 목록
+            Post Fall Progress Notes list
         """
         try:
             headers = {
@@ -286,50 +286,50 @@ class MANADPlusIntegrator:
                 'Content-Type': 'application/json'
             }
             
-            # 날짜 범위 설정 (Fall 이후 ~ max_hours 또는 max_days)
+            # Set date range (Fall after ~ max_hours or max_days)
             if max_hours is not None:
-                # 시간 기반 윈도우 사용 (예: 28시간)
+                # Use time-based window (e.g., 28 hours)
                 end_date = fall_date + timedelta(hours=max_hours)
             else:
-                # 일 기반 윈도우 사용 (기본값)
+                # Use day-based window (default)
                 end_date = fall_date + timedelta(days=max_days)
             start_date_str = fall_date.strftime('%Y-%m-%dT%H:%M:%SZ')
             end_date_str = end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
             
             notes_url = f"{self.config['base_url']}/api/progressnote/details"
             
-            # 🚀 최적화된 파라미터
+            # 🚀 Optimized parameters
             params = {
-                'clientId': client_id,  # ✅ 특정 환자만 조회
-                'date': [f'gt:{start_date_str}', f'lt:{end_date_str}']  # ✅ 날짜 범위
+                'clientId': client_id,  # ✅ Query specific patient only
+                'date': [f'gt:{start_date_str}', f'lt:{end_date_str}']  # ✅ Date range
             }
             
-            # 🔍 Post Fall EventType ID 조회 (캐싱 고려)
-            # Note: progressNoteEventTypeId는 MANAD Plus에서 "Post Fall"의 ID를 알아야 함
-            # 일반적으로 EventType은 고정되어 있으므로 config나 상수로 관리 가능
-            # 예: progressNoteEventTypeId = 12 (Post Fall)
-            # params['progressNoteEventTypeId'] = 12  # TODO: 실제 ID 확인 필요
+            # 🔍 Query Post Fall EventType ID (consider caching)
+            # Note: progressNoteEventTypeId needs to know the ID of "Post Fall" in MANAD Plus
+            # EventTypes are generally fixed, so can be managed as config or constants
+            # Example: progressNoteEventTypeId = 12 (Post Fall)
+            # params['progressNoteEventTypeId'] = 12  # TODO: Need to verify actual ID
             
             logger.debug(f"Querying Post Fall notes: ClientId={client_id}, Date={start_date_str} to {end_date_str}")
             
             response = requests.get(notes_url, headers=headers, params=params, timeout=self.config['timeout'])
             
             if response.status_code != 200:
-                # HTTP 204 = No Content (정상, Progress Note가 없음)
+                # HTTP 204 = No Content (normal, no Progress Note)
                 if response.status_code == 204:
                     logger.debug(f"No Progress Notes found for ClientId={client_id} (HTTP 204 - No Content)")
                     return []
                 else:
-                    # 실제 에러인 경우만 WARNING 레벨로 로깅
+                    # Log at WARNING level only for actual errors
                     logger.warning(f"Failed to get progress notes for ClientId={client_id}: HTTP {response.status_code}")
                     return []
             
             all_notes = response.json()
             
-            # 📊 응답 크기 로그 (모니터링)
+            # 📊 Log response size (monitoring)
             logger.debug(f"API returned {len(all_notes)} notes for ClientId={client_id}")
             
-            # 필터링 (API에서 clientId 필터가 적용되었으므로 간소화)
+            # Filtering (simplified since clientId filter is applied at API level)
             post_fall_notes = []
             
             for note in all_notes:
@@ -340,16 +340,16 @@ class MANADPlusIntegrator:
                 event_type_desc = event_type_obj.get('Description', '') if isinstance(event_type_obj, dict) else ''
                 notes_text = note.get('NotesPlainText', '').lower()
                 
-                # Post Fall 또는 Daily Progress (Fall 관련)
+                # Post Fall or Daily Progress (Fall related)
                 if 'Post Fall' in event_type_desc or (event_type_desc == 'Daily Progress' and 'fall' in notes_text):
                     note_date = datetime.fromisoformat(note.get('CreatedDate').replace('Z', ''))
                     
-                    # Fall Incident 이후의 노트만 (28시간 윈도우 내)
+                    # Only notes after Fall Incident (within 28-hour window)
                     window_end = fall_date + (timedelta(hours=max_hours) if max_hours else timedelta(days=max_days))
                     if fall_date < note_date <= window_end:
                         post_fall_notes.append(note)
             
-            # 시간순 정렬
+            # Sort by time
             post_fall_notes.sort(key=lambda x: x['CreatedDate'])
             
             logger.info(f"Found {len(post_fall_notes)} Post Fall notes for ClientId={client_id}")
@@ -363,7 +363,7 @@ class MANADPlusIntegrator:
             return result
                 
         except requests.exceptions.ConnectionError:
-            logger.warning("MANAD Plus API 서버에 연결할 수 없습니다. Post Fall notes를 조회할 수 없습니다.")
+            logger.warning("Unable to connect to MANAD Plus API server. Cannot query Post Fall notes.")
             return []
         except Exception as e:
             logger.error(f"Error getting post fall notes (optimized): {str(e)}")
@@ -371,18 +371,18 @@ class MANADPlusIntegrator:
     
     def get_post_fall_progress_notes(self, fall_incident_id: str) -> List[Dict]:
         """
-        MANAD Plus API에서 Post Fall Progress Notes 조회 (LEGACY)
+        Query Post Fall Progress Notes from MANAD Plus API (LEGACY)
         
-        ⚠️ DEPRECATED: 최적화를 위해 get_post_fall_progress_notes_optimized() 사용 권장
+        ⚠️ DEPRECATED: Use get_post_fall_progress_notes_optimized() for optimization
         
         Args:
             fall_incident_id: Fall Incident Progress Note ID
             
         Returns:
-            Post Fall Progress Notes 목록 (시간순 정렬, IsDeleted=False만)
+            Post Fall Progress Notes list (sorted by time, IsDeleted=False only)
         """
         try:
-            # 1. Fall Incident Progress Note 조회 (트리거)
+            # 1. Query Fall Incident Progress Note (trigger)
             fall_url = f"{self.config['base_url']}/api/progressnote/{fall_incident_id}"
             
             headers = {
@@ -394,12 +394,12 @@ class MANADPlusIntegrator:
             fall_response = requests.get(fall_url, headers=headers, timeout=self.config['timeout'])
             
             if fall_response.status_code != 200:
-                # HTTP 204 = No Content (정상, Progress Note가 없음)
+                # HTTP 204 = No Content (normal, no Progress Note)
                 if fall_response.status_code == 204:
                     logger.debug(f"No Progress Note found for Fall Incident {fall_incident_id} (HTTP 204 - No Content)")
                     return []
                 else:
-                    # 실제 에러인 경우만 ERROR 레벨로 로깅
+                    # Log at ERROR level only for actual errors
                     logger.error(f"Failed to get Fall Incident note {fall_incident_id}: HTTP {fall_response.status_code}")
                     return []
             
@@ -409,11 +409,11 @@ class MANADPlusIntegrator:
             
             logger.info(f"Fall Incident trigger: ID={fall_incident_id}, Date={fall_trigger_date}, ClientId={client_id}")
             
-            # 최적화된 메서드 사용 (28시간 윈도우 적용)
+            # Use optimized method (apply 28-hour window)
             return self.get_post_fall_progress_notes_optimized(client_id, fall_trigger_date, max_hours=28)
                 
         except requests.exceptions.ConnectionError:
-            logger.warning("MANAD Plus API 서버에 연결할 수 없습니다. Post Fall notes를 조회할 수 없습니다.")
+            logger.warning("Unable to connect to MANAD Plus API server. Cannot query Post Fall notes.")
             return []
         except Exception as e:
             logger.error(f"Error getting post fall notes: {str(e)}")
@@ -421,20 +421,20 @@ class MANADPlusIntegrator:
     
     def check_progress_notes(self, incident_id: str, resident_id: str) -> bool:
         """
-        MANAD Plus에서 특정 인시던트에 대한 progress note 존재 여부 확인
+        Check if progress note exists for a specific incident in MANAD Plus
         
         Args:
-            incident_id: MANAD Plus 인시던트 ID
-            resident_id: 거주자 ID
+            incident_id: MANAD Plus incident ID
+            resident_id: Resident ID
             
         Returns:
-            bool: Progress note 존재 여부
+            bool: Whether progress note exists
         """
         if not self.ensure_authenticated():
             return False
         
         try:
-            # MANAD Plus API에서 progress notes 조회
+            # Query progress notes from MANAD Plus API
             notes_url = f"{self.config['base_url']}/incidents/{incident_id}/progress-notes"
             
             response = requests.get(
@@ -445,7 +445,7 @@ class MANADPlusIntegrator:
             
             if response.status_code == 200:
                 notes = response.json()
-                # 최근 24시간 내에 작성된 follow-up note가 있는지 확인
+                # Check if there are follow-up notes written within last 24 hours
                 recent_notes = [
                     note for note in notes 
                     if self.is_recent_followup_note(note)
@@ -463,24 +463,24 @@ class MANADPlusIntegrator:
     
     def is_recent_followup_note(self, note: Dict) -> bool:
         """
-        Progress note가 최근 follow-up note인지 확인
+        Check if progress note is a recent follow-up note
         
         Args:
-            note: Progress note 데이터
+            note: Progress note data
             
         Returns:
-            bool: 최근 follow-up note 여부
+            bool: Whether it is a recent follow-up note
         """
         try:
-            # 24시간 이내인지 확인
+            # Check if within 24 hours
             note_time = datetime.fromisoformat(note['created_at'].replace('Z', '+00:00'))
             now = datetime.now(note_time.tzinfo)
             time_diff = (now - note_time).total_seconds()
             
-            if time_diff > 24 * 3600:  # 24시간 초과
+            if time_diff > 24 * 3600:  # Exceeds 24 hours
                 return False
             
-            # Follow-up 관련 키워드 확인
+            # Check follow-up related keywords
             followup_keywords = [
                 'follow-up', 'follow up', 'followup',
                 'assessment', 'monitoring', 'check',
@@ -490,7 +490,7 @@ class MANADPlusIntegrator:
             content = note.get('content', '').lower()
             note_type = note.get('type', '').lower()
             
-            # 내용이나 타입에 follow-up 키워드가 있는지 확인
+            # Check if follow-up keywords exist in content or type
             for keyword in followup_keywords:
                 if keyword in content or keyword in note_type:
                     return True
@@ -503,13 +503,13 @@ class MANADPlusIntegrator:
     
     def monitor_deadlines_and_complete_tasks(self) -> None:
         """
-        마감 시점에 progress note 확인 후 자동 완료 처리
+        Auto-complete tasks after checking progress notes at deadline
         """
         try:
             conn = sqlite3.connect('progress_report.db')
             cursor = conn.cursor()
             
-            # 마감 시점이 지난 미완료 태스크 조회
+            # Query incomplete tasks past deadline
             now = datetime.now()
             cursor.execute("""
                 SELECT t.id, t.task_name, t.due_date, t.assigned_user_id,
@@ -527,11 +527,11 @@ class MANADPlusIntegrator:
             for task in overdue_tasks:
                 task_id, task_name, due_date, assigned_user_id, manad_incident_id, resident_id, resident_name = task
                 
-                # MANAD Plus에서 progress note 확인
+                # Check progress note in MANAD Plus
                 has_progress_note = self.check_progress_notes(manad_incident_id, resident_id)
                 
                 if has_progress_note:
-                    # Progress note가 있으면 태스크 자동 완료
+                    # Auto-complete task if progress note exists
                     cursor.execute("""
                         UPDATE cims_tasks 
                         SET status = 'Completed', 
@@ -540,7 +540,7 @@ class MANADPlusIntegrator:
                         WHERE id = ?
                     """, (now.isoformat(), task_id))
                     
-                    # 감사 로그 생성
+                    # Create audit log
                     cursor.execute("""
                         INSERT INTO cims_audit_logs (
                             log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -571,13 +571,13 @@ class MANADPlusIntegrator:
     
     def validate_pending_tasks(self) -> None:
         """
-        Pending 상태 태스크의 주기적 검증 및 완료 처리
+        Periodic validation and completion of Pending status tasks
         """
         try:
             conn = sqlite3.connect('progress_report.db')
             cursor = conn.cursor()
             
-            # Pending 상태 태스크 조회
+            # Query Pending status tasks
             cursor.execute("""
                 SELECT t.id, t.task_name, t.pending_confirmation_at,
                        i.manad_incident_id, i.resident_id, i.resident_name
@@ -594,11 +594,11 @@ class MANADPlusIntegrator:
             for task in pending_tasks:
                 task_id, task_name, pending_confirmation_at, manad_incident_id, resident_id, resident_name = task
                 
-                # MANAD Plus에서 progress note 확인
+                # Check progress note in MANAD Plus
                 has_progress_note = self.check_progress_notes(manad_incident_id, resident_id)
                 
                 if has_progress_note:
-                    # Progress note가 확인되면 태스크 완료 처리
+                    # Complete task if progress note is confirmed
                     now = datetime.now()
                     cursor.execute("""
                         UPDATE cims_tasks 
@@ -608,7 +608,7 @@ class MANADPlusIntegrator:
                         WHERE id = ?
                     """, (now.isoformat(), task_id))
                     
-                    # 감사 로그 생성
+                    # Create audit log
                     cursor.execute("""
                         INSERT INTO cims_audit_logs (
                             log_id, user_id, action, target_entity_type, target_entity_id, details
@@ -630,7 +630,7 @@ class MANADPlusIntegrator:
                     
                     logger.info(f"Task {task_id} validated and completed due to progress note found in MANAD Plus")
                 else:
-                    # Progress note가 없으면 Pending 상태 유지
+                    # Keep Pending status if no progress note
                     logger.info(f"Task {task_id} remains pending - no progress note found in MANAD Plus")
             
             conn.commit()
@@ -641,16 +641,16 @@ class MANADPlusIntegrator:
     
     def poll_incidents(self, full_sync=False) -> List[Dict]:
         """
-        MANAD Plus에서 새로운 사고 기록 폴링 (모의 데이터용)
+        Poll new incident records from MANAD Plus (for mock data)
         
         Args:
-            full_sync: 전체 동기화 여부 (True시 7일 전부터 데이터 가져옴)
+            full_sync: Whether full sync (fetches data from 7 days ago if True)
         
         Returns:
-            List[Dict]: 새로운 사고 기록 목록
+            List[Dict]: List of new incident records
         """
         if not self.ensure_authenticated():
-            logger.error("MANAD Plus 인증 실패로 폴링 중단")
+            logger.error("Polling stopped due to MANAD Plus authentication failure")
             return []
         
         try:
@@ -659,7 +659,7 @@ class MANADPlusIntegrator:
             
             params = {
                 'last_checked_at': last_checked,
-                'limit': 500 if full_sync else 100  # 전체 동기화시 더 많은 데이터 가져옴
+                'limit': 500 if full_sync else 100  # Fetch more data for full sync
             }
             
             try:
@@ -673,41 +673,41 @@ class MANADPlusIntegrator:
                 if response.status_code == 200:
                     incidents = response.json()
                     if full_sync:
-                        logger.info(f"MANAD Plus 전체 동기화: {len(incidents)}개의 사고 기록 조회")
+                        logger.info(f"MANAD Plus full sync: queried {len(incidents)} incident records")
                     else:
-                        logger.info(f"MANAD Plus에서 {len(incidents)}개의 사고 기록 조회")
+                        logger.info(f"Queried {len(incidents)} incident records from MANAD Plus")
                     
-                    # 마지막 체크 시간 업데이트
+                    # Update last check time
                     if incidents:
                         latest_time = max(incident['last_updated_at'] for incident in incidents)
                         self.update_last_checked_time(latest_time)
                     else:
-                        # 새로운 사고가 없어도 현재 시간으로 업데이트
+                        # Update to current time even if no new incidents
                         self.update_last_checked_time(datetime.now().isoformat() + 'Z')
                     
                     return incidents
                 else:
-                    logger.error(f"MANAD Plus 사고 폴링 실패: {response.status_code} - {response.text}")
+                    logger.error(f"MANAD Plus incident polling failed: {response.status_code} - {response.text}")
                     return []
                     
             except requests.exceptions.ConnectionError:
-                # 실제 API가 없는 경우 - 새 데이터 없음
-                logger.warning("MANAD Plus API 서버에 연결할 수 없습니다. 새로운 인시던트를 가져올 수 없습니다.")
+                # No new data if actual API doesn't exist
+                logger.warning("Unable to connect to MANAD Plus API server. Cannot fetch new incidents.")
                 return []
                 
         except Exception as e:
-            logger.error(f"MANAD Plus 사고 폴링 오류: {str(e)}")
+            logger.error(f"MANAD Plus incident polling error: {str(e)}")
             return []
     
     def get_resident_info(self, resident_id: str) -> Optional[Dict]:
         """
-        거주자 정보 조회
+        Query resident information
         
         Args:
-            resident_id: 거주자 ID
+            resident_id: Resident ID
             
         Returns:
-            Dict: 거주자 정보 또는 None
+            Dict: Resident information or None
         """
         if not self.ensure_authenticated():
             return None
@@ -725,12 +725,12 @@ class MANADPlusIntegrator:
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    logger.warning(f"거주자 정보 조회 실패 ({resident_id}): {response.status_code}")
+                    logger.warning(f"Failed to query resident information ({resident_id}): {response.status_code}")
                     return None
                     
             except requests.exceptions.ConnectionError:
-                # 실제 API가 없는 경우 - 기본 정보 반환
-                logger.warning(f"MANAD Plus API 서버에 연결할 수 없습니다. 거주자 기본 정보를 사용합니다. ({resident_id})")
+                # Return default information if actual API doesn't exist
+                logger.warning(f"Unable to connect to MANAD Plus API server. Using default resident information. ({resident_id})")
                 return {
                     'resident_id': resident_id,
                     'full_name': f"Resident {resident_id}",
@@ -738,38 +738,38 @@ class MANADPlusIntegrator:
                 }
                 
         except Exception as e:
-            logger.error(f"거주자 정보 조회 오류 ({resident_id}): {str(e)}")
+            logger.error(f"Error querying resident information ({resident_id}): {str(e)}")
             return None
     
     def process_incident(self, incident_data: Dict) -> bool:
         """
-        MANAD Plus에서 받은 사고 데이터를 CIMS에서 처리
+        Process incident data received from MANAD Plus in CIMS
         
         Args:
-            incident_data: MANAD Plus 사고 데이터
+            incident_data: MANAD Plus incident data
             
         Returns:
-            bool: 처리 성공 여부
+            bool: Processing success status
         """
         max_retries = 3
         retry_delay = 1
         
         for attempt in range(max_retries):
             try:
-                # 거주자 정보 조회
+                # Query resident information
                 resident_info = self.get_resident_info(incident_data['resident_id'])
                 resident_name = resident_info['full_name'] if resident_info else f"Resident {incident_data['resident_id']}"
                 
-                # 사이트 정보 추출 (MANAD Plus 데이터에서)
+                # Extract site information (from MANAD Plus data)
                 site_name = self.extract_site_from_incident(incident_data)
                 
-                # CIMS 사고 데이터 생성 (WAL 모드 사용)
+                # Create CIMS incident data (use WAL mode)
                 conn = sqlite3.connect('progress_report.db')
                 conn.execute("PRAGMA journal_mode=WAL")
                 conn.execute("PRAGMA synchronous=NORMAL")
                 cursor = conn.cursor()
                 
-                # 중복 체크 (MANAD incident ID 기준)
+                # Duplicate check (based on MANAD incident ID)
                 cursor.execute("""
                     SELECT id FROM cims_incidents 
                     WHERE manad_incident_id = ?
@@ -777,11 +777,11 @@ class MANADPlusIntegrator:
                 
                 existing = cursor.fetchone()
                 if existing:
-                    logger.info(f"사고 {incident_data['manad_incident_id']} 이미 처리됨")
+                    logger.info(f"Incident {incident_data['manad_incident_id']} already processed")
                     conn.close()
                     return True
                 
-                # 새 사고 생성
+                # Create new incident
                 incident_id = f"I-{incident_data['manad_incident_id']}"
                 
                 cursor.execute("""
@@ -808,7 +808,7 @@ class MANADPlusIntegrator:
                 incident_db_id = cursor.lastrowid
                 conn.commit()
                 
-                # 정책 엔진 트리거
+                # Trigger policy engine
                 cims_incident_data = {
                     'id': incident_db_id,
                     'incident_id': incident_id,
@@ -822,7 +822,7 @@ class MANADPlusIntegrator:
                 
                 generated_tasks = self.policy_engine.apply_policies_to_incident(cims_incident_data)
                 
-                # 감사 로그 (고유한 로그 ID 생성)
+                # Audit log (generate unique log ID)
                 log_id = f"LOG-{datetime.now().strftime('%Y%m%d%H%M%S%f')}-{incident_db_id}"
                 cursor.execute("""
                     INSERT INTO cims_audit_logs (
@@ -845,97 +845,97 @@ class MANADPlusIntegrator:
                 conn.commit()
                 conn.close()
                 
-                logger.info(f"사고 {incident_data['manad_incident_id']} 처리 완료, {len(generated_tasks)}개 태스크 생성")
+                logger.info(f"Incident {incident_data['manad_incident_id']} processing completed, {len(generated_tasks)} tasks created")
                 return True
                 
             except sqlite3.OperationalError as e:
                 if "database is locked" in str(e) and attempt < max_retries - 1:
-                    logger.warning(f"데이터베이스 락 발생, {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    logger.warning(f"Database lock occurred, retrying after {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})")
                     time.sleep(retry_delay)
-                    retry_delay *= 2  # 지수 백오프
+                    retry_delay *= 2  # Exponential backoff
                     continue
                 else:
-                    logger.error(f"사고 처리 오류 ({incident_data.get('manad_incident_id', 'Unknown')}): {str(e)}")
+                    logger.error(f"Incident processing error ({incident_data.get('manad_incident_id', 'Unknown')}): {str(e)}")
                     return False
             except Exception as e:
-                logger.error(f"사고 처리 오류 ({incident_data.get('manad_incident_id', 'Unknown')}): {str(e)}")
+                logger.error(f"Incident processing error ({incident_data.get('manad_incident_id', 'Unknown')}): {str(e)}")
                 return False
         
         return False
     
     def polling_loop(self) -> None:
         """
-        주기적 폴링 루프
+        Periodic polling loop
         """
-        logger.info("MANAD Plus 폴링 시작")
+        logger.info("MANAD Plus polling started")
         
         while self.is_running:
             try:
-                # 새로운 사고 폴링
+                # Poll new incidents
                 incidents = self.poll_incidents()
                 
-                # 각 사고 처리
+                # Process each incident
                 for incident in incidents:
                     self.process_incident(incident)
                 
-                # 마감 시점 모니터링 및 자동 완료 처리
+                # Monitor deadlines and auto-complete
                 self.monitor_deadlines_and_complete_tasks()
                 
-                # Pending 상태 태스크 주기적 검증
+                # Periodic validation of Pending status tasks
                 self.validate_pending_tasks()
                 
-                # 다음 폴링까지 대기
+                # Wait until next polling
                 time.sleep(self.config['polling_interval'])
                 
             except Exception as e:
-                logger.error(f"폴링 루프 오류: {str(e)}")
-                time.sleep(30)  # 오류 시 30초 대기 후 재시도
+                logger.error(f"Polling loop error: {str(e)}")
+                time.sleep(30)  # Wait 30 seconds on error then retry
     
     def start_polling(self) -> bool:
         """
-        폴링 서비스 시작
+        Start polling service
         
         Returns:
-            bool: 시작 성공 여부
+            bool: Start success status
         """
         if self.is_running:
-            logger.warning("폴링이 이미 실행 중입니다")
+            logger.warning("Polling is already running")
             return False
         
         if not self.ensure_authenticated():
-            logger.error("인증 실패로 폴링을 시작할 수 없습니다")
+            logger.error("Cannot start polling due to authentication failure")
             return False
         
         self.is_running = True
         self.polling_thread = threading.Thread(target=self.polling_loop, daemon=False)
         self.polling_thread.start()
         
-        logger.info("MANAD Plus 폴링 서비스 시작됨")
+        logger.info("MANAD Plus polling service started")
         return True
     
     def stop_polling(self) -> None:
         """
-        폴링 서비스 중지
+        Stop polling service
         """
         self.is_running = False
         if self.polling_thread and self.polling_thread.is_alive():
             self.polling_thread.join(timeout=5)
         
-        logger.info("MANAD Plus 폴링 서비스 중지됨")
+        logger.info("MANAD Plus polling service stopped")
     
     def get_status(self) -> Dict:
         """
-        통합 서비스 상태 조회
+        Query integration service status
         
         Returns:
-            Dict: 서비스 상태 정보
+            Dict: Service status information
         """
-        # API 연결 상태 확인 (Parafield Gardens 서버 기준)
+        # Check API connection status (based on Parafield Gardens server)
         api_connected = False
         connection_error = None
         
         try:
-            # MANAD API 연결 테스트 엔드포인트 사용
+            # Use MANAD API connection test endpoint
             test_url = f"{self.config['base_url']}/api/system/canconnect"
             
             headers = {
@@ -950,25 +950,25 @@ class MANADPlusIntegrator:
                 timeout=5
             )
             
-            # 200-299 범위의 상태 코드면 연결됨
+            # Connected if status code is in 200-299 range
             if 200 <= test_response.status_code < 300:
                 api_connected = True
-                logger.info(f"MANAD Plus 서버 연결 성공: {test_url}")
+                logger.info(f"MANAD Plus server connection successful: {test_url}")
             elif test_response.status_code == 401:
-                api_connected = True  # 인증 오류지만 서버는 응답함
-                connection_error = "인증 필요 (서버는 온라인)"
+                api_connected = True  # Authentication error but server responds
+                connection_error = "Authentication required (server is online)"
             elif test_response.status_code < 500:
-                api_connected = True  # 클라이언트 오류지만 서버는 응답함
+                api_connected = True  # Client error but server responds
                 connection_error = f"HTTP {test_response.status_code}"
             else:
-                connection_error = f"서버 오류: HTTP {test_response.status_code}"
+                connection_error = f"Server error: HTTP {test_response.status_code}"
                 
         except requests.exceptions.ConnectionError:
-            connection_error = f"MANAD Plus 서버({self.config['server_ip']})에 연결할 수 없습니다"
+            connection_error = f"Unable to connect to MANAD Plus server ({self.config['server_ip']})"
         except requests.exceptions.Timeout:
-            connection_error = "MANAD Plus 서버 응답 시간 초과"
+            connection_error = "MANAD Plus server response timeout"
         except Exception as e:
-            connection_error = f"알 수 없는 오류: {str(e)}"
+            connection_error = f"Unknown error: {str(e)}"
         
         return {
             'is_running': self.is_running,
@@ -983,14 +983,14 @@ class MANADPlusIntegrator:
             }
         }
 
-# 전역 인스턴스
+# Global instance
 manad_integrator = MANADPlusIntegrator()
 
 def get_manad_integrator() -> MANADPlusIntegrator:
     """
-    MANAD Plus Integrator 인스턴스 반환
+    Return MANAD Plus Integrator instance
     
     Returns:
-        MANADPlusIntegrator: 통합 서비스 인스턴스
+        MANADPlusIntegrator: Integration service instance
     """
     return manad_integrator

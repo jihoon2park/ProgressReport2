@@ -2,7 +2,7 @@
 -- Policy Manager & Task Scheduling Schema
 -- =========================================
 
--- 1. 스케줄된 작업 테이블
+-- 1. Scheduled tasks table
 CREATE TABLE IF NOT EXISTS scheduled_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id VARCHAR(100) UNIQUE NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
     task_type VARCHAR(100) NOT NULL, -- 'vital_chart', 'medication', 'assessment'
     task_description TEXT,
     scheduled_time TIMESTAMP NOT NULL,
-    due_time TIMESTAMP, -- 마감 시간
+    due_time TIMESTAMP, -- Due time
     status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'cancelled', 'overdue'
     priority VARCHAR(20) DEFAULT 'normal', -- 'high', 'medium', 'normal', 'low'
     assigned_user VARCHAR(100),
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
     FOREIGN KEY (client_id) REFERENCES clients_cache(id)
 );
 
--- 2. 인시던트 테이블 확장 (기존 incidents_cache 테이블 수정)
+-- 2. Extend incidents table (modify existing incidents_cache table)
 ALTER TABLE incidents_cache ADD COLUMN workflow_status VARCHAR(50) DEFAULT 'open'; -- 'open', 'in_progress', 'closed'
 ALTER TABLE incidents_cache ADD COLUMN total_tasks INTEGER DEFAULT 0;
 ALTER TABLE incidents_cache ADD COLUMN completed_tasks INTEGER DEFAULT 0;
@@ -41,19 +41,19 @@ ALTER TABLE incidents_cache ADD COLUMN created_by VARCHAR(100);
 ALTER TABLE incidents_cache ADD COLUMN closed_at TIMESTAMP;
 ALTER TABLE incidents_cache ADD COLUMN closed_by VARCHAR(100);
 
--- 3. 작업 실행 로그 테이블
+-- 3. Task execution logs table
 CREATE TABLE IF NOT EXISTS task_execution_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id VARCHAR(100) NOT NULL,
     action VARCHAR(50) NOT NULL, -- 'created', 'notified', 'started', 'completed', 'cancelled'
     performed_by VARCHAR(100),
     performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    details TEXT, -- JSON 형태의 추가 정보
-    fcm_message_id VARCHAR(100), -- FCM 메시지 ID (알림 전송 시)
+    details TEXT, -- Additional information in JSON format
+    fcm_message_id VARCHAR(100), -- FCM message ID (when sending notification)
     FOREIGN KEY (task_id) REFERENCES scheduled_tasks(task_id)
 );
 
--- 4. 정책 실행 결과 테이블
+-- 4. Policy execution results table
 CREATE TABLE IF NOT EXISTS policy_execution_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     policy_id INTEGER NOT NULL,
@@ -63,13 +63,13 @@ CREATE TABLE IF NOT EXISTS policy_execution_results (
     total_tasks_created INTEGER DEFAULT 0,
     tasks_completed INTEGER DEFAULT 0,
     tasks_cancelled INTEGER DEFAULT 0,
-    success_rate DECIMAL(5,2), -- 완료율 (%)
-    average_completion_time INTEGER, -- 평균 완료 시간 (분)
+    success_rate DECIMAL(5,2), -- Completion rate (%)
+    average_completion_time INTEGER, -- Average completion time (minutes)
     notes TEXT,
     FOREIGN KEY (policy_id) REFERENCES escalation_policies(id)
 );
 
--- 5. 인덱스 생성
+-- 5. Create indexes
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_status ON scheduled_tasks(status, scheduled_time);
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_incident ON scheduled_tasks(incident_id);
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_user ON scheduled_tasks(assigned_user, status);

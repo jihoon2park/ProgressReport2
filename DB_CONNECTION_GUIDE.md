@@ -1,12 +1,18 @@
 # Database Connection Configuration Guide
+<<<<<<< Updated upstream
 # 데이터베이스 접속 설정 가이드
 
 This document explains where database connection settings and login credentials are stored and how to configure them.
 이 문서는 데이터베이스 접속 설정과 로그인 정보가 어디에 저장되어 있는지, 그리고 어떻게 설정하는지 설명합니다.
+=======
+
+This document explains where database connection settings and login credentials are stored and how to configure them.
+>>>>>>> Stashed changes
 
 ---
 
 ## 📁 Configuration Files Overview
+<<<<<<< Updated upstream
 ## 📁 설정 파일 개요
 
 The system uses multiple configuration files for database access. Here's where everything is located:
@@ -26,35 +32,64 @@ The system uses multiple configuration files for database access. Here's where e
 
 **Example Configuration**:
 **설정 예시**:
+=======
+
+The system uses multiple configuration files for database access. Here's where everything is located:
+
+### 1. Environment Variables (`.env` file)
+
+**Location**: Project root directory (`.env`)
+
+**Purpose**: Primary configuration for database direct access mode
+
+**Priority**: Used as fallback when `site_config.json` is not available
+
+**Example Configuration**:
+>>>>>>> Stashed changes
 
 ```env
 # ============================================
 # DB Direct Access Mode Toggle
+<<<<<<< Updated upstream
 # DB 직접 접속 모드 전환
 # ============================================
 # true: Use direct DB access (fast, real-time)
 # true: DB 직접 접속 사용 (빠름, 실시간)
 # false: Use API mode (legacy method)
 # false: API 모드 사용 (기존 방식)
+=======
+# ============================================
+# true: Use direct DB access (fast, real-time)
+# false: Use API mode (legacy method)
+>>>>>>> Stashed changes
 USE_DB_DIRECT_ACCESS=true
 
 # ============================================
 # Parafield Gardens Database Configuration
+<<<<<<< Updated upstream
 # Parafield Gardens 데이터베이스 설정
+=======
+>>>>>>> Stashed changes
 # ============================================
 MANAD_DB_SERVER_PARAFIELD_GARDENS=efsvr02\sqlexpress
 MANAD_DB_NAME_PARAFIELD_GARDENS=ManadPlus_Edenfield
 MANAD_DB_USE_WINDOWS_AUTH_PARAFIELD_GARDENS=true
 
 # For SQL Server Authentication (if not using Windows Auth):
+<<<<<<< Updated upstream
 # SQL Server 인증 사용 시 (Windows 인증 미사용):
+=======
+>>>>>>> Stashed changes
 # MANAD_DB_USER_PARAFIELD_GARDENS=your_username
 # MANAD_DB_PASSWORD_PARAFIELD_GARDENS=your_password
 # MANAD_DB_USE_WINDOWS_AUTH_PARAFIELD_GARDENS=false
 
 # ============================================
 # Other Sites Database Configuration
+<<<<<<< Updated upstream
 # 다른 사이트 데이터베이스 설정
+=======
+>>>>>>> Stashed changes
 # ============================================
 # Nerrilda
 MANAD_DB_SERVER_NERRILDA=server_name\instance
@@ -78,17 +113,25 @@ MANAD_DB_USE_WINDOWS_AUTH_YANKALILLA=true
 
 # ============================================
 # Common Database Settings (Fallback)
+<<<<<<< Updated upstream
 # 공통 데이터베이스 설정 (폴백)
 # ============================================
 # Used when site-specific settings are not available
 # 사이트별 설정이 없을 때 사용
+=======
+# ============================================
+# Used when site-specific settings are not available
+>>>>>>> Stashed changes
 MANAD_DB_NAME=ManadPlus_Edenfield
 MANAD_DB_USER=your_username
 MANAD_DB_PASSWORD=your_password
 
 # ============================================
 # ODBC Driver Configuration (Optional)
+<<<<<<< Updated upstream
 # ODBC 드라이버 설정 (선택사항)
+=======
+>>>>>>> Stashed changes
 # ============================================
 # Windows (usually auto-detected):
 # MANAD_DB_DRIVER={ODBC Driver 17 for SQL Server}
@@ -97,7 +140,10 @@ MANAD_DB_PASSWORD=your_password
 
 # ============================================
 # Flask Application Settings
+<<<<<<< Updated upstream
 # Flask 애플리케이션 설정
+=======
+>>>>>>> Stashed changes
 # ============================================
 SECRET_KEY=your-secret-key-here
 FLASK_DEBUG=False
@@ -109,13 +155,18 @@ LOG_LEVEL=INFO
 
 **File Status**: 
 - **Status**: Not tracked in git (in `.gitignore`)
+<<<<<<< Updated upstream
 - **상태**: Git에서 추적하지 않음 (`.gitignore`에 포함)
 - **Security**: Contains sensitive credentials - DO NOT commit to version control
 - **보안**: 민감한 자격 증명 포함 - 버전 관리에 커밋하지 마세요
+=======
+- **Security**: Contains sensitive credentials - DO NOT commit to version control
+>>>>>>> Stashed changes
 
 ---
 
 ### 2. Site Configuration JSON (`site_config.json`)
+<<<<<<< Updated upstream
 ### 2. 사이트 설정 JSON (`site_config.json`)
 
 **Location**: `data/api_keys/site_config.json`
@@ -129,6 +180,16 @@ LOG_LEVEL=INFO
 
 **Example Configuration**:
 **설정 예시**:
+=======
+
+**Location**: `data/api_keys/site_config.json`
+
+**Purpose**: Recommended method for site-specific database and API configurations
+
+**Priority**: Highest priority - checked first before environment variables
+
+**Example Configuration**:
+>>>>>>> Stashed changes
 
 ```json
 [
@@ -188,6 +249,7 @@ LOG_LEVEL=INFO
 
 **File Status**:
 - **Status**: May be tracked in git (check `.gitignore`)
+<<<<<<< Updated upstream
 - **상태**: Git에서 추적될 수 있음 (`.gitignore` 확인)
 - **Security**: Contains API keys and database credentials - should be secured
 - **보안**: API 키와 데이터베이스 자격 증명 포함 - 보안 처리 필요
@@ -197,10 +259,18 @@ LOG_LEVEL=INFO
 - **코드 위치**: `manad_db_connector.py` (28-85줄)
 - **Function**: `get_site_db_config(site_name)` retrieves database config for a specific site
 - **함수**: `get_site_db_config(site_name)` 특정 사이트의 DB 설정을 가져옴
+=======
+- **Security**: Contains API keys and database credentials - should be secured
+
+**Configuration Loading**:
+- **Code Location**: `manad_db_connector.py` (lines 28-85)
+- **Function**: `get_site_db_config(site_name)` retrieves database config for a specific site
+>>>>>>> Stashed changes
 
 ---
 
 ### 3. User Login Credentials (`config_users.py`)
+<<<<<<< Updated upstream
 ### 3. 사용자 로그인 정보 (`config_users.py`)
 
 **Location**: `config_users.py` (project root)
@@ -214,6 +284,16 @@ LOG_LEVEL=INFO
 
 **Example Structure**:
 **구조 예시**:
+=======
+
+**Location**: `config_users.py` (project root)
+
+**Purpose**: Stores all user authentication credentials and roles
+
+**Documentation**: See `LOGIN_CREDENTIALS.md` for detailed user list
+
+**Example Structure**:
+>>>>>>> Stashed changes
 
 ```python
 USERS = {
@@ -237,12 +317,18 @@ USERS = {
 
 **File Status**:
 - **Status**: Tracked in git (contains non-sensitive test credentials)
+<<<<<<< Updated upstream
 - **상태**: Git에서 추적됨 (민감하지 않은 테스트 자격 증명 포함)
 - **Security**: For production, consider moving to database or environment variables
 - **보안**: 프로덕션 환경에서는 데이터베이스나 환경 변수로 이동 고려
 
 **Quick Reference** (from `LOGIN_CREDENTIALS.md`):
 **빠른 참조** (`LOGIN_CREDENTIALS.md`에서):
+=======
+- **Security**: For production, consider moving to database or environment variables
+
+**Quick Reference** (from `LOGIN_CREDENTIALS.md`):
+>>>>>>> Stashed changes
 
 | Purpose | Username | Password |
 |---------|----------|----------|
@@ -255,6 +341,7 @@ USERS = {
 ---
 
 ### 4. Flask Configuration (`config_env.py`)
+<<<<<<< Updated upstream
 ### 4. Flask 설정 (`config_env.py`)
 
 **Location**: `config_env.py` (project root)
@@ -275,6 +362,20 @@ USERS = {
 
 **Configuration Keys**:
 **설정 키**:
+=======
+
+**Location**: `config_env.py` (project root)
+
+**Purpose**: Flask application settings loaded from environment variables
+
+**Key Functions**:
+
+- `get_flask_config()` - Returns Flask configuration dictionary
+- `get_environment()` - Returns current environment (development/production)
+- `get_config_value(key, default)` - Gets config value with environment-specific override
+
+**Configuration Keys**:
+>>>>>>> Stashed changes
 
 ```python
 {
@@ -292,6 +393,7 @@ USERS = {
 ---
 
 ### 5. SQLite Database (`progress_report.db`)
+<<<<<<< Updated upstream
 ### 5. SQLite 데이터베이스 (`progress_report.db`)
 
 **Location**: Project root directory
@@ -310,10 +412,24 @@ USERS = {
 
 **No credentials required** - file-based database
 **자격 증명 불필요** - 파일 기반 데이터베이스
+=======
+
+**Location**: Project root directory
+
+**Purpose**: Local SQLite database for CIMS data, user sessions, and cache
+
+**Configuration**:
+
+- **Path**: Set in `shared/config.py` or `config_env.py`
+- **Default**: `progress_report.db` (project root)
+
+**No credentials required** - file-based database
+>>>>>>> Stashed changes
 
 ---
 
 ## 🔄 Configuration Priority Order
+<<<<<<< Updated upstream
 ## 🔄 설정 우선순위 순서
 
 When the system needs database connection information, it checks in this order:
@@ -336,14 +452,35 @@ When the system needs database connection information, it checks in this order:
    - 위치: `config.py`
    - Used only if above methods fail
    - 위 방법들이 실패할 때만 사용
+=======
+
+When the system needs database connection information, it checks in this order:
+
+1. **`site_config.json`** (Highest Priority)
+   - Location: `data/api_keys/site_config.json`
+   - Used by: `manad_db_connector.py`
+
+2. **Environment Variables** (Fallback)
+   - Location: `.env` file (project root)
+   - Format: `MANAD_DB_SERVER_{SITE_NAME}`, `MANAD_DB_NAME_{SITE_NAME}`, etc.
+
+3. **Default/Hardcoded Values** (Last Resort)
+   - Location: `config.py`
+   - Used only if above methods fail
+>>>>>>> Stashed changes
 
 ---
 
 ## 🔍 How to Check Current Configuration
+<<<<<<< Updated upstream
 ## 🔍 현재 설정 확인 방법
 
 ### 1. Check Environment Variables
 ### 1. 환경 변수 확인
+=======
+
+### 1. Check Environment Variables
+>>>>>>> Stashed changes
 
 ```bash
 # Windows PowerShell
@@ -357,7 +494,10 @@ cat .env
 ```
 
 ### 2. Check Site Config JSON
+<<<<<<< Updated upstream
 ### 2. 사이트 설정 JSON 확인
+=======
+>>>>>>> Stashed changes
 
 ```bash
 # Windows PowerShell
@@ -368,10 +508,15 @@ cat data/api_keys/site_config.json
 ```
 
 ### 3. Check Application Logs
+<<<<<<< Updated upstream
 ### 3. 애플리케이션 로그 확인
 
 When the application starts, it logs which configuration source is being used:
 애플리케이션이 시작될 때 어떤 설정 소스를 사용하는지 로그에 기록됩니다:
+=======
+
+When the application starts, it logs which configuration source is being used:
+>>>>>>> Stashed changes
 
 ```
 📄 Loaded DB settings from site_config.json: Parafield Gardens
@@ -384,6 +529,7 @@ or
 ```
 
 ### 4. Check Code Location
+<<<<<<< Updated upstream
 ### 4. 코드 위치 확인
 
 **Database Connection Logic**:
@@ -407,10 +553,26 @@ or
 - **함수**:
   - `_load_site_config()` (34줄)
   - `get_site_db_config(site_name)` (54줄)
+=======
+
+**Database Connection Logic**:
+
+- **File**: `manad_db_connector.py`
+- **Class**: `MANADDBConnector`
+- **Method**: `_get_connection_string(site)` (line 176)
+
+**Configuration Loading**:
+
+- **File**: `manad_db_connector.py`
+- **Functions**: 
+  - `_load_site_config()` (line 34)
+  - `get_site_db_config(site_name)` (line 54)
+>>>>>>> Stashed changes
 
 ---
 
 ## 📝 Setting Up Database Connection
+<<<<<<< Updated upstream
 ## 📝 데이터베이스 연결 설정하기
 
 ### Step 1: Choose Configuration Method
@@ -430,13 +592,30 @@ or
 
 1. Create directory if it doesn't exist:
 1. 디렉토리가 없으면 생성:
+=======
+
+### Step 1: Choose Configuration Method
+
+**Recommended**: Use `site_config.json` for centralized management
+
+**Alternative**: Use `.env` file for environment-specific settings
+
+### Step 2: Create/Edit Configuration File
+
+#### Option A: Using `site_config.json` (Recommended)
+
+1. Create directory if it doesn't exist:
+>>>>>>> Stashed changes
 
 ```bash
 mkdir -p data/api_keys
 ```
 
 2. Create/edit `data/api_keys/site_config.json`:
+<<<<<<< Updated upstream
 2. `data/api_keys/site_config.json` 생성/편집:
+=======
+>>>>>>> Stashed changes
 
 ```json
 [
@@ -452,10 +631,15 @@ mkdir -p data/api_keys
 ```
 
 #### Option B: Using `.env` file
+<<<<<<< Updated upstream
 #### 옵션 B: `.env` 파일 사용
 
 1. Create `.env` file in project root:
 1. 프로젝트 루트에 `.env` 파일 생성:
+=======
+
+1. Create `.env` file in project root:
+>>>>>>> Stashed changes
 
 ```env
 USE_DB_DIRECT_ACCESS=true
@@ -465,17 +649,25 @@ MANAD_DB_USE_WINDOWS_AUTH_PARAFIELD_GARDENS=true
 ```
 
 ### Step 3: Verify Configuration
+<<<<<<< Updated upstream
 ### 3단계: 설정 확인
 
 1. Start the application:
 1. 애플리케이션 시작:
+=======
+
+1. Start the application:
+>>>>>>> Stashed changes
 
 ```bash
 python app.py
 ```
 
 2. Check logs for configuration loading messages:
+<<<<<<< Updated upstream
 2. 로그에서 설정 로딩 메시지 확인:
+=======
+>>>>>>> Stashed changes
 
 ```
 ✅ Loaded site_config.json: 1 sites
@@ -485,6 +677,7 @@ python app.py
 ---
 
 ## 🔐 Security Best Practices
+<<<<<<< Updated upstream
 ## 🔐 보안 모범 사례
 
 ### 1. Never Commit Credentials
@@ -518,10 +711,33 @@ python app.py
 - 개발, 스테이징, 프로덕션에 다른 자격 증명 사용
 - Use environment variables for sensitive production settings
 - 민감한 프로덕션 설정에는 환경 변수 사용
+=======
+
+### 1. Never Commit Credentials
+
+- Add `.env` to `.gitignore` (already done)
+- Consider adding `site_config.json` to `.gitignore` if it contains production credentials
+
+### 2. Use Windows Authentication When Possible
+
+- More secure than SQL Server Authentication
+- No passwords stored in configuration files
+
+### 3. Restrict Database Permissions
+
+- Use read-only database accounts for application access
+- Grant minimum required permissions
+
+### 4. Use Environment-Specific Configuration
+
+- Different credentials for development, staging, and production
+- Use environment variables for sensitive production settings
+>>>>>>> Stashed changes
 
 ---
 
 ## 🐛 Troubleshooting
+<<<<<<< Updated upstream
 ## 🐛 문제 해결
 
 ### Issue: "DB server/database is not configured"
@@ -562,10 +778,37 @@ python app.py
 1. `data/api_keys/site_config.json`에 파일 생성
 2. Or use `.env` file as fallback
 2. 또는 `.env` 파일을 폴백으로 사용
+=======
+
+### Issue: "DB server/database is not configured"
+
+**Solution**:
+
+1. Check if `site_config.json` exists and has correct structure
+2. Check if `.env` file has required variables
+3. Verify site name matches exactly (case-sensitive)
+
+### Issue: "Connection failed"
+
+**Solution**:
+
+1. Verify database server is accessible from your network
+2. Check firewall settings
+3. Verify Windows Authentication credentials (if using)
+4. Test connection using SQL Server Management Studio
+
+### Issue: "site_config.json file not found"
+
+**Solution**:
+
+1. Create the file at `data/api_keys/site_config.json`
+2. Or use `.env` file as fallback
+>>>>>>> Stashed changes
 
 ---
 
 ## 📚 Related Documentation
+<<<<<<< Updated upstream
 ## 📚 관련 문서
 
 - **`ENV_SETUP_GUIDE.md`** - Environment variable setup guide
@@ -576,14 +819,26 @@ python app.py
 - **`LOGIN_CREDENTIALS.md`** - 사용자 로그인 자격 증명 참조
 - **`MIGRATION_GUIDE.md`** - Database migration guide
 - **`MIGRATION_GUIDE.md`** - 데이터베이스 마이그레이션 가이드
+=======
+
+- **`ENV_SETUP_GUIDE.md`** - Environment variable setup guide
+- **`DB_DIRECT_ACCESS_GUIDE.md`** - Direct database access guide
+- **`LOGIN_CREDENTIALS.md`** - User login credentials reference
+- **`MIGRATION_GUIDE.md`** - Database migration guide
+>>>>>>> Stashed changes
 
 ---
 
 ## 📞 Quick Reference
+<<<<<<< Updated upstream
 ## 📞 빠른 참조
 
 ### Configuration File Locations
 ### 설정 파일 위치
+=======
+
+### Configuration File Locations
+>>>>>>> Stashed changes
 
 | File | Location | Purpose |
 |------|----------|---------|
@@ -594,12 +849,18 @@ python app.py
 | `progress_report.db` | Project root | SQLite database |
 
 ### Configuration Priority
+<<<<<<< Updated upstream
 ### 설정 우선순위
+=======
+>>>>>>> Stashed changes
 
 1. `site_config.json` → 2. `.env` → 3. Default values
 
 ### Common Environment Variables
+<<<<<<< Updated upstream
 ### 일반적인 환경 변수
+=======
+>>>>>>> Stashed changes
 
 ```env
 USE_DB_DIRECT_ACCESS=true
@@ -611,4 +872,7 @@ MANAD_DB_USE_WINDOWS_AUTH_{SITE}=true
 ---
 
 **Last Updated**: 2026-01-27
+<<<<<<< Updated upstream
 **마지막 업데이트**: 2026-01-27
+=======
+>>>>>>> Stashed changes

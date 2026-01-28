@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""JSON 파일에서 RIAM 검색"""
+"""Search RIAM in JSON files"""
 import json
 import os
 
 def search_in_json_file(filepath, search_name):
-    """JSON 파일에서 이름 검색"""
+    """Search name in JSON file"""
     if not os.path.exists(filepath):
         return []
     
@@ -14,7 +14,7 @@ def search_in_json_file(filepath, search_name):
         
         results = []
         
-        # 리스트인 경우
+        # If it's a list
         if isinstance(data, list):
             for item in data:
                 if isinstance(item, dict):
@@ -29,9 +29,9 @@ def search_in_json_file(filepath, search_name):
                         search_name.upper() in pref):
                         results.append(item)
         
-        # 딕셔너리인 경우
+        # If it's a dictionary
         elif isinstance(data, dict):
-            # 'clients' 키가 있는 경우
+            # If 'clients' key exists
             if 'clients' in data:
                 for item in data['clients']:
                     if isinstance(item, dict):
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         print("No results found in JSON files.")
         print("\nTrying to fetch fresh data from MANAD DB...")
         
-        # 최신 데이터 가져오기
+        # Get latest data
         try:
             from api_client import fetch_client_information
             

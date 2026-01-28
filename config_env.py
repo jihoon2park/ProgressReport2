@@ -1,74 +1,74 @@
 """
-환경별 설정 관리 모듈
-개발환경과 운영환경 설정을 동적으로 로딩
+Environment-specific configuration management module
+Dynamically loads settings for development and production environments
 """
 import os
 from dotenv import load_dotenv
 
-# .env 파일 로딩
+# Load .env file
 load_dotenv()
 
 def get_environment():
-    """현재 환경을 반환 (development 또는 production)"""
+    """Return current environment (development or production)"""
     return os.environ.get('ENVIRONMENT', 'development').lower()
 
 def get_config_value(key, default=None):
-    """환경에 따라 설정값을 반환"""
+    """Return configuration value based on environment"""
     environment = get_environment()
     
-    # 환경별 키 생성 (예: DEV_SECRET_KEY, PROD_SECRET_KEY)
+    # Generate environment-specific key (e.g., DEV_SECRET_KEY, PROD_SECRET_KEY)
     if environment == 'production':
         env_key = f"PROD_{key}"
     else:
         env_key = f"DEV_{key}"
     
-    # 환경별 설정이 있으면 우선 사용, 없으면 공통 설정 사용
+    # Use environment-specific setting if available, otherwise use common setting
     return os.environ.get(env_key, os.environ.get(key, default))
 
 def get_flask_config():
-    """Flask 애플리케이션 설정을 반환"""
+    """Return Flask application configuration"""
     environment = get_environment()
     
     config = {
         'SECRET_KEY': get_config_value('SECRET_KEY', 'fallback-secret-key'),
         'DEBUG': get_config_value('FLASK_DEBUG', 'False').lower() == 'true',
-        'HOST': get_config_value('HOST', '0.0.0.0'),  # 기본값을 0.0.0.0으로 변경 (네트워크 접속 허용)
+        'HOST': get_config_value('HOST', '0.0.0.0'),  # Default changed to 0.0.0.0 (allow network access)
         'PORT': int(get_config_value('PORT', '5000')),
         'ENVIRONMENT': environment,
         
-        # 로깅 설정
+        # Logging configuration
         'LOG_LEVEL': get_config_value('LOG_LEVEL', 'INFO'),
         
-        # API 설정
+        # API configuration
         'API_TIMEOUT': int(get_config_value('API_TIMEOUT', '30')),
         'API_RETRY_COUNT': int(get_config_value('API_RETRY_COUNT', '3')),
         
-        # 백그라운드 프로세서 설정 (개발환경에서는 기본적으로 비활성화)
+        # Background processor configuration (disabled by default in development)
         'ENABLE_BACKGROUND_PROCESSOR': get_config_value('ENABLE_BACKGROUND_PROCESSOR', 'True' if environment == 'production' else 'False').lower() == 'true',
         
-        # 데이터베이스 설정 (향후 사용)
+        # Database configuration (for future use)
         'DATABASE_URL': get_config_value('DATABASE_URL', None),
     }
     
     return config
 
 def get_cache_policy():
-    """캐시 사용 정책 설정"""
+    """Configure cache usage policy"""
     environment = get_environment()
     
     if environment == 'production':
         return {
-            'use_cache_on_failure': False,  # 서버에서는 캐시 사용 안함
-            'cache_expiry_hours': 1,        # 캐시 만료 시간 짧게
-            'force_api_refresh': True,      # 강제 API 새로고침
-            'cleanup_data_on_login': True   # 로그인시 data 폴더 정리
+            'use_cache_on_failure': False,  # Do not use cache on server
+            'cache_expiry_hours': 1,        # Short cache expiry time
+            'force_api_refresh': True,      # Force API refresh
+            'cleanup_data_on_login': True   # Cleanup data folder on login
         }
     else:
         return {
-            'use_cache_on_failure': False,  # 로컬에서도 캐시 사용 안함 (일관성)
-            'cache_expiry_hours': 1,        # 캐시 만료 시간 짧게
-            'force_api_refresh': True,      # 강제 API 새로고침
-            'cleanup_data_on_login': True   # 로그인시 data 폴더 정리
+            'use_cache_on_failure': False,  # Do not use cache locally (consistency)
+            'cache_expiry_hours': 1,        # Short cache expiry time
+            'force_api_refresh': True,      # Force API refresh
+            'cleanup_data_on_login': True   # Cleanup data folder on login
         }
 
 def print_current_config():

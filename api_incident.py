@@ -1,5 +1,5 @@
 """
-Incident (Adverse Event) 데이터를 가져오는 API 모듈
+API module for fetching Incident (Adverse Event) data
 """
 
 import requests
@@ -11,7 +11,7 @@ from config import SITE_SERVERS, get_api_headers
 logger = logging.getLogger(__name__)
 
 class IncidentAPI:
-    """Incident 데이터를 가져오는 API 클라이언트"""
+    """API client for fetching Incident data"""
     
     def __init__(self, site: str):
         self.site = site
@@ -23,15 +23,15 @@ class IncidentAPI:
         logger.info(f"Initialized Incident API for {site} at {self.base_url}")
     
     def fetch_incidents(self, start_date: str, end_date: str) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
-        """지정된 기간의 incident 데이터를 가져옵니다."""
+        """Fetch incident data for specified period"""
         try:
-            # API 엔드포인트
+            # API endpoint
             url = f"{self.base_url}/api/adverseevent"
             
-            # 파라미터 설정
+            # Set parameters
             params = {}
             
-            # changedSinceDateTimeUTC 파라미터 (시작 날짜부터)
+            # changedSinceDateTimeUTC parameter (from start date)
             if start_date:
                 try:
                     start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
@@ -39,7 +39,7 @@ class IncidentAPI:
                 except ValueError as e:
                     logger.warning(f"Invalid start_date format: {start_date}, error: {e}")
             
-            # 사이트별 인증 헤더 가져오기
+            # Get site-specific authentication headers
             auth_headers = get_api_headers(self.site)
             
             logger.info(f"=== INCIDENT API CALL DETAILS ===")
@@ -50,14 +50,14 @@ class IncidentAPI:
             logger.info(f"Parameters: {params}")
             logger.info(f"Headers: {auth_headers}")
             logger.info(f"x-api-username: {auth_headers.get('x-api-username', 'Not set')}")
-            logger.info(f"x-api-key: {'*' * 20}...")  # API 키 마스킹
+            logger.info(f"x-api-key: {'*' * 20}...")  # Mask API key
             logger.info(f"Accept: {auth_headers.get('Accept', 'Not set')}")
             logger.info(f"Content-Type: {auth_headers.get('Content-Type', 'Not set')}")
             logger.info(f"Total headers count: {len(auth_headers)}")
             logger.info(f"Request Method: GET")
             logger.info(f"=================================")
             
-            # API 호출
+            # API call
             logger.info(f"Making API call to: {url}")
             logger.info(f"Request timeout: 120 seconds (2 minutes)")
             logger.info(f"Starting API request...")
@@ -76,15 +76,15 @@ class IncidentAPI:
             logger.info(f"=================================")
             
             if response.status_code == 200:
-                # 응답 내용을 JSON으로 파싱
+                # Parse response content as JSON
                 try:
                     incidents = response.json()
                     logger.info(f"Successfully parsed JSON response with {len(incidents)} incidents")
                     
-                    # JSON 파일로 저장
+                    # Save as JSON file
                     self._save_incidents_to_json(incidents, start_date, end_date)
                     
-                    # 날짜 필터링 (API에서 제공하지 않는 경우 클라이언트 측에서 필터링)
+                    # Date filtering (client-side filtering if API doesn't provide it)
                     filtered_incidents = self._filter_incidents_by_date(incidents, start_date, end_date)
                     logger.info(f"Filtered to {len(filtered_incidents)} incidents within date range")
                     
@@ -112,7 +112,7 @@ class IncidentAPI:
             return False, None
     
     def _filter_incidents_by_date(self, incidents: List[Dict[str, Any]], start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """날짜 범위에 따라 incident를 필터링합니다."""
+        """Filter incidents by date range"""
         try:
             start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
@@ -123,50 +123,50 @@ class IncidentAPI:
                 incident_date = incident.get('Date')
                 if incident_date:
                     try:
-                        # 날짜 문자열을 datetime 객체로 변환
+                        # Convert date string to datetime object
                         if isinstance(incident_date, str):
                             incident_dt = datetime.fromisoformat(incident_date.replace('Z', '+00:00'))
                         else:
-                            # 이미 datetime 객체인 경우
+                            # Already a datetime object
                             incident_dt = incident_date
                         
-                        # 날짜 범위 확인
+                        # Check date range
                         if start_dt <= incident_dt <= end_dt:
                             filtered_incidents.append(incident)
                             
                     except (ValueError, TypeError) as e:
                         logger.warning(f"Invalid incident date format: {incident_date}, error: {e}")
-                        # 날짜 파싱에 실패한 경우 포함 (데이터 검증 필요)
+                        # Include if date parsing fails (data validation needed)
                         filtered_incidents.append(incident)
                 else:
-                    # 날짜가 없는 경우 포함 (데이터 검증 필요)
+                    # Include if no date (data validation needed)
                     filtered_incidents.append(incident)
             
             return filtered_incidents
             
         except Exception as e:
             logger.error(f"Error filtering incidents by date: {str(e)}")
-            return incidents  # 필터링 실패 시 모든 incident 반환
+            return incidents  # Return all incidents if filtering fails
     
     def _save_incidents_to_json(self, incidents: List[Dict[str, Any]], start_date: str, end_date: str):
-        """Incident 데이터를 JSON 파일로 저장합니다."""
+        """Save Incident data to JSON file"""
         try:
             import json
             import os
             from datetime import datetime
             
-            # data 디렉토리 생성
+            # Create data directory
             data_dir = 'data'
             if not os.path.exists(data_dir):
                 os.makedirs(data_dir)
                 logger.info(f"Created data directory: {data_dir}")
             
-            # 파일명 생성
+            # Generate filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f'incidents_{self.site}_{start_date}_{end_date}_{timestamp}.json'
             filepath = os.path.join(data_dir, filename)
             
-            # JSON 데이터 준비
+            # Prepare JSON data
             json_data = {
                 'metadata': {
                     'site': self.site,
@@ -178,7 +178,7 @@ class IncidentAPI:
                 'incidents': incidents
             }
             
-            # JSON 파일로 저장
+            # Save as JSON file
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(json_data, f, indent=2, ensure_ascii=False, default=str)
             
@@ -194,24 +194,24 @@ class IncidentAPI:
             logger.error(f"Traceback: {traceback.format_exc()}")
     
     def _save_clients_to_json(self, clients: List[Dict[str, Any]], site: str):
-        """클라이언트 데이터를 JSON 파일로 저장합니다."""
+        """Save client data to JSON file"""
         try:
             import json
             import os
             from datetime import datetime
             
-            # data 디렉토리 생성
+            # Create data directory
             data_dir = 'data'
             if not os.path.exists(data_dir):
                 os.makedirs(data_dir)
                 logger.info(f"Created data directory: {data_dir}")
             
-            # 파일명 생성
+            # Generate filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f'clients_{site}_{timestamp}.json'
             filepath = os.path.join(data_dir, filename)
             
-            # JSON 데이터 준비
+            # Prepare JSON data
             json_data = {
                 'metadata': {
                     'site': site,
@@ -221,7 +221,7 @@ class IncidentAPI:
                 'clients': clients
             }
             
-            # JSON 파일로 저장
+            # Save as JSON file
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(json_data, f, indent=2, ensure_ascii=False, default=str)
             
@@ -237,9 +237,9 @@ class IncidentAPI:
             logger.error(f"Traceback: {traceback.format_exc()}")
     
     def fetch_clients(self) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
-        """클라이언트 목록을 가져옵니다."""
+        """Fetch client list"""
         try:
-            # 기존 클라이언트 API 사용
+            # Use existing client API
             from api_client import fetch_client_information
             
             success, clients = fetch_client_information(self.site)
@@ -259,27 +259,27 @@ class IncidentAPI:
 
 def fetch_incidents_with_client_data(site: str, start_date: str, end_date: str, fetch_clients: bool = True) -> Optional[Dict[str, Any]]:
     """
-    Incident 데이터와 클라이언트 데이터를 함께 가져와서 매칭합니다.
+    Fetch Incident data and client data together and match them
     
     Args:
-        site: 사이트 이름
-        start_date: 시작 날짜
-        end_date: 종료 날짜
-        fetch_clients: 클라이언트 데이터도 가져올지 여부 (기본: True, 캐시 사용 시: False)
+        site: Site name
+        start_date: Start date
+        end_date: End date
+        fetch_clients: Whether to also fetch client data (default: True, False when using cache)
     """
     try:
         logger.info(f"Fetching incidents with client data for {site} from {start_date} to {end_date}")
         
-        # Incident API 초기화
+        # Initialize Incident API
         incident_api = IncidentAPI(site)
         
-        # Incident 데이터 가져오기
+        # Fetch Incident data
         incidents_success, incidents = incident_api.fetch_incidents(start_date, end_date)
         if not incidents_success:
             logger.error(f"Failed to fetch incidents for {site}")
             return None
         
-        # 클라이언트 데이터 가져오기 (선택적)
+        # Fetch client data (optional)
         clients = []
         if fetch_clients:
             clients_success, clients = incident_api.fetch_clients()
@@ -287,13 +287,13 @@ def fetch_incidents_with_client_data(site: str, start_date: str, end_date: str, 
                 logger.warning(f"Failed to fetch clients for {site}, proceeding with empty client list")
                 clients = []
         else:
-            logger.info(f"클라이언트 데이터 스킵 (로컬 캐시 사용): {site}")
+            logger.info(f"Skipping client data (using local cache): {site}")
         
-        # 클라이언트 데이터도 JSON으로 저장 (클라이언트가 있을 때만)
+        # Also save client data as JSON (only when clients exist)
         if clients:
             incident_api._save_clients_to_json(clients, site)
         
-        # 데이터 매칭 및 가공
+        # Match and process data
         processed_incidents = process_incident_data(incidents, clients)
         
         logger.info(f"Successfully processed {len(processed_incidents)} incidents for {site}")
@@ -313,17 +313,17 @@ def fetch_incidents_with_client_data(site: str, start_date: str, end_date: str, 
         return None
 
 def process_incident_data(incidents: List[Dict[str, Any]], clients: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Incident 데이터를 가공하고 클라이언트 정보와 매칭합니다."""
+    """Process Incident data and match with client information"""
     try:
         processed_incidents = []
         
         for incident in incidents:
-            # 클라이언트 정보 찾기
+            # Find client information
             client_id = incident.get('ClientId')
             matched_client = None
             
             if client_id:
-                # PersonId 또는 MainClientServiceId로 매칭
+                # Match by PersonId or MainClientServiceId
                 matched_client = next(
                     (client for client in clients 
                      if client.get('PersonId') == client_id or 
@@ -331,7 +331,7 @@ def process_incident_data(incidents: List[Dict[str, Any]], clients: List[Dict[st
                     None
                 )
             
-            # 가공된 incident 데이터 생성
+            # Create processed incident data
             processed_incident = {
                 'Id': incident.get('Id'),
                 'ClientId': client_id,
@@ -380,10 +380,10 @@ def process_incident_data(incidents: List[Dict[str, Any]], clients: List[Dict[st
         
     except Exception as e:
         logger.error(f"Error processing incident data: {str(e)}")
-        return incidents  # 처리 실패 시 원본 데이터 반환
+        return incidents  # Return original data if processing fails
 
 def get_incident_summary(incidents: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Incident 데이터의 요약 통계를 생성합니다."""
+    """Generate summary statistics for Incident data"""
     try:
         if not incidents:
             return {
@@ -394,14 +394,14 @@ def get_incident_summary(incidents: List[Dict[str, Any]]) -> Dict[str, Any]:
                 'locations': {}
             }
         
-        # 위험도별 분류
+        # Classify by risk level
         risk_breakdown = {'high': 0, 'medium': 0, 'low': 0}
         event_types = {}
         injury_types = {}
         locations = {}
         
         for incident in incidents:
-            # 위험도 분류
+            # Classify by risk
             risk_rating = incident.get('RiskRatingName', '').lower()
             if 'high' in risk_rating or any(str(i) in risk_rating for i in range(5, 11)):
                 risk_breakdown['high'] += 1
@@ -410,15 +410,15 @@ def get_incident_summary(incidents: List[Dict[str, Any]]) -> Dict[str, Any]:
             else:
                 risk_breakdown['low'] += 1
             
-            # 이벤트 타입별 분류
+            # Classify by event type
             for event_type in incident.get('EventTypeNames', []):
                 event_types[event_type] = event_types.get(event_type, 0) + 1
             
-            # 부상 타입별 분류
+            # Classify by injury type
             for injury_type in incident.get('InjuryTypeNames', []):
                 injury_types[injury_type] = injury_types.get(injury_type, 0) + 1
             
-            # 위치별 분류
+            # Classify by location
             location = incident.get('LocationName') or incident.get('AreaName') or 'Unknown'
             locations[location] = locations.get(location, 0) + 1
         

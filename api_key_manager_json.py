@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-JSON 기반 API 키 매니저
-DB 대신 JSON 파일로 API 키를 관리
+JSON-based API Key Manager
+Manages API keys using JSON files instead of DB
 """
 
 import json
@@ -12,28 +12,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 class APIKeyManagerJSON:
-    """JSON 파일 기반 API 키 매니저 (site_config.json 통합)"""
+    """JSON file-based API key manager (integrated with site_config.json)"""
     
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
-        # 새로운 통합 설정 파일 (권장)
+        # New integrated configuration file (recommended)
         self.site_config_file = os.path.join(data_dir, "api_keys", "site_config.json")
-        # 기존 API 키 파일 (폴백용)
+        # Legacy API key file (for fallback)
         self.api_keys_file = os.path.join(data_dir, "api_keys", "api_keys.json")
         self._ensure_directories()
     
     def _ensure_directories(self):
-        """필요한 디렉토리 생성"""
+        """Create necessary directories"""
         os.makedirs(os.path.join(self.data_dir, "api_keys"), exist_ok=True)
     
     def _load_api_keys(self) -> List[Dict[str, Any]]:
-        """API 키 목록 로드 (site_config.json 우선, 폴백으로 api_keys.json)"""
+        """Load API key list (site_config.json first, fallback to api_keys.json)"""
         try:
-            # 1. site_config.json 시도 (통합 설정)
+            # Step 1: Try site_config.json (integrated configuration)
             if os.path.exists(self.site_config_file):
                 with open(self.site_config_file, 'r', encoding='utf-8') as f:
                     site_configs = json.load(f)
-                    # site_config 형식을 api_keys 형식으로 변환
+                    # Convert site_config format to api_keys format
                     api_keys = []
                     for config in site_configs:
                         api_info = config.get('api', {})
@@ -53,32 +53,32 @@ class APIKeyManagerJSON:
                         api_keys.append(api_key_entry)
                     return api_keys
             
-            # 2. 폴백: api_keys.json
+            # Step 2: Fallback to api_keys.json
             if os.path.exists(self.api_keys_file):
                 with open(self.api_keys_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             
             return []
         except Exception as e:
-            logger.error(f"API 키 로드 실패: {e}")
+            logger.error(f"Failed to load API keys: {e}")
             return []
     
     def _save_api_keys(self, api_keys: List[Dict[str, Any]]) -> bool:
-        """API 키 목록 저장"""
+        """Save API key list"""
         try:
             with open(self.api_keys_file, 'w', encoding='utf-8') as f:
                 json.dump(api_keys, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
-            logger.error(f"API 키 저장 실패: {e}")
+            logger.error(f"Failed to save API keys: {e}")
             return False
     
     def get_all_api_keys(self) -> List[Dict[str, Any]]:
-        """모든 API 키 조회"""
+        """Get all API keys"""
         return self._load_api_keys()
     
     def get_api_key(self, site_name: str) -> Optional[Dict[str, Any]]:
-        """특정 사이트의 API 키 조회"""
+        """Get API key for a specific site"""
         api_keys = self._load_api_keys()
         for api_key in api_keys:
             if api_key.get('site_name') == site_name:
@@ -86,16 +86,16 @@ class APIKeyManagerJSON:
         return None
     
     def add_api_key(self, site_name: str, api_username: str, api_key: str, server_ip: str, server_port: int = 8080, notes: str = '') -> bool:
-        """API 키 추가"""
+        """Add API key"""
         api_keys = self._load_api_keys()
         
-        # 기존 API 키가 있는지 확인
+        # Check if API key already exists
         for existing_key in api_keys:
             if existing_key.get('site_name') == site_name:
-                logger.warning(f"API 키가 이미 존재합니다: {site_name}")
+                logger.warning(f"API key already exists: {site_name}")
                 return False
         
-        # 새 API 키 추가
+        # Add new API key
         new_id = max([k.get('id', 0) for k in api_keys], default=0) + 1
         new_api_key = {
             'id': new_id,
@@ -115,12 +115,12 @@ class APIKeyManagerJSON:
         return self._save_api_keys(api_keys)
     
     def update_api_key(self, site_name: str, **kwargs) -> bool:
-        """API 키 업데이트"""
+        """Update API key"""
         api_keys = self._load_api_keys()
         
         for i, existing_key in enumerate(api_keys):
             if existing_key.get('site_name') == site_name:
-                # 업데이트할 필드들만 변경
+                # Update only specified fields
                 update_data = {}
                 if 'api_username' in kwargs:
                     update_data['api_username'] = kwargs['api_username']
@@ -135,7 +135,7 @@ class APIKeyManagerJSON:
                 if 'is_active' in kwargs:
                     update_data['is_active'] = kwargs['is_active']
                 
-                # server_url 업데이트
+                # Update server_url
                 if 'server_ip' in update_data or 'server_port' in update_data:
                     server_ip = update_data.get('server_ip', existing_key.get('server_ip'))
                     server_port = update_data.get('server_port', existing_key.get('server_port'))
@@ -146,11 +146,11 @@ class APIKeyManagerJSON:
                 api_keys[i].update(update_data)
                 return self._save_api_keys(api_keys)
         
-        logger.warning(f"API 키를 찾을 수 없습니다: {site_name}")
+        logger.warning(f"API key not found: {site_name}")
         return False
     
     def delete_api_key(self, site_name: str) -> bool:
-        """API 키 삭제"""
+        """Delete API key"""
         api_keys = self._load_api_keys()
         original_count = len(api_keys)
         api_keys = [k for k in api_keys if k.get('site_name') != site_name]
@@ -158,19 +158,19 @@ class APIKeyManagerJSON:
         if len(api_keys) < original_count:
             return self._save_api_keys(api_keys)
         
-        logger.warning(f"API 키를 찾을 수 없습니다: {site_name}")
+        logger.warning(f"API key not found: {site_name}")
         return False
     
     def deactivate_api_key(self, site_name: str) -> bool:
-        """API 키 비활성화 (삭제 대신 비활성화)"""
+        """Deactivate API key (deactivate instead of delete)"""
         return self.update_api_key(site_name, is_active=False)
     
     def get_api_headers(self, site_name: str) -> Dict[str, str]:
-        """사이트에 맞는 API 헤더 반환"""
+        """Return API headers for site"""
         api_key_data = self.get_api_key(site_name)
         
         if not api_key_data:
-            logger.error(f"API 키를 찾을 수 없습니다: {site_name}")
+            logger.error(f"API key not found: {site_name}")
             return {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
@@ -186,11 +186,11 @@ class APIKeyManagerJSON:
         }
     
     def get_server_info(self, site_name: str) -> Dict[str, str]:
-        """서버 정보 반환"""
+        """Return server information"""
         api_key_data = self.get_api_key(site_name)
         
         if not api_key_data:
-            logger.error(f"API 키를 찾을 수 없습니다: {site_name}")
+            logger.error(f"API key not found: {site_name}")
             return {
                 'server_ip': '192.168.1.11',
                 'server_port': '8080',
@@ -204,7 +204,7 @@ class APIKeyManagerJSON:
         }
     
     def get_site_servers(self) -> Dict[str, str]:
-        """사이트 서버 정보 반환"""
+        """Return site server information"""
         api_keys = self._load_api_keys()
         servers = {}
         
@@ -218,21 +218,21 @@ class APIKeyManagerJSON:
         
         return servers
 
-# 전역 인스턴스
+# Global instance
 api_key_manager = APIKeyManagerJSON()
 
 def get_api_key_manager():
-    """API 키 매니저 인스턴스 반환"""
+    """Return API key manager instance"""
     return api_key_manager
 
 def get_api_headers(site_name: str) -> Dict[str, str]:
-    """사이트에 맞는 API 헤더 반환"""
+    """Return API headers for site"""
     return api_key_manager.get_api_headers(site_name)
 
 def get_server_info(site_name: str) -> Dict[str, str]:
-    """서버 정보 반환"""
+    """Return server information"""
     return api_key_manager.get_server_info(site_name)
 
 def get_site_servers() -> Dict[str, str]:
-    """사이트 서버 정보 반환"""
+    """Return site server information"""
     return api_key_manager.get_site_servers()

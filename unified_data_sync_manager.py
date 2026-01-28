@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Unified Data Sync Manager - 통합 데이터 동기화 매니저
-매일 새벽 3시에 모든 데이터를 동기화하는 시스템
+Unified Data Sync Manager - Unified Data Synchronization Manager
+System that synchronizes all data daily at 3 AM
 """
 
 import sqlite3
@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import logging
 
-# 필요한 함수들을 직접 import (순환 import 방지)
+# Directly import required functions (prevent circular imports)
 try:
     from api_client import get_api_client, fetch_client_information
     from config import SITE_SERVERS
@@ -22,7 +22,7 @@ except ImportError as e:
     print(f"Warning: some modules could not be found: {e}")
     SITE_SERVERS = {}
 
-# 선택적 import (실패해도 계속 진행)
+# Optional imports (continue even if failed)
 try:
     from api_carearea import APICareArea
 except ImportError:
@@ -41,31 +41,31 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class UnifiedDataSyncManager:
-    """통합 데이터 동기화 매니저"""
+    """Unified data synchronization manager"""
     
     def __init__(self, db_path='progress_report.db'):
         self.db_path = db_path
         self.sites = ['Parafield Gardens', 'Nerrilda', 'Ramsay', 'Yankalilla']
         
-        # 데이터베이스 존재 확인
+        # Check if database exists
         if not os.path.exists(self.db_path):
             raise FileNotFoundError(f"Database file not found: {self.db_path}")
     
     def get_db_connection(self):
-        """데이터베이스 연결"""
+        """Connect to database"""
         conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         return conn
     
     def update_sync_status(self, data_type: str, site: Optional[str] = None, 
                           status: str = 'success', records: int = 0, error: str = None):
-        """동기화 상태 업데이트"""
+        """Update synchronization status"""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            # 타임아웃 설정
-            cursor.execute('PRAGMA busy_timeout = 30000')  # 30초 타임아웃
+            # Set timeout
+            cursor.execute('PRAGMA busy_timeout = 30000')  # 30 second timeout
             
             cursor.execute('''
                 INSERT OR REPLACE INTO sync_status 
@@ -83,11 +83,11 @@ class UnifiedDataSyncManager:
     
     def sync_clients_data(self) -> Dict[str, Any]:
         """
-        클라이언트 데이터 동기화 (단순화)
+        Synchronize client data (simplified)
         
-        DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로,
-        별도의 캐시 업데이트는 불필요합니다.
-        동기화 상태만 기록합니다.
+        In direct DB access mode, latest data is queried each time,
+        so separate cache updates are unnecessary.
+        Only synchronization status is recorded.
         """
         logger.info("🔄 Starting resident data sync status check")
         results = {'success': 0, 'failed': 0, 'total_clients': 0}
@@ -96,7 +96,7 @@ class UnifiedDataSyncManager:
             try:
                 logger.info(f"  📍 Checking resident data for {site}...")
                 
-                # DB에서 최신 데이터 가져오기 (캐시 없이 직접 조회)
+                # Get latest data from DB (direct query without cache)
                 api_success, latest_clients = fetch_client_information(site)
                 
                 if not api_success:
@@ -124,7 +124,7 @@ class UnifiedDataSyncManager:
         return results
     
     def sync_care_areas_data(self) -> Dict[str, Any]:
-        """케어 영역 데이터 동기화"""
+        """Synchronize care area data"""
         logger.info("🔄 Starting care area data sync")
         
         if APICareArea is None:
@@ -132,8 +132,8 @@ class UnifiedDataSyncManager:
             return {'success': False, 'message': 'APICareArea module not found'}
         
         try:
-            # API에서 케어 영역 데이터 가져오기 (첫 번째 사이트 사용)
-            api_carearea = APICareArea(self.sites[0])  # Parafield Gardens 사용
+            # Get care area data from API (using first site)
+            api_carearea = APICareArea(self.sites[0])  # Use Parafield Gardens
             care_areas = api_carearea.get_care_area_information()
             
             if not care_areas:
@@ -141,7 +141,7 @@ class UnifiedDataSyncManager:
                 self.update_sync_status('carearea', None, 'failed', 0, 'API call failed')
                 return {'success': False, 'message': 'API call failed'}
             
-            # SQLite 캐시 업데이트
+            # Update SQLite cache
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
@@ -172,7 +172,7 @@ class UnifiedDataSyncManager:
             return {'success': False, 'message': str(e)}
     
     def sync_event_types_data(self) -> Dict[str, Any]:
-        """이벤트 타입 데이터 동기화"""
+        """Synchronize event type data"""
         logger.info("🔄 Starting event type data sync")
         
         if APIEventType is None:
@@ -180,8 +180,8 @@ class UnifiedDataSyncManager:
             return {'success': False, 'message': 'APIEventType module not found'}
         
         try:
-            # API에서 이벤트 타입 데이터 가져오기 (첫 번째 사이트 사용)
-            api_eventtype = APIEventType(self.sites[0])  # Parafield Gardens 사용
+            # Get event type data from API (using first site)
+            api_eventtype = APIEventType(self.sites[0])  # Use Parafield Gardens
             event_types = api_eventtype.get_event_type_information()
             
             if not event_types:
@@ -189,7 +189,7 @@ class UnifiedDataSyncManager:
                 self.update_sync_status('eventtype', None, 'failed', 0, 'API call failed')
                 return {'success': False, 'message': 'API call failed'}
             
-            # SQLite 캐시 업데이트
+            # Update SQLite cache
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
@@ -221,7 +221,7 @@ class UnifiedDataSyncManager:
             return {'success': False, 'message': str(e)}
     
     def sync_incidents_data(self) -> Dict[str, Any]:
-        """인시던트 데이터 동기화 (DB 직접 접속)"""
+        """Synchronize incident data (direct DB access)"""
         logger.info("🔄 Starting incident data sync (direct DB access)")
         results = {'success': 0, 'failed': 0, 'total_incidents': 0}
         
@@ -229,7 +229,7 @@ class UnifiedDataSyncManager:
             logger.warning("⚠️ fetch_incidents_with_client_data_from_db function not found. Skipping incident sync.")
             return {'success': False, 'message': 'fetch_incidents_with_client_data_from_db function not found'}
         
-        # 최근 30일간의 인시던트 데이터 동기화
+        # Synchronize incident data for the last 30 days
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
         
@@ -237,7 +237,7 @@ class UnifiedDataSyncManager:
             try:
                 logger.info(f"  📍 Syncing incidents for {site}... (direct DB access)")
                 
-                # DB에서 직접 인시던트 데이터 가져오기
+                # Get incident data directly from DB
                 incident_data = fetch_incidents_with_client_data_from_db(
                     site, 
                     start_date.strftime('%Y-%m-%d'), 
@@ -253,16 +253,16 @@ class UnifiedDataSyncManager:
                 
                 incidents = incident_data['incidents']
                 
-                # SQLite 캐시 업데이트
+                # Update SQLite cache
                 conn = self.get_db_connection()
                 cursor = conn.cursor()
                 
                 try:
-                    # 타임아웃 설정
-                    cursor.execute('PRAGMA busy_timeout = 30000')  # 30초 타임아웃
+                    # Set timeout
+                    cursor.execute('PRAGMA busy_timeout = 30000')  # 30 second timeout
                     
                     for incident in incidents:
-                        # incident_id가 없으면 건너뛰기
+                        # Skip if incident_id is missing
                         incident_id = incident.get('IncidentId') or incident.get('Id') or incident.get('incident_id')
                         if not incident_id:
                             logger.warning(f"  ⚠️ Skipping incident with no ID for {site}: {incident}")
@@ -274,7 +274,7 @@ class UnifiedDataSyncManager:
                              description, severity, status, site, reported_by, last_synced)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
-                            str(incident_id),  # 문자열로 변환
+                            str(incident_id),  # Convert to string
                             incident.get('ClientId'),
                             incident.get('ClientName'),
                             incident.get('IncidentType'),
@@ -312,11 +312,11 @@ class UnifiedDataSyncManager:
         )
         return results
     
-    # _update_clients_cache 메서드 제거됨
-    # DB 직접 접속 모드에서는 매번 최신 데이터를 조회하므로 캐시 업데이트 불필요
+    # _update_clients_cache method removed
+    # Cache updates unnecessary in direct DB access mode as latest data is queried each time
     
     def run_full_sync(self) -> Dict[str, Any]:
-        """전체 데이터 동기화 실행"""
+        """Run full data synchronization"""
         logger.info("🌅 Starting unified data sync at 3 AM")
         start_time = datetime.now()
         
@@ -334,13 +334,13 @@ class UnifiedDataSyncManager:
         }
         
         try:
-            # 1. 거주자 데이터 동기화 상태 확인
+            # 1. Check resident data synchronization status
             results['clients'] = self.sync_clients_data()
             results['summary']['total_success'] += results['clients']['success']
             results['summary']['total_failed'] += results['clients']['failed']
             results['summary']['total_records'] += results['clients']['total_clients']
             
-            # 2. 케어 영역 데이터 동기화
+            # 2. Synchronize care area data
             results['care_areas'] = self.sync_care_areas_data()
             if results['care_areas']['success']:
                 results['summary']['total_success'] += 1
@@ -348,7 +348,7 @@ class UnifiedDataSyncManager:
             else:
                 results['summary']['total_failed'] += 1
             
-            # 3. 이벤트 타입 데이터 동기화
+            # 3. Synchronize event type data
             results['event_types'] = self.sync_event_types_data()
             if results['event_types']['success']:
                 results['summary']['total_success'] += 1
@@ -356,7 +356,7 @@ class UnifiedDataSyncManager:
             else:
                 results['summary']['total_failed'] += 1
             
-            # 4. 인시던트 데이터 동기화
+            # 4. Synchronize incident data
             results['incidents'] = self.sync_incidents_data()
             results['summary']['total_success'] += results['incidents']['success']
             results['summary']['total_failed'] += results['incidents']['failed']
@@ -383,45 +383,45 @@ class UnifiedDataSyncManager:
             return results
     
     def start_daily_sync(self):
-        """매일 새벽 3시 동기화 스케줄러 시작"""
+        """Start synchronization scheduler at 3 AM daily"""
         def daily_sync_job():
-            """매일 새벽 3시 동기화 작업"""
+            """Daily synchronization job at 3 AM"""
             logger.info("🌅 Starting unified data sync at 3 AM")
             results = self.run_full_sync()
             
-            # 결과 로깅
+            # Log results
             if 'error' in results:
                 logger.error(f"❌ Sync failed: {results['error']}")
             else:
                 logger.info(f"✅ Sync completed: processed {results['summary']['total_records']} records")
         
-        # 스케줄 설정 - 매일 새벽 3시
+        # Set schedule - daily at 3 AM
         schedule.every().day.at("03:00").do(daily_sync_job)
         
         def run_scheduler():
             while True:
                 schedule.run_pending()
-                time.sleep(60)  # 1분마다 스케줄 확인
+                time.sleep(60)  # Check schedule every minute
         
-        # 백그라운드 스레드로 실행
+        # Run in background thread
         sync_thread = threading.Thread(target=run_scheduler, daemon=False)
         sync_thread.start()
         
         logger.info("🌅 Unified data sync scheduler started (daily at 3 AM)")
 
 
-# Flask 앱에서 사용할 전역 인스턴스
+# Global instance for Flask app
 unified_sync_manager = None
 
 def get_unified_sync_manager():
-    """통합 데이터 동기화 매니저 싱글톤 인스턴스"""
+    """Unified data synchronization manager singleton instance"""
     global unified_sync_manager
     if unified_sync_manager is None:
         unified_sync_manager = UnifiedDataSyncManager()
     return unified_sync_manager
 
 def init_unified_sync():
-    """Flask 앱 초기화 시 호출"""
+    """Called when Flask app initializes"""
     try:
         manager = get_unified_sync_manager()
         manager.start_daily_sync()
@@ -432,14 +432,14 @@ def init_unified_sync():
         return False
 
 
-# 명령줄에서 직접 실행 시 테스트
+# Test when run directly from command line
 if __name__ == "__main__":
     print("🌅 Unified Data Sync Manager test")
     
     try:
         manager = UnifiedDataSyncManager()
         
-        # 수동으로 전체 동기화 실행
+        # Manually run full synchronization
         print("\n🔄 Running full data sync...")
         results = manager.run_full_sync()
         
@@ -457,7 +457,7 @@ if __name__ == "__main__":
         traceback.print_exc()
 
 def init_unifiedd_sync():
-    """통합 데이터 동기화 초기화 함수"""
+    """Unified data synchronization initialization function"""
     try:
         manager = UnifiedDataSyncManager()
         manager.start_background_sync()

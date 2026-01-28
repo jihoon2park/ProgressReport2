@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Progress Report System - 데이터베이스 초기화
-Week 1 - Day 1: 스키마 생성 및 초기 설정
+Progress Report System - Database Initialization
+Week 1 - Day 1: Schema creation and initial setup
 """
 
 import sqlite3
@@ -10,7 +10,7 @@ import sys
 import logging
 from datetime import datetime
 
-# 로깅 설정
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -27,23 +27,23 @@ class DatabaseInitializer:
         self.schema_file = 'database_schema.sql'
         
     def initialize_database(self):
-        """데이터베이스 초기화 실행"""
+        """Execute database initialization"""
         logger.info("🚀 Starting Progress Report System database initialization")
         
         try:
-            # 1. 기존 데이터베이스 백업 (있다면)
+            # Step 1: Backup existing database (if exists)
             self.backup_existing_database()
             
-            # 2. 스키마 파일 확인
+            # Step 2: Verify schema file
             self.verify_schema_file()
             
-            # 3. 데이터베이스 생성 및 스키마 적용
+            # Step 3: Create database and apply schema
             self.create_database_schema()
             
-            # 4. 초기 데이터 삽입
+            # Step 4: Insert initial data
             self.insert_initial_data()
             
-            # 5. 데이터베이스 검증
+            # Step 5: Verify database
             self.verify_database()
             
             logger.info("✅ Database initialization completed!")
@@ -54,33 +54,33 @@ class DatabaseInitializer:
             return False
     
     def backup_existing_database(self):
-        """기존 데이터베이스 백업"""
+        """Backup existing database"""
         if os.path.exists(self.db_path):
             backup_path = f"{self.db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             os.rename(self.db_path, backup_path)
             logger.info(f"📦 Backed up existing database to {backup_path}.")
     
     def verify_schema_file(self):
-        """스키마 파일 존재 확인"""
+        """Verify schema file exists"""
         if not os.path.exists(self.schema_file):
             raise FileNotFoundError(f"Schema file not found: {self.schema_file}")
         
         logger.info(f"📋 Schema file verified: {self.schema_file}")
     
     def create_database_schema(self):
-        """데이터베이스 스키마 생성"""
+        """Create database schema"""
         logger.info("🏗️ Creating database schema...")
         
-        # 스키마 파일 읽기
+        # Read schema file
         with open(self.schema_file, 'r', encoding='utf-8') as f:
             schema_sql = f.read()
         
-        # 데이터베이스 연결 및 스키마 실행
+        # Connect to database and execute schema
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
-            # SQL 문들을 분리해서 실행
+            # Parse and execute SQL statements
             statements = self.parse_sql_statements(schema_sql)
             
             for i, statement in enumerate(statements):
@@ -101,6 +101,7 @@ class DatabaseInitializer:
             conn.close()
     
     def parse_sql_statements(self, sql_content):
+<<<<<<< Updated upstream
         """
         SQL 문들을 파싱하여 개별 문장으로 분리.
 
@@ -178,17 +179,39 @@ class DatabaseInitializer:
         if tail:
             statements.append(tail)
 
+=======
+        """Parse SQL content and split into individual statements"""
+        # Simple method to split SQL statements
+        statements = []
+        
+        # Remove comments
+        lines = []
+        for line in sql_content.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('--'):
+                lines.append(line)
+        
+        # Split by semicolon
+        full_content = ' '.join(lines)
+        raw_statements = full_content.split(';')
+        
+        for statement in raw_statements:
+            statement = statement.strip()
+            if statement:
+                statements.append(statement + ';')
+        
+>>>>>>> Stashed changes
         return statements
     
     def insert_initial_data(self):
-        """초기 데이터 삽입"""
+        """Insert initial data"""
         logger.info("📝 Inserting initial data...")
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
-            # 기본 사이트 정보 삽입
+            # Insert default site information
             sites_data = [
                 ('Parafield Gardens', '192.168.1.11:8080', 'Edenfield Family Care - Parafield Gardens'),
                 ('Nerrilda', None, 'Nerrilda Care Facility'),
@@ -202,7 +225,7 @@ class DatabaseInitializer:
                     VALUES (?, ?, ?)
                 ''', (site_name, server_ip, description))
             
-            # 기본 동기화 상태 레코드
+            # Insert default sync status records
             sync_data = [
                 ('clients', 'Parafield Gardens'),
                 ('clients', 'Nerrilda'),
@@ -230,14 +253,14 @@ class DatabaseInitializer:
             conn.close()
     
     def verify_database(self):
-        """데이터베이스 구조 검증"""
+        """Verify database structure"""
         logger.info("🔍 Verifying database structure...")
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
-            # 테이블 목록 확인
+            # Get list of tables
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = [row[0] for row in cursor.fetchall()]
             
@@ -251,12 +274,12 @@ class DatabaseInitializer:
             for table in tables:
                 logger.info(f"  ✓ {table}")
             
-            # 누락된 테이블 확인
+            # Check for missing tables
             missing_tables = set(expected_tables) - set(tables)
             if missing_tables:
                 logger.warning(f"⚠️ Missing tables: {missing_tables}")
             
-            # 각 테이블의 레코드 수 확인
+            # Check record count for each table
             logger.info("📈 Record count by table:")
             for table in tables:
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
@@ -269,7 +292,7 @@ class DatabaseInitializer:
             conn.close()
     
     def get_database_info(self):
-        """데이터베이스 정보 조회"""
+        """Get database information"""
         if not os.path.exists(self.db_path):
             return None
         
@@ -277,14 +300,14 @@ class DatabaseInitializer:
         cursor = conn.cursor()
         
         try:
-            # 데이터베이스 버전
+            # Get database version
             cursor.execute("SELECT sqlite_version()")
             sqlite_version = cursor.fetchone()[0]
             
-            # 데이터베이스 크기
+            # Get database size
             db_size = os.path.getsize(self.db_path)
             
-            # 테이블 수
+            # Get table count
             cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
             table_count = cursor.fetchone()[0]
             
@@ -300,7 +323,7 @@ class DatabaseInitializer:
 
 
 def main():
-    """메인 실행 함수"""
+    """Main execution function"""
     print("=" * 60)
     print("🚀 Progress Report System - Database initialization")
     print("Week 1 - Day 1: Foundation Setup")
@@ -308,11 +331,11 @@ def main():
     
     initializer = DatabaseInitializer()
     
-    # 초기화 실행
+    # Execute initialization
     success = initializer.initialize_database()
     
     if success:
-        # 데이터베이스 정보 출력
+        # Print database information
         db_info = initializer.get_database_info()
         if db_info:
             print("\n" + "=" * 60)

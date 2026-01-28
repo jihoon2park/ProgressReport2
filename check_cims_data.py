@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-CIMS 데이터베이스 상태 확인 스크립트
-프로덕션 서버에서 cims_incidents 테이블 상태를 확인합니다.
+CIMS database status check script
+Check cims_incidents table status on production server.
 """
 
 import sqlite3
@@ -9,13 +9,13 @@ import os
 from datetime import datetime, timedelta
 
 def check_cims_data():
-    """CIMS 데이터베이스 상태 확인"""
+    """Check CIMS database status"""
     
-    # 데이터베이스 경로
+    # Database path
     db_path = 'progress_report.db'
     
     if not os.path.exists(db_path):
-        print(f"❌ 데이터베이스 파일을 찾을 수 없습니다: {db_path}")
+        print(f"❌ Database file not found: {db_path}")
         return
     
     conn = sqlite3.connect(db_path)
@@ -23,25 +23,25 @@ def check_cims_data():
     cursor = conn.cursor()
     
     try:
-        # 1. 테이블 존재 확인
+        # 1. Check if table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cims_incidents'")
         if not cursor.fetchone():
-            print("❌ cims_incidents 테이블이 존재하지 않습니다.")
+            print("❌ cims_incidents table does not exist.")
             return
         
-        print("✅ cims_incidents 테이블 존재 확인")
+        print("✅ cims_incidents table exists")
         
-        # 2. 전체 인시던트 수
+        # 2. Total incident count
         cursor.execute("SELECT COUNT(*) as total FROM cims_incidents")
         total = cursor.fetchone()[0]
-        print(f"\n📊 전체 인시던트 수: {total}")
+        print(f"\n📊 Total incidents: {total}")
         
         if total == 0:
-            print("⚠️  테이블이 비어있습니다. 동기화가 필요합니다.")
-            print("   해결 방법: /api/cims/force-sync API를 호출하거나 서버를 재시작하세요.")
+            print("⚠️  Table is empty. Synchronization is required.")
+            print("   Solution: Call /api/cims/force-sync API or restart the server.")
             return
         
-        # 3. 날짜별 통계
+        # 3. Statistics by date
         cursor.execute("""
             SELECT 
                 COUNT(*) as total,
@@ -50,10 +50,10 @@ def check_cims_data():
             FROM cims_incidents
         """)
         stats = cursor.fetchone()
-        print(f"   - 날짜가 있는 인시던트: {stats[1]}")
-        print(f"   - 상태가 있는 인시던트: {stats[2]}")
+        print(f"   - Incidents with date: {stats[1]}")
+        print(f"   - Incidents with status: {stats[2]}")
         
-        # 4. 상태별 분포
+        # 4. Status distribution
         cursor.execute("""
             SELECT status, COUNT(*) as cnt
             FROM cims_incidents
@@ -62,11 +62,11 @@ def check_cims_data():
             ORDER BY cnt DESC
         """)
         status_dist = cursor.fetchall()
-        print(f"\n📈 상태별 분포:")
+        print(f"\n📈 Status distribution:")
         for row in status_dist:
-            print(f"   - {row[0]}: {row[1]}개")
+            print(f"   - {row[0]}: {row[1]}")
         
-        # 5. 최근 7일 인시던트 수
+        # 5. Incidents in last 7 days
         week_ago = (datetime.now() - timedelta(days=7)).isoformat()
         cursor.execute("""
             SELECT COUNT(*) as cnt
@@ -76,9 +76,9 @@ def check_cims_data():
             AND incident_date >= ?
         """, [week_ago])
         week_count = cursor.fetchone()[0]
-        print(f"\n📅 최근 7일 인시던트: {week_count}개")
+        print(f"\n📅 Incidents in last 7 days: {week_count}")
         
-        # 6. 날짜 샘플
+        # 6. Date samples
         cursor.execute("""
             SELECT incident_date, status, incident_type
             FROM cims_incidents
@@ -87,23 +87,23 @@ def check_cims_data():
             LIMIT 5
         """)
         samples = cursor.fetchall()
-        print(f"\n📋 최근 인시던트 샘플 (5개):")
+        print(f"\n📋 Recent incident samples (5):")
         for row in samples:
             print(f"   - {row[0]} | {row[1]} | {row[2]}")
         
-        # 7. 동기화 상태 확인
+        # 7. Check synchronization status
         cursor.execute("""
             SELECT value FROM system_settings 
             WHERE key = 'last_incident_sync_time'
         """)
         last_sync = cursor.fetchone()
         if last_sync:
-            print(f"\n🔄 마지막 동기화 시간: {last_sync[0]}")
+            print(f"\n🔄 Last sync time: {last_sync[0]}")
         else:
-            print(f"\n⚠️  동기화 기록이 없습니다.")
+            print(f"\n⚠️  No sync record found.")
         
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        print(f"❌ Error occurred: {e}")
     finally:
         conn.close()
 
