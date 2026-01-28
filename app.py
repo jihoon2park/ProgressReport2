@@ -1011,12 +1011,8 @@ def login():
                 
                 # Step 3: Auto-collect site-specific data
                 try:
-<<<<<<< Updated upstream
-                    # 3-1. 클라이언트 데이터 수집 (매번)
-                    logger.info(f"🔍 DEBUG: About to call fetch_client_information for site: {site}")
-=======
                     # 3-1. Collect client data (every time)
->>>>>>> Stashed changes
+
                     from api_client import fetch_client_information
                     logger.info(f"🔍 DEBUG: fetch_client_information imported, calling now...")
                     import time
@@ -1121,43 +1117,24 @@ def login():
                     
                     logger.info(f"Site data collection completed - site: {site}")
                     
-<<<<<<< Updated upstream
-                    # 4. Flask-Login을 사용한 로그인 처리
-                    logger.info(f"🔍 DEBUG: Starting session creation for user: {username}")
-=======
                     # Step 4: Login processing using Flask-Login
->>>>>>> Stashed changes
                     user = User(username, user_info)
                     user_role = user_info.get('role', 'USER').upper()
                     logger.info(f"🔍 DEBUG: User object created, role: {user_role}")
+                   
                     
-<<<<<<< Updated upstream
-                    # 모든 사용자에게 동일한 세션 설정 적용
-                    logger.info(f"🔍 DEBUG: About to call login_user()")
-                    login_user(user, remember=False)  # 모든 사용자: 브라우저 닫으면 세션 만료
-                    logger.info(f"🔍 DEBUG: login_user() completed")
-                    session.permanent = False
-                    logger.info(f"User login: remember=False, session.permanent=False (role: {user_role})")
-                    
-                    # 사용자 역할에 따라 세션 타임아웃 설정
-                    logger.info(f"🔍 DEBUG: About to set session permanent for role: {user_role}")
-=======
                     # Apply same session settings to all users
                     login_user(user, remember=False)  # All users: session expires when browser closes
                     session.permanent = False
                     logger.info(f"User login: remember=False, session.permanent=False (role: {user_role})")
                     
                     # Set session timeout based on user role
->>>>>>> Stashed changes
+
                     set_session_permanent(user_role)
                     logger.info(f"🔍 DEBUG: Session permanent set")
                     
-<<<<<<< Updated upstream
-                    # 세션 생성 시간 기록
-                    logger.info(f"🔍 DEBUG: Setting session variables")
-=======
                     # Record session creation time
->>>>>>> Stashed changes
+
                     session['_created'] = get_australian_time().isoformat()
                     session['user_role'] = user_role  # Store user role in session
                     
@@ -4410,17 +4387,12 @@ def add_user_api():
     try:
         data = request.get_json()
         
-<<<<<<< Updated upstream
-        # Use validation from user_management.py
-        from user_management import validate_user_data, create_new_user
-        from config_users import USERS_DB
-=======
+
         # Check required fields
         required_fields = ['username', 'password', 'first_name', 'last_name', 'role', 'position', 'location']
         for field in required_fields:
             if field not in data:
                 return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
->>>>>>> Stashed changes
         
         # Validate user data (includes admin role check)
         is_valid, error_msg = validate_user_data(data)
@@ -4480,17 +4452,11 @@ def delete_user_api(username):
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     try:
-<<<<<<< Updated upstream
-        # Use delete_user from user_management.py (includes admin check and self-deletion prevention)
-        from user_management import delete_user
-        from config_users import USERS_DB
-=======
         # Cannot delete own account
         from config_users import get_username_by_lowercase
         actual_username = get_username_by_lowercase(username)
         if actual_username and actual_username.lower() == current_user.username.lower():
             return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
->>>>>>> Stashed changes
         
         success, message = delete_user(username, USERS_DB)
         
