@@ -8,8 +8,17 @@ import requests
 import logging
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional, Dict, Any, List
+
+
+def _range_last_n_days(days: int) -> tuple[datetime, datetime]:
+    """Return (start, end) for 'last N days' as full calendar days: start-of first day, end-of today."""
+    today = date.today()
+    first_day = today - timedelta(days=days)
+    start = datetime.combine(first_day, datetime.min.time())
+    end = datetime.combine(today, datetime.max.time())
+    return start, end
 from config import SITE_SERVERS, API_HEADERS, get_api_headers
 
 # Logging configuration
@@ -171,8 +180,7 @@ class ProgressNoteFetchClient:
         Returns:
             (success status, data list or None)
         """
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
+        start_date, end_date = _range_last_n_days(days)
         effective_limit = limit if limit is not None else 500
         return self.fetch_progress_notes(start_date, end_date, limit=effective_limit)
     
@@ -288,10 +296,7 @@ class ProgressNoteFetchClient:
         try:
             logger.info(f"Fetching progress notes by event types: {event_types} for {days} days")
             
-            # Calculate date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
+            start_date, end_date = _range_last_n_days(days)
             logger.info(f"Date range: {start_date} to {end_date}")
             
             # Find event type IDs
@@ -405,21 +410,23 @@ class ProgressNoteFetchClient:
             logger.error(f"Error finding event type ID for '{event_type_name}': {str(e)}")
             return None
 
-def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None, client_service_id: int = None, limit: Optional[int] = None) -> tuple[bool, Optional[List[Dict[str, Any]]]]:
+def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None, client_service_id: int = None, limit: Optional[int] = None, offset: int = 0, return_total: bool = False) -> tuple[bool, Optional[List[Dict[str, Any]]], Optional[int]]:
     """
     Convenience function to fetch progress notes for a specific site (DB direct access or API)
     
     Args:
-
         site: Site name
         days: Number of days to fetch
         event_types: List of event types to filter
         year: Year (for ROD dashboard)
         month: Month (for ROD dashboard)
         client_service_id: Filter by specific client service ID
+        limit: Max rows to return (default 500 when not set)
+        offset: Rows to skip for server pagination
+        return_total: If True, return (success, notes, total_count); total_count only in DB mode when set
         
     Returns:
-        (success status, data list or None)
+        (success status, data list or None, total_count or None)
     """
     import sqlite3
     import os
@@ -457,8 +464,7 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
                 else:
                     end_date = datetime(year, month + 1, 1) - timedelta(days=1)
             else:
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=days)
+                start_date, end_date = _range_last_n_days(days)
             
             # Event Type filtering (ID conversion if needed)
             event_type_id = None
@@ -466,20 +472,24 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
                 # Find ID by Event Type name (simple version, may be more complex in practice)
                 logger.warning(f"Event Type filtering is not yet fully supported in DB direct access mode: {event_types}")
             
+            effective_limit = limit if limit is not None else 500
 
-            logger.info(f"🔍 [FILTER] Calling connector.fetch_progress_notes - client_service_id={client_service_id}")
-            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit=500, event_type_id={event_type_id}, client_service_id={client_service_id}")
-            progress_success, progress_notes = connector.fetch_progress_notes(
-                start_date, end_date, limit=effective_limit, progress_note_event_type_id=event_type_id, client_service_id=client_service_id
+            logger.info(f"🔍 [FILTER] Calling connector.fetch_progress_notes - client_service_id={client_service_id}, offset={offset}, return_total={return_total}")
+            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit={effective_limit}, event_type_id={event_type_id}, client_service_id={client_service_id}")
+            progress_success, progress_notes, total_count = connector.fetch_progress_notes(
+                start_date, end_date, limit=effective_limit, offset=offset,
+                progress_note_event_type_id=event_type_id, client_service_id=client_service_id,
+                return_total=return_total
             )
-            logger.info(f"🔍 [FILTER] connector.fetch_progress_notes result - success={progress_success}, notes_count={len(progress_notes) if progress_notes else 0}")
+            logger.info(f"🔍 [FILTER] connector.fetch_progress_notes result - success={progress_success}, notes_count={len(progress_notes) if progress_notes else 0}, total_count={total_count}")
             
-            if not progress_success or not progress_notes:
-                error_msg = f"❌ DB direct access failed: {site} - Progress Notes query result is empty. Please check DB connection settings."
+            if not progress_success:
+                error_msg = f"❌ DB direct access failed: {site} - Progress Notes query failed. Please check DB connection settings."
                 logger.error(error_msg)
                 raise Exception(error_msg)
-            
-            return True, progress_notes
+            # Empty list is valid (e.g. no notes in range)
+            notes_out = progress_notes if progress_notes else []
+            return (True, notes_out, total_count)
             
         except Exception as db_error:
             error_msg = f"❌ DB direct access failed: {site} - {str(db_error)}. Please check DB connection settings and driver installation."
@@ -508,24 +518,25 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
         
         if is_rod_mode:
             logger.info(f"ROD dashboard mode - fetching for year: {year}, month: {month}, event_types: {event_types}")
-            return client.fetch_rod_progress_notes(year, month, event_types)
+            s, n = client.fetch_rod_progress_notes(year, month, event_types)
+            return (s, n, None)
         else:
             # General progress note request
             # Note: API mode does not support client_service_id filtering
             # Client filtering is performed on the client side
             if event_types:
-                # Fetch filtered by event type
                 logger.info(f"General request with event type filtering: {event_types}")
-                return client.fetch_progress_notes_by_event_types(days, event_types)
+                s, n = client.fetch_progress_notes_by_event_types(days, event_types)
+                return (s, n, None)
             else:
-                # General progress note request: fetch all notes
                 logger.info("No event types specified, fetching all progress notes")
                 if client_service_id:
                     logger.warning(f"Client service ID filter ({client_service_id}) is not supported in API mode. Filtering will be done client-side.")
-                return client.fetch_recent_progress_notes(days, limit=limit)
+                s, n = client.fetch_recent_progress_notes(days, limit=limit)
+                return (s, n, None)
     except Exception as e:
         logger.error(f"Error creating client for site {site}: {str(e)}")
-        return False, None
+        return (False, None, None)
 
 def fetch_progress_notes_for_all_sites(days: int = 14) -> Dict[str, tuple[bool, Optional[List[Dict[str, Any]]]]]:
     """
@@ -541,7 +552,7 @@ def fetch_progress_notes_for_all_sites(days: int = 14) -> Dict[str, tuple[bool, 
     
     for site in SITE_SERVERS.keys():
         logger.info(f"Fetching progress notes for site: {site}")
-        success, data = fetch_progress_notes_for_site(site, days)
+        success, data, _ = fetch_progress_notes_for_site(site, days)
         results[site] = (success, data)
         
         if success:

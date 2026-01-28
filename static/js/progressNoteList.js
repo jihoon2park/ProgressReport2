@@ -438,12 +438,17 @@ function mapNoteToRow(note) {
         serviceWing = note.WingName || note.LocationName || (note.Client && note.Client.WingName) || (note.ClientInfo && note.ClientInfo.WingName) || '';
     }
     
+    var rawEventType = note.ProgressNoteEventType?.Description || '';
+    var eventType = (typeof rawEventType === 'string')
+        ? rawEventType.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+        : rawEventType;
+
     return {
         serviceWing: serviceWing,
         client: clientName,
         date: note.EventDate ? note.EventDate.split('T')[0] : '',
         time: note.EventDate ? (note.EventDate.split('T')[1] || '').slice(0,5) : '',
-        eventType: note.ProgressNoteEventType?.Description || '',
+        eventType: eventType,
         careAreas: (note.CareAreas || []).map(ca => ca.Description).join(', ')
     };
 }
@@ -495,17 +500,20 @@ async function renderNotesTable() {
     const startTime = Date.now();
     
     try {
-        console.log('[renderNotesTable] Initializing IndexedDB...');
         await window.progressNoteDB.init();
-        console.log('[renderNotesTable] IndexedDB initialized successfully');
         
-        // If client filter is active, get all notes (already filtered from server)
-        // Otherwise, get limited notes from IndexedDB
-        const limit = selectedClientId ? 10000 : 10000;  // Always get enough data
-        console.log(`[renderNotesTable] Fetching notes from IndexedDB - site: ${currentSite}, limit: ${limit}, selectedClientId: ${selectedClientId}`);
-        const { notes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: limit, sortBy: 'eventDate', sortOrder: 'desc' });
-        
-        console.log(`[renderNotesTable] Retrieved ${notes ? notes.length : 0} notes from IndexedDB`);
+        // Filter mode + server pagination: use current page from last fetch (window.filterModeNotes). No bulk load into IndexedDB.
+        // Default mode: use IndexedDB (filled by cached API or full fetch).
+        let notes;
+        if (isFilterMode() && Array.isArray(window.filterModeNotes)) {
+            notes = window.filterModeNotes;
+            console.log(`[renderNotesTable] Filter mode: using server page data, ${notes.length} notes`);
+        } else {
+            const limit = 10000;
+            const { notes: idbNotes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: limit, sortBy: 'eventDate', sortOrder: 'desc' });
+            notes = idbNotes || [];
+            console.log(`[renderNotesTable] Default mode: ${notes.length} notes from IndexedDB`);
+        }
         if (notes && notes.length > 0) {
             console.log(`[renderNotesTable] Sample notes from IndexedDB (first 3):`);
             notes.slice(0, 3).forEach((note, idx) => {
@@ -571,21 +579,20 @@ async function renderNotesTable() {
             console.warn(`[renderNotesTable] Client filter is active (${selectedClientId}) but no notes found in IndexedDB`);
         }
     
-        // Same pagination (50 per page) for both APIs: cached and fetch-progress-notes.
-        // Filter mode = client-side slice by currentPage/perPage. Non-filter = server pagination when from cached API.
+        // Filter mode = server pagination: one page in window.filterModeNotes, pagination in window.serverPagination.
+        // Default mode = cached API: notes from IndexedDB, pagination from window.serverPagination or derived.
         let notesToShow;
         let paginationData;
-        if (isFilterMode()) {
+        if (isFilterMode() && window.serverPagination) {
+            notesToShow = filteredNotes;
+            paginationData = window.serverPagination;
+        } else if (isFilterMode()) {
             const totalCount = filteredNotes.length;
             notesToShow = filteredNotes.slice((currentPage - 1) * perPage, currentPage * perPage);
             paginationData = { page: currentPage, per_page: perPage, total_count: totalCount, total_pages: Math.ceil(totalCount / perPage) };
         } else {
             notesToShow = filteredNotes;
-            if (window.serverPagination && !selectedClientId) {
-                paginationData = window.serverPagination;
-            } else {
-                paginationData = { page: 1, per_page: perPage, total_count: filteredNotes.length, total_pages: Math.ceil(filteredNotes.length / perPage) };
-            }
+            paginationData = (window.serverPagination && !selectedClientId) ? window.serverPagination : { page: 1, per_page: perPage, total_count: filteredNotes.length, total_pages: Math.ceil(filteredNotes.length / perPage) };
         }
         
         // 전역 변수에 모든 노트 데이터 저장 (필터링용)
@@ -708,7 +715,45 @@ function updateProgressNotesTable(notes) {
     console.log('Table updated successfully');
 }
 
-// Execute on page load
+/**
+ * Load one page of progress notes in filter mode (server pagination).
+ * Uses /api/fetch-progress-notes with page, per_page; does not bulk-fetch into IndexedDB.
+ * Sets window.filterModeNotes and window.serverPagination, then renders.
+ */
+async function loadFilterModePage(page) {
+    const req = {
+        site: currentSite,
+        days: getPeriodDays(),
+        page: page,
+        per_page: perPage
+    };
+    const selectedClient = selectedClientId != null ? clientList.find(c => (c.PersonId === selectedClientId || String(c.PersonId) === String(selectedClientId))) : null;
+    if (selectedClient && selectedClient.MainClientServiceId != null) {
+        req.client_service_id = selectedClient.MainClientServiceId;
+    }
+    try {
+        const response = await fetch('/api/fetch-progress-notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req)
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + (await response.text()));
+        const result = await response.json();
+        if (!result.success) throw new Error(result.message || 'Fetch failed');
+        const data = (result.data && Array.isArray(result.data)) ? result.data : [];
+        const pag = result.pagination || { page: 1, per_page: perPage, total_count: data.length, total_pages: 1 };
+        window.filterModeNotes = data;
+        window.serverPagination = { page: pag.page, per_page: pag.per_page, total_count: pag.total_count, total_pages: pag.total_pages };
+        currentPage = pag.page;
+        updatePaginationUI(window.serverPagination);
+        await renderNotesTable();
+    } catch (e) {
+        console.error('[loadFilterModePage]', e);
+        const tbody = document.querySelector('#notesTable tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:red;">Error: ' + (e.message || String(e)) + '</td></tr>';
+    }
+}
+
 // Client filter change handler
 async function handleClientFilterChange() {
     console.log('[FILTER] ========== CLIENT FILTER CHANGE ==========');
@@ -789,89 +834,10 @@ async function handleClientFilterChange() {
             selectedClient.MainClientServiceId !== '';
         
         if (hasValidMainClientServiceId) {
-            console.log('[FILTER] MainClientServiceId found:', selectedClient.MainClientServiceId);
-            console.log('[FILTER] Preparing API request...');
-            
-            const requestBody = {
-                site: currentSite,
-                days: getPeriodDays(),
-                client_service_id: selectedClient.MainClientServiceId,
-                per_page: 10000,
-                page: 1
-            };
-            
-            console.log('[FILTER] Request body (period days=', requestBody.days, '):', JSON.stringify(requestBody, null, 2));
-            console.log('[FILTER] Making API call to /api/fetch-progress-notes');
-            console.log('[FILTER] API call started at:', new Date().toISOString());
-            
-            try {
-                const response = await fetch('/api/fetch-progress-notes', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                console.log('[FILTER] API response received at:', new Date().toISOString());
-                console.log('[FILTER] Response status:', response.status, response.statusText);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('[FILTER] HTTP error response:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-                }
-                
-                const result = await response.json();
-                console.log('[FILTER] API response parsed:', {
-                    success: result.success,
-                    dataLength: result.data ? result.data.length : 0,
-                    count: result.count,
-                    hasPagination: !!result.pagination
-                });
-                
-                // Clear existing data and save filtered data
-                console.log('[FILTER] Clearing existing data from IndexedDB for site:', currentSite);
-                await window.progressNoteDB.deleteProgressNotes(currentSite);
-                console.log('[FILTER] Existing data cleared');
-                
-                if (result.success && result.data && Array.isArray(result.data)) {
-                    console.log('[FILTER] API returned', result.data.length, 'progress notes');
-                    
-                    if (result.data.length > 0) {
-                        console.log('[FILTER] Saving', result.data.length, 'progress notes to IndexedDB');
-                        const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
-                        console.log('[FILTER] Save result:', saveResult);
-                        console.log('[FILTER] Data saved successfully');
-                        
-                        // Log sample data to verify
-                        console.log('[FILTER] Sample saved notes (first 3):');
-                        result.data.slice(0, 3).forEach((note, idx) => {
-                            console.log(`  ${idx + 1}. Id: ${note.Id}, ClientServiceId: ${note.ClientServiceId}, EventDate: ${note.EventDate}`);
-                        });
-                    } else {
-                        console.warn('[FILTER] API returned empty array - no progress notes for this client');
-                        console.warn('[FILTER] This means the client has no progress notes in the selected time range');
-                    }
-                } else {
-                    console.error('[FILTER] Invalid API response:', result);
-                    console.error('[FILTER] Response success:', result.success);
-                    console.error('[FILTER] Response data type:', typeof result.data);
-                    console.error('[FILTER] Response data:', result);
-                }
-            } catch (error) {
-                console.error('[FILTER] Failed to fetch progress notes for client:', {
-                    error: error,
-                    message: error.message,
-                    stack: error.stack,
-                    clientId: selectedClientId,
-                    mainClientServiceId: selectedClient.MainClientServiceId
-                });
-                if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error loading data: ${error.message}</td></tr>`;
-                }
-                return;
-            }
+            // Filter mode: server pagination — fetch one page only (no bulk to IndexedDB)
+            console.log('[FILTER] Client selected — loading page 1 via server pagination');
+            await loadFilterModePage(1);
+            return;
         } else {
             console.error('[FILTER] Client not found or missing MainClientServiceId');
             console.error('[FILTER] selectedClient:', selectedClient);
@@ -894,35 +860,22 @@ async function handleClientFilterChange() {
             return;
         }
     } else {
-        // "All Clients" selected. Cached API only when period equals DEFAULT_PERIOD_DAYS; otherwise fetch-progress-notes (no cache).
+        // "All Clients" selected. Cached API only when period === DEFAULT_PERIOD_DAYS; otherwise server-paginated fetch-progress-notes.
         const days = getPeriodDays();
         await window.progressNoteDB.deleteProgressNotes(currentSite);
         if (days === DEFAULT_PERIOD_DAYS) {
             console.log('[FILTER] All clients,', DEFAULT_PERIOD_DAYS, 'days (default) - using cached API');
+            window.filterModeNotes = undefined;
             await fetchAndSaveProgressNotes();
         } else {
-            console.log('[FILTER] All clients, period', days, 'days - using fetch-progress-notes (no cache)');
-            const requestBody = { site: currentSite, days: days, per_page: 10000, page: 1 };
-            const response = await fetch('/api/fetch-progress-notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
-            if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message || 'Fetch failed');
-            const notes = (result.data && Array.isArray(result.data)) ? result.data : [];
-            if (notes.length > 0) {
-                await window.progressNoteDB.saveProgressNotes(currentSite, notes);
-            }
+            console.log('[FILTER] All clients, period', days, 'days - server pagination (one page)');
+            await loadFilterModePage(1);
+            return;
         }
     }
     
-    // Render table with filtered data
     console.log('[FILTER] Rendering table with filtered data');
-    if (isFilterMode()) {
-        currentPage = 1;
-    }
+    if (isFilterMode()) currentPage = 1;
     await renderNotesTable();
     console.log('[FILTER] Table rendering completed');
 }
@@ -1505,15 +1458,19 @@ function updatePaginationUI(paginationData) {
     
     const container = document.getElementById('paginationContainer');
     const info = document.getElementById('paginationInfo');
+    const firstBtn = document.getElementById('firstPageBtn');
     const prevBtn = document.getElementById('prevPageBtn');
     const nextBtn = document.getElementById('nextPageBtn');
+    const lastBtn = document.getElementById('lastPageBtn');
     const pageNumbers = document.getElementById('pageNumbers');
     
     console.log('Pagination elements found:', {
         container: !!container,
         info: !!info,
+        firstBtn: !!firstBtn,
         prevBtn: !!prevBtn,
         nextBtn: !!nextBtn,
+        lastBtn: !!lastBtn,
         pageNumbers: !!pageNumbers
     });
     
@@ -1523,9 +1480,22 @@ function updatePaginationUI(paginationData) {
     }
     
     // Update page information
-    const startItem = (currentPage - 1) * perPage + 1;
+    const startItem = totalCount === 0 ? 0 : (currentPage - 1) * perPage + 1;
     const endItem = Math.min(currentPage * perPage, totalCount);
     info.textContent = `Showing ${startItem}-${endItem} of ${totalCount} items (Page ${currentPage}/${totalPages})`;
+    
+    // First/Last: show only when more than one page
+    const showFirstLast = totalPages > 1;
+    if (firstBtn) {
+        firstBtn.style.display = showFirstLast ? '' : 'none';
+        firstBtn.disabled = currentPage <= 1;
+        firstBtn.onclick = () => goToPage(1);
+    }
+    if (lastBtn) {
+        lastBtn.style.display = showFirstLast ? '' : 'none';
+        lastBtn.disabled = currentPage >= totalPages;
+        lastBtn.onclick = () => goToPage(totalPages);
+    }
     
     // Update Previous/Next button states
     prevBtn.disabled = currentPage <= 1;
@@ -1601,7 +1571,7 @@ function goToPage(page) {
         return;
     }
     
-    if (page === currentPage) {
+    if (page === currentPage && !isFilterMode()) {
         console.log(`Same page: ${page} - no action needed`);
         return;
     }
@@ -1609,7 +1579,7 @@ function goToPage(page) {
     console.log(`Changing to page: ${page}`);
     currentPage = page;
     if (isFilterMode()) {
-        renderNotesTable();
+        loadFilterModePage(page);
         return;
     }
     loadProgressNotes();
@@ -1618,9 +1588,9 @@ function goToPage(page) {
 function changePerPage() {
     const select = document.getElementById('perPageSelect');
     perPage = parseInt(select.value);
-    currentPage = 1; // Reset to first page
+    currentPage = 1;
     if (isFilterMode()) {
-        renderNotesTable();
+        loadFilterModePage(1);
         return;
     }
     loadProgressNotes();
@@ -1689,7 +1659,6 @@ async function loadProgressNotes(forceRefresh = false) {
         console.log('API Response:', result);
         
         if (result.success) {
-            // 데이터 표시
             updateProgressNotesTable(result.data);
             
             // 페이지네이션 UI 업데이트
@@ -1699,7 +1668,6 @@ async function loadProgressNotes(forceRefresh = false) {
                 updatePaginationUI(result.pagination);
             } else {
                 console.log('No pagination data received - creating default pagination');
-                // API에서 페이지네이션 데이터가 없으면 기본값으로 생성
                 const defaultPagination = {
                     page: currentPage,
                     per_page: perPage,

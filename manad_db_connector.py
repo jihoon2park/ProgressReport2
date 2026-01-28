@@ -662,7 +662,8 @@ class MANADDBConnector:
                              limit: int = 500,
                              offset: int = 0,
                              progress_note_event_type_id: Optional[int] = None,
-                             client_service_id: Optional[int] = None) -> Tuple[bool, Optional[List[Dict[str, Any]]], Optional[int]]:
+                             client_service_id: Optional[int] = None,
+                             return_total: bool = False) -> Tuple[bool, Optional[List[Dict[str, Any]]], Optional[int]]:
         """
         Query Progress Notes data directly from DB
         
@@ -670,11 +671,13 @@ class MANADDBConnector:
             start_date: Start date (datetime, default: 14 days ago)
             end_date: End date (datetime, default: now)
             limit: Maximum number of records to fetch
+            offset: Number of rows to skip (for server pagination)
             progress_note_event_type_id: Filter by specific event type ID
             client_service_id: Filter by specific client service ID
+            return_total: If True, run COUNT and return (success, notes, total_count)
             
         Returns:
-            (Success status, Progress Notes list) - Same format as API response
+            (Success status, Progress Notes list, total_count or None)
         """
         if not DRIVER_AVAILABLE:
             error_msg = (
@@ -695,44 +698,14 @@ class MANADDBConnector:
             if end_date is None:
                 end_date = datetime.now()
             
-            logger.info(f"🔍 [FILTER] Starting fetch_progress_notes - site={self.site}, client_service_id={client_service_id}, limit={limit}")
+            logger.info(f"🔍 [FILTER] Starting fetch_progress_notes - site={self.site}, client_service_id={client_service_id}, limit={limit}, offset={offset}, return_total={return_total}")
             logger.info(f"🔍 [FILTER] Date range: {start_date.date()} ~ {end_date.date()}")
             
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # ProgressNote query (matching API response format)
-                # Includes Client, Wing, Location information
-                query = """
-                    SELECT TOP (?)
-                        pn.Id,
-                        pn.ClientId,
-                        pn.ClientServiceId,
-                        pn.Date AS EventDate,
-                        pn.CreatedDate,
-                        pn.IsLateEntry,
-                        pn.ProgressNoteRiskRatingId,
-                        pn.ProgressNoteEventTypeId,
-                        pn.IsArchived,
-                        pn.IsDeleted,
-                        -- Person information (ClientId -> Client -> PersonId -> Person)
-                        ISNULL(p.FirstName, '') AS ClientFirstName,
-                        ISNULL(p.LastName, '') AS ClientLastName,
-                        ISNULL(p.PreferredName, '') AS ClientPreferredName,
-                        '' AS ClientTitle,  -- Person table does not have Title column
-                        -- ClientService information (Service Wing, Location)
-                        ISNULL(cs.WingId, 0) AS WingId,
-                        ISNULL(w.Name, '') AS WingName,
-                        ISNULL(cs.LocationId, 0) AS LocationId,
-                        ISNULL(loc.Name, '') AS LocationName,
-                        -- ProgressNoteEventType
-                        ISNULL(pne.Id, 0) AS EventTypeId,
-                        ISNULL(pne.Description, '') AS EventTypeDescription,
-                        ISNULL(pne.ColorArgb, 0) AS EventTypeColorArgb,
-                        -- ProgressNoteDetail (Note text)
-                        (SELECT TOP 1 Note FROM ProgressNoteDetail WHERE ProgressNoteId = pn.Id) AS NotesPlainText,
-                        -- CreatedByUser information (simple version)
-                        ISNULL(pn.CreatedByUserId, 0) AS CreatedByUserId
+                # WHERE clause (shared by count and main query)
+                where_clause = """
                     FROM ProgressNote pn
                     LEFT JOIN Client c ON pn.ClientId = c.Id
                     LEFT JOIN Person p ON c.PersonId = p.Id
@@ -743,31 +716,47 @@ class MANADDBConnector:
                     WHERE pn.IsDeleted = 0
                     AND pn.Date >= ? AND pn.Date <= ?
                 """
-                
-                # Event Type filtering
+                params_where = [start_date, end_date]
                 if progress_note_event_type_id is not None:
-                    query += " AND pn.ProgressNoteEventTypeId = ?"
-                    logger.info(f"🔍 [FILTER] Added Event Type filter: {progress_note_event_type_id}")
-                
-                # Client Service ID filtering
+                    where_clause += " AND pn.ProgressNoteEventTypeId = ?"
+                    params_where.append(progress_note_event_type_id)
                 if client_service_id is not None:
-                    query += " AND pn.ClientServiceId = ?"
+                    where_clause += " AND pn.ClientServiceId = ?"
                     logger.info(f"🔍 [FILTER] Adding Client Service ID filter: {client_service_id} (type: {type(client_service_id)})")
+                    params_where.append(client_service_id)
                 else:
                     logger.info("🔍 [FILTER] No Client Service ID filter - fetching all clients")
                 
-                query += " ORDER BY pn.Date DESC"
+                total_count = None
+                if return_total or offset > 0:
+                    count_query = "SELECT COUNT(DISTINCT pn.Id) " + where_clause
+                    cursor.execute(count_query, params_where)
+                    total_count = cursor.fetchone()[0]
+                    logger.info(f"🔍 [FILTER] Total count: {total_count}")
                 
-                params = [limit, start_date, end_date]
-                if progress_note_event_type_id is not None:
-                    params.append(progress_note_event_type_id)
-                if client_service_id is not None:
-                    params.append(client_service_id)
+                # Main query: SELECT ... ORDER BY ... [OFFSET/FETCH or TOP]
+                cols = (
+                    "pn.Id, pn.ClientId, pn.ClientServiceId, pn.Date AS EventDate, pn.CreatedDate, "
+                    "pn.IsLateEntry, pn.ProgressNoteRiskRatingId, pn.ProgressNoteEventTypeId, pn.IsArchived, pn.IsDeleted, "
+                    "ISNULL(p.FirstName, '') AS ClientFirstName, ISNULL(p.LastName, '') AS ClientLastName, "
+                    "ISNULL(p.PreferredName, '') AS ClientPreferredName, '' AS ClientTitle, "
+                    "ISNULL(cs.WingId, 0) AS WingId, ISNULL(w.Name, '') AS WingName, "
+                    "ISNULL(cs.LocationId, 0) AS LocationId, ISNULL(loc.Name, '') AS LocationName, "
+                    "ISNULL(pne.Id, 0) AS EventTypeId, ISNULL(pne.Description, '') AS EventTypeDescription, "
+                    "ISNULL(pne.ColorArgb, 0) AS EventTypeColorArgb, "
+                    "(SELECT TOP 1 Note FROM ProgressNoteDetail WHERE ProgressNoteId = pn.Id) AS NotesPlainText, "
+                    "ISNULL(pn.CreatedByUserId, 0) AS CreatedByUserId"
+                )
+                order_by = " ORDER BY pn.Date DESC"
+                if offset > 0:
+                    query = "SELECT " + cols + " " + where_clause + order_by + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
+                    params = params_where + [offset, limit]
+                else:
+                    query = "SELECT TOP (?) " + cols + " " + where_clause + order_by
+                    params = [limit] + params_where
                 
                 logger.info("🔍 [FILTER] SQL query prepared")
-                logger.info(f"🔍 [FILTER] Query params: limit={limit}, start_date={start_date}, end_date={end_date}, client_service_id={client_service_id}")
-                logger.info(f"🔍 Fetching Progress Notes: {self.site} ({start_date.date()} ~ {end_date.date()})")
-                logger.info("🔍 [FILTER] Executing SQL query...")
+                logger.info(f"🔍 [FILTER] Executing SQL query...")
                 
                 cursor.execute(query, params)
                 logger.info("🔍 [FILTER] SQL query completed")
@@ -889,7 +878,7 @@ class MANADDBConnector:
                             f"🔍 [FILTER] First note sample: Id={sample_note.get('Id')}, ClientServiceId={sample_note.get('ClientServiceId')}"
                         )
                 
-                return True, progress_notes
+                return (True, progress_notes, total_count)
                 
         except Exception as e:
             logger.error(f"🔍 [FILTER] Error fetching Progress Notes: {e}")
@@ -897,7 +886,7 @@ class MANADDBConnector:
             logger.error(f"❌ Progress Notes fetch error ({self.site}): {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return False, None
+            return (False, None, None)
     
     def fetch_care_areas(self) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
         """

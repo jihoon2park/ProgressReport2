@@ -496,9 +496,11 @@
                 <span id="paginationInfo">Page Information</span>
             </div>
             <div class="pagination-controls">
+                <button id="firstPageBtn" class="btn-pagination" onclick="goToPage(1)" title="First page" style="display: none;">⏮ First</button>
                 <button id="prevPageBtn" class="btn-pagination" onclick="changePage(-1)">← Previous</button>
                 <div id="pageNumbers" class="page-numbers"></div>
                 <button id="nextPageBtn" class="btn-pagination" onclick="changePage(1)">Next →</button>
+                <button id="lastPageBtn" class="btn-pagination" onclick="goToPage(totalPages)" title="Last page" style="display: none;">Last ⏭</button>
             </div>
             <div class="pagination-settings">
                 <label for="perPageSelect">Items per page:</label>

@@ -78,19 +78,13 @@ class ProgressNoteDB {
             let errorCount = 0;
 
             progressNotes.forEach(note => {
-                // 사이트 정보 추가
                 const noteWithSite = {
                     ...note,
                     site: site,
                     savedAt: new Date().toISOString()
                 };
-
                 const request = store.put(noteWithSite);
-
-                request.onsuccess = () => {
-                    savedCount++;
-                };
-
+                request.onsuccess = () => { savedCount++; };
                 request.onerror = () => {
                     console.error('프로그레스 노트 저장 실패:', request.error);
                     errorCount++;

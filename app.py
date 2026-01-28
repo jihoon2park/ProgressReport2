@@ -1053,7 +1053,7 @@ def login():
                         from progress_notes_json_cache import json_cache
                         from api_progressnote_fetch import fetch_progress_notes_for_site
                         logger.info(f"🌐 API mode: Fetch and cache Progress Notes - {site}")
-                        progress_success, progress_notes = fetch_progress_notes_for_site(site, 7)
+                        progress_success, progress_notes, _ = fetch_progress_notes_for_site(site, 7)
                         if progress_success and progress_notes:
                             json_cache.update_cache(site, progress_notes)
                             logger.info(f"Progress Notes fetched and cached - {site}: {len(progress_notes)} items")
@@ -2233,7 +2233,7 @@ def get_rod_stats():
         try:
             # Get progress note count
             from api_progressnote_fetch import fetch_progress_notes_for_site
-            success, progress_notes = fetch_progress_notes_for_site(site, 30)  # 30 days
+            success, progress_notes, _ = fetch_progress_notes_for_site(site, 30)  # 30 days
             
             if success and progress_notes:
                 stats['totalNotes'] = len(progress_notes)
@@ -2395,7 +2395,6 @@ def extend_session():
 @app.route('/api/fetch-progress-notes', methods=['POST'])
 @login_required
 def fetch_progress_notes():
-<<<<<<< HEAD
     """프로그레스 노트를 사이트에서 가져오기. days from request; default = DEFAULT_PERIOD_DAYS (matches frontend PERIOD_OPTIONS)."""
     try:
         data = request.get_json()
@@ -2408,20 +2407,7 @@ def fetch_progress_notes():
         year = data.get('year')  # 년도
         month = data.get('month')  # 월
         client_service_id = data.get('client_service_id')  # 클라이언트 서비스 ID 필터
-=======
-    """Fetch progress notes from site (cache-based)"""
-    try:
-        data = request.get_json()
-        site = data.get('site')
-        days = data.get('days', 7)  # Default: 7 days
-        page = data.get('page', 1)  # Page number
-        per_page = data.get('per_page', 50)  # Items per page
-        force_refresh = data.get('force_refresh', False)  # Force refresh
-        event_types = data.get('event_types', [])  # Event type filter
-        year = data.get('year')  # Year
-        month = data.get('month')  # Month
-        client_service_id = data.get('client_service_id')  # Client service ID filter
->>>>>>> main
+
         
         if not site:
             logger.error("Site parameter is missing in request")
@@ -2461,24 +2447,44 @@ def fetch_progress_notes():
         
         from api_progressnote_fetch import fetch_progress_notes_for_site
         
+        # Server pagination: page and per_page (default 50). Used in filter mode for performance.
+        req_page = max(1, int(data.get('page', 1)))
+        req_per_page = min(500, max(1, int(data.get('per_page', 50))))
+        offset = (req_page - 1) * req_per_page
+        
         # Fetch Progress Notes (DB direct access or API)
         if use_db_direct:
-            logger.info(f"🔌 Direct DB access mode: Progress Notes fetched in real time (no cache) - {site}")
+            logger.info(f"🔌 Direct DB access mode: Progress Notes fetched in real time (no cache) - {site}, page={req_page}, per_page={req_per_page}")
+            # Server-side pagination: one page per request
+            success, notes, total_count = fetch_progress_notes_for_site(
+                site, days,
+                event_types=event_types, year=year, month=month,
+                client_service_id=client_service_id,
+                limit=req_per_page, offset=offset, return_total=True
+            )
+            logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site result - success={success}, notes_count={len(notes) if notes else 0}, total_count={total_count}")
         else:
             logger.info(f"🌐 API mode: Fetching Progress Notes - {site}")
+            # API mode: no server pagination; fetch with limit, return one page by slicing
+            fetch_limit = min(100000, max(req_per_page, 5000))
+            success, notes, _ = fetch_progress_notes_for_site(
+                site, days,
+                event_types=event_types, year=year, month=month,
+                client_service_id=client_service_id, limit=fetch_limit
+            )
+            total_count = len(notes) if notes else 0
+            if success and notes:
+                start_idx = (req_page - 1) * req_per_page
+                notes = list(notes)[start_idx:start_idx + req_per_page]
+                # Cache is not updated per-page in API mode to avoid partial cache
+            logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site result - success={success}, notes_count={len(notes) if notes else 0}")
         
-        # Filter endpoint: fetch with high limit, return ALL in one page (no server-side pagination slice)
-        fetch_limit = min(1000000, max(1, int(data.get('per_page', 100000))))
-        logger.info(f"🔍 [FILTER] Calling fetch_progress_notes_for_site - site={site}, days={days}, client_service_id={client_service_id}, limit={fetch_limit}")
-        success, notes = fetch_progress_notes_for_site(site, days, event_types=event_types, year=year, month=month, client_service_id=client_service_id, limit=fetch_limit)
-        logger.info(f"🔍 [FILTER] fetch_progress_notes_for_site result - success={success}, notes_count={len(notes) if notes else 0}")
-        
-        if not success or not notes:
+        if not success:
             result = {
                 'success': False,
                 'notes': [],
-                'page': 1,
-                'per_page': 0,
+                'page': req_page,
+                'per_page': req_per_page,
                 'total_count': 0,
                 'total_pages': 0,
                 'cache_status': 'no_data',
@@ -2486,20 +2492,16 @@ def fetch_progress_notes():
                 'cache_age_hours': 0
             }
         else:
-            notes = list(notes)
-            total_count = len(notes)
-            if not use_db_direct:
-                from progress_notes_json_cache import json_cache
-                json_cache.update_cache(site, notes)
-            # Return ALL in one page — no slice (filter endpoint; frontend does client-side paging if needed)
-
+            notes_out = list(notes) if notes else []
+            total_count = total_count if total_count is not None else len(notes_out)
+            total_pages = max(1, (total_count + req_per_page - 1) // req_per_page) if total_count else 0
             result = {
                 'success': True,
-                'notes': notes,
-                'page': 1,
-                'per_page': total_count,
+                'notes': notes_out,
+                'page': req_page,
+                'per_page': req_per_page,
                 'total_count': total_count,
-                'total_pages': 1,
+                'total_pages': total_pages,
                 'cache_status': 'fresh_db_data' if use_db_direct else 'fresh_api_data',
                 'last_sync': get_australian_time().isoformat(),
                 'cache_age_hours': 0
@@ -2507,7 +2509,7 @@ def fetch_progress_notes():
         
         # Build response data
         response_data = {
-            'success': True,
+            'success': result['success'],
             'data': result['notes'],
             'pagination': {
                 'page': result['page'],
@@ -2589,7 +2591,7 @@ def fetch_progress_notes_incremental():
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
             # Always fetch 7 days of data
-            success, progress_notes = fetch_progress_notes_for_site(site, 7)
+            success, progress_notes, _ = fetch_progress_notes_for_site(site, 7)
             
             if success:
                 logger.info(

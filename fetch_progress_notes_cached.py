@@ -19,7 +19,9 @@ DEFAULT_PERIOD_DAYS = 7
 progress_notes_cached_bp = Blueprint('progress_notes_cached', __name__)
 
 def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int):
-    """Query Progress Notes (Direct DB access or API) - Cache not needed in direct DB access mode"""
+    """Query Progress Notes (Direct DB access or API). Does not use DB-level server pagination:
+    fetches a bounded set (default-limit when no limit passed) then slices to (page, per_page).
+    Used only for default period (e.g. 7 days); cache/slice design is intentional."""
     try:
         import sqlite3
         import os
@@ -41,7 +43,7 @@ def _get_notes_from_api_and_cache(site: str, page: int, per_page: int, days: int
             use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
         
         from api_progressnote_fetch import fetch_progress_notes_for_site
-        success, notes = fetch_progress_notes_for_site(site, days)
+        success, notes, _ = fetch_progress_notes_for_site(site, days)
         
         if not success or not notes:
             return {

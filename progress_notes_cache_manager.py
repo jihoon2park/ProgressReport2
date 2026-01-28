@@ -241,7 +241,7 @@ class ProgressNotesCacheManager:
             # Query data from API (use existing logic)
             from api_progressnote_fetch import fetch_progress_notes_for_site
             
-            success, api_notes = fetch_progress_notes_for_site(site, days=days, event_types=[])
+            success, api_notes, _ = fetch_progress_notes_for_site(site, days=days, event_types=[])
             
             if not success or not api_notes:
                 return {
