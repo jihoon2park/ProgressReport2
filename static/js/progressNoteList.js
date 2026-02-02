@@ -5,7 +5,7 @@ console.log('[progressNoteList.js] Script file loaded at:', new Date().toISOStri
 // Use global progressNoteDB instance (without variable declaration)
 
 // Current site setting (received from server or URL parameter or default value)
-const currentSite = window.currentSite || new URLSearchParams(window.location.search).get('site') || 'Ramsay';
+let currentSite = window.currentSite || new URLSearchParams(window.location.search).get('site') || 'Ramsay';
 console.log('[progressNoteList.js] Current site determined:', currentSite);
 console.log('[progressNoteList.js] window.currentSite:', window.currentSite);
 console.log('[progressNoteList.js] URL params:', new URLSearchParams(window.location.search).get('site'));
@@ -25,6 +25,9 @@ let clientList = [];
 
 // Selected client filter (PersonId)
 let selectedClientId = null;
+
+// Selected event type filter (server filter; value '' or '__fall__' or exact Description)
+let selectedEventType = '';
 
 /**
  * Single source of truth for Reporting Period options (nursing system: no hardcoded values in HTML).
@@ -52,9 +55,74 @@ function getPeriodDays() {
     return (PERIOD_VALUES.indexOf(v) >= 0) ? v : DEFAULT_PERIOD_DAYS;
 }
 
-/** True when client and/or period differ from default — pagination is client-side and we must never call the cached API. */
+/** True when client, period, or event type differs from default — use server pagination, not cached API. */
 function isFilterMode() {
-    return selectedClientId != null || getPeriodDays() !== DEFAULT_PERIOD_DAYS;
+    return selectedClientId != null || getPeriodDays() !== DEFAULT_PERIOD_DAYS || selectedEventType !== '';
+}
+
+/** Value for grouped Fall event types (any description containing 'fall'). */
+const EVENT_TYPE_FALL = '__fall__';
+
+/** Cached event types per site. Load once per site, bind to select. */
+let cachedEventTypesBySite = {};
+
+/**
+ * Load event types for current site once and cache. Populate #eventTypeFilter from cache.
+ * Call on init and when site changes.
+ */
+async function populateEventTypeFilter() {
+    const el = document.getElementById('eventTypeFilter');
+    if (!el) return;
+    const currentValue = el.value;
+    try {
+        if (!cachedEventTypesBySite[currentSite]) {
+            const response = await fetch('/api/event-types', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ site: currentSite })
+            });
+            const result = await response.json();
+            let raw = (result.success && result.data) ? result.data : [];
+            cachedEventTypesBySite[currentSite] = Array.isArray(raw) ? raw : (raw && raw.data) ? raw.data : [];
+        }
+        const allTypes = cachedEventTypesBySite[currentSite];
+        const fallLabels = new Set();
+        const otherLabels = new Set();
+        allTypes.forEach(function (et) {
+            const desc = (et.Description || '').trim();
+            if (!desc) return;
+            if (desc.toLowerCase().indexOf('fall') >= 0) {
+                fallLabels.add(desc);
+            } else {
+                otherLabels.add(desc);
+            }
+        });
+        el.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.textContent = 'All Event Types';
+        el.appendChild(optAll);
+        if (fallLabels.size > 0) {
+            const optFall = document.createElement('option');
+            optFall.value = EVENT_TYPE_FALL;
+            optFall.textContent = 'Fall';
+            el.appendChild(optFall);
+        }
+        Array.from(otherLabels).sort().forEach(function (label) {
+            const opt = document.createElement('option');
+            opt.value = label;
+            opt.textContent = label;
+            el.appendChild(opt);
+        });
+        if (currentValue && (currentValue === EVENT_TYPE_FALL || Array.from(otherLabels).indexOf(currentValue) >= 0)) {
+            el.value = currentValue;
+        } else {
+            el.value = '';
+            selectedEventType = '';
+        }
+    } catch (e) {
+        console.error('[populateEventTypeFilter]', e);
+    }
 }
 
 /** Populate #reportingPeriodFilter from PERIOD_OPTIONS. Call before any fetch that uses getPeriodDays(). */
@@ -481,8 +549,21 @@ function formatNoteDetail(note) {
     `;
 }
 
+// Placeholder text for detail panel (never show note content on load — only on row click)
+const DETAIL_PLACEHOLDER = 'Select a row to view detailed content here.';
+
+/** Reset detail panel to placeholder and clear row selection. Call on every table render so detail never shows on load. */
+function resetDetailPanel() {
+    const el = document.getElementById('noteDetailContent');
+    if (el) el.innerHTML = DETAIL_PLACEHOLDER;
+    document.querySelectorAll('#notesTable tbody tr').forEach(function (tr) { tr.classList.remove('selected'); });
+}
+
 // Table rendering
 async function renderNotesTable() {
+    // Never show detail on load: reset panel first, before any async work
+    resetDetailPanel();
+
     console.log('[renderNotesTable] ========== STARTING TABLE RENDERING ==========');
     console.log('[renderNotesTable] Starting table rendering');
     
@@ -553,10 +634,10 @@ async function renderNotesTable() {
     
         // Filter notes by selected client if filter is active
         // Note: If client filter is active, data should already be filtered from server and saved to IndexedDB
-        // So we just use all notes from IndexedDB directly (they are already filtered)
+        // Event type filter is server-side; no local filtering needed
         let filteredNotes = notes || [];
         
-        console.log(`[renderNotesTable] Filtering notes - selectedClientId: ${selectedClientId}, notes count: ${notes ? notes.length : 0}`);
+        console.log(`[renderNotesTable] Filtering notes - selectedClientId: ${selectedClientId}, selectedEventType: ${selectedEventType || 'all'}, notes count: ${notes ? notes.length : 0}`);
         
         // If client filter is active, data from IndexedDB should already be filtered from server
         // No need to filter again - just use all notes from IndexedDB
@@ -650,11 +731,8 @@ async function renderNotesTable() {
             updatePaginationUI(paginationData);
         }
         
-        // Auto-select first visible row
-        if (notesToShow.length > 0) {
-            selectNote(0, notesToShow);
-        }
-        
+        // Detail panel already reset at start of renderNotesTable(); no row selected until user clicks
+
         logPerformance('Table rendering completed', { 
             totalTime: Date.now() - startTime,
             rowsRendered: filteredNotes.length 
@@ -684,6 +762,7 @@ function selectNote(idx, notes) {
 
 // Update progress notes table with new data
 function updateProgressNotesTable(notes) {
+    resetDetailPanel();
     console.log('Updating table with', notes.length, 'notes');
     
     const tbody = document.querySelector('#notesTable tbody');
@@ -706,12 +785,7 @@ function updateProgressNotesTable(notes) {
     });
     
     tbody.appendChild(fragment);
-    
-    // Auto-select first visible row
-    if (notes.length > 0) {
-        selectNote(0, notes);
-    }
-    
+
     console.log('Table updated successfully');
 }
 
@@ -731,6 +805,9 @@ async function loadFilterModePage(page) {
     if (selectedClient && selectedClient.MainClientServiceId != null) {
         req.client_service_id = selectedClient.MainClientServiceId;
     }
+    if (selectedEventType) {
+        req.event_types = selectedEventType === EVENT_TYPE_FALL ? ['Fall'] : [selectedEventType];
+    }
     try {
         const response = await fetch('/api/fetch-progress-notes', {
             method: 'POST',
@@ -749,8 +826,22 @@ async function loadFilterModePage(page) {
         await renderNotesTable();
     } catch (e) {
         console.error('[loadFilterModePage]', e);
+        window.filterModeNotes = [];
+        window.serverPagination = { page: 1, per_page: perPage, total_count: 0, total_pages: 1 };
         const tbody = document.querySelector('#notesTable tbody');
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:red;">Error: ' + (e.message || String(e)) + '</td></tr>';
+        updatePaginationUI(window.serverPagination);
+    }
+}
+
+// Event type filter change handler (server filter; refetch)
+function handleEventTypeFilterChange() {
+    const el = document.getElementById('eventTypeFilter');
+    selectedEventType = el ? el.value || '' : '';
+    if (isFilterMode()) {
+        loadFilterModePage(1);
+    } else {
+        loadProgressNotes();
     }
 }
 
@@ -758,6 +849,11 @@ async function loadFilterModePage(page) {
 async function handleClientFilterChange() {
     console.log('[FILTER] ========== CLIENT FILTER CHANGE ==========');
     console.log('[FILTER] Filter change event triggered at:', new Date().toISOString());
+    
+    // Reset Event type to "All" when Client or Period changes
+    selectedEventType = '';
+    const eventTypeEl = document.getElementById('eventTypeFilter');
+    if (eventTypeEl) eventTypeEl.value = '';
     
     const filterSelect = document.getElementById('clientFilter');
     if (!filterSelect) {
@@ -988,6 +1084,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (periodFilterEl) {
             periodFilterEl.addEventListener('change', handleClientFilterChange);
         }
+        // Event Type filter: server filter; refetch on change
+        const eventTypeFilterEl = document.getElementById('eventTypeFilter');
+        if (eventTypeFilterEl) {
+            eventTypeFilterEl.addEventListener('change', handleEventTypeFilterChange);
+        }
         
         // Detect URL change (browser back/forward)
         window.addEventListener('popstate', handleSiteChange);
@@ -1062,6 +1163,10 @@ async function initializeForSite(site) {
         populatePeriodFilter();
         console.log('[initializeForSite] Step 1.6 completed: Period filter populated, default=', DEFAULT_PERIOD_DAYS, 'days');
         
+        // 1.7. Populate Event Type filter from /api/event-types (server filter)
+        await populateEventTypeFilter();
+        console.log('[initializeForSite] Step 1.7 completed: Event type filter populated');
+        
         // 2. Initialize IndexedDB
         console.log('[initializeForSite] Step 2: Initializing IndexedDB');
         await window.progressNoteDB.init();
@@ -1110,6 +1215,8 @@ async function initializeForSite(site) {
         if (tbody) {
             tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Initialization Error: ${error.message}</td></tr>`;
         }
+    } finally {
+        enableRefreshButton();
     }
 }
 
@@ -1257,25 +1364,23 @@ function showErrorMessage(message) {
     }, 10000);
 }
 
-// 수동 새로고침 함수
+// 수동 새로고침 함수 — respects current filters (client, period, event type)
 async function refreshData() {
     try {
         console.log('Manual refresh requested for site:', currentSite);
-        
-        // Refresh 버튼 비활성화
         disableRefreshButton();
-        
-        // Clear existing data and fetch default-period data (cached)
-        await window.progressNoteDB.deleteProgressNotes(currentSite);
-        
-        // 일반 프로그레스 노트 목록: 모든 노트 가져오기 (성능 최적화를 위해 기본 limit 사용)
-        console.log('Fetching all progress notes for general list view');
-        await fetchAndSaveProgressNotes();
-        
-        // 테이블 다시 렌더링
-        await renderNotesTable();
+        if (isFilterMode()) {
+            await loadFilterModePage(1);
+        } else {
+            await window.progressNoteDB.deleteProgressNotes(currentSite);
+            console.log('Fetching all progress notes for general list view');
+            await fetchAndSaveProgressNotes();
+            await renderNotesTable();
+        }
     } catch (error) {
         console.error('Refresh failed for site:', currentSite, error);
+    } finally {
+        enableRefreshButton();
     }
 }
 
@@ -1292,6 +1397,12 @@ function handleSiteChange() {
     if (newSite !== currentSite) {
         logPerformance('Site changed from', { from: currentSite, to: newSite });
         currentSite = newSite;
+        selectedClientId = null;
+        selectedEventType = '';
+        const clientFilterEl = document.getElementById('clientFilter');
+        if (clientFilterEl) clientFilterEl.value = '';
+        const eventTypeEl = document.getElementById('eventTypeFilter');
+        if (eventTypeEl) eventTypeEl.value = '';
         
         // Update site title
         const siteTitle = document.getElementById('siteTitle');

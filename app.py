@@ -2049,6 +2049,45 @@ def get_event_type_list():
     except FileNotFoundError:
         return jsonify([]), 404
 
+
+@app.route('/api/event-types', methods=['POST'])
+@login_required
+def api_event_types():
+    """Return event types for a site (for Event Type filter dropdown). DB direct or JSON fallback."""
+    try:
+        data = request.get_json() or {}
+        site = data.get('site') or request.args.get('site')
+        if not site:
+            return jsonify({'success': False, 'message': 'site required'}), 400
+        use_db_direct = False
+        try:
+            conn = sqlite3.connect('progress_report.db', timeout=10)
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'USE_DB_DIRECT_ACCESS'")
+            result = cursor.fetchone()
+            conn.close()
+            if result and result[0]:
+                use_db_direct = result[0].lower() == 'true'
+            else:
+                use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        except Exception:
+            use_db_direct = os.environ.get('USE_DB_DIRECT_ACCESS', 'false').lower() == 'true'
+        if use_db_direct:
+            from manad_db_connector import MANADDBConnector
+            connector = MANADDBConnector(site)
+            success, event_types = connector.fetch_event_types()
+            if success and event_types:
+                return jsonify({'success': True, 'data': event_types})
+        from api_eventtype import get_site_event_types
+        raw = get_site_event_types(site)
+        event_types = raw if isinstance(raw, list) else (raw.get('data', []) if isinstance(raw, dict) else [])
+        if event_types:
+            return jsonify({'success': True, 'data': event_types})
+        return jsonify({'success': False, 'data': [], 'message': 'No event types found'})
+    except Exception as e:
+        logger.error(f"Error fetching event types: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/rod-residence-status')
 @login_required
 def get_rod_residence_status():

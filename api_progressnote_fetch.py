@@ -410,6 +410,42 @@ class ProgressNoteFetchClient:
             logger.error(f"Error finding event type ID for '{event_type_name}': {str(e)}")
             return None
 
+
+def _resolve_event_types_to_ids(connector, event_types: List[str]) -> Optional[List[int]]:
+    """
+    Resolve event type names to IDs for DB filtering.
+    - "Fall" (case-insensitive): any Description containing 'fall'
+    - Other: exact Description match
+    Returns list of unique IDs, or None if event_types is empty.
+    """
+    if not event_types or len(event_types) == 0:
+        return None
+    success, all_types = connector.fetch_event_types()
+    if not success or not all_types:
+        logger.warning("Could not fetch event types for filtering")
+        return None
+    ids = []
+    for name in event_types:
+        name_str = (name or '').strip()
+        if not name_str:
+            continue
+        if name_str.lower() == 'fall':
+            for et in all_types:
+                desc = (et.get('Description') or '').lower()
+                if 'fall' in desc:
+                    eid = et.get('Id')
+                    if eid is not None and eid not in ids:
+                        ids.append(eid)
+        else:
+            for et in all_types:
+                if (et.get('Description') or '').strip() == name_str:
+                    eid = et.get('Id')
+                    if eid is not None and eid not in ids:
+                        ids.append(eid)
+                    break
+    return ids if ids else None
+
+
 def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[str] = None, year: int = None, month: int = None, client_service_id: int = None, limit: Optional[int] = None, offset: int = 0, return_total: bool = False) -> tuple[bool, Optional[List[Dict[str, Any]]], Optional[int]]:
     """
     Convenience function to fetch progress notes for a specific site (DB direct access or API)
@@ -466,19 +502,16 @@ def fetch_progress_notes_for_site(site: str, days: int = 14, event_types: List[s
             else:
                 start_date, end_date = _range_last_n_days(days)
             
-            # Event Type filtering (ID conversion if needed)
-            event_type_id = None
-            if event_types and len(event_types) > 0:
-                # Find ID by Event Type name (simple version, may be more complex in practice)
-                logger.warning(f"Event Type filtering is not yet fully supported in DB direct access mode: {event_types}")
+            # Event Type filtering: resolve names to IDs
+            event_type_ids = _resolve_event_types_to_ids(connector, event_types or [])
             
             effective_limit = limit if limit is not None else 500
 
-            logger.info(f"🔍 [FILTER] Calling connector.fetch_progress_notes - client_service_id={client_service_id}, offset={offset}, return_total={return_total}")
-            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit={effective_limit}, event_type_id={event_type_id}, client_service_id={client_service_id}")
+            logger.info(f"🔍 [FILTER] Calling connector.fetch_progress_notes - client_service_id={client_service_id}, offset={offset}, return_total={return_total}, event_type_ids={event_type_ids}")
+            logger.info(f"🔍 [FILTER] Parameters: start_date={start_date}, end_date={end_date}, limit={effective_limit}, client_service_id={client_service_id}")
             progress_success, progress_notes, total_count = connector.fetch_progress_notes(
                 start_date, end_date, limit=effective_limit, offset=offset,
-                progress_note_event_type_id=event_type_id, client_service_id=client_service_id,
+                progress_note_event_type_ids=event_type_ids, client_service_id=client_service_id,
                 return_total=return_total
             )
             logger.info(f"🔍 [FILTER] connector.fetch_progress_notes result - success={progress_success}, notes_count={len(progress_notes) if progress_notes else 0}, total_count={total_count}")

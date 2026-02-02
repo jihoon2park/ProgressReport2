@@ -338,8 +338,9 @@
         tbody tr:nth-child(even) { background: #f6f8fa; }
         tr.selected { background: #e3f2fd !important; }
         tr:hover { background: #eaf4fb !important; cursor: pointer; }
-        .note-detail { background: #fff; border-radius: 6px; box-shadow: 0 2px 8px #0001; padding: 18px; min-height: 200px; }
-        .note-detail h3 { margin-top: 0; font-size: 1.1em; color: #1976d2; }
+        .note-detail { background: #fff; border-radius: 6px; box-shadow: 0 2px 8px #0001; padding: 18px; min-height: 120px; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden; }
+        .note-detail h3 { margin-top: 0; font-size: 1.1em; color: #1976d2; flex-shrink: 0; }
+        #noteDetailContent { flex: 1; overflow-y: auto; min-height: 0; }
         .note-detail pre { background: #f7f7f7; padding: 10px; border-radius: 4px; font-size: 0.97em; }
         
         /* Popup styles */
@@ -422,7 +423,9 @@
         @media (max-width: 900px) {
             .container { flex-direction: column; }
             .left-panel, .right-panel { flex: unset; width: 100%; }
-            
+            .right-panel { order: 2; max-height: 45vh; overflow: hidden; }
+            .left-panel { order: 1; }
+            .note-detail { max-height: 40vh; }
             .popup-content {
                 width: 95%;
                 height: 95%;
@@ -470,6 +473,13 @@
                 <label for="reportingPeriodFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Period:</label>
                 <select id="reportingPeriodFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 120px; background-color: white;">
                     <!-- Options populated by JS from PERIOD_OPTIONS (progressNoteList.js). Do not hardcode values here. -->
+                </select>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <label for="eventTypeFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Event type:</label>
+                <select id="eventTypeFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 180px; background-color: white;">
+                    <option value="">All Event Types</option>
+                    <!-- Options populated by JS from cached event types (fetched once per site). Fall-related grouped first. -->
                 </select>
             </div>
         </div>

@@ -662,6 +662,7 @@ class MANADDBConnector:
                              limit: int = 500,
                              offset: int = 0,
                              progress_note_event_type_id: Optional[int] = None,
+                             progress_note_event_type_ids: Optional[List[int]] = None,
                              client_service_id: Optional[int] = None,
                              return_total: bool = False) -> Tuple[bool, Optional[List[Dict[str, Any]]], Optional[int]]:
         """
@@ -672,7 +673,8 @@ class MANADDBConnector:
             end_date: End date (datetime, default: now)
             limit: Maximum number of records to fetch
             offset: Number of rows to skip (for server pagination)
-            progress_note_event_type_id: Filter by specific event type ID
+            progress_note_event_type_id: Filter by specific event type ID (single)
+            progress_note_event_type_ids: Filter by event type IDs (list; preferred over single id if non-empty)
             client_service_id: Filter by specific client service ID
             return_total: If True, run COUNT and return (success, notes, total_count)
             
@@ -717,7 +719,11 @@ class MANADDBConnector:
                     AND pn.Date >= ? AND pn.Date <= ?
                 """
                 params_where = [start_date, end_date]
-                if progress_note_event_type_id is not None:
+                if progress_note_event_type_ids and len(progress_note_event_type_ids) > 0:
+                    placeholders = ','.join('?' * len(progress_note_event_type_ids))
+                    where_clause += f" AND pn.ProgressNoteEventTypeId IN ({placeholders})"
+                    params_where.extend(progress_note_event_type_ids)
+                elif progress_note_event_type_id is not None:
                     where_clause += " AND pn.ProgressNoteEventTypeId = ?"
                     params_where.append(progress_note_event_type_id)
                 if client_service_id is not None:
