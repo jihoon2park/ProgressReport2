@@ -277,7 +277,7 @@
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 p-0">
+            <div class="col-md-2 p-0">
                 <div class="sidebar">
                     <div class="sidebar-header">
                         <i class="fas fa-cogs me-2"></i>
@@ -296,7 +296,7 @@
             </div>
 
             <!-- Main Content -->
-            <div class="col-md-9">
+            <div class="col-md-10">
                 <div class="main-content">
                     <!-- Policy List Section -->
                     <div id="policies-section" class="content-section">
@@ -371,6 +371,9 @@
                             <div>
                                 <button class="btn btn-success btn-custom me-2" onclick="savePolicy()">
                                     <i class="fas fa-save me-2"></i>Save Policy
+                                </button>
+                                <button class="btn btn-warning btn-custom me-2" onclick="testPolicy()">
+                                    <i class="fas fa-paper-plane me-2"></i>Test Policy
                                 </button>
                                 <button class="btn btn-secondary btn-custom" onclick="cancelEdit()">
                                     <i class="fas fa-times me-2"></i>Cancel
@@ -508,6 +511,96 @@
                                     </button>
                                 </div>
 
+                                <!-- Recipient Groups Selection -->
+                                <div class="mb-4">
+                                    <h4><i class="fas fa-users me-2"></i>Recipient Groups</h4>
+                                    <p class="text-muted">Select which recipient groups should receive notifications for this policy</p>
+                                    <div id="policyRecipientGroups" class="border rounded p-3" style="max-height:200px;overflow-y:auto;">
+                                        <p class="text-muted mb-0">Loading groups...</p>
+                                    </div>
+                                </div>
+
+                                <!-- Message Templates (Email & 3CX tabs) -->
+                                <div class="mb-4">
+                                    <h4><i class="fas fa-envelope me-2"></i>Message Templates</h4>
+                                    <ul class="nav nav-tabs" id="templateTabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="email-tab" data-bs-toggle="tab" data-bs-target="#emailTemplate" type="button" role="tab">
+                                                <i class="fas fa-envelope me-1"></i>Email Template
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="threecx-tab" data-bs-toggle="tab" data-bs-target="#threecxTemplate" type="button" role="tab">
+                                                <i class="fas fa-phone-alt me-1"></i>3CX Message Template
+                                            </button>
+                                        </li>
+                                    </ul>
+                                    {% raw %}
+                                    <div class="mb-3 p-3 bg-light border rounded">
+                                        <label class="form-label fw-bold mb-2"><i class="fas fa-code me-1"></i>Available Placeholders <small class="text-muted fw-normal">(click to insert into active field)</small></label>
+                                        <table class="table table-sm table-borderless mb-0" style="font-size:0.85rem;">
+                                            <tbody>
+                                                <tr>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{incident_type}}')">{{incident_type}}</span></td>
+                                                    <td class="text-muted">Type of incident (e.g. Fall, Medication Error)</td>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{incident_date}}')">{{incident_date}}</span></td>
+                                                    <td class="text-muted">Date/time of the incident</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{resident_name}}')">{{resident_name}}</span></td>
+                                                    <td class="text-muted">Full name of the resident</td>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{room}}')">{{room}}</span></td>
+                                                    <td class="text-muted">Resident's room number</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{reported_by}}')">{{reported_by}}</span></td>
+                                                    <td class="text-muted">Staff who reported the incident</td>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{severity}}')">{{severity}}</span></td>
+                                                    <td class="text-muted">Severity level (Low, Medium, High)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{site}}')">{{site}}</span></td>
+                                                    <td class="text-muted">Site name (e.g. Parafield Gardens)</td>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{status}}')">{{status}}</span></td>
+                                                    <td class="text-muted">Incident status (Open, Closed)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{location}}')">{{location}}</span></td>
+                                                    <td class="text-muted">Where in the facility it happened</td>
+                                                    <td><span class="badge bg-primary" style="cursor:pointer" onclick="insertPlaceholder('{{witnesses}}')">{{witnesses}}</span></td>
+                                                    <td class="text-muted">Witnesses (or "Unwitnessed")</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><span class="badge bg-success" style="cursor:pointer" onclick="insertPlaceholder('{{description}}')">{{description}}</span></td>
+                                                    <td class="text-muted">Full incident description text</td>
+                                                    <td><span class="badge bg-success" style="cursor:pointer" onclick="insertPlaceholder('{{action_taken}}')">{{action_taken}}</span></td>
+                                                    <td class="text-muted">Actions taken after the incident</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="tab-content border border-top-0 rounded-bottom p-3" id="templateTabContent">
+                                        <div class="tab-pane fade show active" id="emailTemplate" role="tabpanel">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Email Subject</label>
+                                                <input type="text" class="form-control template-field" id="emailSubject" placeholder="e.g. [ALERT] &#123;&#123;incident_type&#125;&#125; - &#123;&#123;resident_name&#125;&#125; - &#123;&#123;site&#125;&#125;">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Email Body</label>
+                                                <textarea class="form-control template-field" id="emailBody" rows="10" placeholder="Dear Team,&#10;&#10;An incident has been reported:&#10;&#10;Type: &#123;&#123;incident_type&#125;&#125;&#10;Date: &#123;&#123;incident_date&#125;&#125;&#10;Severity: &#123;&#123;severity&#125;&#125;&#10;Site: &#123;&#123;site&#125;&#125;&#10;&#10;Resident: &#123;&#123;resident_name&#125;&#125; (Room: &#123;&#123;room&#125;&#125;)&#10;Reported By: &#123;&#123;reported_by&#125;&#125;&#10;&#10;Description:&#10;&#123;&#123;description&#125;&#125;&#10;&#10;Action Taken:&#10;&#123;&#123;action_taken&#125;&#125;&#10;&#10;Please take appropriate action."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="tab-pane fade" id="threecxTemplate" role="tabpanel">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">3CX Message</label>
+                                                <textarea class="form-control template-field" id="threecxMessage" rows="6" placeholder="ALERT: &#123;&#123;incident_type&#125;&#125;&#10;Date: &#123;&#123;incident_date&#125;&#125;&#10;Resident: &#123;&#123;resident_name&#125;&#125; (Room: &#123;&#123;room&#125;&#125;)&#10;Severity: &#123;&#123;severity&#125;&#125; | Site: &#123;&#123;site&#125;&#125;&#10;Reported By: &#123;&#123;reported_by&#125;&#125;&#10;Description: &#123;&#123;description&#125;&#125;"></textarea>
+                                                <small class="form-text text-muted">Keep concise for 3CX chat messages.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endraw %}
+                                </div>
+
                                 <!-- JSON Preview -->
                                 <div class="mb-4">
                                     <h4>JSON Preview</h4>
@@ -521,51 +614,76 @@
 
                     <!-- Other sections (templates, analytics, settings) -->
 
-                    <!-- Recipients Section -->
+                    <!-- Recipients Section (Groups only) -->
                     <div id="recipients-section" class="content-section" style="display: none;">
                         <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h2><i class="fas fa-users me-3"></i>Recipients Management</h2>
-                            <button class="btn btn-success btn-custom" onclick="addNewRecipient()">
-                                <i class="fas fa-user-plus me-2"></i>Add Recipient
+                            <h2><i class="fas fa-users me-3"></i>Recipient Groups</h2>
+                            <button class="btn btn-success btn-custom" onclick="showAddGroupModal()">
+                                <i class="fas fa-plus me-2"></i>Add Group
                             </button>
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="policy-card">
-                                    <div class="policy-header">
-                                        <h5>👥 Recipients List</h5>
+                        <div id="recipientGroupsList">
+                            <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading recipient groups...</p></div>
+                        </div>
+                    </div>
+
+                    <!-- Add/Edit Recipient Group Modal -->
+                    <div class="modal fade" id="recipientGroupModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header" style="background:var(--primary-color);color:#fff;">
+                                    <h5 class="modal-title" id="recipientGroupModalTitle">Add Recipient Group</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" id="editGroupId" value="">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Group Name *</label>
+                                        <input type="text" class="form-control" id="groupName" placeholder="e.g. Parafield - Managers" required>
                                     </div>
-                                    <div class="policy-body">
-                                        <div id="recipientsList">
-                                            <div class="text-center py-4">
-                                                <div class="spinner-border text-primary" role="status">
-                                                    <span class="visually-hidden">Loading...</span>
-                                                </div>
-                                                <p class="mt-2">Loading recipients...</p>
-                                            </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">Site *</label>
+                                            <select class="form-select" id="groupSite" required>
+                                                <option value="">-- Select Site --</option>
+                                                <option value="Parafield Gardens">Parafield Gardens</option>
+                                                <option value="Nerrilda">Nerrilda</option>
+                                                <option value="Ramsay">Ramsay</option>
+                                                <option value="West Park">West Park</option>
+                                                <option value="Yankalilla">Yankalilla</option>
+                                            </select>
                                         </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">Role *</label>
+                                            <select class="form-select" id="groupRole" required>
+                                                <option value="">-- Select Role --</option>
+                                                <option value="manager">Manager</option>
+                                                <option value="nurse">Nurse</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <h6><i class="fas fa-envelope me-2"></i>Email Addresses *</h6>
+                                    <p class="text-muted small mb-2">At least one email is required. Add more if needed.</p>
+                                    <div id="groupEmailsContainer">
+                                        <!-- 3 default email rows added by JS -->
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addGroupEmailRow()">
+                                        <i class="fas fa-plus me-1"></i>Add Email
+                                    </button>
+                                    <hr>
+                                    <h6><i class="fas fa-phone-alt me-2"></i>3CX Group Chat</h6>
+                                    <p class="text-muted small">One 3CX conversation ID for this group.</p>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">3CX Conversation ID</label>
+                                        <input type="text" class="form-control" id="groupThreecx" placeholder="e.g. 36">
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="policy-card">
-                                    <div class="policy-header">
-                                        <h5>📈 Recipients Statistics</h5>
-                                    </div>
-                                    <div class="policy-body">
-                                        <div class="row text-center">
-                                            <div class="col-6">
-                                                <h4 class="text-primary" id="totalRecipients">0</h4>
-                                                <small class="text-muted">Total Recipients</small>
-                                            </div>
-                                            <div class="col-6">
-                                                <h4 class="text-success" id="activeRecipients">0</h4>
-                                                <small class="text-muted">Active</small>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-primary" onclick="saveRecipientGroup()">
+                                        <i class="fas fa-save me-1"></i>Save Group
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -672,7 +790,7 @@
             // Load section-specific data
             switch(sectionName) {
                 case 'recipients':
-                    loadRecipients();
+                    loadRecipientGroups();
                     break;
                 case 'fcm-devices':
                     loadFCMDevices();
@@ -760,11 +878,19 @@
             
             // Reset incident association
             document.getElementById('incidentType').value = '';
-            document.getElementById('severityLevel').value = 'All';  // 기본값 All
+            document.getElementById('severityLevel').value = 'All';
             document.getElementById('policyPreview').style.display = 'none';
+            
+            // Reset message templates
+            document.getElementById('emailSubject').value = '';
+            document.getElementById('emailBody').value = '';
+            document.getElementById('threecxMessage').value = '';
             
             // Add default timeline step
             addTimelineStep();
+            
+            // Load recipient group checkboxes
+            loadPolicyRecipientGroupOptions([]);
             
             showSection('editor');
         }
@@ -790,6 +916,12 @@
                 
                 // Load incident association settings
                 loadIncidentAssociationFromJSON(policy.rules_json);
+                
+                // Load message templates
+                loadMessageTemplatesFromJSON(policy.rules_json);
+                
+                // Load recipient group checkboxes
+                loadRecipientGroupsFromJSON(policy.rules_json);
                 
                 showSection('editor');
             } catch (error) {
@@ -902,27 +1034,34 @@
             const settings = {
                 policy_name: document.getElementById('policyName').value,
                 policy_id: currentPolicy ? currentPolicy.policy_id : generatePolicyId(),
-                // 공통 항목
                 common_assessment_tasks: document.getElementById('commonAssessmentTasks').value,
                 common_conditions: document.getElementById('commonConditions').value,
                 common_instructions: document.getElementById('commonInstructions').value,
-                // 방문 일정
-                nurse_visit_schedule: []
+                nurse_visit_schedule: [],
+                // Message templates
+                email_template: {
+                    subject: document.getElementById('emailSubject').value,
+                    body: document.getElementById('emailBody').value
+                },
+                threecx_template: {
+                    message: document.getElementById('threecxMessage').value
+                },
+                // Recipient group IDs
+                recipient_group_ids: []
             };
 
-            // Collect visit schedule (only interval and duration)
+            // Collect visit schedule
             document.querySelectorAll('.timeline-step').forEach(step => {
                 const interval = parseFloat(step.querySelector('.visit-interval').value) || 1;
                 const intervalUnit = step.querySelector('.visit-interval-unit').value;
                 const duration = parseFloat(step.querySelector('.visit-duration').value) || 24;
                 const durationUnit = step.querySelector('.visit-duration-unit').value;
+                settings.nurse_visit_schedule.push({ interval, interval_unit: intervalUnit, duration, duration_unit: durationUnit });
+            });
 
-                settings.nurse_visit_schedule.push({
-                    interval: interval,
-                    interval_unit: intervalUnit,
-                    duration: duration,
-                    duration_unit: durationUnit
-                });
+            // Collect selected recipient groups
+            document.querySelectorAll('.policy-group-check:checked').forEach(cb => {
+                settings.recipient_group_ids.push(parseInt(cb.value));
             });
 
             return settings;
@@ -1051,8 +1190,78 @@
         }
 
         function showAlert(message, type) {
-            // Implementation for showing alerts
-            console.log(`${type.toUpperCase()}: ${message}`);
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:300px;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+            alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => { alertDiv.remove(); }, 4000);
+        }
+
+        // Insert placeholder into the last focused template field
+        let lastFocusedTemplateField = null;
+        document.addEventListener('focusin', function(e) {
+            if (e.target.classList.contains('template-field')) {
+                lastFocusedTemplateField = e.target;
+            }
+        });
+        function insertPlaceholder(placeholder) {
+            const field = lastFocusedTemplateField || document.getElementById('emailBody');
+            if (!field) return;
+            const start = field.selectionStart || field.value.length;
+            const end = field.selectionEnd || field.value.length;
+            field.value = field.value.substring(0, start) + placeholder + field.value.substring(end);
+            field.focus();
+            field.selectionStart = field.selectionEnd = start + placeholder.length;
+        }
+
+        // Test Policy - sends test email and 3CX message using current templates
+        async function testPolicy() {
+            const emailSubject = document.getElementById('emailSubject').value.trim();
+            const emailBody = document.getElementById('emailBody').value.trim();
+            const threecxMessage = document.getElementById('threecxMessage').value.trim();
+
+            if (!emailSubject && !emailBody && !threecxMessage) {
+                showAlert('Please fill in at least one template (email or 3CX) before testing.', 'warning');
+                return;
+            }
+
+            // Collect selected recipient group IDs
+            const groupIds = [];
+            document.querySelectorAll('.policy-group-check:checked').forEach(cb => {
+                groupIds.push(parseInt(cb.value));
+            });
+            if (groupIds.length === 0) {
+                showAlert('Please select at least one recipient group to test.', 'warning');
+                return;
+            }
+
+            if (!confirm('This will send a TEST notification (email and/or 3CX) to the selected recipient groups with sample data. Continue?')) return;
+
+            try {
+                showAlert('Sending test notifications...', 'info');
+                const response = await fetch('/api/cims/test-policy-notification', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email_subject: emailSubject,
+                        email_body: emailBody,
+                        threecx_message: threecxMessage,
+                        recipient_group_ids: groupIds,
+                        nurse_visit_schedule: collectAlarmSettings().nurse_visit_schedule,
+                        common_assessment_tasks: document.getElementById('commonAssessmentTasks').value
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showAlert(`Test complete! ${data.message}`, 'success');
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (e) {
+                showAlert('Test failed: ' + e.message, 'danger');
+            }
         }
 
         function setupEventListeners() {
@@ -1141,6 +1350,29 @@
             }
         }
 
+        // Load message templates from JSON
+        function loadMessageTemplatesFromJSON(settingsJson) {
+            try {
+                const settings = JSON.parse(settingsJson);
+                if (settings.email_template) {
+                    document.getElementById('emailSubject').value = settings.email_template.subject || '';
+                    document.getElementById('emailBody').value = settings.email_template.body || '';
+                }
+                if (settings.threecx_template) {
+                    document.getElementById('threecxMessage').value = settings.threecx_template.message || '';
+                }
+            } catch (e) { console.error('Error loading message templates:', e); }
+        }
+
+        // Load recipient groups from JSON
+        function loadRecipientGroupsFromJSON(settingsJson) {
+            try {
+                const settings = JSON.parse(settingsJson);
+                const selectedIds = settings.recipient_group_ids || [];
+                loadPolicyRecipientGroupOptions(selectedIds);
+            } catch (e) { console.error('Error loading recipient groups:', e); }
+        }
+
         function cancelEdit() {
             showSection('policies');
         }
@@ -1183,79 +1415,168 @@
 
 
 
-        // Load recipients
-        async function loadRecipients() {
+        // ========== Recipient Groups (group_name + site + role + emails + 3CX) ==========
+        let recipientGroupsCache = [];
+
+        function addGroupEmailRow(email) {
+            const container = document.getElementById('groupEmailsContainer');
+            const row = document.createElement('div');
+            row.className = 'input-group input-group-sm mb-2 group-email-row';
+            row.innerHTML = `
+                <input type="email" class="form-control group-email-input" placeholder="email@eden-field.com.au" value="${email || ''}">
+                <button type="button" class="btn btn-outline-danger" onclick="this.closest('.group-email-row').remove()"><i class="fas fa-times"></i></button>
+            `;
+            container.appendChild(row);
+        }
+
+        async function loadRecipientGroups() {
             try {
-                const response = await fetch('/api/recipients');
-                if (response.ok) {
-                    const recipients = await response.json();
-                    renderRecipientsList(recipients);
-                    updateRecipientsStatistics(recipients);
-                } else {
-                    throw new Error('Failed to load recipients');
-                }
+                const response = await fetch('/api/recipient-groups', { credentials: 'same-origin' });
+                const data = await response.json();
+                if (data.success) {
+                    recipientGroupsCache = data.groups || [];
+                    renderRecipientGroups(recipientGroupsCache);
+                } else { throw new Error(data.message || 'Failed to load'); }
             } catch (error) {
-                console.error('Error loading recipients:', error);
-                document.getElementById('recipientsList').innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Failed to load recipients. Please try again.
-                    </div>
-                `;
+                document.getElementById('recipientGroupsList').innerHTML = '<div class="alert alert-warning"><i class="fas fa-info-circle me-2"></i>No recipient groups yet. Click <strong>Add Group</strong> to create one.</div>';
             }
         }
 
-        // Render recipients list
-        function renderRecipientsList(recipients) {
-            const container = document.getElementById('recipientsList');
-            
-            if (recipients.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-4">
-                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">No recipients found</p>
-                        <button class="btn btn-success" onclick="addNewRecipient()">
-                            <i class="fas fa-user-plus me-2"></i>Add First Recipient
-                        </button>
-                    </div>
-                `;
+        function renderRecipientGroups(groups) {
+            const container = document.getElementById('recipientGroupsList');
+            if (!groups || groups.length === 0) {
+                container.innerHTML = '<div class="text-center py-4"><i class="fas fa-users fa-3x text-muted mb-3"></i><p class="text-muted">No recipient groups yet</p><button class="btn btn-success" onclick="showAddGroupModal()"><i class="fas fa-plus me-2"></i>Add First Group</button></div>';
                 return;
             }
-
-            container.innerHTML = recipients.map(recipient => `
-                <div class="policy-item mb-3 p-3 border rounded">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <h6 class="mb-1">${recipient.name || 'Unnamed Recipient'}</h6>
-                            <p class="text-muted mb-2">${recipient.email || 'No email'}</p>
-                            <div class="d-flex gap-2">
-                                <span class="badge bg-${recipient.status === 'active' ? 'success' : 'secondary'}">
-                                    ${recipient.status || 'inactive'}
-                                </span>
-                                <span class="badge bg-info">${recipient.role || 'user'}</span>
-                            </div>
-                        </div>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="editRecipient('${recipient.id}')">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteRecipient('${recipient.id}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
+            container.innerHTML = groups.map(g => {
+                const role = (g.roles || [])[0] || '-';
+                const emails = g.emails || [];
+                const threecx = g.threecx_id || '-';
+                return `
+                <div class="policy-card mb-3">
+                    <div class="policy-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i>${g.group_name}</h5>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editGroup(${g.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-outline-danger" onclick="deleteGroup(${g.id})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                    <div class="policy-body">
+                        <div class="mb-2"><strong><i class="fas fa-building me-1"></i>Site:</strong> ${g.site || '-'}</div>
+                        <div class="mb-2"><strong><i class="fas fa-user-tag me-1"></i>Role:</strong> <span class="badge ${role === 'manager' ? 'bg-primary' : 'bg-success'}">${role}</span></div>
+                        <div class="mb-2"><strong><i class="fas fa-envelope me-1"></i>Emails (${emails.length}):</strong></div>
+                        ${emails.length === 0 ? '<p class="text-muted small">No emails</p>' :
+                            '<ul class="list-unstyled mb-2 small">' + emails.map(e => `<li><i class="fas fa-envelope me-2 text-muted"></i>${e}</li>`).join('') + '</ul>'}
+                        <div class="border-top pt-2 mt-2">
+                            <strong><i class="fas fa-phone-alt me-1"></i>3CX:</strong> <span class="badge bg-info">${threecx}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
-        // Update recipients statistics
-        function updateRecipientsStatistics(recipients) {
-            const total = recipients.length;
-            const active = recipients.filter(r => r.status === 'active').length;
-            
-            document.getElementById('totalRecipients').textContent = total;
-            document.getElementById('activeRecipients').textContent = active;
+        function showAddGroupModal() {
+            document.getElementById('editGroupId').value = '';
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupSite').value = '';
+            document.getElementById('groupRole').value = '';
+            document.getElementById('groupThreecx').value = '';
+            document.getElementById('groupEmailsContainer').innerHTML = '';
+            document.getElementById('recipientGroupModalTitle').textContent = 'Add Recipient Group';
+            addGroupEmailRow(); addGroupEmailRow(); addGroupEmailRow();
+            new bootstrap.Modal(document.getElementById('recipientGroupModal')).show();
         }
+
+        function editGroup(groupId) {
+            const group = recipientGroupsCache.find(g => g.id === groupId);
+            if (!group) return;
+            document.getElementById('editGroupId').value = groupId;
+            document.getElementById('groupName').value = group.group_name;
+            document.getElementById('groupSite').value = group.site || '';
+            document.getElementById('groupRole').value = (group.roles || [])[0] || '';
+            document.getElementById('groupThreecx').value = group.threecx_id || '';
+            document.getElementById('groupEmailsContainer').innerHTML = '';
+            const emails = group.emails || [];
+            if (emails.length === 0) {
+                addGroupEmailRow(); addGroupEmailRow(); addGroupEmailRow();
+            } else {
+                emails.forEach(e => addGroupEmailRow(e));
+            }
+            document.getElementById('recipientGroupModalTitle').textContent = 'Edit Recipient Group';
+            new bootstrap.Modal(document.getElementById('recipientGroupModal')).show();
+        }
+
+        async function saveRecipientGroup() {
+            const groupName = document.getElementById('groupName').value.trim();
+            if (!groupName) { showAlert('Group name is required', 'warning'); return; }
+            const site = document.getElementById('groupSite').value;
+            if (!site) { showAlert('Site is required', 'warning'); return; }
+            const role = document.getElementById('groupRole').value;
+            if (!role) { showAlert('Role is required', 'warning'); return; }
+            const emails = [];
+            document.querySelectorAll('.group-email-input').forEach(input => {
+                const v = input.value.trim();
+                if (v) emails.push(v);
+            });
+            if (emails.length === 0) { showAlert('At least one email address is required', 'warning'); return; }
+            const threecxId = document.getElementById('groupThreecx').value.trim();
+            const editId = document.getElementById('editGroupId').value;
+            const url = editId ? `/api/recipient-groups/${editId}` : '/api/recipient-groups';
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const response = await fetch(url, {
+                    method, credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ group_name: groupName, site, roles: [role], emails, threecx_id: threecxId })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('recipientGroupModal')).hide();
+                    showAlert(editId ? 'Group updated' : 'Group created', 'success');
+                    loadRecipientGroups();
+                } else { throw new Error(data.message); }
+            } catch (e) { showAlert('Failed to save group: ' + e.message, 'danger'); }
+        }
+
+        async function deleteGroup(groupId) {
+            if (!confirm('Delete this recipient group?')) return;
+            try {
+                const response = await fetch(`/api/recipient-groups/${groupId}`, { method: 'DELETE', credentials: 'same-origin' });
+                const data = await response.json();
+                if (data.success) { showAlert('Group deleted', 'success'); loadRecipientGroups(); }
+                else { throw new Error(data.message); }
+            } catch (e) { showAlert('Failed to delete group: ' + e.message, 'danger'); }
+        }
+
+        // Load recipient group checkboxes into the policy editor
+        async function loadPolicyRecipientGroupOptions(selectedIds) {
+            selectedIds = selectedIds || [];
+            try {
+                const response = await fetch('/api/recipient-groups', { credentials: 'same-origin' });
+                const data = await response.json();
+                const groups = (data.success && data.groups) ? data.groups : [];
+                const container = document.getElementById('policyRecipientGroups');
+                if (groups.length === 0) {
+                    container.innerHTML = '<p class="text-muted mb-0">No recipient groups available. Create groups in the Recipients section first.</p>';
+                    return;
+                }
+                container.innerHTML = groups.map(g => {
+                    const role = (g.roles || [])[0] || '';
+                    const emailCount = (g.emails || []).length;
+                    return `
+                    <div class="form-check">
+                        <input class="form-check-input policy-group-check" type="checkbox" value="${g.id}" id="policyGroup_${g.id}" ${selectedIds.includes(g.id) ? 'checked' : ''}>
+                        <label class="form-check-label" for="policyGroup_${g.id}">
+                            <strong>${g.group_name}</strong> <span class="text-muted">(${g.site} - ${role} - ${emailCount} emails)</span>
+                        </label>
+                    </div>`;
+                }).join('');
+            } catch (e) { console.error('Error loading groups for policy:', e); }
+        }
+
+        // Aliases for old functions
+        function loadRecipients() { loadRecipientGroups(); }
+        function addNewRecipient() { showAddGroupModal(); }
 
         // Load FCM devices
         async function loadFCMDevices() {
@@ -1331,19 +1652,7 @@
 
         // Action functions
 
-        function addNewRecipient() {
-            alert('Add new recipient functionality will be implemented here.');
-        }
-
-        function editRecipient(recipientId) {
-            alert(`Edit recipient ${recipientId} functionality will be implemented here.`);
-        }
-
-        function deleteRecipient(recipientId) {
-            if (confirm('Are you sure you want to delete this recipient?')) {
-                alert(`Delete recipient ${recipientId} functionality will be implemented here.`);
-            }
-        }
+        
 
         function refreshFCMDevices() {
             loadFCMDevices();

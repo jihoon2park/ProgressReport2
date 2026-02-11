@@ -10,6 +10,7 @@ from flask import (
     send_from_directory,
     make_response
 )
+from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 import requests
@@ -177,6 +178,15 @@ print_current_config()
 
 # Initialize Flask app
 app = Flask(__name__, static_url_path='/static')
+
+# CORS for Edenfield mobile app (Expo web: localhost:8081, etc.)
+CORS(app, resources={
+    r"/api/incidents-last-30-days": {"origins": "*"},
+    r"/api/audit-progress-notes": {"origins": "*"},
+    r"/api/wounds": {"origins": "*"},
+    r"/api/residents": {"origins": "*"},
+    r"/api/residents/*": {"origins": "*"},
+})
 
 # Apply environment-specific configuration
 app.secret_key = flask_config['SECRET_KEY']
@@ -2917,6 +2927,190 @@ def fetch_incidents():
             'message': f'Error: {str(e)}'
         }), 500
 
+
+@app.route('/api/incidents-last-30-days', methods=['GET', 'POST'])
+@login_required
+def api_incidents_last_30_days():
+    """Return incidents (adverse_events + personnel_incidents) for last 30 days. Protected by login."""
+    try:
+        site = None
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            site = data.get('site')
+        else:
+            site = request.args.get('site')
+        site = site or 'Parafield Gardens'
+        days = 30
+
+        from query_incidents_yesterday import query_incidents_yesterday
+
+        result = query_incidents_yesterday(site, days=days)
+        if result.get('error'):
+            return jsonify({'success': False, 'message': result['error'], 'data': result}), 500
+
+        # Return only what the mobile app needs: summary fields from adverse_events and personnel_incidents
+        return jsonify({
+            'success': True,
+            'site': result.get('site'),
+            'date_from': result.get('date_from'),
+            'date_to': result.get('date_to'),
+            'id_meanings': result.get('id_meanings', {}),
+            'adverse_events': result.get('adverse_events', []),
+            'personnel_incidents': result.get('personnel_incidents', []),
+        })
+    except Exception as e:
+        logger.error(f"Error in api_incidents_last_30_days: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/wounds', methods=['GET', 'POST'])
+@login_required
+def api_wounds():
+    """Return wound data with client info. Protected by login."""
+    try:
+        site = None
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            site = data.get('site')
+        else:
+            site = request.args.get('site')
+        site = site or 'Parafield Gardens'
+        limit = 500
+
+        safe_site_servers = get_safe_site_servers()
+        if site not in safe_site_servers:
+            return jsonify({'success': False, 'message': f'Unknown site: {site}'}), 400
+
+        from manad_db_connector import MANADDBConnector
+
+        connector = MANADDBConnector(site)
+        if not connector.connection_string:
+            return jsonify({
+                'success': False,
+                'message': f'DB not configured for {site}. Wound data requires direct DB access.',
+                'data': [],
+            }), 503
+
+        success, wounds_list = connector.fetch_wounds(limit=limit)
+        if not success:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to fetch wounds from database',
+                'data': [],
+            }), 500
+
+        return jsonify({
+            'success': True,
+            'site': site,
+            'data': wounds_list or [],
+            'count': len(wounds_list or []),
+        })
+    except Exception as e:
+        logger.error(f"Error in api_wounds: {e}")
+        return jsonify({'success': False, 'message': str(e), 'data': []}), 500
+
+
+@app.route('/api/residents', methods=['GET', 'POST'])
+@login_required
+def api_residents_list():
+    """Return list of residents (clients) for the site. Protected by login."""
+    try:
+        site = None
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            site = data.get('site')
+        else:
+            site = request.args.get('site')
+        site = site or 'Parafield Gardens'
+
+        safe_site_servers = get_safe_site_servers()
+        if site not in safe_site_servers:
+            return jsonify({'success': False, 'message': f'Unknown site: {site}'}), 400
+
+        from manad_db_connector import MANADDBConnector
+
+        connector = MANADDBConnector(site)
+        if not connector.connection_string:
+            return jsonify({
+                'success': False,
+                'message': f'DB not configured for {site}. Resident data requires direct DB access.',
+                'data': [],
+            }), 503
+
+        success, clients = connector.fetch_clients()
+        if not success:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to fetch residents from database',
+                'data': [],
+            }), 500
+
+        residents = []
+        for c in (clients or []):
+            first = (c.get('FirstName') or '').strip()
+            last = (c.get('LastName') or '').strip()
+            pref = (c.get('PreferredName') or '').strip()
+            name = pref if pref else f"{first} {last}".strip() or 'Unknown'
+            residents.append({
+                'client_id': c.get('Id'),
+                'name': name,
+                'first_name': first,
+                'last_name': last,
+                'preferred_name': pref,
+                'wing_name': c.get('WingName') or '',
+                'location_name': c.get('LocationName') or '',
+                'birth_date': c.get('BirthDate'),
+                'admission_date': c.get('AdmissionDate'),
+            })
+
+        return jsonify({
+            'success': True,
+            'site': site,
+            'data': residents,
+            'count': len(residents),
+        })
+    except Exception as e:
+        logger.error(f"Error in api_residents_list: {e}")
+        return jsonify({'success': False, 'message': str(e), 'data': []}), 500
+
+
+@app.route('/api/residents/<int:client_id>', methods=['GET', 'POST'])
+@login_required
+def api_resident_detail(client_id):
+    """Return full resident detail for a client. Protected by login."""
+    try:
+        site = None
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            site = data.get('site')
+        else:
+            site = request.args.get('site')
+        site = site or 'Parafield Gardens'
+
+        safe_site_servers = get_safe_site_servers()
+        if site not in safe_site_servers:
+            return jsonify({'success': False, 'message': f'Unknown site: {site}'}), 400
+
+        from query_resident_full import query_resident_full
+
+        result = query_resident_full(client_id, site, verbose=False)
+        if result.get('error'):
+            return jsonify({
+                'success': False,
+                'message': result.get('error', 'Resident not found'),
+                'data': None,
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'site': site,
+            'data': result,
+        })
+    except Exception as e:
+        logger.error(f"Error in api_resident_detail: {e}")
+        return jsonify({'success': False, 'message': str(e), 'data': None}), 500
+
+
 @app.route('/api/logs/access-hourly-summary')
 @login_required
 def get_access_hourly_summary():
@@ -5168,58 +5362,510 @@ def test_escalation_policy_unified():
             'device_count': device_count,
             'message': f'Test complete: {total_notifications} notifications to {device_count} devices'
         })
-        
     except Exception as e:
         logger.error(f"Escalation policy test failed: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/recipient-groups', methods=['POST'])
+def _ensure_recipient_tables():
+    """Ensure recipient_groups table exists with emails stored directly on the group."""
+    conn = sqlite3.connect('progress_report.db')
+    cursor = conn.cursor()
+
+    # Drop old schema if it has 'members' column or missing 'emails' column
+    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='recipient_groups'")
+    row = cursor.fetchone()
+    if row and ('members' in (row[0] or '') or 'devices' in (row[0] or '') or 'emails' not in (row[0] or '')):
+        cursor.execute('DROP TABLE IF EXISTS recipient_groups')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS recipient_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_name VARCHAR(200) NOT NULL,
+            site VARCHAR(100) NOT NULL DEFAULT '',
+            roles TEXT NOT NULL DEFAULT '[]',
+            emails TEXT NOT NULL DEFAULT '[]',
+            threecx_id VARCHAR(50) DEFAULT '',
+            created_by INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def _ensure_incident_messages_table():
+    """Ensure incident_messages table exists for app polling."""
+    conn = sqlite3.connect('progress_report.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS incident_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            incident_type VARCHAR(100) NOT NULL DEFAULT 'Fall',
+            severity VARCHAR(50) NOT NULL DEFAULT 'High',
+            resident_name VARCHAR(200) NOT NULL,
+            room VARCHAR(100) DEFAULT '',
+            site VARCHAR(100) NOT NULL DEFAULT '',
+            location VARCHAR(200) DEFAULT '',
+            reported_by VARCHAR(200) DEFAULT '',
+            description TEXT DEFAULT '',
+            action_taken TEXT DEFAULT '',
+            witnesses VARCHAR(200) DEFAULT '',
+            incident_date TIMESTAMP NOT NULL,
+            status VARCHAR(50) DEFAULT 'Open',
+            nurse_visit_schedule TEXT DEFAULT '[]',
+            common_assessment_tasks TEXT DEFAULT '',
+            email_subject TEXT DEFAULT '',
+            email_body TEXT DEFAULT '',
+            threecx_message TEXT DEFAULT '',
+            is_test BOOLEAN DEFAULT 0,
+            is_read BOOLEAN DEFAULT 0,
+            created_by VARCHAR(100) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# ========== Recipient Groups CRUD (group_name + site + role + emails + threecx) ==========
+
+@app.route('/api/recipient-groups', methods=['GET'])
 @login_required
-def save_recipient_group():
-    """Save recipient group (FCM device based)"""
+def get_recipient_groups():
+    """Get all recipient groups"""
     try:
         if current_user.role not in ['admin', 'site_admin']:
-            return jsonify({'success': False, 'message': 'You do not have permission.'}), 403
-        
-        data = request.get_json()
-        group_name = data.get('group_name')
-        devices = data.get('devices', [])
-        
-        if not group_name or not devices:
-            return jsonify({'success': False, 'message': 'Please select a group name and devices.'}), 400
-        
-        # Create recipient group table if it doesn't exist
+            return jsonify({'success': False, 'message': 'Admin privileges required.'}), 403
+        _ensure_recipient_tables()
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
-        
+        cursor.execute('SELECT id, group_name, site, roles, emails, threecx_id, created_by, created_at, updated_at FROM recipient_groups ORDER BY group_name')
+        groups = []
+        for row in cursor.fetchall():
+            groups.append({
+                'id': row[0],
+                'group_name': row[1],
+                'site': row[2] or '',
+                'roles': json.loads(row[3]) if row[3] else [],
+                'emails': json.loads(row[4]) if row[4] else [],
+                'threecx_id': row[5] or '',
+                'created_by': row[6],
+                'created_at': row[7],
+                'updated_at': row[8]
+            })
+        conn.close()
+        return jsonify({'success': True, 'groups': groups})
+    except Exception as e:
+        logger.error(f"Failed to load recipient groups: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/recipient-groups', methods=['POST'])
+@login_required
+def create_recipient_group():
+    """Create a new recipient group"""
+    try:
+        if current_user.role not in ['admin', 'site_admin']:
+            return jsonify({'success': False, 'message': 'Admin privileges required.'}), 403
+        data = request.get_json()
+        group_name = data.get('group_name', '').strip()
+        site = data.get('site', '').strip()
+        roles = data.get('roles', [])
+        emails = data.get('emails', [])
+        threecx_id = data.get('threecx_id', '').strip()
+        if not group_name:
+            return jsonify({'success': False, 'message': 'Group name is required.'}), 400
+        if not site:
+            return jsonify({'success': False, 'message': 'Site is required.'}), 400
+        if not roles:
+            return jsonify({'success': False, 'message': 'Role is required.'}), 400
+        if not emails:
+            return jsonify({'success': False, 'message': 'At least one email is required.'}), 400
+        _ensure_recipient_tables()
+        conn = sqlite3.connect('progress_report.db')
+        cursor = conn.cursor()
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS recipient_groups (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                group_name VARCHAR(100) NOT NULL,
-                devices TEXT NOT NULL,
-                created_by INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Save group
+            INSERT INTO recipient_groups (group_name, site, roles, emails, threecx_id, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (group_name, site, json.dumps(roles), json.dumps(emails), threecx_id, current_user.id))
+        conn.commit()
+        new_id = cursor.lastrowid
+        conn.close()
+        return jsonify({'success': True, 'message': 'Group created.', 'id': new_id})
+    except Exception as e:
+        logger.error(f"Failed to create recipient group: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/recipient-groups/<int:group_id>', methods=['PUT'])
+@login_required
+def update_recipient_group(group_id):
+    """Update an existing recipient group"""
+    try:
+        if current_user.role not in ['admin', 'site_admin']:
+            return jsonify({'success': False, 'message': 'Admin privileges required.'}), 403
+        data = request.get_json()
+        group_name = data.get('group_name', '').strip()
+        site = data.get('site', '').strip()
+        roles = data.get('roles', [])
+        emails = data.get('emails', [])
+        threecx_id = data.get('threecx_id', '').strip()
+        if not group_name:
+            return jsonify({'success': False, 'message': 'Group name is required.'}), 400
+        _ensure_recipient_tables()
+        conn = sqlite3.connect('progress_report.db')
+        cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR REPLACE INTO recipient_groups 
-            (group_name, devices, created_by)
-            VALUES (?, ?, ?)
-        ''', (group_name, json.dumps(devices), current_user.id))
-        
+            UPDATE recipient_groups SET group_name=?, site=?, roles=?, emails=?, threecx_id=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (group_name, site, json.dumps(roles), json.dumps(emails), threecx_id, group_id))
         conn.commit()
         conn.close()
-        
+        return jsonify({'success': True, 'message': 'Group updated.'})
+    except Exception as e:
+        logger.error(f"Failed to update recipient group: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/recipient-groups/<int:group_id>', methods=['DELETE'])
+@login_required
+def delete_recipient_group(group_id):
+    """Delete a recipient group"""
+    try:
+        if current_user.role not in ['admin', 'site_admin']:
+            return jsonify({'success': False, 'message': 'Admin privileges required.'}), 403
+        _ensure_recipient_tables()
+        conn = sqlite3.connect('progress_report.db')
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM recipient_groups WHERE id=?', (group_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Group deleted.'})
+    except Exception as e:
+        logger.error(f"Failed to delete recipient group: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/cims/test-policy-notification', methods=['POST'])
+@login_required
+def test_policy_notification():
+    """Test policy notification - sends test email and/or 3CX message to selected recipient groups"""
+    try:
+        if current_user.role not in ['admin', 'site_admin']:
+            return jsonify({'success': False, 'message': 'Admin privileges required.'}), 403
+
+        data = request.get_json()
+        email_subject = data.get('email_subject', '')
+        email_body = data.get('email_body', '')
+        threecx_message = data.get('threecx_message', '')
+        group_ids = data.get('recipient_group_ids', [])
+
+        if not group_ids:
+            return jsonify({'success': False, 'message': 'No recipient groups selected.'}), 400
+
+        # Sample test data for placeholder replacement
+        sample_data = {
+            '{{incident_type}}': 'Fall',
+            '{{incident_date}}': '08/02/2026 20:30',
+            '{{resident_name}}': 'Mary-Louise McKenzie',
+            '{{room}}': 'Room 12',
+            '{{reported_by}}': 'Jossy Joseph',
+            '{{description}}': 'Unwitnessed Fall - 2030 hrs Staff responded to the call bell and found the resident lying on the floor in front of her chair.',
+            '{{action_taken}}': 'Head to toe skin assessment conducted. Nil redness, bruise or graze. Transfer to chair with standby assist.',
+            '{{severity}}': 'High',
+            '{{site}}': 'Parafield Gardens',
+            '{{status}}': 'Open',
+            '{{location}}': 'Lounge Room',
+            '{{witnesses}}': 'None (Unwitnessed)',
+        }
+
+        def replace_placeholders(template):
+            result = template
+            for key, val in sample_data.items():
+                result = result.replace(key, val)
+            return result
+
+        # Fetch recipient groups and read emails directly from the group
+        _ensure_recipient_tables()
+        conn = sqlite3.connect('progress_report.db')
+        cursor = conn.cursor()
+        placeholders_sql = ','.join(['?' for _ in group_ids])
+        cursor.execute(
+            f'SELECT id, group_name, site, roles, emails, threecx_id FROM recipient_groups WHERE id IN ({placeholders_sql})',
+            group_ids
+        )
+        groups = cursor.fetchall()
+        conn.close()
+
+        if not groups:
+            return jsonify({'success': False, 'message': 'No matching recipient groups found.'}), 404
+
+        # Collect emails directly from each group's emails JSON column
+        all_emails = []
+        for g in groups:
+            g_emails = json.loads(g[4]) if g[4] else []
+            for email in g_emails:
+                if email and email not in all_emails:
+                    all_emails.append(email)
+
+        emails_sent = 0
+        threecx_sent = 0
+        errors = []
+
+        # --- Send emails via exchangelib ---
+        if (email_subject or email_body) and all_emails:
+            resolved_subject = replace_placeholders(email_subject) if email_subject else '[TEST] Policy Notification'
+            resolved_body = replace_placeholders(email_body) if email_body else 'This is a test notification.'
+
+            try:
+                from exchangelib import DELEGATE, Account, Credentials, Configuration, Message, HTMLBody, NTLM, FileAttachment
+
+                EWS_HOST = "remote.eden-field.com.au"
+                EWS_USERNAME = r"EDENFIELD\it.support"
+                EWS_PASSWORD = "Iwillwin123!@#"
+                SENDER = "it.support@eden-field.com.au"
+
+                creds = Credentials(username=EWS_USERNAME, password=EWS_PASSWORD)
+                config = Configuration(server=EWS_HOST, credentials=creds, auth_type=NTLM)
+                account = Account(
+                    primary_smtp_address=SENDER, credentials=creds,
+                    config=config, autodiscover=False, access_type=DELEGATE
+                )
+
+                body_html = resolved_body.replace('\n', '<br>')
+                signature_img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dev-services', 'signature.png')
+                if os.path.exists(signature_img_path):
+                    body_html = f"{body_html}<br><img src=\"cid:full_sig\">"
+                msg = Message(
+                    account=account,
+                    subject=f"[TEST] {resolved_subject}",
+                    body=HTMLBody(
+                        f"<p><strong>*** THIS IS A TEST NOTIFICATION ***</strong></p><br>{body_html}"
+                    ),
+                    to_recipients=all_emails
+                )
+                if os.path.exists(signature_img_path):
+                    with open(signature_img_path, 'rb') as f:
+                        msg.attach(FileAttachment(
+                            name='signature.png',
+                            content=f.read(),
+                            content_id='full_sig',
+                            is_inline=True
+                        ))
+                msg.send_and_save()
+                emails_sent = len(all_emails)
+            except Exception as e:
+                logger.error(f"Test email send failed: {e}")
+                errors.append(f"Email: {str(e)}")
+
+        # --- Send 3CX messages ---
+        if threecx_message:
+            resolved_3cx = replace_placeholders(threecx_message)
+            try:
+                import sys
+                import importlib.util as _ilu
+                _dev_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dev-services')
+                # Add dev-services to sys.path BEFORE loading the module so schema_3cx can be found
+                if _dev_path not in sys.path:
+                    sys.path.insert(0, _dev_path)
+                _spec = _ilu.spec_from_file_location("send_3cx", os.path.join(_dev_path, 'send-3cx.py'))
+                _s3cx = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(_s3cx)
+
+                for g in groups:
+                    tcx_id = (g[5] or '').strip()
+                    if not tcx_id:
+                        continue
+                    try:
+                        conv_id = int(tcx_id)
+                        login_result = _s3cx.ensure_auth(
+                            _s3cx.DEFAULT_PROV_URL, verify_ssl=True,
+                            base_url=_s3cx.BASE_URL,
+                            username=_s3cx.USERNAME,
+                            password=_s3cx.PASSWORD,
+                        )
+                        _s3cx.send_message_to_conversation(
+                            _s3cx.BASE_URL, login_result.session_id,
+                            conv_id, f"[TEST] {resolved_3cx}", verify_ssl=True
+                        )
+                        threecx_sent += 1
+                    except Exception as e:
+                        logger.error(f"3CX send to conv {tcx_id} failed: {e}")
+                        errors.append(f"3CX conv {tcx_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"3CX module load failed: {e}")
+                errors.append(f"3CX module: {str(e)}")
+
+        # --- Also read the nurse_visit_schedule from the current policy if provided ---
+        nurse_visit_schedule = data.get('nurse_visit_schedule', [])
+        common_assessment_tasks = data.get('common_assessment_tasks', '')
+
+        # --- Insert incident message into DB for app polling ---
+        try:
+            _ensure_incident_messages_table()
+            resolved_subject = replace_placeholders(email_subject) if email_subject else ''
+            resolved_body_text = replace_placeholders(email_body) if email_body else ''
+            resolved_3cx_text = replace_placeholders(threecx_message) if threecx_message else ''
+            # Convert DD/MM/YYYY HH:MM to ISO format for JS compatibility
+            raw_date = sample_data.get('{{incident_date}}', '')
+            try:
+                from datetime import datetime as _dt
+                parsed = _dt.strptime(raw_date, '%d/%m/%Y %H:%M')
+                incident_date_str = parsed.isoformat()
+            except Exception:
+                incident_date_str = get_australian_time().isoformat()
+
+            conn2 = sqlite3.connect('progress_report.db')
+            cur2 = conn2.cursor()
+            cur2.execute('''
+                INSERT INTO incident_messages
+                (incident_type, severity, resident_name, room, site, location, reported_by,
+                 description, action_taken, witnesses, incident_date, status,
+                 nurse_visit_schedule, common_assessment_tasks,
+                 email_subject, email_body, threecx_message, is_test, created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+            ''', (
+                sample_data.get('{{incident_type}}', 'Fall'),
+                sample_data.get('{{severity}}', 'High'),
+                sample_data.get('{{resident_name}}', 'Test Resident'),
+                sample_data.get('{{room}}', 'Room 1'),
+                sample_data.get('{{site}}', 'Parafield Gardens'),
+                sample_data.get('{{location}}', ''),
+                sample_data.get('{{reported_by}}', ''),
+                sample_data.get('{{description}}', ''),
+                sample_data.get('{{action_taken}}', ''),
+                sample_data.get('{{witnesses}}', ''),
+                incident_date_str,
+                sample_data.get('{{status}}', 'Open'),
+                json.dumps(nurse_visit_schedule),
+                common_assessment_tasks,
+                resolved_subject,
+                resolved_body_text,
+                resolved_3cx_text,
+                current_user.username if hasattr(current_user, 'username') else ''
+            ))
+            conn2.commit()
+            conn2.close()
+            logger.info("Incident message inserted into DB for app polling")
+        except Exception as e:
+            logger.error(f"Failed to insert incident message: {e}")
+            errors.append(f"DB message: {str(e)}")
+
+        msg_parts = []
+        if emails_sent > 0:
+            msg_parts.append(f"Email sent to {emails_sent} recipients")
+        if threecx_sent > 0:
+            msg_parts.append(f"3CX message sent to {threecx_sent} groups")
+        if errors:
+            msg_parts.append(f"Errors: {'; '.join(errors)}")
+
         return jsonify({
             'success': True,
-            'message': f'Saved {len(devices)} devices to group {group_name}.'
+            'message': '. '.join(msg_parts) if msg_parts else 'No notifications sent.',
+            'emails_sent': emails_sent,
+            'threecx_sent': threecx_sent,
+            'errors': errors
         })
-        
+
     except Exception as e:
-        logger.error(f"Failed to save recipient group: {e}")
+        logger.error(f"Test policy notification failed: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ========== App Polling API (Edenfield App reads incident messages) ==========
+
+@app.route('/api/app/messages', methods=['GET'])
+@login_required
+def get_app_messages():
+    """Get incident messages for the Edenfield app to poll. Supports ?since_id=N to get only new messages."""
+    try:
+        _ensure_incident_messages_table()
+        since_id = request.args.get('since_id', 0, type=int)
+        conn = sqlite3.connect('progress_report.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, incident_type, severity, resident_name, room, site, location,
+                   reported_by, description, action_taken, witnesses, incident_date,
+                   status, nurse_visit_schedule, common_assessment_tasks,
+                   email_subject, email_body, threecx_message, is_test, is_read,
+                   created_by, created_at
+            FROM incident_messages
+            WHERE id > ?
+            ORDER BY id DESC
+            LIMIT 50
+        ''', (since_id,))
+        def _normalise_date(raw):
+            """Convert DD/MM/YYYY HH:MM to ISO format if needed"""
+            if not raw:
+                return raw
+            try:
+                from datetime import datetime as _dt
+                return _dt.strptime(raw, '%d/%m/%Y %H:%M').isoformat()
+            except Exception:
+                return raw  # already ISO or other parseable format
+
+        messages = []
+        for row in cursor.fetchall():
+            messages.append({
+                'id': row[0],
+                'incident_type': row[1],
+                'severity': row[2],
+                'resident_name': row[3],
+                'room': row[4],
+                'site': row[5],
+                'location': row[6],
+                'reported_by': row[7],
+                'description': row[8],
+                'action_taken': row[9],
+                'witnesses': row[10],
+                'incident_date': _normalise_date(row[11]),
+                'status': row[12],
+                'nurse_visit_schedule': json.loads(row[13]) if row[13] else [],
+                'common_assessment_tasks': row[14] or '',
+                'email_subject': row[15] or '',
+                'email_body': row[16] or '',
+                'threecx_message': row[17] or '',
+                'is_test': bool(row[18]),
+                'is_read': bool(row[19]),
+                'created_by': row[20] or '',
+                'created_at': row[21] or '',
+            })
+        conn.close()
+        return jsonify({'success': True, 'messages': messages})
+    except Exception as e:
+        logger.error(f"Failed to fetch app messages: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/app/login', methods=['POST'])
+def app_login():
+    """JSON-based login for the Edenfield mobile app. Returns session cookie."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'JSON body required'}), 400
+        username = (data.get('username') or '').strip()
+        password = (data.get('password') or '').strip()
+        site = (data.get('site') or 'Parafield Gardens').strip()
+        if not username or not password:
+            return jsonify({'success': False, 'message': 'Username and password required'}), 400
+
+        auth_success, user_info = authenticate_user(username, password)
+        if not auth_success:
+            return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+
+        user = User(username, user_info)
+        login_user(user, remember=False)
+        session.permanent = False
+        session['site'] = site
+        session['user_role'] = user_info.get('role', 'USER').upper()
+        session['_created'] = get_australian_time().isoformat()
+
+        return jsonify({
+            'success': True,
+            'message': 'Login successful',
+            'user': {
+                'username': username,
+                'display_name': user.display_name,
+                'role': user.role,
+                'site': site,
+            }
+        })
+    except Exception as e:
+        logger.error(f"App login failed: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/test-group-notification', methods=['POST'])
@@ -5237,7 +5883,6 @@ def test_group_notification():
         if not devices:
             return jsonify({'success': False, 'message': 'Please select devices to test.'}), 400
         
-        # Query FCM tokens
         conn = sqlite3.connect('progress_report.db')
         cursor = conn.cursor()
         
@@ -5254,11 +5899,7 @@ def test_group_notification():
         if not tokens:
             return jsonify({'success': False, 'message': 'No active tokens found.'}), 404
         
-        # Actual FCM send (simulation here)
         sent_count = len(tokens)
-        
-        # In actual implementation:
-        # fcm_result = send_fcm_notification(tokens, message)
         
         return jsonify({
             'success': True,
@@ -8573,6 +9214,14 @@ def get_upcoming_tasks():
 # ==============================
 # Register CIMS API Blueprint
 # ==============================
+
+# Register mobile public API (no login) - must be before other API blueprints
+from api_mobile_public import mobile_public_bp
+app.register_blueprint(mobile_public_bp)
+
+# Register Ramsay Callbell public route (no login required)
+from ramsay_callbell_bp import ramsay_callbell_bp
+app.register_blueprint(ramsay_callbell_bp)
 
 # Register CIMS API Blueprint
 from cims_api_endpoints import cims_api

@@ -258,7 +258,7 @@ async function loadClientMap() {
             dataType: typeof data
         });
         
-        // MainClientServiceId → clientInfo mapping (unified with string keys)
+        // MainClientServiceId â†’ clientInfo mapping (unified with string keys)
         clientMap = {};
         let mappedCount = 0;
         
@@ -434,13 +434,13 @@ async function getResidentOfDayEventTypeNames() {
     }
 }
 
-// Field mapping (API data → table column)
+// Field mapping (API data â†’ table column)
 function mapNoteToRow(note) {
     // Convert to string for mapping (resolve type mismatch)
     const clientServiceIdStr = String(note.ClientServiceId);
     let clientInfo = clientMap[clientServiceIdStr];
     
-    // Extract client name - 표시 형식: "성, 이름" (LastName, FirstName)
+    // Extract client name - í‘œì‹œ í˜•ì‹: "ì„±, ì´ë¦„" (LastName, FirstName)
     let clientName = '';
     
     // Helper function to format name as "LastName, FirstName"
@@ -450,7 +450,7 @@ function mapNoteToRow(note) {
         const title = (obj.Title || '').trim();
         
         if (lastName && firstName) {
-            // "LastName, FirstName" 형식
+            // "LastName, FirstName" í˜•ì‹
             return title ? `${lastName}, ${title} ${firstName}` : `${lastName}, ${firstName}`;
         } else if (lastName) {
             return lastName;
@@ -465,10 +465,10 @@ function mapNoteToRow(note) {
     } else if (note.Client) {
         clientName = formatClientNameAsLastNameFirst(note.Client);
     } else if (note.ClientName) {
-        // ClientName이 이미 있는 경우, "FirstName LastName" 형식일 수 있으므로 파싱 시도
+        // ClientNameì´ ì´ë¯¸ ìžˆëŠ” ê²½ìš°, "FirstName LastName" í˜•ì‹ì¼ ìˆ˜ ìžˆìœ¼ë¯€ë¡œ íŒŒì‹± ì‹œë„
         const nameParts = note.ClientName.trim().split(/\s+/);
         if (nameParts.length >= 2) {
-            // 마지막 부분이 성(LastName), 나머지가 이름(FirstName)으로 가정
+            // ë§ˆì§€ë§‰ ë¶€ë¶„ì´ ì„±(LastName), ë‚˜ë¨¸ì§€ê°€ ì´ë¦„(FirstName)ìœ¼ë¡œ ê°€ì •
             const lastName = nameParts[nameParts.length - 1];
             const firstName = nameParts.slice(0, -1).join(' ');
             clientName = `${lastName}, ${firstName}`;
@@ -476,7 +476,7 @@ function mapNoteToRow(note) {
             clientName = note.ClientName;
         }
     } else if (note.Client && note.Client.Name) {
-        // Client.Name이 있는 경우도 파싱 시도
+        // Client.Nameì´ ìžˆëŠ” ê²½ìš°ë„ íŒŒì‹± ì‹œë„
         const nameParts = note.Client.Name.trim().split(/\s+/);
         if (nameParts.length >= 2) {
             const lastName = nameParts[nameParts.length - 1];
@@ -523,17 +523,17 @@ function mapNoteToRow(note) {
 
 // Format note details
 function formatNoteDetail(note) {
-    // HTML 노트 내용을 안전하게 처리
+    // HTML ë…¸íŠ¸ ë‚´ìš©ì„ ì•ˆì „í•˜ê²Œ ì²˜ë¦¬
     let safeHtmlNotes = '';
     if (note.HtmlNotes) {
-        // style 태그와 body 태그를 제거하여 페이지 CSS에 영향을 주지 않도록 함
+        // style íƒœê·¸ì™€ body íƒœê·¸ë¥¼ ì œê±°í•˜ì—¬ íŽ˜ì´ì§€ CSSì— ì˜í–¥ì„ ì£¼ì§€ ì•Šë„ë¡ í•¨
         safeHtmlNotes = note.HtmlNotes
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // style 태그 제거
-            .replace(/<body[^>]*>/gi, '<div class="note-content">') // body 태그를 div로 변경
-            .replace(/<\/body>/gi, '</div>') // body 닫는 태그를 div로 변경
-            .replace(/<html[^>]*>/gi, '') // html 태그 제거
-            .replace(/<\/html>/gi, '') // html 닫는 태그 제거
-            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, ''); // head 태그와 내용 제거
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // style íƒœê·¸ ì œê±°
+            .replace(/<body[^>]*>/gi, '<div class="note-content">') // body íƒœê·¸ë¥¼ divë¡œ ë³€ê²½
+            .replace(/<\/body>/gi, '</div>') // body ë‹«ëŠ” íƒœê·¸ë¥¼ divë¡œ ë³€ê²½
+            .replace(/<html[^>]*>/gi, '') // html íƒœê·¸ ì œê±°
+            .replace(/<\/html>/gi, '') // html ë‹«ëŠ” íƒœê·¸ ì œê±°
+            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, ''); // head íƒœê·¸ì™€ ë‚´ìš© ì œê±°
     }
     
     return `
@@ -552,212 +552,108 @@ function formatNoteDetail(note) {
 // Placeholder text for detail panel (never show note content on load — only on row click)
 const DETAIL_PLACEHOLDER = 'Select a row to view detailed content here.';
 
-/** Reset detail panel to placeholder and clear row selection. Call on every table render so detail never shows on load. */
+/** Reset detail panel — close slide panel and clear row selection. Call on every table render. */
 function resetDetailPanel() {
-    const el = document.getElementById('noteDetailContent');
-    if (el) el.innerHTML = DETAIL_PLACEHOLDER;
+    closeDetailPanel();
     document.querySelectorAll('#notesTable tbody tr').forEach(function (tr) { tr.classList.remove('selected'); });
 }
 
-// Table rendering
-async function renderNotesTable() {
-    // Never show detail on load: reset panel first, before any async work
+// â”€â”€ Render notes array into the table (pure render, no fetching) â”€â”€
+function renderNotes(notes, pagination) {
     resetDetailPanel();
+    var tbody = document.querySelector('#notesTable tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-    console.log('[renderNotesTable] ========== STARTING TABLE RENDERING ==========');
-    console.log('[renderNotesTable] Starting table rendering');
-    
-    // Check if progressNoteDB is available
-    if (typeof window.progressNoteDB === 'undefined') {
-        console.error('[renderNotesTable] CRITICAL ERROR: progressNoteDB is not defined!');
-        const tbody = document.querySelector('#notesTable tbody');
-        if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error: progressNoteDB is not available</td></tr>';
-        }
-        return;
-    }
-    
-    const measure = window.performanceMonitor ? window.performanceMonitor.startMeasure('renderNotesTable') : null;
-    const startTime = Date.now();
-    
-    try {
-        await window.progressNoteDB.init();
-        
-        // Filter mode + server pagination: use current page from last fetch (window.filterModeNotes). No bulk load into IndexedDB.
-        // Default mode: use IndexedDB (filled by cached API or full fetch).
-        let notes;
-        if (isFilterMode() && Array.isArray(window.filterModeNotes)) {
-            notes = window.filterModeNotes;
-            console.log(`[renderNotesTable] Filter mode: using server page data, ${notes.length} notes`);
-        } else {
-            const limit = 10000;
-            const { notes: idbNotes } = await window.progressNoteDB.getProgressNotes(currentSite, { limit: limit, sortBy: 'eventDate', sortOrder: 'desc' });
-            notes = idbNotes || [];
-            console.log(`[renderNotesTable] Default mode: ${notes.length} notes from IndexedDB`);
-        }
-        if (notes && notes.length > 0) {
-            console.log(`[renderNotesTable] Sample notes from IndexedDB (first 3):`);
-            notes.slice(0, 3).forEach((note, idx) => {
-                console.log(`  ${idx + 1}. Id: ${note.Id}, ClientServiceId: ${note.ClientServiceId}, EventDate: ${note.EventDate}`);
-            });
-        } else {
-            console.warn(`[renderNotesTable] No notes retrieved from IndexedDB for site: ${currentSite}`);
-        }
-        
-        logPerformance(`Rendering table with ${notes.length} notes for site: ${currentSite}`, { 
-            notesCount: notes.length,
-            loadTime: Date.now() - startTime 
-        });
-        
-        // 최신 데이터 로깅 (디버깅용)
-        if (notes && notes.length > 0) {
-            console.log('[renderNotesTable] Latest 5 notes from IndexedDB:');
-            notes.slice(0, 5).forEach((note, index) => {
-                console.log(`  ${index + 1}. ID: ${note.Id}, EventDate: ${note.EventDate}, CreatedDate: ${note.CreatedDate || 'N/A'}`);
-            });
-        } else {
-            console.warn('[renderNotesTable] No notes found in IndexedDB');
-        }
-        
-        // 최신 데이터 로깅 (성능 개선을 위해 간소화)
-        if (notes && notes.length > 0) {
-        // 성능 개선을 위해 상세 로깅 제거
-        // logPerformance('Latest 5 notes in table:', {
-        //     notes: notes.slice(0, 5).map((note, index) => ({
-        //         index: index + 1,
-        //         id: note.Id,
-        //         eventDate: note.EventDate,
-        //         createdDate: note.CreatedDate || 'N/A'
-        //     }))
-        // });
-    }
-    
-        // Filter notes by selected client if filter is active
-        // Note: If client filter is active, data should already be filtered from server and saved to IndexedDB
-        // Event type filter is server-side; no local filtering needed
-        let filteredNotes = notes || [];
-        
-        console.log(`[renderNotesTable] Filtering notes - selectedClientId: ${selectedClientId}, selectedEventType: ${selectedEventType || 'all'}, notes count: ${notes ? notes.length : 0}`);
-        
-        // If client filter is active, data from IndexedDB should already be filtered from server
-        // No need to filter again - just use all notes from IndexedDB
-        // But we add a safety check to log if there's a mismatch
-        if (selectedClientId && notes && notes.length > 0) {
-            console.log(`[renderNotesTable] Client filter is active (${selectedClientId}), using all notes from IndexedDB (already filtered from server)`);
-            
-            // Optional: Verify that all notes match the selected client (for debugging)
-            const selectedClient = clientList.find(c => c.PersonId === selectedClientId);
-            if (selectedClient && selectedClient.MainClientServiceId) {
-                const mismatchedNotes = notes.filter(note => {
-                    return note && note.ClientServiceId && String(note.ClientServiceId) !== String(selectedClient.MainClientServiceId);
-                });
-                if (mismatchedNotes.length > 0) {
-                    console.warn(`[renderNotesTable] Warning: Found ${mismatchedNotes.length} notes that don't match the selected client's MainClientServiceId`);
-                    console.warn(`[renderNotesTable] Expected ClientServiceId: ${selectedClient.MainClientServiceId}`);
-                }
-            }
-        } else if (selectedClientId && (!notes || notes.length === 0)) {
-            console.warn(`[renderNotesTable] Client filter is active (${selectedClientId}) but no notes found in IndexedDB`);
-        }
-    
-        // Filter mode = server pagination: one page in window.filterModeNotes, pagination in window.serverPagination.
-        // Default mode = cached API: notes from IndexedDB, pagination from window.serverPagination or derived.
-        let notesToShow;
-        let paginationData;
-        if (isFilterMode() && window.serverPagination) {
-            notesToShow = filteredNotes;
-            paginationData = window.serverPagination;
-        } else if (isFilterMode()) {
-            const totalCount = filteredNotes.length;
-            notesToShow = filteredNotes.slice((currentPage - 1) * perPage, currentPage * perPage);
-            paginationData = { page: currentPage, per_page: perPage, total_count: totalCount, total_pages: Math.ceil(totalCount / perPage) };
-        } else {
-            notesToShow = filteredNotes;
-            paginationData = (window.serverPagination && !selectedClientId) ? window.serverPagination : { page: 1, per_page: perPage, total_count: filteredNotes.length, total_pages: Math.ceil(filteredNotes.length / perPage) };
-        }
-        
-        // 전역 변수에 모든 노트 데이터 저장 (필터링용)
-        window.allNotes = filteredNotes.map(note => mapNoteToRow(note));
-        
-        const tbody = document.querySelector('#notesTable tbody');
-        if (!tbody) {
-            console.error('[renderNotesTable] tbody element not found');
-            return;
-        }
-        
-        tbody.innerHTML = '';
-        
-        if (filteredNotes.length === 0) {
-            const tr = document.createElement('tr');
-            const td = document.createElement('td');
-            td.colSpan = 6;
-            td.style.textAlign = 'center';
-            td.style.padding = '20px';
-            td.textContent = selectedClientId ? 'No progress notes found for selected client' : 'No progress notes found';
-            tr.appendChild(td);
-            tbody.appendChild(tr);
-        } else {
-            // Batch DOM operations for better performance (render only notesToShow)
-            const fragment = document.createDocumentFragment();
-            
-            notesToShow.forEach((note, idx) => {
-                try {
-                    const rowData = mapNoteToRow(note);
-                    const tr = document.createElement('tr');
-                    tr.dataset.idx = idx;
-                    Object.values(rowData).forEach(val => {
-                        const td = document.createElement('td');
-                        td.textContent = val || '';
-                        tr.appendChild(td);
-                    });
-                    tr.addEventListener('click', () => selectNote(idx, notesToShow));
-                    fragment.appendChild(tr);
-                } catch (error) {
-                    console.error('[renderNotesTable] Error mapping note to row:', error, note);
-                }
-            });
-            
-            tbody.appendChild(fragment);
-        }
-        
-        // 페이지네이션 UI 강제 표시 (일반 목록 보기에서도)
-        if (filteredNotes.length > 0 || (notes && notes.length > 0)) {
-            console.log('강제로 페이지네이션 UI 표시 중...');
-            if (isFilterMode()) {
-                console.log('필터 모드: 클라이언트 페이지네이션', paginationData);
-            } else if (window.serverPagination && !selectedClientId) {
-                console.log('서버 페이지네이션 정보 사용:', window.serverPagination);
-            }
-            updatePaginationUI(paginationData);
-        }
-        
-        // Detail panel already reset at start of renderNotesTable(); no row selected until user clicks
+    window.currentPageNotes = notes; // keep reference for selectNote
+    window.allNotes = notes.map(function(n){ return mapNoteToRow(n); });
 
-        logPerformance('Table rendering completed', { 
-            totalTime: Date.now() - startTime,
-            rowsRendered: filteredNotes.length 
+    if (!notes || notes.length === 0) {
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        td.colSpan = 6; td.style.textAlign = 'center'; td.style.padding = '20px';
+        td.textContent = selectedClientId ? 'No progress notes found for selected client' : 'No progress notes found';
+        tr.appendChild(td); tbody.appendChild(tr);
+    } else {
+        var fragment = document.createDocumentFragment();
+        notes.forEach(function(note, idx) {
+            var rowData = mapNoteToRow(note);
+            var tr = document.createElement('tr');
+            tr.dataset.idx = idx;
+            Object.values(rowData).forEach(function(val) {
+                var td = document.createElement('td');
+                td.textContent = val || '';
+                tr.appendChild(td);
+            });
+            tr.addEventListener('click', function() { selectNote(idx, notes); });
+            fragment.appendChild(tr);
         });
-        
-        measure.end();
-    } catch (error) {
-        console.error('[renderNotesTable] Error rendering table:', error);
-        const tbody = document.querySelector('#notesTable tbody');
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error rendering table: ${error.message}</td></tr>`;
-        }
-        measure.end();
+        tbody.appendChild(fragment);
+    }
+
+    if (pagination) {
+        updatePaginationUI(pagination);
     }
 }
 
-// Show details when row is selected
+// Track which client is shown in the detail panel (for Client Details button)
+var detailPanelClientId = null;
+
+// Show details when row is selected — opens slide-from-right panel
 function selectNote(idx, notes) {
     // Row highlight
     document.querySelectorAll('#notesTable tbody tr').forEach((tr, i) => {
         tr.classList.toggle('selected', i === idx);
     });
-    // Show detail content
-    const note = notes[idx];
-    document.getElementById('noteDetailContent').innerHTML = formatNoteDetail(note);
+    var note = notes[idx];
+    if (!note) return;
+
+    // Populate detail panel meta
+    var clientName = '';
+    var clientInfo = clientMap[note.ClientId] || clientMap[note.ClientServiceId];
+    if (clientInfo) {
+        var first = (clientInfo.FirstName || '').trim();
+        var last = (clientInfo.LastName || clientInfo.Surname || '').trim();
+        clientName = last && first ? last + ', ' + first : (last || first || 'Unknown');
+    } else {
+        clientName = note.ClientId || '';
+    }
+
+    var metaEl = document.getElementById('detailMeta');
+    if (metaEl) {
+        metaEl.innerHTML = ''
+            + '<div class="detail-meta-item"><span class="detail-meta-label">Client</span><span class="detail-meta-value">' + escHtml(clientName) + '</span></div>'
+            + '<div class="detail-meta-item"><span class="detail-meta-label">Date / Time</span><span class="detail-meta-value">' + escHtml(note.EventDate ? note.EventDate.replace('T', ' ').slice(0, 16) : '') + '</span></div>'
+            + '<div class="detail-meta-item"><span class="detail-meta-label">Event Type</span><span class="detail-meta-value">' + escHtml(note.ProgressNoteEventType?.Description || '') + '</span></div>'
+            + '<div class="detail-meta-item"><span class="detail-meta-label">Care Area(s)</span><span class="detail-meta-value">' + escHtml((note.CareAreas || []).map(function(ca){return ca.Description;}).join(', ')) + '</span></div>';
+    }
+
+    // Populate notes content
+    var notesEl = document.getElementById('detailNotes');
+    if (notesEl) {
+        var safeHtml = '';
+        if (note.HtmlNotes) {
+            safeHtml = note.HtmlNotes
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<body[^>]*>/gi, '<div>')
+                .replace(/<\/body>/gi, '</div>')
+                .replace(/<html[^>]*>/gi, '').replace(/<\/html>/gi, '')
+                .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+        }
+        notesEl.innerHTML = safeHtml || (note.NotesPlainText || note.Notes || '<span style="color:#aaa">No notes</span>');
+    }
+
+    var titleEl = document.getElementById('detailPanelTitle');
+    if (titleEl) titleEl.textContent = clientName ? clientName + ' — Note Details' : 'Note Details';
+
+    // Store client ID and show/hide Client Details button in panel
+    detailPanelClientId = note.ClientId || note.ClientServiceId || null;
+    var panelClientBtn = document.getElementById('detailPanelClientBtn');
+    if (panelClientBtn) {
+        panelClientBtn.style.display = detailPanelClientId ? 'inline-block' : 'none';
+    }
+
+    openDetailPanel();
 }
 
 // Update progress notes table with new data
@@ -789,191 +685,83 @@ function updateProgressNotesTable(notes) {
     console.log('Table updated successfully');
 }
 
-/**
- * Load one page of progress notes in filter mode (server pagination).
- * Uses /api/fetch-progress-notes with page, per_page; does not bulk-fetch into IndexedDB.
- * Sets window.filterModeNotes and window.serverPagination, then renders.
- */
-async function loadFilterModePage(page) {
-    const req = {
+// Unified: fetch one page of progress notes from /api/fetch-progress-notes with current filters and render.
+async function loadProgressNotes(page) {
+    if (page == null) page = currentPage || 1;
+    var req = {
         site: currentSite,
         days: getPeriodDays(),
         page: page,
         per_page: perPage
     };
-    const selectedClient = selectedClientId != null ? clientList.find(c => (c.PersonId === selectedClientId || String(c.PersonId) === String(selectedClientId))) : null;
-    if (selectedClient && selectedClient.MainClientServiceId != null) {
-        req.client_service_id = selectedClient.MainClientServiceId;
+    // Add client filter
+    if (selectedClientId) {
+        var selectedClient = clientList.find(function(c) {
+            return String(c.PersonId) === String(selectedClientId);
+        });
+        if (selectedClient && selectedClient.MainClientServiceId != null) {
+            req.client_service_id = selectedClient.MainClientServiceId;
+        }
     }
+    // Add event type filter
     if (selectedEventType) {
         req.event_types = selectedEventType === EVENT_TYPE_FALL ? ['Fall'] : [selectedEventType];
     }
+    // Show loading
+    var tbody = document.querySelector('#notesTable tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Loading...</td></tr>';
+
     try {
-        const response = await fetch('/api/fetch-progress-notes', {
+        var response = await fetch('/api/fetch-progress-notes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(req)
         });
-        if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + (await response.text()));
-        const result = await response.json();
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        var result = await response.json();
         if (!result.success) throw new Error(result.message || 'Fetch failed');
-        const data = (result.data && Array.isArray(result.data)) ? result.data : [];
-        const pag = result.pagination || { page: 1, per_page: perPage, total_count: data.length, total_pages: 1 };
-        window.filterModeNotes = data;
+        var data = (result.data && Array.isArray(result.data)) ? result.data : [];
+        var pag = result.pagination || { page: page, per_page: perPage, total_count: data.length, total_pages: 1 };
         window.serverPagination = { page: pag.page, per_page: pag.per_page, total_count: pag.total_count, total_pages: pag.total_pages };
         currentPage = pag.page;
-        updatePaginationUI(window.serverPagination);
-        await renderNotesTable();
+        renderNotes(data, window.serverPagination);
     } catch (e) {
-        console.error('[loadFilterModePage]', e);
-        window.filterModeNotes = [];
-        window.serverPagination = { page: 1, per_page: perPage, total_count: 0, total_pages: 1 };
-        const tbody = document.querySelector('#notesTable tbody');
+        console.error('[loadProgressNotes] Error:', e);
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:red;">Error: ' + (e.message || String(e)) + '</td></tr>';
-        updatePaginationUI(window.serverPagination);
     }
 }
 
-// Event type filter change handler (server filter; refetch)
+// Keep old name as alias so any stale references still work
+var loadFilterModePage = loadProgressNotes;
+
+// Event type filter change handler
 function handleEventTypeFilterChange() {
-    const el = document.getElementById('eventTypeFilter');
+    var el = document.getElementById('eventTypeFilter');
     selectedEventType = el ? el.value || '' : '';
-    if (isFilterMode()) {
-        loadFilterModePage(1);
-    } else {
-        loadProgressNotes();
-    }
+    currentPage = 1;
+    loadProgressNotes(1);
 }
 
 // Client filter change handler
 async function handleClientFilterChange() {
-    console.log('[FILTER] ========== CLIENT FILTER CHANGE ==========');
-    console.log('[FILTER] Filter change event triggered at:', new Date().toISOString());
-    
-    // Reset Event type to "All" when Client or Period changes
+    // Reset event type when client/period changes
     selectedEventType = '';
-    const eventTypeEl = document.getElementById('eventTypeFilter');
+    var eventTypeEl = document.getElementById('eventTypeFilter');
     if (eventTypeEl) eventTypeEl.value = '';
-    
-    const filterSelect = document.getElementById('clientFilter');
-    if (!filterSelect) {
-        console.error('[FILTER] clientFilter element not found');
-        return;
-    }
-    
-    const previousClientId = selectedClientId;
+
+    var filterSelect = document.getElementById('clientFilter');
+    if (!filterSelect) return;
+
     selectedClientId = filterSelect.value ? parseInt(filterSelect.value) : null;
-    console.log('[FILTER] Previous client ID:', previousClientId);
-    console.log('[FILTER] New selected client ID:', selectedClientId);
-    console.log('[FILTER] Filter select value:', filterSelect.value);
-    
-    // Show loading indicator
-    const tbody = document.querySelector('#notesTable tbody');
-    if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Loading...</td></tr>';
-    }
-    
-    // If a client is selected, fetch data from server
+
     if (selectedClientId) {
-        console.log('[FILTER] Client selected, looking up client in clientList');
-        console.log('[FILTER] clientList length:', clientList.length);
-        console.log('[FILTER] Searching for PersonId:', selectedClientId);
-        
-        // Try both numeric and string comparison (PersonId might be string or number)
-        let selectedClient = clientList.find(c => c.PersonId === selectedClientId);
-        if (!selectedClient) {
-            // Try with string comparison
-            selectedClient = clientList.find(c => String(c.PersonId) === String(selectedClientId));
-        }
-        if (!selectedClient) {
-            // Try with numeric comparison
-            selectedClient = clientList.find(c => parseInt(c.PersonId) === selectedClientId);
-        }
-        
-        console.log('[FILTER] Selected client found:', selectedClient);
-        console.log('[FILTER] Selected client type check:', {
-            found: !!selectedClient,
-            hasMainClientServiceId: selectedClient ? !!selectedClient.MainClientServiceId : false,
-            MainClientServiceId: selectedClient ? selectedClient.MainClientServiceId : 'N/A',
-            MainClientServiceIdType: selectedClient ? typeof selectedClient.MainClientServiceId : 'N/A'
-        });
-        
-        if (selectedClient) {
-            console.log('[FILTER] Client details:', {
-                PersonId: selectedClient.PersonId,
-                PersonIdType: typeof selectedClient.PersonId,
-                FirstName: selectedClient.FirstName,
-                LastName: selectedClient.LastName,
-                MainClientServiceId: selectedClient.MainClientServiceId,
-                MainClientServiceIdType: typeof selectedClient.MainClientServiceId,
-                AllKeys: Object.keys(selectedClient)
-            });
-        } else {
-            console.error('[FILTER] Client not found in clientList for PersonId:', selectedClientId);
-            console.error('[FILTER] Searching in clientList:', {
-                clientListLength: clientList.length,
-                selectedClientId: selectedClientId,
-                selectedClientIdType: typeof selectedClientId,
-                firstFewClients: clientList.slice(0, 5).map(c => ({
-                    PersonId: c.PersonId,
-                    PersonIdType: typeof c.PersonId,
-                    Name: `${c.LastName}, ${c.FirstName}`,
-                    MainClientServiceId: c.MainClientServiceId
-                }))
-            });
-        }
-        
-        // Check if MainClientServiceId exists and is not empty
-        const hasValidMainClientServiceId = selectedClient && 
-            selectedClient.MainClientServiceId !== null && 
-            selectedClient.MainClientServiceId !== undefined && 
-            selectedClient.MainClientServiceId !== '';
-        
-        if (hasValidMainClientServiceId) {
-            // Filter mode: server pagination — fetch one page only (no bulk to IndexedDB)
-            console.log('[FILTER] Client selected — loading page 1 via server pagination');
-            await loadFilterModePage(1);
-            return;
-        } else {
-            console.error('[FILTER] Client not found or missing MainClientServiceId');
-            console.error('[FILTER] selectedClient:', selectedClient);
-            if (selectedClient) {
-                console.error('[FILTER] MainClientServiceId check failed:', {
-                    MainClientServiceId: selectedClient.MainClientServiceId,
-                    MainClientServiceIdType: typeof selectedClient.MainClientServiceId,
-                    isNull: selectedClient.MainClientServiceId === null,
-                    isUndefined: selectedClient.MainClientServiceId === undefined,
-                    isEmptyString: selectedClient.MainClientServiceId === '',
-                    isZero: selectedClient.MainClientServiceId === 0
-                });
-            }
-            if (tbody) {
-                const errorMsg = selectedClient 
-                    ? `Client found but MainClientServiceId is missing or empty (ID: ${selectedClient.MainClientServiceId})`
-                    : 'Client not found in client list';
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Client information not found: ${errorMsg}</td></tr>`;
-            }
-            return;
-        }
+        showClientProfile(selectedClientId);
     } else {
-        // "All Clients" selected. Cached API only when period === DEFAULT_PERIOD_DAYS; otherwise server-paginated fetch-progress-notes.
-        const days = getPeriodDays();
-        await window.progressNoteDB.deleteProgressNotes(currentSite);
-        if (days === DEFAULT_PERIOD_DAYS) {
-            console.log('[FILTER] All clients,', DEFAULT_PERIOD_DAYS, 'days (default) - using cached API');
-            window.filterModeNotes = undefined;
-            await fetchAndSaveProgressNotes();
-        } else {
-            console.log('[FILTER] All clients, period', days, 'days - server pagination (one page)');
-            await loadFilterModePage(1);
-            return;
-        }
+        hideClientProfile();
     }
-    
-    console.log('[FILTER] Rendering table with filtered data');
-    if (isFilterMode()) currentPage = 1;
-    await renderNotesTable();
-    console.log('[FILTER] Table rendering completed');
+
+    currentPage = 1;
+    await loadProgressNotes(1);
 }
 
 // Fallback initialization function
@@ -1043,7 +831,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         performanceMetrics.startTime = Date.now();
         logPerformance('Page loaded - starting initialization', { currentSite });
         
-        // 사이트 제목 업데이트 (옵셔널 - 요소가 없어도 무시)
+        // ì‚¬ì´íŠ¸ ì œëª© ì—…ë°ì´íŠ¸ (ì˜µì…”ë„ - ìš”ì†Œê°€ ì—†ì–´ë„ ë¬´ì‹œ)
         const siteTitle = document.getElementById('siteTitle');
         if (siteTitle) {
             siteTitle.textContent = `Progress Notes - ${currentSite}`;
@@ -1145,11 +933,6 @@ async function initializeForSite(site) {
     logPerformance(`Initializing for site: ${site}`);
     
     try {
-        // Refresh 버튼 비활성화
-        console.log('[initializeForSite] Disabling refresh button');
-        disableRefreshButton();
-        
-        // 1. Load client mapping first (differs by site)
         console.log('[initializeForSite] Step 1: Loading client map');
         await loadClientMap();
         console.log('[initializeForSite] Step 1 completed: Client map loaded');
@@ -1167,36 +950,11 @@ async function initializeForSite(site) {
         await populateEventTypeFilter();
         console.log('[initializeForSite] Step 1.7 completed: Event type filter populated');
         
-        // 2. Initialize IndexedDB
-        console.log('[initializeForSite] Step 2: Initializing IndexedDB');
-        await window.progressNoteDB.init();
-        console.log('[initializeForSite] Step 2 completed: IndexedDB initialized');
-        
-        // 3. Clear existing data and fetch default-period data (cached)
-        console.log('[initializeForSite] Step 3: Clearing existing data and fetching progress notes');
-        logPerformance('Clearing existing data and fetching default-period data for site:', { site, days: DEFAULT_PERIOD_DAYS });
-        await window.progressNoteDB.deleteProgressNotes(site);
-        console.log('[initializeForSite] Step 3.1: Existing data cleared');
-        
-        // 일반 프로그레스 노트 목록: 모든 노트 가져오기 (성능 최적화를 위해 기본 limit 사용)
-        console.log('[initializeForSite] Step 3.2: Fetching all progress notes for general list view');
-        console.log('[initializeForSite] About to call fetchAndSaveProgressNotes()');
-        try {
-            await fetchAndSaveProgressNotes();
-            console.log('[initializeForSite] Step 3 completed: Progress notes fetched and saved');
-        } catch (fetchError) {
-            console.error('[initializeForSite] Error in fetchAndSaveProgressNotes:', {
-                error: fetchError,
-                message: fetchError.message,
-                stack: fetchError.stack
-            });
-            throw fetchError; // Re-throw to be caught by outer try-catch
-        }
-        
-        // 4. Table rendering
-        console.log('[initializeForSite] Step 4: Rendering table');
-        await renderNotesTable();
-        console.log('[initializeForSite] Step 4 completed: Table rendered');
+        // 2. Fetch and render page 1 via unified loadProgressNotes
+        console.log('[initializeForSite] Step 2: Fetching page 1 of progress notes');
+        currentPage = 1;
+        await loadProgressNotes(1);
+        console.log('[initializeForSite] Step 2 completed: Page 1 loaded and rendered');
         
         console.log('[initializeForSite] Initialization completed successfully for site:', site);
         logPerformance('Site initialization completed for:', { site });
@@ -1220,119 +978,16 @@ async function initializeForSite(site) {
     }
 }
 
-// Fetch Progress Notes from server and save (cached, DEFAULT_PERIOD_DAYS only). Use only for first visit or All Clients + default period. Other cases use /api/fetch-progress-notes (no cache).
-async function fetchAndSaveProgressNotes(eventTypes = null) {
-    try {
-        console.log('[fetchAndSaveProgressNotes] Cached fetch -', DEFAULT_PERIOD_DAYS, 'days, no client filter');
-        
-        const requestBody = {
-            site: currentSite,
-            days: DEFAULT_PERIOD_DAYS
-        };
-        
-        if (eventTypes && eventTypes.length > 0) {
-            requestBody.event_types = eventTypes;
-            console.log('[fetchAndSaveProgressNotes] Fetching progress notes with event type filtering:', eventTypes.join(', '));
-        } else {
-            console.log('[fetchAndSaveProgressNotes] Fetching all progress notes (no event type filtering)');
-        }
-        
-        console.log('[fetchAndSaveProgressNotes] Request body:', JSON.stringify(requestBody, null, 2));
-        
-        const response = await fetch('/api/fetch-progress-notes-cached', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
-        
-        console.log('[fetchAndSaveProgressNotes] Response status:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[fetchAndSaveProgressNotes] HTTP error response:', {
-                status: response.status,
-                statusText: response.statusText,
-                errorText: errorText
-            });
-            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-        }
-        
-        const result = await response.json();
-        console.log('[fetchAndSaveProgressNotes] Response received:', {
-            success: result.success,
-            count: result.count,
-            dataLength: result.data ? result.data.length : 0,
-            hasPagination: !!result.pagination
-        });
-        
-        if (result.success) {
-            console.log(`[fetchAndSaveProgressNotes] Successfully fetched ${result.count} Progress Notes from server`);
-            
-            // 서버에서 받은 페이지네이션 정보를 전역 변수에 저장
-            if (result.pagination) {
-                window.serverPagination = result.pagination;
-                console.log('[fetchAndSaveProgressNotes] 서버 페이지네이션 정보 저장:', result.pagination);
-            }
-            
-            // Save to IndexedDB
-            if (result.data && result.data.length > 0) {
-                console.log('[fetchAndSaveProgressNotes] Saving to IndexedDB...');
-                const saveResult = await window.progressNoteDB.saveProgressNotes(currentSite, result.data);
-                console.log('[fetchAndSaveProgressNotes] IndexedDB save result:', saveResult);
-                
-                // Save last update time (use UTC time for API compatibility)
-                const utcTime = new Date().toISOString();
-                await window.progressNoteDB.saveLastUpdateTime(currentSite, utcTime);
-                
-                console.log('[fetchAndSaveProgressNotes] Progress Note data saved successfully');
-            } else {
-                console.warn('[fetchAndSaveProgressNotes] No progress notes found in response');
-            }
-        } else {
-            console.error('[fetchAndSaveProgressNotes] API returned success=false:', result);
-            throw new Error(result.message || 'Failed to fetch Progress Notes');
-        }
-    } catch (error) {
-        console.error('[fetchAndSaveProgressNotes] Failed to fetch Progress Notes:', {
-            error: error,
-            message: error.message,
-            stack: error.stack,
-            site: currentSite
-        });
-        
-        // 사용자에게 에러 메시지 표시
-        const errorMessage = `데이터 가져오기 실패: ${error.message}`;
-        showErrorMessage(errorMessage);
-        
-        // 에러 로그를 서버로 전송 (선택사항)
-        try {
-            await fetch('/api/log-rod-debug', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    error: 'Progress Notes fetch failed',
-                    message: error.message,
-                    site: currentSite,
-                    timestamp: new Date().toISOString()
-                })
-            });
-        } catch (logError) {
-            console.error('[fetchAndSaveProgressNotes] Failed to log error to server:', logError);
-        }
-    }
-}
 
-// 에러 메시지 표시 함수
+// ì—ëŸ¬ ë©”ì‹œì§€ í‘œì‹œ í•¨ìˆ˜
 function showErrorMessage(message) {
-    // 기존 에러 메시지 제거
+    // ê¸°ì¡´ ì—ëŸ¬ ë©”ì‹œì§€ ì œê±°
     const existingError = document.querySelector('.error-message');
     if (existingError) {
         existingError.remove();
     }
     
-    // 새 에러 메시지 생성
+    // ìƒˆ ì—ëŸ¬ ë©”ì‹œì§€ ìƒì„±
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
     errorDiv.style.cssText = `
@@ -1349,14 +1004,14 @@ function showErrorMessage(message) {
         word-wrap: break-word;
     `;
     errorDiv.innerHTML = `
-        <strong>오류 발생</strong><br>
+        <strong>ì˜¤ë¥˜ ë°œìƒ</strong><br>
         ${message}<br>
-        <small>자동으로 사라집니다</small>
+        <small>ìžë™ìœ¼ë¡œ ì‚¬ë¼ì§‘ë‹ˆë‹¤</small>
     `;
     
     document.body.appendChild(errorDiv);
     
-    // 10초 후 자동 제거
+    // 10ì´ˆ í›„ ìžë™ ì œê±°
     setTimeout(() => {
         if (errorDiv.parentNode) {
             errorDiv.remove();
@@ -1364,32 +1019,24 @@ function showErrorMessage(message) {
     }, 10000);
 }
 
-// 수동 새로고침 함수 — respects current filters (client, period, event type)
+// ìˆ˜ë™ ìƒˆë¡œê³ ì¹¨ í•¨ìˆ˜ — respects current filters (client, period, event type)
 async function refreshData() {
     try {
-        console.log('Manual refresh requested for site:', currentSite);
         disableRefreshButton();
-        if (isFilterMode()) {
-            await loadFilterModePage(1);
-        } else {
-            await window.progressNoteDB.deleteProgressNotes(currentSite);
-            console.log('Fetching all progress notes for general list view');
-            await fetchAndSaveProgressNotes();
-            await renderNotesTable();
-        }
+        await loadProgressNotes(1);
     } catch (error) {
-        console.error('Refresh failed for site:', currentSite, error);
+        console.error('Refresh failed:', error);
     } finally {
         enableRefreshButton();
     }
 }
 
-// 전역 함수로 노출 (테스트용)
+// ì „ì—­ í•¨ìˆ˜ë¡œ ë…¸ì¶œ (í…ŒìŠ¤íŠ¸ìš©)
 window.testIncrementalUpdate = () => {
     console.log('Incremental update is disabled. Use refreshData() instead.');
 };
 
-// 사이트 변경 시 호출할 함수 (URL 파라미터 변경 시)
+// ì‚¬ì´íŠ¸ ë³€ê²½ ì‹œ í˜¸ì¶œí•  í•¨ìˆ˜ (URL íŒŒë¼ë¯¸í„° ë³€ê²½ ì‹œ)
 function handleSiteChange() {
     const urlParams = new URLSearchParams(window.location.search);
     const newSite = urlParams.get('site') || 'Ramsay';
@@ -1399,6 +1046,7 @@ function handleSiteChange() {
         currentSite = newSite;
         selectedClientId = null;
         selectedEventType = '';
+        hideClientProfile();
         const clientFilterEl = document.getElementById('clientFilter');
         if (clientFilterEl) clientFilterEl.value = '';
         const eventTypeEl = document.getElementById('eventTypeFilter');
@@ -1410,20 +1058,15 @@ function handleSiteChange() {
             siteTitle.textContent = `Progress Notes - ${currentSite}`;
         }
         
-        // 새로운 사이트로 초기화
+        // ìƒˆë¡œìš´ ì‚¬ì´íŠ¸ë¡œ ì´ˆê¸°í™”
         initializeForSite(currentSite);
     }
 }
 
-// 증분 업데이트 함수는 제거됨 (항상 1주일 데이터를 가져옴)
-async function fetchIncrementalProgressNotes(lastUpdateTime) {
-    console.log('Incremental update is disabled. Fetching default-period (' + DEFAULT_PERIOD_DAYS + ' days) data instead.');
-    await fetchAndSaveProgressNotes();
-}
 
 // Performance debugging tools (available in console)
 window.debugPerformance = {
-    // 현재 성능 상태 출력
+    // í˜„ìž¬ ì„±ëŠ¥ ìƒíƒœ ì¶œë ¥
     status: () => {
         const memory = performance.memory ? {
             used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
@@ -1450,13 +1093,13 @@ window.debugPerformance = {
         }
     },
     
-    // 강제 정리
+    // ê°•ì œ ì •ë¦¬
     cleanup: () => {
         cleanup();
         console.log('Forced cleanup completed');
     },
     
-    // 메모리 사용량 모니터링 시작
+    // ë©”ëª¨ë¦¬ ì‚¬ìš©ëŸ‰ ëª¨ë‹ˆí„°ë§ ì‹œìž‘
     startMemoryMonitoring: () => {
         if (window.debugPerformance.memoryInterval) {
             clearInterval(window.debugPerformance.memoryInterval);
@@ -1471,17 +1114,17 @@ window.debugPerformance = {
                 
                 console.log(`Memory: ${used}MB / ${total}MB (${limit}MB limit)`);
                 
-                // 메모리 사용량이 80%를 넘으면 경고
+                // ë©”ëª¨ë¦¬ ì‚¬ìš©ëŸ‰ì´ 80%ë¥¼ ë„˜ìœ¼ë©´ ê²½ê³ 
                 if (used / limit > 0.8) {
-                    console.warn('⚠️ High memory usage detected!');
+                    console.warn('âš ï¸ High memory usage detected!');
                 }
             }
-        }, 5000); // 5초마다 체크
+        }, 5000); // 5ì´ˆë§ˆë‹¤ ì²´í¬
         
         console.log('Memory monitoring started');
     },
     
-    // 메모리 모니터링 중지
+    // ë©”ëª¨ë¦¬ ëª¨ë‹ˆí„°ë§ ì¤‘ì§€
     stopMemoryMonitoring: () => {
         if (window.debugPerformance.memoryInterval) {
             clearInterval(window.debugPerformance.memoryInterval);
@@ -1490,7 +1133,7 @@ window.debugPerformance = {
         }
     },
     
-    // 가비지 컬렉션 강제 실행 (가능한 경우)
+    // ê°€ë¹„ì§€ ì»¬ë ‰ì…˜ ê°•ì œ ì‹¤í–‰ (ê°€ëŠ¥í•œ ê²½ìš°)
     forceGC: () => {
         if (window.gc) {
             window.gc();
@@ -1503,7 +1146,7 @@ window.debugPerformance = {
 
 // Chrome DevTools Performance Panel Integration
 if (window.chrome && window.chrome.devtools) {
-    // DevTools가 열려있을 때만 실행
+    // DevToolsê°€ ì—´ë ¤ìžˆì„ ë•Œë§Œ ì‹¤í–‰
     window.addEventListener('devtoolschange', (e) => {
         if (e.detail.open) {
             console.log('DevTools opened - enabling detailed performance monitoring');
@@ -1514,7 +1157,7 @@ if (window.chrome && window.chrome.devtools) {
 
 // Performance monitoring for Chrome DevTools
 window.performanceMonitor = {
-    // 성능 마커 추가
+    // ì„±ëŠ¥ ë§ˆì»¤ ì¶”ê°€
     mark: (name) => {
         if (performance.mark) {
             performance.mark(name);
@@ -1522,7 +1165,7 @@ window.performanceMonitor = {
         logPerformance(`Mark: ${name}`);
     },
     
-    // 성능 측정
+    // ì„±ëŠ¥ ì¸¡ì •
     measure: (name, startMark, endMark) => {
         if (performance.measure) {
             try {
@@ -1538,7 +1181,7 @@ window.performanceMonitor = {
         }
     },
     
-    // 성능 측정 시작
+    // ì„±ëŠ¥ ì¸¡ì • ì‹œìž‘
     startMeasure: (name) => {
         const startMark = `${name}-start`;
         performance.mark(startMark);
@@ -1552,14 +1195,14 @@ window.performanceMonitor = {
     }
 };
 
-// 페이지네이션 관련 전역 변수
+// íŽ˜ì´ì§€ë„¤ì´ì…˜ ê´€ë ¨ ì „ì—­ ë³€ìˆ˜
 let currentPage = 1;
 let totalPages = 1;
 let totalCount = 0;
 let perPage = 50;
 let currentPaginationData = null;
 
-// 페이지네이션 기능
+// íŽ˜ì´ì§€ë„¤ì´ì…˜ ê¸°ëŠ¥
 function updatePaginationUI(paginationData) {
     console.log('updatePaginationUI called with:', paginationData);
     currentPaginationData = paginationData;
@@ -1586,7 +1229,7 @@ function updatePaginationUI(paginationData) {
     });
     
     if (!container || !info || !prevBtn || !nextBtn || !pageNumbers) {
-        console.error('페이지네이션 UI 요소를 찾을 수 없습니다.');
+        console.error('íŽ˜ì´ì§€ë„¤ì´ì…˜ UI ìš”ì†Œë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.');
         return;
     }
     
@@ -1676,143 +1319,332 @@ function changePage(direction) {
 }
 
 function goToPage(page) {
-    console.log(`goToPage called: page=${page}, currentPage=${currentPage}, totalPages=${totalPages}`);
-    if (page < 1 || page > totalPages) {
-        console.log(`Invalid page: ${page} (must be between 1 and ${totalPages})`);
-        return;
-    }
-    
-    if (page === currentPage && !isFilterMode()) {
-        console.log(`Same page: ${page} - no action needed`);
-        return;
-    }
-    
-    console.log(`Changing to page: ${page}`);
+    if (page < 1 || page > totalPages || page === currentPage) return;
     currentPage = page;
-    if (isFilterMode()) {
-        loadFilterModePage(page);
-        return;
-    }
-    loadProgressNotes();
+    loadProgressNotes(page);
 }
 
 function changePerPage() {
-    const select = document.getElementById('perPageSelect');
+    var select = document.getElementById('perPageSelect');
     perPage = parseInt(select.value);
     currentPage = 1;
-    if (isFilterMode()) {
-        loadFilterModePage(1);
-        return;
-    }
-    loadProgressNotes();
+    loadProgressNotes(1);
 }
 
 
-function updateCacheStatus(cacheInfo) {
-    const statusDiv = document.getElementById('cacheStatus');
-    const statusText = document.getElementById('cacheStatusText');
-    
-    if (!statusDiv || !statusText) {
-        return;
-    }
-    
-    let statusClass = 'cached';
-    let statusMessage = 'Loaded from cache';
-    
-    if (cacheInfo.status === 'api-fresh') {
-        statusClass = 'api-fresh';
-        statusMessage = 'Freshly loaded from API';
-    } else if (cacheInfo.status === 'error') {
-        statusClass = 'error';
-        statusMessage = 'Error occurred during loading';
-    } else if (cacheInfo.status === 'cached') {
-        const ageHours = cacheInfo.cache_age_hours || 0;
-        if (ageHours < 1) {
-            statusMessage = `Loaded from cache (${Math.round(ageHours * 60)} minutes ago)`;
-        } else {
-            statusMessage = `Loaded from cache (${Math.round(ageHours)} hours ago)`;
-        }
-    }
-    
-    statusText.textContent = statusMessage;
-    statusDiv.className = `cache-status ${statusClass}`;
-    statusDiv.style.display = 'block';
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// â”€â”€ CLIENT PROFILE (resident detail, wounds, tabs) â”€â”€
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+var residentCache = {};
+var woundsCache = [];
+var activeProfileTab = 'overview';
+
+function escHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
-// 기존 loadProgressNotes 함수 수정
-async function loadProgressNotes(forceRefresh = false) {
+function formatDateShort(iso) {
+    if (!iso) return '\u2014';
     try {
-        performanceMonitor.startMeasure('loadProgressNotes');
-        
-        const requestBody = {
-            site: currentSite,
-            days: DEFAULT_PERIOD_DAYS,
-            page: currentPage,
-            per_page: perPage,
-            force_refresh: forceRefresh
-        };
-        
-        console.log(`Loading progress notes (cached ${DEFAULT_PERIOD_DAYS}-day) - Page: ${currentPage}, Per Page: ${perPage}, Force Refresh: ${forceRefresh}`);
-        
-        const response = await fetch('/api/fetch-progress-notes-cached', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        console.log('API Response:', result);
-        
-        if (result.success) {
-            updateProgressNotesTable(result.data);
-            
-            // 페이지네이션 UI 업데이트
-            console.log('Pagination data:', result.pagination);
-            if (result.pagination) {
-                console.log('Updating pagination UI...', result.pagination);
-                updatePaginationUI(result.pagination);
-            } else {
-                console.log('No pagination data received - creating default pagination');
-                const defaultPagination = {
-                    page: currentPage,
-                    per_page: perPage,
-                    total_count: result.data ? result.data.length : 0,
-                    total_pages: Math.ceil((result.data ? result.data.length : 0) / perPage)
-                };
-                console.log('Using default pagination:', defaultPagination);
-                updatePaginationUI(defaultPagination);
-            }
-            
-            // 캐시 상태 표시
-            if (result.cache_info) {
-                updateCacheStatus(result.cache_info);
-            }
-            
-            console.log(`Progress notes loaded successfully - ${result.count} items (Page ${currentPage}/${result.pagination?.total_pages || 1})`);
-        } else {
-            throw new Error(result.message || 'Failed to load progress notes');
-        }
-        
-    } catch (error) {
-        console.error('Error loading progress notes:', error);
-        showError(`Failed to load progress notes: ${error.message}`);
-    } finally {
-        performanceMonitor.endMeasure('loadProgressNotes');
+        var d = new Date(iso);
+        return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) { return String(iso); }
+}
+
+function openDetailPanel() {
+    var overlay = document.getElementById('detailOverlay');
+    var panel = document.getElementById('detailPanel');
+    if (overlay) overlay.classList.add('open');
+    if (panel) panel.classList.add('open');
+}
+
+function closeDetailPanel() {
+    var overlay = document.getElementById('detailOverlay');
+    var panel = document.getElementById('detailPanel');
+    if (overlay) overlay.classList.remove('open');
+    if (panel) panel.classList.remove('open');
+}
+
+// Show "Client Details" button when a client is selected
+function showClientProfile(clientId) {
+    var btn = document.getElementById('btnClientDetails');
+    if (btn) btn.classList.add('visible');
+    // Pre-fetch resident data so modal opens fast
+    var client = clientList.find(function (c) { return String(c.PersonId) === String(clientId); });
+    if (client) {
+        var cid = client.Id || client.PersonId;
+        fetchResidentDetail(cid);
     }
 }
 
-// 페이지 로드 시 디버깅 도구 안내
-console.log('Performance debugging tools available:');
-console.log('- debugPerformance.status() - 현재 성능 상태 확인');
-console.log('- debugPerformance.cleanup() - 강제 정리');
-console.log('- debugPerformance.startMemoryMonitoring() - 메모리 모니터링 시작');
-console.log('- debugPerformance.stopMemoryMonitoring() - 메모리 모니터링 중지');
-console.log('- debugPerformance.forceGC() - 가비지 컬렉션 강제 실행');
-console.log('- performanceMonitor.mark("name") - 성능 마커 추가');
-console.log('- performanceMonitor.startMeasure("name") - 성능 측정 시작'); 
+// Open client details modal from the detail panel (for All Clients mode)
+function openClientDetailsFromPanel() {
+    if (!detailPanelClientId) return;
+    // Find client in clientList by PersonId or MainClientServiceId
+    var client = clientList.find(function(c) {
+        return String(c.PersonId) === String(detailPanelClientId) ||
+               String(c.MainClientServiceId) === String(detailPanelClientId);
+    });
+    if (!client) {
+        // Try clientMap
+        client = clientMap[detailPanelClientId];
+    }
+    if (!client) { alert('Client details not available'); return; }
+
+    // Temporarily set selectedClientId so openClientDetailsModal works
+    var prevSelected = selectedClientId;
+    selectedClientId = client.PersonId;
+    openClientDetailsModal();
+    selectedClientId = prevSelected;
+}
+
+// Hide "Client Details" button
+function hideClientProfile() {
+    var btn = document.getElementById('btnClientDetails');
+    if (btn) btn.classList.remove('visible');
+    residentCache = {};
+    woundsCache = [];
+}
+
+// Open client details modal
+function openClientDetailsModal() {
+    if (!selectedClientId) return;
+    var client = clientList.find(function (c) { return String(c.PersonId) === String(selectedClientId); });
+    if (!client) return;
+
+    var last = (client.LastName || '').trim();
+    var first = (client.FirstName || '').trim();
+    var name = last && first ? last + ', ' + first : (last || first || 'Unknown');
+    var initials = ((first || '?')[0] + (last || '?')[0]).toUpperCase();
+
+    var avatarEl = document.getElementById('clientAvatar');
+    var nameEl = document.getElementById('clientModalName');
+    var subtitleEl = document.getElementById('clientModalSubtitle');
+    if (avatarEl) avatarEl.textContent = initials;
+    if (nameEl) nameEl.textContent = name;
+    if (subtitleEl) subtitleEl.textContent = (client.WingName || '') + (client.WingName && client.LocationName ? ' · ' : '') + (client.LocationName || '');
+
+    activeProfileTab = 'overview';
+    updateProfileTabUI();
+
+    // If data already fetched, render immediately; otherwise show loading
+    if (residentCache && residentCache.person) {
+        renderProfileTab('overview');
+    } else {
+        var content = document.getElementById('profileContent');
+        if (content) content.innerHTML = '<div class="client-profile-loading">Loading resident data...</div>';
+        var cid = client.Id || client.PersonId;
+        fetchResidentDetail(cid);
+    }
+
+    var overlay = document.getElementById('clientModalOverlay');
+    if (overlay) overlay.classList.add('open');
+}
+
+// Close client details modal
+function closeClientDetailsModal() {
+    var overlay = document.getElementById('clientModalOverlay');
+    if (overlay) overlay.classList.remove('open');
+}
+
+function infoItem(label, value) {
+    return '<div class="info-item"><span class="info-label">' + escHtml(label) + '</span><span class="info-value">' + escHtml(value || '—') + '</span></div>';
+}
+
+async function fetchResidentDetail(clientId) {
+    try {
+        var resp = await fetch('/api/residents/' + clientId + '?site=' + encodeURIComponent(currentSite));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var json = await resp.json();
+        if (!json.success) throw new Error(json.message || 'Failed');
+        residentCache = json.data || {};
+
+        // Also fetch wounds
+        try {
+            var wResp = await fetch('/api/wounds?site=' + encodeURIComponent(currentSite));
+            if (wResp.ok) {
+                var wJson = await wResp.json();
+                if (wJson.success) {
+                    woundsCache = (wJson.data || []).filter(function (w) {
+                        return w.ClientId === clientId;
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[ClientProfile] Wounds fetch failed:', e.message);
+            woundsCache = [];
+        }
+
+        renderProfileTab(activeProfileTab);
+    } catch (e) {
+        console.error('[ClientProfile] Resident detail error:', e.message);
+        var content = document.getElementById('profileContent');
+        if (content) content.innerHTML = '<div class="empty-tab">Could not load resident data: ' + escHtml(e.message) + '</div>';
+    }
+}
+
+function switchProfileTab(tabId) {
+    activeProfileTab = tabId;
+    updateProfileTabUI();
+    renderProfileTab(tabId);
+}
+
+function updateProfileTabUI() {
+    document.querySelectorAll('.profile-tab').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.tab === activeProfileTab);
+    });
+}
+
+function renderProfileTab(tabId) {
+    var content = document.getElementById('profileContent');
+    if (!content) return;
+
+    if (!residentCache || !residentCache.person) {
+        content.innerHTML = '<div class="client-profile-loading">Loading...</div>';
+        return;
+    }
+
+    var person = residentCache.person || {};
+    var cs = residentCache.client_service || {};
+    var contacts = residentCache.emergency_contacts || [];
+    var tables = residentCache.tables || {};
+
+    switch (tabId) {
+        case 'overview':
+            content.innerHTML = renderOverviewTab(person, cs, contacts);
+            break;
+        case 'clinical':
+            content.innerHTML = renderClinicalTab(tables);
+            break;
+        case 'wounds':
+            content.innerHTML = renderWoundsTab(tables);
+            break;
+        case 'monitoring':
+            content.innerHTML = renderMonitoringTab(tables);
+            break;
+        default:
+            content.innerHTML = '<div class="empty-tab">Unknown tab</div>';
+    }
+}
+
+function renderOverviewTab(person, cs, contacts) {
+    var html = '<div class="section-card"><div class="section-card-header">Personal & Location</div><div class="section-card-body"><div class="info-grid">';
+    var pref = (person.PreferredName || '').trim();
+    var fullName = ((person.FirstName || '') + ' ' + (person.LastName || '')).trim();
+    html += infoItem('Name', pref || fullName || '—');
+    html += infoItem('Birth Date', formatDateShort(person.BirthDate));
+    html += infoItem('Height', person.Height ? person.Height + ' cm' : '—');
+    html += infoItem('Wing', cs.WingName || '—');
+    html += infoItem('Location', cs.LocationName || '—');
+    html += infoItem('Admission', formatDateShort(cs.StartDate));
+    html += '</div></div></div>';
+
+    html += '<div class="section-card"><div class="section-card-header">Emergency Contacts</div><div class="section-card-body">';
+    if (contacts.length === 0) {
+        html += '<div class="empty-tab">No emergency contacts</div>';
+    } else {
+        contacts.forEach(function (c) {
+            html += '<div class="contact-block">';
+            html += '<div class="contact-name">' + escHtml(c.ContactName || 'Contact') + '</div>';
+            if (c.Relationship) html += '<div class="contact-detail">Relationship: ' + escHtml(c.Relationship) + '</div>';
+            if (c.MobilePhone) html += '<div class="contact-detail">Mobile: ' + escHtml(c.MobilePhone) + '</div>';
+            if (c.BusinessHoursPhone) html += '<div class="contact-detail">Business: ' + escHtml(c.BusinessHoursPhone) + '</div>';
+            if (c.AfterHoursPhone) html += '<div class="contact-detail">After Hours: ' + escHtml(c.AfterHoursPhone) + '</div>';
+            if (c.Email) html += '<div class="contact-detail">Email: ' + escHtml(c.Email) + '</div>';
+            html += '</div>';
+        });
+    }
+    html += '</div></div>';
+    return html;
+}
+
+function renderClinicalTab(tables) {
+    var html = '';
+    var adverseEvents = tables.AdverseEvent || [];
+    var diagnosis = tables.ClientDiagnosis || [];
+
+    if (adverseEvents.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Adverse Events</div><div class="section-card-body">';
+        adverseEvents.forEach(function (ev) {
+            html += '<div class="data-row"><span class="data-row-date">' + escHtml(formatDateShort(ev.Date)) + '</span><span class="data-row-text">' + escHtml(ev.Description || '—') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (diagnosis.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Diagnosis</div><div class="section-card-body">';
+        diagnosis.forEach(function (d) {
+            html += '<div class="data-row"><span class="data-row-text">' + escHtml(d.Description || d.Id || '—') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (!html) html = '<div class="empty-tab">No clinical data available</div>';
+    return html;
+}
+
+function renderWoundsTab(tables) {
+    var html = '';
+    var wounds = tables.Wound || woundsCache || [];
+    var followUps = tables.WoundFollowUp || [];
+
+    if (wounds.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Active Wounds</div><div class="section-card-body">';
+        wounds.forEach(function (w) {
+            var desc = w.LocationNotes || w.Ma4WoundLocation || '—';
+            var type = '';
+            if (w.WoundType && w.WoundType.Description) type = w.WoundType.Description;
+            html += '<div class="data-row"><span class="data-row-date">' + escHtml(formatDateShort(w.Date)) + '</span><span class="data-row-text">' + escHtml(desc) + (type ? ' <span style="color:#aaa">(' + escHtml(type) + ')</span>' : '') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (followUps.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Wound Follow-ups</div><div class="section-card-body">';
+        followUps.forEach(function (w) {
+            html += '<div class="data-row"><span class="data-row-date">' + escHtml(formatDateShort(w.Date)) + '</span><span class="data-row-text">' + escHtml(w.LocationNotes || '—') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (!html) html = '<div class="empty-tab">No wound data available</div>';
+    return html;
+}
+
+function renderMonitoringTab(tables) {
+    var html = '';
+    var weight = tables.Weight || [];
+    var pain = tables.Pain || [];
+    var bowel = tables.BowelMonitoring || [];
+
+    if (weight.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Weight</div><div class="section-card-body">';
+        weight.forEach(function (w) {
+            html += '<div class="data-row"><span class="data-row-date">' + escHtml(formatDateShort(w.Date)) + '</span><span class="data-row-text">' + escHtml(w.Value != null ? w.Value + ' kg' : '—') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (pain.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Pain</div><div class="section-card-body">';
+        pain.forEach(function (p) {
+            html += '<div class="data-row"><span class="data-row-date">' + escHtml(formatDateShort(p.Date)) + '</span><span class="data-row-text">' + escHtml(p.LocationNotes || '—') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (bowel.length > 0) {
+        html += '<div class="section-card"><div class="section-card-header">Bowel Monitoring</div><div class="section-card-body">';
+        bowel.forEach(function (b) {
+            html += '<div class="data-row"><span class="data-row-date">' + escHtml(formatDateShort(b.Date)) + '</span><span class="data-row-text">Bowel open: ' + (b.IsBowelOpen ? 'Yes' : 'No') + '</span></div>';
+        });
+        html += '</div></div>';
+    }
+
+    if (!html) html = '<div class="empty-tab">No monitoring data available</div>';
+    return html;
+}

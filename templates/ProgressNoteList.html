@@ -5,436 +5,324 @@
     <title>Progress Notes</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f7f9fa; }
-        .container { display: flex; height: 100vh; position: relative; }
-        .left-panel { flex: 2; padding: 24px 16px 16px 24px; background: #fff; border-right: 1px solid #e0e0e0; overflow-y: auto; overflow-x: visible; }
-        .right-panel { flex: 1; padding: 24px 24px 16px 24px; background: #f9fbfd; }
-        
+        /* ═══════════════════════════════════════════════
+           PROGRESS NOTES — Clean Modern Design
+           ═══════════════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f0f2f5; color: #1d1d1f; -webkit-font-smoothing: antialiased; }
+
+        /* ── Top Navigation Bar ── */
         .top-bar {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            max-width: 1200px;
-            margin: 10px auto 0 auto;
-            padding: 0 10px;
-            box-sizing: border-box;
-            gap: 40px;
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; padding: 12px 28px;
+            background: #fff; border-bottom: 1px solid #e5e5e5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .site-info-box {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #dee2e6;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-            min-width: 350px;
-            max-width: 650px;
-            text-align: left;
-            margin: 0;
+            background: none; padding: 0; border: none; box-shadow: none;
+            min-width: auto; max-width: none; margin: 0;
         }
         .site-info-line {
-            font-size: 1.3em;
-            color: #495057;
-            font-weight: 600;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            gap: 15px !important;
-            flex-wrap: nowrap !important;
+            font-size: 14px; color: #555; font-weight: 500;
+            display: flex !important; align-items: center !important;
+            gap: 8px !important; flex-wrap: nowrap !important;
         }
+        .site-info-line .site-name { font-weight: 700; color: #1d1d1f; }
+        .site-info-line .separator { color: #ccc; }
         .header-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: flex-end;
-            margin: 0;
-            flex-wrap: wrap;
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
         }
-        .btn-addnew { background: #28a745; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
-        .btn-addnew:hover { background: #218838; }
-        .btn-refresh { background: #17a2b8; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
-        .btn-refresh:hover { background: #138496; }
-        .btn-logout { background: #dc3545; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
-        .btn-logout:hover { background: #c82333; }
-        .btn-admin { background: #6f42c1; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
-        .btn-admin:hover { background: #5a32a3; }
-        
-        .btn-incident { background: #e74c3c; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 1em; font-weight: 500; cursor: pointer; }
-        .btn-incident:hover { background: #c0392b; }
-        
-        
-        /* Log Viewer Button - Bottom Fixed */
-        .log-viewer-footer {
-            text-align: right;
-            padding: 20px;
-            margin-top: 30px;
-            border-top: 1px solid #e9ecef;
+        .header-buttons button {
+            border: none; border-radius: 6px; padding: 8px 16px;
+            font-size: 13px; font-weight: 500; cursor: pointer;
+            transition: all 0.15s ease; line-height: 1.4;
         }
-        .btn-log-viewer { 
-            background: linear-gradient(135deg, #6c757d, #495057); 
-            color: #fff; 
-            border: none; 
-            border-radius: 6px; 
-            padding: 10px 20px; 
-            font-size: 1em; 
-            font-weight: 500; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
-            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3); 
-        }
-        .btn-log-viewer:hover { 
-            background: linear-gradient(135deg, #495057, #343a40); 
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4); 
-        }
-        
-        /* 페이지네이션 스타일 */
-        .pagination-container {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-        }
-        
-        .pagination-info {
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 14px;
-            color: #6c757d;
-        }
-        
-        .pagination-controls {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .btn-pagination {
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        
-        .btn-pagination:hover:not(:disabled) {
-            background: #0056b3;
-        }
-        
-        .btn-pagination:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-        
-        .page-numbers {
-            display: flex;
-            gap: 5px;
-        }
-        
-        .page-number {
-            background: #fff;
-            color: #007bff;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 8px 12px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-        
-        .page-number:hover {
-            background: #e9ecef;
-        }
-        
-        .page-number.active {
-            background: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        
-        .pagination-settings {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            font-size: 14px;
-        }
-        
-        .pagination-settings select {
-            padding: 4px 8px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        .btn-refresh-cache {
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 6px 12px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        
-        .btn-refresh-cache:hover {
-            background: #218838;
-        }
-        
-        .cache-status {
-            margin-top: 10px;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            text-align: center;
-        }
-        
-        .cache-status.cached {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .cache-status.api-fresh {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        .cache-status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        /* site-info-line override */
-        .site-info-line {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            gap: 15px !important;
-            flex-wrap: nowrap !important;
-        }
-        
-        /* Filter styles */
-        .filter-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            user-select: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-        
-        .filter-header:hover {
-            background-color: #f0f0f0;
-        }
-        
-        .filter-header.active {
-            background-color: #e3f2fd;
-            color: #1976d2;
-        }
-        
+        .btn-addnew { background: #34c759; color: #fff; }
+        .btn-addnew:hover { background: #2db84d; }
+        .btn-refresh { background: #007aff; color: #fff; }
+        .btn-refresh:hover { background: #0066d6; }
+        .btn-logout { background: #ff3b30; color: #fff; }
+        .btn-logout:hover { background: #e0332b; }
+        .btn-incident { background: #ff3b30; color: #fff; }
+        .btn-incident:hover { background: #e0332b; }
 
-        
-        .filter-icon {
-            font-size: 12px;
-            transition: transform 0.2s;
+        /* ── Main Content Area ── */
+        .container { display: flex; min-height: calc(100vh - 56px); }
+        .left-panel {
+            flex: 1; padding: 24px 32px 32px; overflow-y: auto;
         }
-        
-        .filter-icon.active {
-            transform: rotate(180deg);
+
+        /* ── Filter Bar ── */
+        .client-filter-container {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+            padding: 14px 18px; margin-bottom: 20px;
+            background: #fff; border-radius: 10px;
+            border: 1px solid #e5e5e5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
-        
-        .filter-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 99999;
-            min-width: 200px;
+        .client-filter-container label {
+            font-size: 12px; font-weight: 600; color: #86868b;
+            text-transform: uppercase; letter-spacing: 0.3px; margin-right: 6px;
+        }
+        .client-filter-container select {
+            padding: 7px 12px; border: 1px solid #d2d2d7; border-radius: 6px;
+            font-size: 13px; background: #fff; color: #1d1d1f;
+            min-width: 180px; outline: none; transition: border-color 0.2s;
+        }
+        .client-filter-container select:focus { border-color: #007aff; }
+
+        /* ── Client Details Button ── */
+        .btn-client-details {
             display: none;
-            margin-top: 2px;
-            font-size: 0.9em;
-            transform: translateZ(0);
+            background: #007aff; color: #fff; border: none; border-radius: 6px;
+            padding: 7px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: background 0.15s; white-space: nowrap;
         }
-        
-        .filter-dropdown.show {
-            display: block;
-        }
-        
-        .filter-item {
-            padding: 8px 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-            transition: background 0.2s;
-        }
-        
-        .filter-item:hover {
-            background: #f5f5f5;
-        }
-        
-        .filter-item.selected {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-        
-        .filter-clear {
-            padding: 8px 12px;
-            background: #f8f9fa;
-            border-top: 1px solid #ddd;
-            cursor: pointer;
-            text-align: center;
-            font-weight: 500;
-            color: #666;
-        }
-        
-        .filter-clear:hover {
-            background: #e9ecef;
-        }
-        
-        .filter-header-wrapper {
-            position: relative !important;
-        }
-        
-        th.filter-header-wrapper {
-            position: relative !important;
-            overflow: visible !important;
-        }
-        
-        table thead th {
-            position: relative !important;
-            overflow: visible !important;
-        }
-        
-        table { width: 100%; border-collapse: collapse; background: #fff; table-layout: fixed; overflow: visible; }
-        th, td { padding: 8px 10px; border-bottom: 1px solid #e0e0e0; text-align: left; font-size: 0.98em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        th { background: #f1f5fa !important; font-weight: 600; color: #222 !important; }
-        th, thead tr { background: #f1f5fa !important; }
-        /* 컬럼 너비 조정: Date/Time 축소, Event type 확대 */
-        th:nth-child(1) { width: 80px; }  /* Service wing */
-        th:nth-child(2) { width: 120px; } /* Client - 축소 */
-        th:nth-child(3) { width: 100px; } /* Date - 축소 */
-        th:nth-child(4) { width: 60px; }  /* Time - 축소 */
-        th:nth-child(5) { width: 160px; } /* Event type - 확대 */
-        th:nth-child(6) { width: 80px; }  /* Care area(s) - 기존 크기로 */
-        th:nth-child(7) { width: 120px; }
-        th:nth-child(8) { width: 140px; }
-        th:nth-child(9) { width: 120px; }
-        tbody tr { background: #fff; transition: background 0.2s; }
-        tbody tr:nth-child(even) { background: #f6f8fa; }
-        tr.selected { background: #e3f2fd !important; }
-        tr:hover { background: #eaf4fb !important; cursor: pointer; }
-        .note-detail { background: #fff; border-radius: 6px; box-shadow: 0 2px 8px #0001; padding: 18px; min-height: 120px; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden; }
-        .note-detail h3 { margin-top: 0; font-size: 1.1em; color: #1976d2; flex-shrink: 0; }
-        #noteDetailContent { flex: 1; overflow-y: auto; min-height: 0; }
-        .note-detail pre { background: #f7f7f7; padding: 10px; border-radius: 4px; font-size: 0.97em; }
-        
-        /* Popup styles */
-        .popup-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 10000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .popup-content {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            width: 90%;
-            max-width: 1200px;
-            height: 90%;
-            max-height: 800px;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .popup-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #e0e0e0;
-            background: #f8f9fa;
-            border-radius: 8px 8px 0 0;
-        }
-        
-        .popup-header h3 {
-            margin: 0;
-            color: #2c3e50;
-            font-size: 1.2em;
-        }
-        
-        .popup-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-        }
-        
-        .popup-close:hover {
-            background: #e0e0e0;
-            color: #333;
-        }
-        
-        .popup-body {
-            flex: 1;
-            padding: 0;
-            overflow: hidden;
-        }
-        
-        #progressNoteFrame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 0 0 8px 8px;
-        }
-        
+        .btn-client-details:hover { background: #0066d6; }
+        .btn-client-details.visible { display: inline-flex; align-items: center; gap: 5px; }
 
-        
+        /* ── Notes Table ── */
+        #notesTable {
+            width: 100%; border-collapse: separate; border-spacing: 0;
+            background: #fff; border-radius: 10px; overflow: hidden;
+            border: 1px solid #e5e5e5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            table-layout: auto;
+        }
+        #notesTable thead th {
+            padding: 12px 18px; font-size: 12px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: #86868b; background: #fafafa;
+            border-bottom: 1px solid #e5e5e5;
+            text-align: left; white-space: nowrap;
+        }
+        #notesTable tbody td {
+            padding: 12px 18px; font-size: 14px; color: #1d1d1f;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 280px;
+        }
+        #notesTable tbody tr {
+            transition: background 0.12s ease;
+        }
+        #notesTable tbody tr:hover {
+            background: #f5f5f7 !important; cursor: pointer;
+        }
+        #notesTable tbody tr:nth-child(even) { background: #fafafa; }
+        #notesTable tbody tr.selected {
+            background: #e8f0fe !important;
+            box-shadow: inset 3px 0 0 #007aff;
+        }
+        #notesTable tbody tr:last-child td { border-bottom: none; }
+
+        /* ── Pagination ── */
+        .pagination-container {
+            margin-top: 16px; padding: 14px 18px;
+            background: #fff; border-radius: 10px;
+            border: 1px solid #e5e5e5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            position: relative; z-index: 10;
+        }
+        .pagination-info {
+            text-align: center; margin-bottom: 10px;
+            font-size: 12px; color: #86868b; font-weight: 500;
+        }
+        .pagination-controls {
+            display: flex; justify-content: center; align-items: center;
+            gap: 6px; margin-bottom: 10px;
+        }
+        .btn-pagination {
+            background: #007aff; color: #fff; border: none; border-radius: 6px;
+            padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+            transition: background 0.15s;
+        }
+        .btn-pagination:hover:not(:disabled) { background: #0066d6; }
+        .btn-pagination:disabled { background: #d2d2d7; color: #fff; cursor: not-allowed; }
+        .page-numbers { display: flex; gap: 4px; }
+        .page-number {
+            background: #fff; color: #007aff; border: 1px solid #d2d2d7;
+            border-radius: 6px; padding: 7px 11px; cursor: pointer;
+            font-size: 12px; font-weight: 600; transition: all 0.15s;
+        }
+        .page-number:hover { background: #f5f5f7; }
+        .page-number.active { background: #007aff; color: #fff; border-color: #007aff; }
+        .pagination-settings {
+            display: flex; justify-content: center; align-items: center;
+            gap: 10px; font-size: 12px; color: #86868b;
+        }
+        .pagination-settings select {
+            padding: 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px;
+            font-size: 12px; background: #fff;
+        }
+
+        /* ── Cache Status ── */
+        .cache-status { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 11px; text-align: center; }
+        .cache-status.cached { background: #d1f2d9; color: #1a7431; border: 1px solid #b8e6c4; }
+        .cache-status.api-fresh { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .cache-status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        /* ── Slide-from-right Detail Panel ── */
+        .detail-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+            z-index: 5000; opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .detail-overlay.open { opacity: 1; visibility: visible; }
+        .detail-panel {
+            position: fixed; top: 0; right: 0; bottom: 0;
+            width: 820px; max-width: 92vw; background: #fff;
+            box-shadow: -6px 0 30px rgba(0,0,0,0.12);
+            z-index: 5001; transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+            display: flex; flex-direction: column;
+        }
+        .detail-panel.open { transform: translateX(0); }
+        .detail-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 24px; border-bottom: 1px solid #e5e5e5;
+            background: #fafafa; flex-shrink: 0;
+        }
+        .detail-panel-title { font-size: 15px; font-weight: 700; color: #1d1d1f; }
+        .detail-panel-close {
+            width: 32px; height: 32px; border-radius: 50%; border: none;
+            background: #e5e5ea; color: #666; font-size: 18px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s;
+        }
+        .detail-panel-close:hover { background: #d1d1d6; color: #333; }
+        .detail-panel-body { padding: 24px; overflow-y: auto; flex: 1; min-height: 0; }
+        .detail-meta {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+        }
+        .detail-meta-item { display: flex; flex-direction: column; gap: 3px; }
+        .detail-meta-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #86868b; }
+        .detail-meta-value { font-size: 14px; color: #1d1d1f; font-weight: 500; }
+        .detail-notes-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #86868b; margin-bottom: 8px; }
+        .detail-notes {
+            background: #f5f5f7; border-radius: 8px; padding: 18px;
+            font-size: 14px; line-height: 1.7; color: #333;
+            overflow-y: auto; word-wrap: break-word;
+        }
+
+        /* ── Client Details Modal ── */
+        .client-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 6000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .client-modal-overlay.open { display: flex; }
+        .client-modal {
+            background: #fff; border-radius: 14px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.2);
+            width: 94%; max-width: 1100px; height: 88vh; max-height: 92vh;
+            display: flex; flex-direction: column; overflow: hidden;
+            animation: clientModalIn 0.25s ease;
+        }
+        @keyframes clientModalIn {
+            from { opacity: 0; transform: scale(0.96) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .client-modal-header {
+            display: flex; align-items: center; gap: 14px;
+            padding: 20px 24px; border-bottom: 1px solid #e5e5e5;
+            background: #fafafa; flex-shrink: 0;
+        }
+        .client-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: linear-gradient(135deg, #007aff, #5856d6);
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 700; flex-shrink: 0;
+        }
+        .client-modal-info { flex: 1; }
+        .client-modal-name { font-size: 17px; font-weight: 700; color: #1d1d1f; }
+        .client-modal-subtitle { font-size: 13px; color: #86868b; margin-top: 2px; }
+        .client-modal-close {
+            width: 32px; height: 32px; border-radius: 50%; border: none;
+            background: #e5e5ea; color: #666; font-size: 20px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s; flex-shrink: 0;
+        }
+        .client-modal-close:hover { background: #d1d1d6; color: #333; }
+        .profile-tabs {
+            display: flex; gap: 0; padding: 0 24px;
+            border-bottom: 1px solid #e5e5e5; overflow-x: auto; flex-shrink: 0;
+            background: #fafafa;
+        }
+        .profile-tab {
+            padding: 11px 18px; font-size: 13px; font-weight: 600;
+            color: #86868b; background: none; border: none;
+            border-bottom: 2px solid transparent; cursor: pointer;
+            white-space: nowrap; transition: all 0.15s;
+        }
+        .profile-tab:hover { color: #1d1d1f; }
+        .profile-tab.active { color: #007aff; border-bottom-color: #007aff; }
+        .profile-content { padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 0; }
+        .client-profile-loading { padding: 24px; text-align: center; color: #86868b; font-size: 13px; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+        .info-item { display: flex; flex-direction: column; gap: 3px; }
+        .info-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #86868b; }
+        .info-value { font-size: 14px; color: #1d1d1f; font-weight: 500; }
+        .section-card { background: #f5f5f7; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+        .section-card-header {
+            padding: 10px 14px; font-size: 12px; font-weight: 700;
+            color: #1d1d1f; border-bottom: 1px solid #e5e5e5;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .section-card-body { padding: 10px 14px; }
+        .data-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 7px 0; border-bottom: 1px solid #eee; font-size: 13px;
+        }
+        .data-row:last-child { border-bottom: none; }
+        .data-row-date { color: #86868b; font-size: 12px; min-width: 85px; flex-shrink: 0; }
+        .data-row-text { color: #333; flex: 1; }
+        .contact-block { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .contact-block:last-child { border-bottom: none; }
+        .contact-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .contact-detail { font-size: 13px; color: #666; margin-bottom: 2px; }
+        .empty-tab { text-align: center; padding: 28px 16px; color: #86868b; font-size: 14px; }
+
+        /* ── Popup (Add New) ── */
+        .popup-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            z-index: 10000; display: flex; justify-content: center; align-items: center;
+        }
+        .popup-content {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.25);
+            width: 90%; max-width: 1200px; height: 90%; max-height: 800px;
+            display: flex; flex-direction: column;
+        }
+        .popup-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 24px; border-bottom: 1px solid #e5e5e5;
+            background: #fafafa; border-radius: 12px 12px 0 0;
+        }
+        .popup-header h3 { margin: 0; color: #1d1d1f; font-size: 16px; font-weight: 700; }
+        .popup-close {
+            background: #e5e5ea; border: none; font-size: 20px; cursor: pointer;
+            color: #666; width: 32px; height: 32px; display: flex;
+            align-items: center; justify-content: center; border-radius: 50%;
+            transition: background 0.15s;
+        }
+        .popup-close:hover { background: #d1d1d6; color: #333; }
+        .popup-body { flex: 1; padding: 0; overflow: hidden; }
+        #progressNoteFrame { width: 100%; height: 100%; border: none; border-radius: 0 0 12px 12px; }
+
+        /* ── Responsive ── */
         @media (max-width: 900px) {
-            .container { flex-direction: column; }
-            .left-panel, .right-panel { flex: unset; width: 100%; }
-            .right-panel { order: 2; max-height: 45vh; overflow: hidden; }
-            .left-panel { order: 1; }
-            .note-detail { max-height: 40vh; }
-            .popup-content {
-                width: 95%;
-                height: 95%;
-            }
+            .top-bar { flex-direction: column; gap: 10px; padding: 12px 16px; }
+            .left-panel { padding: 16px; }
+            .detail-panel { width: 100%; max-width: 100%; }
+            .detail-meta { grid-template-columns: 1fr; }
+            .popup-content { width: 95%; height: 95%; }
+            .client-modal { width: 95%; max-height: 90vh; }
+            #notesTable tbody td { font-size: 12px; padding: 9px 10px; }
         }
     </style>
 </head>
 <body>
-    <!-- Top progress bar removed for performance optimization -->
+
+<!-- ── Top Navigation Bar ── -->
 <div class="top-bar">
     <div class="site-info-box">
         <div class="site-info-line">
@@ -447,70 +335,70 @@
         <button class="btn-addnew" onclick="openProgressNotePopup()">Add New</button>
         <button id="refreshBtn" class="btn-refresh" onclick="refreshData()">Refresh</button>
         {% if current_user.role in ['admin', 'site_admin'] %}
-        <button class="btn-incident" onclick="window.location.href='/incident-viewer?site={{ site }}'">🚨 Incident Viewer</button>
+        <button class="btn-incident" onclick="window.location.href='/incident-viewer?site={{ site }}'">Incident Viewer</button>
         {% endif %}
         {% if current_user.can_complete_tasks() or current_user.is_admin() %}
-        <button class="btn-cims" onclick="window.location.href='/integrated_dashboard'" style="background-color: #28a745; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🛡️ CIMS Dashboard</button>
-        <button class="btn-edenfield" onclick="window.location.href='/edenfield-dashboard'" style="background: linear-gradient(135deg, #1a1a2e, #0f3460); color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🏢 Edenfield</button>
+        <button onclick="window.location.href='/integrated_dashboard'" style="background:#34c759;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;">CIMS Dashboard</button>
+        <button onclick="window.location.href='/edenfield-dashboard'" style="background:linear-gradient(135deg,#1a1a2e,#0f3460);color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;">Edenfield</button>
         {% endif %}
         {% if current_user.role in ['admin', 'site_admin'] %}
-        <button class="btn-admin-settings" onclick="window.location.href='/admin-settings'" style="background-color: #6c757d; color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; font-size: 12px; margin-left: 5px;">🔧 Settings</button>
+        <button onclick="window.location.href='/admin-settings'" style="background:#8e8e93;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;">Settings</button>
         {% endif %}
         <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
     </div>
 </div>
+
+<!-- ── Main Content ── -->
 <div class="container">
     <div class="left-panel">
-        <!-- Client + Period filters (same row); max notes returned = within selected period only -->
-        <div class="client-filter-container" style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px;">
-            <div style="display: flex; align-items: center;">
-                <label for="clientFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Filter by Client:</label>
-                <select id="clientFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 250px; background-color: white;">
+
+        <!-- Filter Bar -->
+        <div class="client-filter-container">
+            <div style="display:flex;align-items:center;">
+                <label for="clientFilter">Client</label>
+                <select id="clientFilter" style="min-width:240px;">
                     <option value="">All Clients</option>
                 </select>
             </div>
-            <div style="display: flex; align-items: center;">
-                <label for="reportingPeriodFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Period:</label>
-                <select id="reportingPeriodFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 120px; background-color: white;">
-                    <!-- Options populated by JS from PERIOD_OPTIONS (progressNoteList.js). Do not hardcode values here. -->
-                </select>
+            <div style="display:flex;align-items:center;">
+                <label for="reportingPeriodFilter">Period</label>
+                <select id="reportingPeriodFilter"></select>
             </div>
-            <div style="display: flex; align-items: center;">
-                <label for="eventTypeFilter" style="margin-right: 10px; font-weight: 600; color: #2c3e50;">Event type:</label>
-                <select id="eventTypeFilter" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 180px; background-color: white;">
+            <div style="display:flex;align-items:center;">
+                <label for="eventTypeFilter">Event Type</label>
+                <select id="eventTypeFilter" style="min-width:180px;">
                     <option value="">All Event Types</option>
-                    <!-- Options populated by JS from cached event types (fetched once per site). Fall-related grouped first. -->
                 </select>
             </div>
+            <button class="btn-client-details" id="btnClientDetails" onclick="openClientDetailsModal()">Client Details</button>
         </div>
+
+        <!-- Notes Table -->
         <table id="notesTable">
             <thead>
             <tr>
-                <th>Service wing</th>
+                <th>Service Wing</th>
                 <th>Client</th>
                 <th>Date</th>
                 <th>Time</th>
-                <th>Event type</th>
-                <th>Care area(s)</th>
+                <th>Event Type</th>
+                <th>Care Area(s)</th>
             </tr>
             </thead>
-            <tbody>
-            <!-- Data rendered by JS -->
-            </tbody>
+            <tbody></tbody>
         </table>
-        
-        
-        <!-- Pagination UI -->
-        <div id="paginationContainer" class="pagination-container" style="display: block;">
+
+        <!-- Pagination -->
+        <div id="paginationContainer" class="pagination-container" style="display:block;">
             <div class="pagination-info">
                 <span id="paginationInfo">Page Information</span>
             </div>
             <div class="pagination-controls">
-                <button id="firstPageBtn" class="btn-pagination" onclick="goToPage(1)" title="First page" style="display: none;">⏮ First</button>
-                <button id="prevPageBtn" class="btn-pagination" onclick="changePage(-1)">← Previous</button>
+                <button id="firstPageBtn" class="btn-pagination" onclick="goToPage(1)" title="First page" style="display:none;">First</button>
+                <button id="prevPageBtn" class="btn-pagination" onclick="changePage(-1)">Previous</button>
                 <div id="pageNumbers" class="page-numbers"></div>
-                <button id="nextPageBtn" class="btn-pagination" onclick="changePage(1)">Next →</button>
-                <button id="lastPageBtn" class="btn-pagination" onclick="goToPage(totalPages)" title="Last page" style="display: none;">Last ⏭</button>
+                <button id="nextPageBtn" class="btn-pagination" onclick="changePage(1)">Next</button>
+                <button id="lastPageBtn" class="btn-pagination" onclick="goToPage(totalPages)" title="Last page" style="display:none;">Last</button>
             </div>
             <div class="pagination-settings">
                 <label for="perPageSelect">Items per page:</label>
@@ -521,22 +409,55 @@
                 </select>
             </div>
         </div>
-        
-        <!-- Cache Status Display -->
-        <div id="cacheStatus" class="cache-status" style="display: none;">
+
+        <!-- Cache Status -->
+        <div id="cacheStatus" class="cache-status" style="display:none;">
             <span id="cacheStatusText">Cache Status</span>
         </div>
     </div>
-    <div class="right-panel">
-        <div class="note-detail" id="noteDetail">
-            <h3>Progress Note Details</h3>
-            <div id="noteDetailContent">Select a row to view detailed content here.</div>
+
+    <!-- Slide-from-right Detail Panel -->
+    <div class="detail-overlay" id="detailOverlay" onclick="closeDetailPanel()"></div>
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-panel-header">
+            <span class="detail-panel-title" id="detailPanelTitle">Note Details</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button id="detailPanelClientBtn" style="display:none;background:#007aff;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;" onclick="openClientDetailsFromPanel()">Client Details</button>
+                <button class="detail-panel-close" onclick="closeDetailPanel()">&times;</button>
+            </div>
+        </div>
+        <div class="detail-panel-body">
+            <div class="detail-meta" id="detailMeta"></div>
+            <div class="detail-notes-label">Notes</div>
+            <div class="detail-notes" id="detailNotes">Select a row to view details.</div>
         </div>
     </div>
-</div>
 
-        <!-- Progress Note Popup -->
-<div id="progressNotePopup" class="popup-overlay" style="display: none;">
+    <!-- Client Details Modal -->
+    <div class="client-modal-overlay" id="clientModalOverlay" onclick="closeClientDetailsModal()">
+        <div class="client-modal" onclick="event.stopPropagation()">
+            <div class="client-modal-header">
+                <div class="client-avatar" id="clientAvatar">?</div>
+                <div class="client-modal-info">
+                    <div class="client-modal-name" id="clientModalName">&mdash;</div>
+                    <div class="client-modal-subtitle" id="clientModalSubtitle">&mdash;</div>
+                </div>
+                <button class="client-modal-close" onclick="closeClientDetailsModal()">&times;</button>
+            </div>
+            <div class="profile-tabs" id="profileTabs">
+                <button class="profile-tab active" data-tab="overview" onclick="switchProfileTab('overview')">Overview</button>
+                <button class="profile-tab" data-tab="clinical" onclick="switchProfileTab('clinical')">Clinical</button>
+                <button class="profile-tab" data-tab="wounds" onclick="switchProfileTab('wounds')">Wounds</button>
+                <button class="profile-tab" data-tab="monitoring" onclick="switchProfileTab('monitoring')">Monitoring</button>
+            </div>
+            <div class="profile-content" id="profileContent">
+                <div class="client-profile-loading">Loading resident data...</div>
+            </div>
+        </div>
+    </div>
+
+<!-- Progress Note Popup -->
+<div id="progressNotePopup" class="popup-overlay" style="display:none;">
     <div class="popup-content">
         <div class="popup-header">
             <h3>Add New Progress Note</h3>
@@ -551,126 +472,78 @@
 <script>
     // Suppress Chrome extension errors
     window.addEventListener('unhandledrejection', function(event) {
-        if (event.reason && event.reason.message && 
+        if (event.reason && event.reason.message &&
             event.reason.message.includes('message channel closed')) {
-            // Chrome extension error - suppress
             event.preventDefault();
-            console.warn('Chrome extension error suppressed:', event.reason.message);
         }
     });
-    
+
     // Set site information received from server as global variable
     window.currentSite = '{{ site }}';
-    console.log('Site from server:', window.currentSite);
-    
+
     // Initialize session expiration flag
     window.sessionExpiredHandled = false;
-    
-            // Function to open popup
+
     function openProgressNotePopup() {
-        // Check if session was expired
-        if (window.sessionExpiredHandled) {
-            console.log('🔒 [SESSION] 세션이 만료되어 팝업을 열 수 없습니다.');
-            window.location.href = '/';
-            return;
-        }
-        
+        if (window.sessionExpiredHandled) { window.location.href = '/'; return; }
         const popup = document.getElementById('progressNotePopup');
         const frame = document.getElementById('progressNoteFrame');
-        
-        if (!popup || !frame) {
-            console.error('🔒 [SESSION] 팝업 또는 프레임 요소를 찾을 수 없습니다.');
-            return;
-        }
-        
-        // Clear iframe src first to ensure clean state
+        if (!popup || !frame) return;
         frame.src = '';
-        
-        // Set iframe src with current site information
-        frame.src = `/index?site=${encodeURIComponent(window.currentSite)}`;
-        
+        frame.src = '/index?site=' + encodeURIComponent(window.currentSite);
         popup.style.display = 'flex';
-        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        document.body.style.overflow = 'hidden';
     }
-    
-            // Function to close popup
+
     function closeProgressNotePopup() {
         const popup = document.getElementById('progressNotePopup');
         const frame = document.getElementById('progressNoteFrame');
-        
-        if (!popup || !frame) {
-            return;
-        }
-        
-        // Clear iframe src when closing popup to prevent unnecessary requests
+        if (!popup || !frame) return;
         frame.src = '';
-        
         popup.style.display = 'none';
-        document.body.style.overflow = 'auto'; // Restore background scrolling
+        document.body.style.overflow = 'auto';
     }
-    
-            // Close popup with ESC key
+
+    // Close panels with ESC key (priority: client modal > detail panel > popup)
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
-            const popup = document.getElementById('progressNotePopup');
-            if (popup.style.display === 'flex') {
-                closeProgressNotePopup();
-            }
+            var cm = document.getElementById('clientModalOverlay');
+            if (cm && cm.classList.contains('open')) { closeClientDetailsModal(); return; }
+            var dp = document.getElementById('detailPanel');
+            if (dp && dp.classList.contains('open')) { closeDetailPanel(); return; }
+            var popup = document.getElementById('progressNotePopup');
+            if (popup && popup.style.display === 'flex') { closeProgressNotePopup(); }
         }
     });
-    
-            // Close popup by clicking outside
+
+    // Close popup by clicking outside
     document.addEventListener('click', function(event) {
-        const popup = document.getElementById('progressNotePopup');
-        if (event.target === popup) {
-            closeProgressNotePopup();
-        }
+        var popup = document.getElementById('progressNotePopup');
+        if (event.target === popup) closeProgressNotePopup();
     });
-    
-            // Receive messages from iframe
+
+    // Receive messages from iframe
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'PROGRESS_NOTE_SAVED') {
             if (event.data.action === 'close_and_refresh') {
                 closeProgressNotePopup();
-                // Data refresh
-                setTimeout(() => {
-                    refreshData();
-                }, 500);
+                setTimeout(function(){ refreshData(); }, 500);
             } else if (event.data.action === 'refresh_only') {
-                // Data only refresh
-                setTimeout(() => {
-                    refreshData();
-                }, 500);
+                setTimeout(function(){ refreshData(); }, 500);
             } else if (event.data.action === 'close_only') {
-                // Close popup only
                 closeProgressNotePopup();
             }
         } else if (event.data && event.data.type === 'SESSION_EXPIRED') {
-            // Session expired in iframe - close popup and redirect to login
-            console.log('🔒 [SESSION] 세션 만료 감지 - 팝업 닫기 및 로그인 페이지로 이동');
-            
-            // Close popup immediately
             closeProgressNotePopup();
-            
-            // Set flag to prevent duplicate handling
-            if (typeof window !== 'undefined') {
-                window.sessionExpiredHandled = true;
-            }
-            
-            // Immediately redirect to login page (logout will happen on server side)
+            window.sessionExpiredHandled = true;
             window.location.href = '/';
         }
     });
-    
-    window.allNotes = []; // Store all notes data
-    
 
+    window.allNotes = [];
 </script>
 <script src="/static/js/progressNoteDB.js"></script>
 <script src="/static/js/progressNoteList.js"></script>
-<!-- Session monitoring script - must be loaded for session timeout handling -->
 <script src="/static/js/script.js"></script>
-
-
 </body>
-</html> 
+</html>

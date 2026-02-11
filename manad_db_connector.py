@@ -1032,6 +1032,119 @@ class MANADDBConnector:
             logger.error(traceback.format_exc())
             return False, None
 
+    def fetch_wounds(self, limit: int = 500) -> Tuple[bool, Optional[List[Dict[str, Any]]]]:
+        """
+        Query Wound data directly from DB with Client info joined.
+
+        Returns:
+            (Success status, Wound list with Client, WoundType, BodyLocation, etc.)
+        """
+        if not DRIVER_AVAILABLE:
+            error_msg = (
+                "❌ MSSQL driver is not installed.\n"
+                "Please install using: pip install pyodbc or pip install pymssql"
+            )
+            logger.error(error_msg)
+            raise ImportError("MSSQL driver is not installed.")
+
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT TOP (?)
+                        w.Id,
+                        w.ClientId,
+                        w.ClientServiceId,
+                        w.Date,
+                        w.HasOrigin,
+                        w.OriginId,
+                        w.IsWoundIssue,
+                        w.IsAcuteStatus,
+                        w.WoundTypeId,
+                        w.WoundSubTypeId,
+                        w.BodyLocationId,
+                        w.BodyLocationAspectId,
+                        w.LocationNotes,
+                        w.Resolved,
+                        w.ResolvedDate,
+                        w.ResolvedNotes,
+                        w.Ma4WoundSubTypes,
+                        w.Ma4WoundLocation,
+                        w.IsArchived,
+                        w.CreatedDate,
+                        ISNULL(p.FirstName, '') AS ClientFirstName,
+                        ISNULL(p.LastName, '') AS ClientLastName,
+                        ISNULL(p.PreferredName, '') AS ClientPreferredName,
+                        ISNULL(wing.Name, '') AS WingName,
+                        ISNULL(loc.Name, '') AS LocationName,
+                        ISNULL(wt.Description, '') AS WoundTypeDescription,
+                        ISNULL(wst.Description, '') AS WoundSubTypeDescription,
+                        ISNULL(bl.Description, '') AS BodyLocationDescription
+                    FROM Wound w
+                    LEFT JOIN Client c ON w.ClientId = c.Id
+                    LEFT JOIN Person p ON c.PersonId = p.Id
+                    LEFT JOIN ClientService cs ON w.ClientServiceId = cs.Id
+                    LEFT JOIN Wing wing ON cs.WingId = wing.Id
+                    LEFT JOIN Location loc ON cs.LocationId = loc.Id
+                    LEFT JOIN WoundType wt ON w.WoundTypeId = wt.Id
+                    LEFT JOIN WoundSubType wst ON w.WoundSubTypeId = wst.Id
+                    LEFT JOIN BodyLocation bl ON w.BodyLocationId = bl.Id
+                    WHERE w.IsDeleted = 0
+                    AND w.IsArchived = 0
+                    AND w.Resolved = 0
+                    ORDER BY w.Date DESC
+                """
+
+                logger.info(f"🔍 Fetching Wounds: {self.site}")
+
+                cursor.execute(query, (limit,))
+                columns = [column[0] for column in cursor.description]
+                wounds = []
+
+                for row in cursor.fetchall():
+                    d = dict(zip(columns, row))
+                    wounds.append({
+                        'Id': d.get('Id'),
+                        'ClientId': d.get('ClientId'),
+                        'ClientServiceId': d.get('ClientServiceId'),
+                        'Date': d['Date'].isoformat() if d.get('Date') else None,
+                        'HasOrigin': bool(d.get('HasOrigin', False)),
+                        'OriginId': d.get('OriginId'),
+                        'IsWoundIssue': bool(d.get('IsWoundIssue', False)),
+                        'IsAcuteStatus': bool(d.get('IsAcuteStatus', False)),
+                        'WoundTypeId': d.get('WoundTypeId'),
+                        'WoundSubTypeId': d.get('WoundSubTypeId'),
+                        'BodyLocationId': d.get('BodyLocationId'),
+                        'LocationNotes': d.get('LocationNotes'),
+                        'Resolved': bool(d.get('Resolved', False)),
+                        'ResolvedDate': d['ResolvedDate'].isoformat() if d.get('ResolvedDate') else None,
+                        'ResolvedNotes': d.get('ResolvedNotes'),
+                        'Ma4WoundSubTypes': d.get('Ma4WoundSubTypes'),
+                        'Ma4WoundLocation': d.get('Ma4WoundLocation'),
+                        'IsArchived': bool(d.get('IsArchived', False)),
+                        'CreatedDate': d['CreatedDate'].isoformat() if d.get('CreatedDate') else None,
+                        'Client': {
+                            'FirstName': d.get('ClientFirstName') or '',
+                            'LastName': d.get('ClientLastName') or '',
+                            'PreferredName': d.get('ClientPreferredName') or '',
+                        },
+                        'WingName': d.get('WingName') or '',
+                        'LocationName': d.get('LocationName') or '',
+                        'WoundType': {'Description': d.get('WoundTypeDescription') or ''},
+                        'WoundSubType': {'Description': d.get('WoundSubTypeDescription') or ''},
+                        'BodyLocation': {'Description': d.get('BodyLocationDescription') or ''},
+                    })
+
+                logger.info(f"✅ Wound fetch completed: {self.site} - {len(wounds)} items")
+                return True, wounds
+
+        except Exception as e:
+            logger.error(f"❌ Wound fetch error ({self.site}): {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False, None
+
 
 def fetch_incidents_with_client_data_from_db(
     site: str, 

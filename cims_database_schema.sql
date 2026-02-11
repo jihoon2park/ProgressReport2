@@ -186,6 +186,42 @@ CREATE INDEX idx_cims_notifications_read ON cims_notifications(is_read);
 CREATE INDEX idx_cims_notifications_created ON cims_notifications(created_at);
 
 -- ===========================================
+-- 8. Policy Recipients table (individual people: site + role + email)
+-- Migration: Auto-created by _ensure_recipient_tables() on first access
+-- ===========================================
+CREATE TABLE IF NOT EXISTS policy_recipients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site VARCHAR(100) NOT NULL,              -- e.g. 'Parafield Gardens', 'Nerrilda'
+    role VARCHAR(50) NOT NULL,               -- e.g. 'manager', 'nurse'
+    email VARCHAR(200) NOT NULL,
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(site, role, email),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_policy_recipients_site_role ON policy_recipients(site, role);
+
+-- ===========================================
+-- 9. Recipient Groups table (site + roles based notification groups)
+-- Migration: Auto-created by _ensure_recipient_tables() on first access
+-- Groups reference site + roles; emails are resolved from policy_recipients at send time
+-- ===========================================
+CREATE TABLE IF NOT EXISTS recipient_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_name VARCHAR(200) NOT NULL,
+    site VARCHAR(100) NOT NULL DEFAULT '',    -- which site this group targets
+    roles TEXT NOT NULL DEFAULT '[]',         -- JSON array: ["manager", "nurse"]
+    threecx_id VARCHAR(50) DEFAULT '',        -- 3CX conversation ID for this group
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipient_groups_name ON recipient_groups(group_name);
+
+-- ===========================================
 -- Insert default policy data
 -- ===========================================
 
@@ -332,3 +368,35 @@ INSERT INTO cims_policies (policy_id, name, description, version, effective_date
     }
   ]
 }', 1);
+
+-- ===========================================
+-- 10. Incident Messages table (App polling - messages from policy test/trigger)
+-- Auto-created by _ensure_incident_messages_table() on first access
+-- ===========================================
+CREATE TABLE IF NOT EXISTS incident_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    incident_type VARCHAR(100) NOT NULL DEFAULT 'Fall',
+    severity VARCHAR(50) NOT NULL DEFAULT 'High',
+    resident_name VARCHAR(200) NOT NULL,
+    room VARCHAR(100) DEFAULT '',
+    site VARCHAR(100) NOT NULL DEFAULT '',
+    location VARCHAR(200) DEFAULT '',
+    reported_by VARCHAR(200) DEFAULT '',
+    description TEXT DEFAULT '',
+    action_taken TEXT DEFAULT '',
+    witnesses VARCHAR(200) DEFAULT '',
+    incident_date TIMESTAMP NOT NULL,
+    status VARCHAR(50) DEFAULT 'Open',
+    nurse_visit_schedule TEXT DEFAULT '[]',    -- JSON array of visit phases
+    common_assessment_tasks TEXT DEFAULT '',
+    email_subject TEXT DEFAULT '',
+    email_body TEXT DEFAULT '',
+    threecx_message TEXT DEFAULT '',
+    is_test BOOLEAN DEFAULT 0,
+    is_read BOOLEAN DEFAULT 0,
+    created_by VARCHAR(100) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_incident_messages_created ON incident_messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_incident_messages_site ON incident_messages(site);

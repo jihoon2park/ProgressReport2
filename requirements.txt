@@ -1,4 +1,5 @@
 Flask==3.1.1
+Flask-CORS==5.0.0
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
 requests==2.32.3
@@ -21,3 +22,8 @@ croniter==2.0.1
 schedule==1.2.0
 pyodbc
 pymssql; platform_system != "Windows"
+exchangelib>=5.0.0
+lxml>=5.0.0
+protobuf>=4.0.0
+cffi>=2.0.0
+cryptography>=46.0.0

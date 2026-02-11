@@ -1199,18 +1199,7 @@
                     ` : ''}
                 </div>
                 
-                <!-- Alarm Send Button -->
-                <button class="alarm-button ${riskClass === 'risk-high' ? 'high-priority' : ''}" onclick="sendAlarmToMobile('${incident.Id}', '${eventType}', '${clientName}', '${severityRating}')">
-                    ${riskClass === 'risk-high' ? '🚨 URGENT: Send Alarm' : '📱 Send Alarm to Mobile'}
-                </button>
                 
-                <!-- Create Workflow Button -->
-                <button class="workflow-button" onclick="createWorkflow('${incident.Id}', '${eventType}', '${clientName}', '${incident.ClientId}', '${severityRating}')">
-                    📋 Create Workflow
-                </button>
-                
-                <!-- Alarm Status Display -->
-                <div id="alarmStatus_${incident.Id}" class="alarm-status" style="display: none;"></div>
             `;
             
             // Add click event to show popup
