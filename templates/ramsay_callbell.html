@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edenfield Ramsay | Ultra-Fast Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { background-color: #020617; color: white; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
+        #call-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            padding: 12px;
+        }
+
+        /* GPU Accelerated Classes */
+        .card { 
+            will-change: transform;
+            transition: transform 0.2s ease-out;
+        }
+
+        .emerg { animation: pulse-red 1s infinite; border: 2px solid #f87171; }
+        @keyframes pulse-red { 0%, 100% { background: #450a0a; } 50% { background: #991b1b; } }
+        
+        .staff { background: #78350f; border: 2px solid #d97706; }
+        .normal { background: #1e293b; border: 2px solid #334155; }
+        
+        .timer-font { font-family: 'Courier New', Courier, monospace; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+    <header class="p-4 bg-slate-900/80 border-b border-slate-800 flex justify-between items-center shadow-xl">
+        <h1 class="text-xl font-black uppercase tracking-tighter"><span class="text-blue-500">Edenfield</span> Ramsay</h1>
+        <div id="clock" class="text-2xl font-bold text-slate-400 tabular-nums">00:00:00</div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto">
+        <div id="call-grid"></div>
+        <div id="no-calls" class="fixed inset-0 flex items-center justify-center opacity-5 pointer-events-none hidden">
+            <h2 class="text-9xl font-black italic">CLEAR</h2>
+        </div>
+    </main>
+
+    <script>
+        // Connect to the same server (SocketIO integrated into main app)
+        const socket = io();
+        const grid = document.getElementById('call-grid');
+        const empty = document.getElementById('no-calls');
+
+        // 1. Instant Clock Update
+        const updateClock = () => {
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+        };
+        setInterval(updateClock, 1000);
+
+        // 2. High Performance UI Sync
+        const syncUI = (data) => {
+            let card = document.getElementById(`room-${data.room}`);
+            
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `room-${data.room}`;
+                grid.appendChild(card);
+            }
+
+            const style = data.priority === 1 ? 'emerg' : (data.priority === 2 ? 'staff' : 'normal');
+            card.className = `card p-4 rounded-xl shadow-lg flex flex-col justify-between h-36 ${style}`;
+            card.dataset.priority = data.priority;
+            card.dataset.start = data.start;
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div class="text-4xl font-black">${data.room}</div>
+                    <div class="text-[10px] font-bold bg-black/40 px-2 py-1 rounded uppercase border border-white/5">${data.type}</div>
+                </div>
+                <div class="text-5xl font-bold text-right timer-font tabular-nums" data-start="${data.start}">00:00</div>
+            `;
+            
+            sortGrid();
+        };
+
+        const sortGrid = () => {
+            const children = Array.from(grid.children);
+            if (children.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            children.sort((a, b) => a.dataset.priority - b.dataset.priority || a.dataset.start - b.dataset.start);
+            
+            // DocumentFragment prevents "Layout Thrashing" and lagging
+            const fragment = document.createDocumentFragment();
+            children.forEach(child => fragment.appendChild(child));
+            grid.appendChild(fragment);
+        };
+
+        socket.on('load_existing_calls', (calls) => {
+            grid.innerHTML = '';
+            calls.forEach(syncUI);
+        });
+
+        socket.on('new_call', syncUI);
+
+        socket.on('remove_call', (data) => {
+            const el = document.getElementById(`room-${data.room}`);
+            if (el) el.remove();
+            sortGrid();
+        });
+
+        // 3. Ultra-Fast Timer (Uses requestAnimationFrame for zero-lag)
+        const runTimers = () => {
+            const now = Math.floor(Date.now() / 1000);
+            const timers = document.getElementsByClassName('timer-font');
+            for (let i = 0; i < timers.length; i++) {
+                const start = Math.floor(parseFloat(timers[i].dataset.start));
+                const diff = now - start;
+                const m = (diff / 60 | 0).toString().padStart(2, '0');
+                const s = (diff % 60).toString().padStart(2, '0');
+                const timeStr = `${m}:${s}`;
+                
+                // Only update if text changed to save CPU
+                if (timers[i].textContent !== timeStr) {
+                    timers[i].textContent = timeStr;
+                }
+            }
+            requestAnimationFrame(runTimers);
+        };
+        requestAnimationFrame(runTimers);
+    </script>
+</body>
+</html>

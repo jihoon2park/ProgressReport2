@@ -11,6 +11,7 @@ from flask import (
     make_response
 )
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_socketio import SocketIO, emit as socketio_emit
 
 import requests
 from functools import wraps
@@ -177,6 +178,7 @@ print_current_config()
 
 # Initialize Flask app
 app = Flask(__name__, static_url_path='/static')
+socketio = SocketIO(app, cors_allowed_origins='*')
 
 # Apply environment-specific configuration
 app.secret_key = flask_config['SECRET_KEY']
@@ -8898,6 +8900,17 @@ from fetch_progress_notes_cached import progress_notes_cached_bp, DEFAULT_PERIOD
 app.register_blueprint(progress_notes_cached_bp)
 
 # ==============================
+# Ramsay Callbell Monitor (separate module)
+# ==============================
+from callbell_monitor import callbell_bp, init_callbell, callbell_monitor, get_active_calls
+app.register_blueprint(callbell_bp)
+init_callbell(socketio)
+
+@socketio.on('connect')
+def callbell_connect():
+    socketio_emit('load_existing_calls', get_active_calls())
+
+# ==============================
 # App Execution
 # ==============================
 
@@ -9016,11 +9029,17 @@ if __name__ == '__main__':
     # Future: If real-time polling is needed, set 'manad_integrator_enabled'=true in system_settings
     # Note: Mostly unnecessary (incremental sync is more efficient)
     
+    # Start Ramsay Callbell monitor background task
+    socketio.start_background_task(callbell_monitor)
+    logger.info('✅ Ramsay Callbell monitor started')
+
     try:
-        app.run(
+        socketio.run(
+            app,
             debug=flask_config['DEBUG'], 
             host=flask_config['HOST'],
-            port=flask_config['PORT']
+            port=flask_config['PORT'],
+            allow_unsafe_werkzeug=True
         )
     finally:
         # Stop memory monitoring
