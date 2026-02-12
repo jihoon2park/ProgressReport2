@@ -107,9 +107,25 @@ def _decode(raw_data):
     matches = re.findall(r'(\d{3}(?:,\d{3})*)', raw_data)
     return [''.join([chr(int(c)) for c in m.split(',')]) for m in matches]
 
+# ── Debug state (visible via /api/callbell/active) ──
+_debug = {
+    'monitor_started': False,
+    'config_loaded': _config is not None,
+    'poll_count': 0,
+    'last_status': None,
+    'last_response_len': None,
+    'last_error': None,
+    'last_raw_preview': None,
+    'last_decoded_count': None,
+    'last_saved': None,
+    'db_path': _CALLBELL_DB,
+    'config_path': _SITE_CONFIG_PATH,
+}
+
 # ── Background monitor thread ──
 def _monitor_loop():
     """Background thread: poll callbell hardware and update DB."""
+    _debug['monitor_started'] = True
     print('[CALLBELL DEBUG] _monitor_loop() STARTED')
     if not _config:
         print('[CALLBELL DEBUG] *** _config is None — monitor exiting ***')
@@ -123,8 +139,11 @@ def _monitor_loop():
     while True:
         try:
             poll_count += 1
+            _debug['poll_count'] = poll_count
             response = hw_session.get(_config['data_url'],
                                       params={'id': '10', 'pdata': pdata_val}, timeout=10)
+            _debug['last_status'] = response.status_code
+            _debug['last_response_len'] = len(response.text)
             print(f'[CALLBELL DEBUG] Poll #{poll_count} status={response.status_code} len={len(response.text)}')
 
             raw_text = response.text.strip()
@@ -141,6 +160,7 @@ def _monitor_loop():
                 time.sleep(1)
                 continue
 
+            _debug['last_raw_preview'] = repr(raw_text[:200])
             print(f'[CALLBELL DEBUG] Raw response (first 200 chars): {repr(raw_text[:200])}')
 
             new_id = re.search(r'^(\d+):', raw_text)
@@ -149,6 +169,7 @@ def _monitor_loop():
                 print(f'[CALLBELL DEBUG] Updated pdata_val={pdata_val}')
 
             messages = _decode(raw_text)
+            _debug['last_decoded_count'] = len(messages)
             print(f'[CALLBELL DEBUG] Decoded {len(messages)} messages')
             for msg in messages:
                 print(f'[CALLBELL DEBUG]   msg: {repr(msg)}')
@@ -178,6 +199,7 @@ def _monitor_loop():
                     start_time = found['start'] if found else time.time()
                     if not found:
                         _save(room_id, call_type, priority, start_time)
+                        _debug['last_saved'] = f'{room_id} ({call_type})'
                         print(f'[CALLBELL DEBUG]   -> SAVED new call room={room_id} type={call_type}')
                     else:
                         print(f'[CALLBELL DEBUG]   -> already active room={room_id}')
@@ -188,6 +210,7 @@ def _monitor_loop():
 
             time.sleep(1)
         except Exception as e:
+            _debug['last_error'] = str(e)
             print(f'[CALLBELL DEBUG] *** EXCEPTION: {e}')
             time.sleep(2)
 
@@ -207,8 +230,11 @@ def ramsay_callbell():
 
 @callbell_bp.route('/api/callbell/active')
 def api_callbell_active():
-    """REST endpoint — returns current active calls as JSON."""
-    return jsonify(get_active_calls())
+    """REST endpoint — returns current active calls + debug info as JSON."""
+    return jsonify({
+        'calls': get_active_calls(),
+        'debug': _debug,
+    })
 
 @callbell_bp.route('/api/callbell/reset', methods=['POST'])
 def api_callbell_reset():

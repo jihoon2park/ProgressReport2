@@ -8901,6 +8901,7 @@ app.register_blueprint(progress_notes_cached_bp)
 # ==============================
 from callbell_monitor import callbell_bp, start_callbell_monitor
 app.register_blueprint(callbell_bp)
+start_callbell_monitor()          # must run at module level so IIS (wfastcgi) starts the thread
 
 # ==============================
 # App Execution
@@ -9021,9 +9022,6 @@ if __name__ == '__main__':
     # Future: If real-time polling is needed, set 'manad_integrator_enabled'=true in system_settings
     # Note: Mostly unnecessary (incremental sync is more efficient)
     
-    # Start Ramsay Callbell monitor background thread
-    start_callbell_monitor()
-
     try:
         app.run(
             debug=flask_config['DEBUG'], 

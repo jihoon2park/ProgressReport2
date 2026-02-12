@@ -97,8 +97,12 @@
         const pollCalls = async () => {
             try {
                 const res = await fetch('/api/callbell/active');
-                const calls = await res.json();
+                const data = await res.json();
+                const calls = data.calls || data;   // supports both debug and plain format
                 const json = JSON.stringify(calls);
+
+                // Log debug info to console for IIS troubleshooting
+                if (data.debug) console.log('[callbell debug]', data.debug);
 
                 // Only re-render if data actually changed
                 if (json === _prevJson) return;
