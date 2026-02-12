@@ -1,7 +1,8 @@
 """
-Ramsay Callbell Monitor — loads credentials from site_config.json.
-Provides: init_callbell(socketio_instance), callbell_monitor background task,
-          get_active_calls(), and the /ramsay-callbell route via a Blueprint.
+Ramsay Callbell Monitor — polling strategy (no WebSockets).
+Loads credentials from site_config.json.
+Provides: start_callbell_monitor(), REST API at /api/callbell/active,
+          and the /ramsay-callbell page route via a Blueprint.
 """
 import os
 import re
@@ -9,8 +10,9 @@ import json
 import time
 import sqlite3
 import logging
+import threading
 import requests
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, jsonify
 
 logger = logging.getLogger(__name__)
 
@@ -101,22 +103,11 @@ def _decode(raw_data):
     matches = re.findall(r'(\d{3}(?:,\d{3})*)', raw_data)
     return [''.join([chr(int(c)) for c in m.split(',')]) for m in matches]
 
-# ── SocketIO reference (set by init_callbell) ──
-_socketio = None
-
-def init_callbell(socketio_instance):
-    """Call once from app.py to bind the SocketIO instance."""
-    global _socketio
-    _socketio = socketio_instance
-
-# ── Background monitor task ──
-def callbell_monitor():
-    """Background task: poll callbell hardware and emit SocketIO events."""
+# ── Background monitor thread ──
+def _monitor_loop():
+    """Background thread: poll callbell hardware and update DB."""
     if not _config:
         logger.error('Callbell config not found in site_config.json — monitor disabled')
-        return
-    if not _socketio:
-        logger.error('SocketIO not initialised — call init_callbell() first')
         return
 
     hw_session = requests.Session()
@@ -145,7 +136,6 @@ def callbell_monitor():
 
                 if 'Cancelled' in msg:
                     _archive(room_id)
-                    _socketio.emit('remove_call', {'room': room_id})
                 else:
                     call_type, priority = 'Normal', 3
                     if 'EMERGENCY' in msg:
@@ -162,20 +152,27 @@ def callbell_monitor():
                     start_time = found['start'] if found else time.time()
                     if not found:
                         _save(room_id, call_type, priority, start_time)
-                    _socketio.emit('new_call', {
-                        'room': room_id, 'type': call_type,
-                        'priority': priority, 'start': start_time
-                    })
 
-            _socketio.sleep(1)
+            time.sleep(1)
         except Exception as e:
             logger.warning(f'Callbell hardware link down: {e}')
-            _socketio.sleep(2)
+            time.sleep(2)
 
-# ── Blueprint (public route, no login) ──
+def start_callbell_monitor():
+    """Start the callbell hardware polling thread (daemon)."""
+    t = threading.Thread(target=_monitor_loop, daemon=True)
+    t.start()
+    logger.info('✅ Ramsay Callbell monitor started (polling mode)')
+
+# ── Blueprint (public routes, no login) ──
 callbell_bp = Blueprint('callbell', __name__)
 
 @callbell_bp.route('/ramsay-callbell')
 def ramsay_callbell():
     """Public callbell monitor page — no login required."""
     return render_template('ramsay_callbell.html')
+
+@callbell_bp.route('/api/callbell/active')
+def api_callbell_active():
+    """REST endpoint — returns current active calls as JSON."""
+    return jsonify(get_active_calls())

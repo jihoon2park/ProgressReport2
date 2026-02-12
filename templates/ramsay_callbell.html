@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Edenfield Ramsay | Ultra-Fast Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body { background-color: #020617; color: white; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
         #call-grid {
@@ -43,16 +42,13 @@
     </main>
 
     <script>
-        // Connect to the same server (SocketIO integrated into main app)
-        const socket = io();
         const grid = document.getElementById('call-grid');
         const empty = document.getElementById('no-calls');
 
         // 1. Instant Clock Update
-        const updateClock = () => {
+        setInterval(() => {
             document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
-        };
-        setInterval(updateClock, 1000);
+        }, 1000);
 
         // 2. High Performance UI Sync
         const syncUI = (data) => {
@@ -76,8 +72,6 @@
                 </div>
                 <div class="text-5xl font-bold text-right timer-font tabular-nums" data-start="${data.start}">00:00</div>
             `;
-            
-            sortGrid();
         };
 
         const sortGrid = () => {
@@ -90,26 +84,44 @@
 
             children.sort((a, b) => a.dataset.priority - b.dataset.priority || a.dataset.start - b.dataset.start);
             
-            // DocumentFragment prevents "Layout Thrashing" and lagging
             const fragment = document.createDocumentFragment();
             children.forEach(child => fragment.appendChild(child));
             grid.appendChild(fragment);
         };
 
-        socket.on('load_existing_calls', (calls) => {
-            grid.innerHTML = '';
-            calls.forEach(syncUI);
-        });
+        // 3. Poll /api/callbell/active every 5 seconds
+        let _prevJson = '';
+        const pollCalls = async () => {
+            try {
+                const res = await fetch('/api/callbell/active');
+                const calls = await res.json();
+                const json = JSON.stringify(calls);
 
-        socket.on('new_call', syncUI);
+                // Only re-render if data actually changed
+                if (json === _prevJson) return;
+                _prevJson = json;
 
-        socket.on('remove_call', (data) => {
-            const el = document.getElementById(`room-${data.room}`);
-            if (el) el.remove();
-            sortGrid();
-        });
+                // Build set of current room IDs from server
+                const serverRooms = new Set(calls.map(c => c.room));
 
-        // 3. Ultra-Fast Timer (Uses requestAnimationFrame for zero-lag)
+                // Remove cards no longer in active calls
+                Array.from(grid.children).forEach(card => {
+                    const roomId = card.id.replace('room-', '');
+                    if (!serverRooms.has(roomId)) card.remove();
+                });
+
+                // Add or update cards
+                calls.forEach(syncUI);
+                sortGrid();
+            } catch (e) {
+                console.warn('Poll failed:', e);
+            }
+        };
+
+        pollCalls();
+        setInterval(pollCalls, 5000);
+
+        // 4. Ultra-Fast Timer (Uses requestAnimationFrame for zero-lag)
         const runTimers = () => {
             const now = Math.floor(Date.now() / 1000);
             const timers = document.getElementsByClassName('timer-font');
@@ -120,7 +132,6 @@
                 const s = (diff % 60).toString().padStart(2, '0');
                 const timeStr = `${m}:${s}`;
                 
-                // Only update if text changed to save CPU
                 if (timers[i].textContent !== timeStr) {
                     timers[i].textContent = timeStr;
                 }
