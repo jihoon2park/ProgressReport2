@@ -53,6 +53,10 @@ def _load_callbell_config():
     return None
 
 _config = _load_callbell_config()
+if _config:
+    print(f'[CALLBELL DEBUG] Config loaded OK — base_url={_config["base_url"]}')
+else:
+    print('[CALLBELL DEBUG] *** CONFIG IS NONE — check site_config.json ***')
 
 # ── DB schema ──
 _SCHEMA = """
@@ -106,35 +110,56 @@ def _decode(raw_data):
 # ── Background monitor thread ──
 def _monitor_loop():
     """Background thread: poll callbell hardware and update DB."""
+    print('[CALLBELL DEBUG] _monitor_loop() STARTED')
     if not _config:
-        logger.error('Callbell config not found in site_config.json — monitor disabled')
+        print('[CALLBELL DEBUG] *** _config is None — monitor exiting ***')
         return
 
     hw_session = requests.Session()
     hw_session.headers.update(_config['headers'])
     pdata_val = '1257726'
+    poll_count = 0
 
     while True:
         try:
+            poll_count += 1
             response = hw_session.get(_config['data_url'],
                                       params={'id': '10', 'pdata': pdata_val}, timeout=10)
-            if response.status_code != 200 or 'Login.asp' in response.text:
+            print(f'[CALLBELL DEBUG] Poll #{poll_count} status={response.status_code} len={len(response.text)}')
+
+            raw_text = response.text.strip()
+
+            # Only re-login if the response is an actual HTML login page, not just data containing "Login.asp"
+            if response.status_code != 200 or (raw_text.startswith('<') and 'Login.asp' in raw_text):
+                print(f'[CALLBELL DEBUG] Re-login required (status={response.status_code}, starts_with_html={raw_text[:20]})')
                 hw_session.post(_config['login_url'], data=_config['login_payload'], timeout=10)
                 continue
 
-            raw_text = response.text
+            # Skip empty/null responses
+            if not raw_text or raw_text == 'null':
+                print(f'[CALLBELL DEBUG] Empty/null response, skipping')
+                time.sleep(1)
+                continue
+
+            print(f'[CALLBELL DEBUG] Raw response (first 200 chars): {repr(raw_text[:200])}')
+
             new_id = re.search(r'^(\d+):', raw_text)
             if new_id:
                 pdata_val = new_id.group(1)
+                print(f'[CALLBELL DEBUG] Updated pdata_val={pdata_val}')
 
             messages = _decode(raw_text)
+            print(f'[CALLBELL DEBUG] Decoded {len(messages)} messages')
             for msg in messages:
+                print(f'[CALLBELL DEBUG]   msg: {repr(msg)}')
                 room_match = re.search(r'\[(.*?)\]', msg)
                 if not room_match:
+                    print(f'[CALLBELL DEBUG]   -> no room match, skipping')
                     continue
                 room_id = room_match.group(1)
 
                 if 'Cancelled' in msg:
+                    print(f'[CALLBELL DEBUG]   -> CANCELLED room={room_id}')
                     _archive(room_id)
                 else:
                     call_type, priority = 'Normal', 3
@@ -145,6 +170,7 @@ def _monitor_loop():
                     elif 'CALL' in msg:
                         call_type, priority = 'Call', 3
                     else:
+                        print(f'[CALLBELL DEBUG]   -> unknown type, skipping')
                         continue
 
                     active = get_active_calls()
@@ -152,10 +178,17 @@ def _monitor_loop():
                     start_time = found['start'] if found else time.time()
                     if not found:
                         _save(room_id, call_type, priority, start_time)
+                        print(f'[CALLBELL DEBUG]   -> SAVED new call room={room_id} type={call_type}')
+                    else:
+                        print(f'[CALLBELL DEBUG]   -> already active room={room_id}')
+
+            # Print DB state every 10 polls
+            if poll_count % 10 == 0:
+                print(f'[CALLBELL DEBUG] DB active_calls: {get_active_calls()}')
 
             time.sleep(1)
         except Exception as e:
-            logger.warning(f'Callbell hardware link down: {e}')
+            print(f'[CALLBELL DEBUG] *** EXCEPTION: {e}')
             time.sleep(2)
 
 def start_callbell_monitor():
