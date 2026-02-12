@@ -176,3 +176,11 @@ def ramsay_callbell():
 def api_callbell_active():
     """REST endpoint — returns current active calls as JSON."""
     return jsonify(get_active_calls())
+
+@callbell_bp.route('/api/callbell/reset', methods=['POST'])
+def api_callbell_reset():
+    """Clear all active calls from the database."""
+    with sqlite3.connect(_CALLBELL_DB) as conn:
+        conn.execute('DELETE FROM active_calls')
+    logger.info('Callbell active calls cleared via reset')
+    return jsonify({'status': 'ok'})
