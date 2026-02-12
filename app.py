@@ -11,7 +11,13 @@ from flask import (
     make_response
 )
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from flask_socketio import SocketIO, emit as socketio_emit
+try:
+    from flask_socketio import SocketIO, emit as socketio_emit
+    _HAS_SOCKETIO = True
+except ImportError:
+    _HAS_SOCKETIO = False
+    SocketIO = None
+    socketio_emit = None
 
 import requests
 from functools import wraps
@@ -178,7 +184,7 @@ print_current_config()
 
 # Initialize Flask app
 app = Flask(__name__, static_url_path='/static')
-socketio = SocketIO(app, cors_allowed_origins='*')
+socketio = SocketIO(app, cors_allowed_origins='*') if _HAS_SOCKETIO else None
 
 # Apply environment-specific configuration
 app.secret_key = flask_config['SECRET_KEY']
@@ -8904,11 +8910,14 @@ app.register_blueprint(progress_notes_cached_bp)
 # ==============================
 from callbell_monitor import callbell_bp, init_callbell, callbell_monitor, get_active_calls
 app.register_blueprint(callbell_bp)
-init_callbell(socketio)
+if _HAS_SOCKETIO and socketio:
+    init_callbell(socketio)
 
-@socketio.on('connect')
-def callbell_connect():
-    socketio_emit('load_existing_calls', get_active_calls())
+    @socketio.on('connect')
+    def callbell_connect():
+        socketio_emit('load_existing_calls', get_active_calls())
+else:
+    logger.warning('⚠️ flask-socketio not installed — callbell real-time disabled (route still works)')
 
 # ==============================
 # App Execution
@@ -9030,17 +9039,25 @@ if __name__ == '__main__':
     # Note: Mostly unnecessary (incremental sync is more efficient)
     
     # Start Ramsay Callbell monitor background task
-    socketio.start_background_task(callbell_monitor)
-    logger.info('✅ Ramsay Callbell monitor started')
+    if _HAS_SOCKETIO and socketio:
+        socketio.start_background_task(callbell_monitor)
+        logger.info('✅ Ramsay Callbell monitor started')
 
     try:
-        socketio.run(
-            app,
-            debug=flask_config['DEBUG'], 
-            host=flask_config['HOST'],
-            port=flask_config['PORT'],
-            allow_unsafe_werkzeug=True
-        )
+        if _HAS_SOCKETIO and socketio:
+            socketio.run(
+                app,
+                debug=flask_config['DEBUG'], 
+                host=flask_config['HOST'],
+                port=flask_config['PORT'],
+                allow_unsafe_werkzeug=True
+            )
+        else:
+            app.run(
+                debug=flask_config['DEBUG'], 
+                host=flask_config['HOST'],
+                port=flask_config['PORT']
+            )
     finally:
         # Stop memory monitoring
         try:
