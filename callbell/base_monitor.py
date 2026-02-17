@@ -184,6 +184,19 @@ class CallbellMonitor(ABC):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.executescript(schema)
+                
+                # Migrate existing tables: add missing columns if they don't exist
+                # (CREATE TABLE IF NOT EXISTS won't alter existing tables)
+                for tbl in [active_table, history_table]:
+                    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
+                    if 'event_id' not in cols:
+                        conn.execute(f"ALTER TABLE {tbl} ADD COLUMN event_id TEXT")
+                    if tbl == active_table:
+                        for col in ['color', 'message_text', 'message_subtext']:
+                            if col not in cols:
+                                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} TEXT")
+                conn.commit()
+            
             # Also ensure settings table exists
             init_settings_table(self.db_path)
             logger.info(f"✅ Database initialized for {self.site_name}")

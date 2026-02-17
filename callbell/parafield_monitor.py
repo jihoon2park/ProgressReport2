@@ -220,7 +220,7 @@ class ParafieldCallbellMonitor(CallbellMonitor):
             self.sio.connect(
                 url_with_query,
                 socketio_path="/annunciator/socketio",
-                transports=["polling"],
+                transports=["websocket", "polling"],
                 wait_timeout=10,
             )
             logger.info(f"✅ [{self.site_name}] Connected via polling transport")
@@ -231,36 +231,42 @@ class ParafieldCallbellMonitor(CallbellMonitor):
             return False
     
     def _monitor_loop(self):
-        """Background WebSocket monitoring loop."""
+        """Background monitoring loop with automatic reconnection."""
         self.debug_info['monitor_started'] = True
         logger.info(f"[{self.site_name}] Monitor loop started (no authentication required)")
         
-        # Step 1: Create Socket.IO client with auto-reconnect
-        self.sio = socketio.Client(
-            reconnection=True,
-            reconnection_delay=5,
-            reconnection_attempts=0,  # Infinite reconnection attempts
-            logger=False,
-            engineio_logger=False,
-        )
-        
-        self._setup_websocket_handlers()
-        
-        # Step 3: Connect WebSocket
-        if not self._connect_websocket():
-            logger.error(f"[{self.site_name}] Failed to connect WebSocket")
-            return
-        
-        # Step 4: Start time sync thread
-        time_sync_thread = threading.Thread(target=self._time_sync_loop, daemon=True)
-        time_sync_thread.start()
-        
-        # Step 5: Keep connection alive - Socket.IO handles reconnection automatically
-        try:
-            self.sio.wait()
-        except Exception as e:
-            logger.error(f"[{self.site_name}] Monitor loop error: {e}")
-            self.debug_info['last_error'] = str(e)
+        while self.running:
+            try:
+                self.sio = socketio.Client(
+                    reconnection=True,
+                    reconnection_delay=5,
+                    reconnection_attempts=0,
+                    logger=False,
+                    engineio_logger=False,
+                )
+                
+                self._setup_websocket_handlers()
+                
+                if not self._connect_websocket():
+                    logger.warning(f"[{self.site_name}] Connection failed, retrying in 30s...")
+                    time.sleep(30)
+                    continue
+                
+                # Start time sync thread
+                time_sync_thread = threading.Thread(target=self._time_sync_loop, daemon=True)
+                time_sync_thread.start()
+                
+                # Keep connection alive
+                self.sio.wait()
+                
+            except Exception as e:
+                logger.error(f"[{self.site_name}] Monitor loop error: {e}")
+                self.debug_info['last_error'] = str(e)
+            
+            # If we get here, connection was lost — retry after delay
+            if self.running:
+                logger.info(f"[{self.site_name}] Reconnecting in 30s...")
+                time.sleep(30)
     
     def start(self):
         """Start the Parafield callbell monitor."""
