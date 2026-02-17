@@ -27,3 +27,4 @@ lxml>=5.0.0
 protobuf>=4.0.0
 cffi>=2.0.0
 cryptography>=46.0.0
+python-socketio[client]>=5.11.0

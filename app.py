@@ -8897,11 +8897,16 @@ from fetch_progress_notes_cached import progress_notes_cached_bp, DEFAULT_PERIOD
 app.register_blueprint(progress_notes_cached_bp)
 
 # ==============================
-# Ramsay Callbell Monitor (separate module)
+# Multi-Site Callbell Monitor (modular system)
 # ==============================
-from callbell_monitor import callbell_bp, start_callbell_monitor
+from callbell_monitor_multi import init_callbell_system, callbell_bp
 app.register_blueprint(callbell_bp)
-start_callbell_monitor()          # must run at module level so IIS (wfastcgi) starts the thread
+# Initialize callbell monitors
+# To enable/disable monitors, modify the sites_to_monitor list:
+#   ['parafield_gardens'] - Only Parafield (Ramsay OFF)
+#   ['ramsay', 'parafield_gardens'] - Both sites
+#   [] - All monitors disabled
+init_callbell_system(app, sites_to_monitor=['ramsay', 'parafield_gardens'])
 
 # ==============================
 # App Execution
