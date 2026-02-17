@@ -20,6 +20,7 @@ USERS_DB = {
         "position": "System Administrator",
         "location": ["All"]
     },
+    
     "PG_admin": {
         "password_hash": hash_password("password"),
         "first_name": "PG",
@@ -221,6 +222,14 @@ USERS_DB = {
         "role": "doctor",
         "position": "Physiotherapist",
         "location": ["All"]
+    },
+    "esm.pg": {
+        "password_hash": hash_password("Edenfield2026!"),
+        "first_name": "ESM.PG",
+        "last_name": "Admin",
+        "role": "site_admin",
+        "position": "Site Administrator",
+        "location": ["Parafield Gardens"]
     },
 }
 

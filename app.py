@@ -903,10 +903,10 @@ def home():
             logger.info(f"NROD user detected - redirecting to Nerrilda ROD dashboard")
             return redirect(url_for('rod_dashboard', site='Nerrilda'))
         
-        # PG_admin users redirect to incident_viewer
+        # PG_admin users redirect to callbell
         if current_user.role == 'site_admin':
-            logger.info(f"PG_admin user detected - redirecting to incident_viewer")
-            return redirect(url_for('incident_viewer', site=site))
+            logger.info(f"PG_admin user detected - redirecting to callbell")
+            return redirect(url_for('callbell.callbell_page'))
         
         # Regular users redirect to progress_notes, checking session info
         logger.info(f"Regular user - redirecting to progress_notes (site={site}, allowed_sites={allowed_sites})")
@@ -1203,9 +1203,9 @@ def login():
                         session['allowed_sites'] = ['Nerrilda']
                         return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
-                        logger.info("🔍 DEBUG: SITE_ADMIN detected, redirecting to incident_viewer")
-                        logger.info("Login succeeded - SITE_ADMIN user detected, redirecting to incident_viewer")
-                        return redirect(url_for('incident_viewer', site=site))
+                        logger.info("🔍 DEBUG: SITE_ADMIN detected, redirecting to callbell")
+                        logger.info("Login succeeded - SITE_ADMIN user detected, redirecting to callbell")
+                        return redirect(url_for('callbell.callbell_page'))
                     else:
                         logger.info(f"🔍 DEBUG: Regular user detected, redirecting to progress_notes for site: {site}")
                         logger.info("Login succeeded - regular user, redirecting to progress_notes")
@@ -1314,9 +1314,9 @@ def login():
                         return redirect(url_for('rod_dashboard', site='Nerrilda'))
                     elif user_role == 'SITE_ADMIN':
                         logger.info(
-                            "Login succeeded (with API error) - SITE_ADMIN user detected, redirecting to incident_viewer"
+                            "Login succeeded (with API error) - SITE_ADMIN user detected, redirecting to callbell"
                         )
-                        return redirect(url_for('incident_viewer', site=site))
+                        return redirect(url_for('callbell.callbell_page'))
                     else:
                         logger.info("Login succeeded (with API error) - regular user, redirecting to progress_notes")
                         return redirect(url_for('progress_notes', site=site))

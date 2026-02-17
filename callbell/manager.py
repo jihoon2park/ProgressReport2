@@ -7,7 +7,7 @@ import json
 import sqlite3
 import logging
 from typing import Dict, List, Any, Optional
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for
 from flask_login import current_user
 
 from .base_monitor import (
@@ -208,15 +208,22 @@ def init_manager(db_path: str, site_config_path: str) -> CallbellManager:
 callbell_bp = Blueprint('callbell', __name__)
 
 
+@callbell_bp.route('/callbell')
+def callbell_page():
+    """Unified callbell monitor page. All data comes from /api/callbell/poll."""
+    return render_template('callbell.html')
+
+
+# Legacy routes for backward compatibility
 @callbell_bp.route('/ramsay-callbell')
 def ramsay_callbell_page():
     """Ramsay callbell monitor page."""
-    return render_template('ramsay_callbell.html')
+    return redirect(url_for('callbell.callbell_page'))
 
 @callbell_bp.route('/parafield-callbell')
 def parafield_callbell_page():
     """Parafield Gardens callbell monitor page."""
-    return render_template('parafield_gardens_callbell.html')
+    return redirect(url_for('callbell.callbell_page'))
 
 
 @callbell_bp.route('/api/callbell/auth')
@@ -267,20 +274,55 @@ def api_site_reset_calls(site_id: str):
         return jsonify({'status': 'error', 'message': f'Site {site_id} not found'}), 404
 
 
-@callbell_bp.route('/api/callbell/all/active')
-def api_all_active_calls():
-    """Get active calls from all sites."""
+@callbell_bp.route('/api/callbell/poll')
+def api_callbell_poll():
+    """Single combined endpoint: returns all permitted sites' calls, auth, and settings.
+    Frontend calls this ONE endpoint every 1 second."""
     manager = get_manager()
-    calls = manager.get_all_active_calls()
+
+    # Determine which callbell sites exist
+    callbell_site_ids = set()
+    callbell_sites_meta = []
+    for cfg in manager.site_configs:
+        if 'callbell' in cfg and cfg.get('is_active', True):
+            callbell_site_ids.add(cfg['id'])
+            callbell_sites_meta.append({'id': cfg['id'], 'name': cfg['site_name']})
+
+    # Filter by user permissions
+    is_admin = False
+    role = ''
+    display_name = ''
+    if current_user.is_authenticated:
+        role = getattr(current_user, 'role', '')
+        is_admin = role in ('admin', 'site_admin')
+        display_name = getattr(current_user, 'display_name', '')
+        locations = getattr(current_user, 'location', [])
+
+        if role != 'admin' and 'All' not in locations:
+            allowed_names = set(locations) if isinstance(locations, list) else {locations}
+            callbell_sites_meta = [s for s in callbell_sites_meta if s['name'] in allowed_names]
+            callbell_site_ids = {s['id'] for s in callbell_sites_meta}
+
+    # Gather calls per permitted site
+    sites_data = {}
+    total = 0
+    for site_id in callbell_site_ids:
+        monitor = manager.get_monitor(site_id)
+        calls = monitor.get_active_calls() if monitor else []
+        sites_data[site_id] = calls
+        total += len(calls)
+
     settings = get_color_settings(manager.db_path)
-    debug = manager.get_debug_info()
-    
+
     return jsonify({
-        'calls': calls,
+        'sites': callbell_sites_meta,
+        'calls_by_site': sites_data,
+        'total_calls': total,
         'settings': settings,
         'card_styles': CARD_STYLES,
-        'debug': debug,
-        'total_calls': len(calls),
+        'is_admin': is_admin,
+        'role': role,
+        'display_name': display_name,
     })
 
 
@@ -332,6 +374,11 @@ def api_save_settings():
 def api_callbell_active():
     """Legacy route - returns Ramsay active calls."""
     return api_site_active_calls('ramsay')
+
+@callbell_bp.route('/api/callbell/all/active')
+def api_all_active_calls():
+    """Legacy route - redirects to combined poll endpoint."""
+    return api_callbell_poll()
 
 @callbell_bp.route('/api/callbell/reset', methods=['POST'])
 def api_callbell_reset():

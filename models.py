@@ -12,6 +12,7 @@ class User(UserMixin):
         self.last_name = user_data.get('last_name', '')
         self.role = user_data.get('role', '')
         self.position = user_data.get('position', '')
+        self.location = user_data.get('location', [])
         # Add display_name attribute (combination of first_name and last_name)
         self.display_name = f"{self.first_name} {self.last_name}".strip() if (self.first_name or self.last_name) else username
         

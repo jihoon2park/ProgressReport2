@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edenfield | Callbell Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #020617; color: white; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
+        .call-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            padding: 12px;
+        }
+        .card {
+            will-change: transform;
+            transition: background-color 0.4s ease, border-color 0.4s ease, transform 0.2s ease-out;
+        }
+        .card-red { animation: pulse-red 1s infinite; }
+        @keyframes pulse-red {
+            0%, 100% { background-color: #450a0a; }
+            50% { background-color: #991b1b; }
+        }
+        .timer-font { font-family: 'Courier New', Courier, monospace; font-variant-numeric: tabular-nums; }
+        .room-text { font-size: clamp(1.25rem, 3vw, 1.75rem); line-height: 1.2; word-break: break-word; text-transform: uppercase; }
+
+        /* Tabs */
+        .tab-btn {
+            padding: 6px 16px; font-size: 0.75rem; font-weight: 800;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            border-radius: 6px; transition: all 0.2s; cursor: pointer;
+            border: 1px solid transparent; white-space: nowrap;
+        }
+        .tab-btn.active { background: rgba(20,184,166,0.2); border-color: #14b8a6; color: #5eead4; }
+        .tab-btn:not(.active) { background: rgba(255,255,255,0.05); color: #94a3b8; }
+        .tab-btn:not(.active):hover { background: rgba(255,255,255,0.1); color: white; }
+        .tab-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 9px; font-size: 10px; font-weight: 900; margin-left: 6px;
+        }
+        .tab-count.has-calls { background: #ef4444; color: white; }
+        .tab-count.empty { background: rgba(255,255,255,0.1); color: #64748b; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Settings */
+        .settings-panel {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.35s ease, padding 0.35s ease, opacity 0.25s ease;
+            opacity: 0;
+        }
+        .settings-panel.open { max-height: 220px; opacity: 1; }
+        .threshold-card {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            padding: 12px 20px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+        }
+        .threshold-input {
+            width: 64px; text-align: center; font-weight: 800; font-size: 1.25rem;
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px; color: white; padding: 6px 0;
+            outline: none; transition: border-color 0.2s;
+        }
+        .threshold-input:focus { border-color: rgba(255,255,255,0.4); }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+    <!-- Header -->
+    <header class="px-5 py-3 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center shadow-xl backdrop-blur-sm">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-black uppercase tracking-tighter">
+                <span class="text-teal-400">Edenfield</span> Callbell
+            </h1>
+            <!-- Tabs built dynamically by JS -->
+            <div id="tab-bar" class="flex items-center gap-2"></div>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- Admin controls: hidden for guests, shown only for admin/site_admin -->
+            <div id="admin-controls" class="hidden items-center gap-3">
+                <button id="settings-toggle" onclick="toggleSettings()"
+                    class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold uppercase rounded transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Settings
+                </button>
+                <button id="timer-on-btn" onclick="toggleTimer(true)"
+                    class="px-4 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold uppercase rounded transition-colors">Timer ON</button>
+                <button id="timer-off-btn" onclick="toggleTimer(false)"
+                    class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase rounded transition-colors">Timer OFF</button>
+                <button onclick="resetCalls()"
+                    class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase rounded transition-colors">Reset All</button>
+            </div>
+            <!-- Nav buttons: visible to authenticated users -->
+            <div id="nav-controls" class="hidden items-center gap-2">
+                <a href="/incident-viewer"
+                    class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold uppercase rounded transition-colors">Incident Viewer</a>
+                <a href="/logout"
+                    class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold uppercase rounded transition-colors">Logout</a>
+            </div>
+            <div id="clock" class="text-2xl font-bold text-slate-400 tabular-nums ml-2" style="font-variant-numeric: tabular-nums;">00:00:00</div>
+        </div>
+    </header>
+
+    <!-- Settings Panel (admin only) -->
+    <div id="settings-panel" class="settings-panel bg-slate-900/95 border-b border-slate-700/50 backdrop-blur-xl">
+        <div class="px-5 py-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-black uppercase tracking-wide text-slate-300">Color Threshold Settings</h2>
+                <div class="flex items-center gap-2">
+                    <span id="save-status" class="text-xs text-slate-500 hidden">Saved</span>
+                    <button onclick="saveSettings()"
+                        class="px-5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold uppercase rounded transition-colors">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-start gap-4">
+                <div class="threshold-card">
+                    <div class="w-4 h-4 rounded-full" style="background:#22c55e; box-shadow: 0 0 8px #22c55e88;"></div>
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Green Alert</span>
+                    <div class="flex items-center gap-1">
+                        <input id="set-green" type="number" min="1" max="59" value="3" class="threshold-input" style="color: #86efac;">
+                        <span class="text-xs text-slate-500 font-bold">min</span>
+                    </div>
+                </div>
+                <div class="threshold-card">
+                    <div class="w-4 h-4 rounded-full" style="background:#d97706; box-shadow: 0 0 8px #d9770688;"></div>
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Yellow Alert</span>
+                    <div class="flex items-center gap-1">
+                        <input id="set-yellow" type="number" min="1" max="59" value="5" class="threshold-input" style="color: #fcd34d;">
+                        <span class="text-xs text-slate-500 font-bold">min</span>
+                    </div>
+                </div>
+                <div class="threshold-card">
+                    <div class="w-4 h-4 rounded-full" style="background:#f87171; box-shadow: 0 0 8px #f8717188;"></div>
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Red Alert</span>
+                    <div class="flex items-center gap-1">
+                        <input id="set-red" type="number" min="1" max="59" value="7" class="threshold-input" style="color: #fca5a5;">
+                        <span class="text-xs text-slate-500 font-bold">min</span>
+                    </div>
+                </div>
+                <div class="flex-1 flex items-center">
+                    <div class="text-[11px] text-slate-500 leading-relaxed pl-4 border-l border-slate-700/50">
+                        <div class="mb-1"><span class="text-yellow-400 font-bold">Assist</span> calls always start from <span class="text-yellow-400 font-bold">Yellow</span></div>
+                        <div><span class="text-red-400 font-bold">Emergency</span> calls are always <span class="text-red-400 font-bold">Red</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content: tab containers built dynamically -->
+    <main id="main-content" class="flex-1 overflow-y-auto relative">
+        <!-- CLEAR overlay (shared) -->
+        <div id="no-calls" class="fixed inset-0 flex items-center justify-center opacity-5 pointer-events-none hidden" style="z-index:0;">
+            <h2 class="text-9xl font-black italic">CLEAR</h2>
+        </div>
+    </main>
+
+    <script>
+        // ── State ──
+        let sites = [];          // [{id, name}] from server
+        let activeTab = null;
+        let timerEnabled = false;
+        let isAdmin = false;
+        let authChecked = false;
+        const siteState = {};    // siteId -> { prevJson, callCount }
+        let prevPollJson = '';   // full response dedup
+
+        // ── Build Tabs + Grids dynamically ──
+        function buildUI(siteList) {
+            if (siteList.length === 0) return;
+
+            // Only rebuild if site list changed
+            const ids = siteList.map(s => s.id).join(',');
+            if (sites.map(s => s.id).join(',') === ids) return;
+
+            sites = siteList;
+            if (!activeTab || !siteState[activeTab]) activeTab = sites[0].id;
+
+            // Build tab bar
+            const tabBar = document.getElementById('tab-bar');
+            tabBar.innerHTML = '';
+            if (sites.length > 1) {
+                sites.forEach(s => {
+                    const btn = document.createElement('button');
+                    btn.className = 'tab-btn' + (s.id === activeTab ? ' active' : '');
+                    btn.dataset.site = s.id;
+                    btn.onclick = function() { switchTab(s.id); };
+                    btn.innerHTML = s.name + ' <span class="tab-count empty" id="count-' + s.id + '">0</span>';
+                    tabBar.appendChild(btn);
+                });
+            } else if (sites.length === 1) {
+                const label = document.createElement('span');
+                label.className = 'text-sm font-bold text-slate-400 uppercase tracking-wide';
+                label.textContent = sites[0].name;
+                tabBar.appendChild(label);
+            }
+
+            // Build grid containers
+            const main = document.getElementById('main-content');
+            // Remove old tab-content divs but keep #no-calls
+            Array.from(main.children).forEach(el => {
+                if (el.id !== 'no-calls') el.remove();
+            });
+            sites.forEach((s, i) => {
+                if (!siteState[s.id]) siteState[s.id] = { prevJson: '', callCount: 0 };
+                const div = document.createElement('div');
+                div.id = 'tab-' + s.id;
+                div.className = 'tab-content' + (s.id === activeTab ? ' active' : '');
+                div.innerHTML = '<div id="call-grid-' + s.id + '" class="call-grid"></div>';
+                main.insertBefore(div, document.getElementById('no-calls'));
+            });
+        }
+
+        // ── Tab Switching ──
+        function switchTab(siteId) {
+            activeTab = siteId;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.site === siteId);
+            });
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.toggle('active', el.id === 'tab-' + siteId);
+            });
+            updateClearMessage();
+        }
+
+        function updateClearMessage() {
+            const empty = document.getElementById('no-calls');
+            if (!activeTab || !siteState[activeTab]) { empty.classList.add('hidden'); return; }
+            if (siteState[activeTab].callCount === 0) {
+                empty.classList.remove('hidden');
+            } else {
+                empty.classList.add('hidden');
+            }
+        }
+
+        // ── Settings Panel ──
+        const toggleSettings = () => {
+            document.getElementById('settings-panel').classList.toggle('open');
+        };
+
+        const applySettings = (settings) => {
+            if (!settings) return;
+            document.getElementById('set-green').value = settings.green_minutes || 3;
+            document.getElementById('set-yellow').value = settings.yellow_minutes || 5;
+            document.getElementById('set-red').value = settings.red_minutes || 7;
+        };
+
+        const saveSettings = async () => {
+            const green = parseInt(document.getElementById('set-green').value);
+            const yellow = parseInt(document.getElementById('set-yellow').value);
+            const red = parseInt(document.getElementById('set-red').value);
+
+            if (!(green < yellow && yellow < red && green > 0)) {
+                alert('Thresholds must be: Green < Yellow < Red (all > 0)');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/callbell/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ green_minutes: green, yellow_minutes: yellow, red_minutes: red })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    const status = document.getElementById('save-status');
+                    status.classList.remove('hidden');
+                    status.textContent = 'Saved!';
+                    status.className = 'text-xs text-green-400 font-bold';
+                    setTimeout(() => { status.classList.add('hidden'); }, 2000);
+                    prevPollJson = '';  // force re-render on next poll
+                } else {
+                    alert(data.message || 'Failed to save');
+                }
+            } catch (e) { alert('Error saving settings'); }
+        };
+
+        // ── Timer Toggle ──
+        const toggleTimer = (enabled) => {
+            timerEnabled = enabled;
+            if (isAdmin) localStorage.setItem('callbell_timer_enabled', enabled);
+            const onBtn = document.getElementById('timer-on-btn');
+            const offBtn = document.getElementById('timer-off-btn');
+            if (onBtn && offBtn) {
+                if (enabled) {
+                    onBtn.className = 'px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase rounded transition-colors';
+                    offBtn.className = 'px-4 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold uppercase rounded transition-colors';
+                } else {
+                    onBtn.className = 'px-4 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold uppercase rounded transition-colors';
+                    offBtn.className = 'px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase rounded transition-colors';
+                }
+            }
+            const timers = document.getElementsByClassName('timer-font');
+            for (let i = 0; i < timers.length; i++) {
+                timers[i].style.display = enabled ? 'block' : 'none';
+            }
+        };
+        toggleTimer(false);
+
+        // ── Clock ──
+        setInterval(() => {
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+        }, 1000);
+
+        // ── Render Card ──
+        const syncUI = (siteId, data) => {
+            const grid = document.getElementById('call-grid-' + siteId);
+            if (!grid) return;
+            const cardId = 'room-' + siteId + '-' + data.room;
+            let card = document.getElementById(cardId);
+            if (!card) {
+                card = document.createElement('div');
+                card.id = cardId;
+                grid.appendChild(card);
+            }
+
+            const isRed = data.card_level === 'red';
+            card.className = 'card p-4 rounded-xl shadow-lg flex flex-col justify-between ' + (isRed ? 'card-red' : '');
+            card.style.backgroundColor = isRed ? '' : data.card_bg;
+            card.style.borderWidth = '2px';
+            card.style.borderStyle = 'solid';
+            card.style.borderColor = data.card_border;
+            card.dataset.priority = data.priority;
+            card.dataset.start = data.start;
+            card.dataset.level = data.card_level;
+
+            const label = data.messageText || data.room;
+
+            card.innerHTML =
+                '<div class="room-text font-black">' + label + '</div>' +
+                '<div class="flex justify-end items-end mt-3">' +
+                    '<div class="text-4xl font-bold timer-font tabular-nums" data-start="' + data.start + '" style="display: ' + (timerEnabled ? 'block' : 'none') + '; color: ' + (data.card_text || '#94a3b8') + '">00:00</div>' +
+                '</div>';
+        };
+
+        const sortGrid = (siteId) => {
+            const grid = document.getElementById('call-grid-' + siteId);
+            if (!grid) return;
+            const children = Array.from(grid.children);
+            siteState[siteId].callCount = children.length;
+
+            const levelOrder = { red: 0, yellow: 1, green: 2, gray: 3 };
+            children.sort((a, b) => (levelOrder[a.dataset.level] || 3) - (levelOrder[b.dataset.level] || 3) || parseFloat(a.dataset.start) - parseFloat(b.dataset.start));
+            const fragment = document.createDocumentFragment();
+            children.forEach(child => fragment.appendChild(child));
+            grid.appendChild(fragment);
+
+            updateClearMessage();
+        };
+
+        // ── Single Poll: ONE request for everything ──
+        const poll = async () => {
+            try {
+                const res = await fetch('/api/callbell/poll');
+                const data = await res.json();
+
+                // Build / rebuild tabs if site list changed
+                buildUI(data.sites || []);
+
+                // Handle auth (from same response, no extra request)
+                if (!authChecked) {
+                    authChecked = true;
+                    // Show nav buttons (Incident Viewer + Logout) for any logged-in user
+                    if (data.role) {
+                        document.getElementById('nav-controls').classList.remove('hidden');
+                        document.getElementById('nav-controls').classList.add('flex');
+                    }
+                    if (data.is_admin) {
+                        isAdmin = true;
+                        document.getElementById('admin-controls').classList.remove('hidden');
+                        document.getElementById('admin-controls').classList.add('flex');
+                        applySettings(data.settings);
+                        const saved = localStorage.getItem('callbell_timer_enabled');
+                        timerEnabled = saved !== null ? saved === 'true' : true;
+                        toggleTimer(timerEnabled);
+                    } else {
+                        timerEnabled = false;
+                        toggleTimer(false);
+                    }
+                }
+
+                // Check if data actually changed (dedup across ALL sites)
+                const callsJson = JSON.stringify(data.calls_by_site || {});
+                if (callsJson === prevPollJson) return;
+                prevPollJson = callsJson;
+
+                // Update each site's grid
+                const callsBySite = data.calls_by_site || {};
+                sites.forEach(s => {
+                    const calls = callsBySite[s.id] || [];
+
+                    // Update tab badge
+                    const countEl = document.getElementById('count-' + s.id);
+                    if (countEl) {
+                        countEl.textContent = calls.length;
+                        countEl.className = 'tab-count ' + (calls.length > 0 ? 'has-calls' : 'empty');
+                    }
+
+                    // Remove cards no longer in server data
+                    const grid = document.getElementById('call-grid-' + s.id);
+                    if (!grid) return;
+                    const serverRooms = new Set(calls.map(c => c.room));
+                    Array.from(grid.children).forEach(card => {
+                        const roomId = card.id.replace('room-' + s.id + '-', '');
+                        if (!serverRooms.has(roomId)) card.remove();
+                    });
+
+                    // Add / update cards
+                    calls.forEach(c => syncUI(s.id, c));
+                    sortGrid(s.id);
+                });
+
+            } catch (e) { console.warn('Poll failed:', e); }
+        };
+
+        poll();
+        setInterval(poll, 1000);
+
+        // ── Reset (active tab only) ──
+        const resetCalls = async () => {
+            if (!activeTab) return;
+            const site = sites.find(s => s.id === activeTab);
+            const siteName = site ? site.name : activeTab;
+            if (!confirm('Clear all active calls for ' + siteName + '?')) return;
+            await fetch('/api/callbell/' + activeTab + '/reset', { method: 'POST' });
+            const grid = document.getElementById('call-grid-' + activeTab);
+            if (grid) grid.innerHTML = '';
+            siteState[activeTab].prevJson = '';
+            siteState[activeTab].callCount = 0;
+            prevPollJson = '';
+            updateClearMessage();
+        };
+
+        // ── Timer Animation ──
+        const runTimers = () => {
+            const now = Math.floor(Date.now() / 1000);
+            const timers = document.getElementsByClassName('timer-font');
+            for (let i = 0; i < timers.length; i++) {
+                const start = Math.floor(parseFloat(timers[i].dataset.start));
+                const diff = now - start;
+                const m = (diff / 60 | 0).toString().padStart(2, '0');
+                const s = (diff % 60).toString().padStart(2, '0');
+                const t = m + ':' + s;
+                if (timers[i].textContent !== t) timers[i].textContent = t;
+            }
+            requestAnimationFrame(runTimers);
+        };
+        requestAnimationFrame(runTimers);
+
+        updateClearMessage();
+    </script>
+</body>
+</html>
