@@ -220,13 +220,13 @@ class ParafieldCallbellMonitor(CallbellMonitor):
             self.sio.connect(
                 url_with_query,
                 socketio_path="/annunciator/socketio",
-                transports=["websocket"],
+                transports=["polling"],
                 wait_timeout=10,
             )
-            logger.info(f"✅ [{self.site_name}] WebSocket connected")
+            logger.info(f"✅ [{self.site_name}] Connected via polling transport")
             return True
         except Exception as e:
-            logger.error(f"[{self.site_name}] WebSocket connection failed: {e}")
+            logger.error(f"[{self.site_name}] Connection failed: {e}")
             self.debug_info['last_error'] = str(e)
             return False
     
