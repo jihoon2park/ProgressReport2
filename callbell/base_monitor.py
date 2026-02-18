@@ -185,17 +185,24 @@ class CallbellMonitor(ABC):
             with sqlite3.connect(self.db_path) as conn:
                 conn.executescript(schema)
                 
-                # Migrate existing tables: add missing columns if they don't exist
+                # Migrate existing tables: add ALL expected columns if missing
                 # (CREATE TABLE IF NOT EXISTS won't alter existing tables)
-                for tbl in [active_table, history_table]:
+                active_migrations = {
+                    'event_id': 'TEXT', 'site_id': 'TEXT',
+                    'color': 'TEXT', 'message_text': 'TEXT', 'message_subtext': 'TEXT',
+                    'priority': 'INTEGER DEFAULT 3',
+                }
+                history_migrations = {
+                    'event_id': 'TEXT', 'site_id': 'TEXT',
+                    'priority': 'INTEGER DEFAULT 3',
+                    'end_time': 'REAL', 'duration_seconds': 'REAL',
+                }
+                for tbl, migrations in [(active_table, active_migrations), (history_table, history_migrations)]:
                     cols = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
-                    for col in ['event_id', 'site_id']:
+                    for col, col_type in migrations.items():
                         if col not in cols:
-                            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} TEXT")
-                    if tbl == active_table:
-                        for col in ['color', 'message_text', 'message_subtext']:
-                            if col not in cols:
-                                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} TEXT")
+                            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type}")
+                            logger.info(f"Migrated: added {col} to {tbl}")
                 conn.commit()
             
             # Also ensure settings table exists

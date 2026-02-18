@@ -231,6 +231,14 @@ USERS_DB = {
         "position": "Site Administrator",
         "location": ["Parafield Gardens"]
     },
+    "esm.pa": {
+        "password_hash": hash_password("Edenfield2026!"),
+        "first_name": "ESM.PA",
+        "last_name": "Admin",
+        "role": "site_admin",
+        "position": "Site Administrator",
+        "location": ["Ramsay"]
+    },
 }
 
 def verify_password(password, password_hash):
