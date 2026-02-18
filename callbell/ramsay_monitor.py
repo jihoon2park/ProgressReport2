@@ -150,23 +150,38 @@ class RamsayCallbellMonitor(CallbellMonitor):
     # ── Main listener loop ──────────────────────────────────────
 
     def _cleanup_port(self):
-        """Kill any stale processes holding our UDP port on startup."""
+        """Kill any stale processes holding our UDP port and verify they're dead."""
         my_pid = os.getpid()
-        try:
-            result = subprocess.run(
-                ['netstat', '-ano', '-p', 'UDP'],
-                capture_output=True, text=True, timeout=10
-            )
-            for line in result.stdout.splitlines():
-                if f':{self.listen_port}' in line and 'UDP' in line:
-                    parts = line.split()
-                    pid = int(parts[-1])
-                    if pid != my_pid and pid != 0:
-                        logger.info(f"[{self.site_name}] Killing stale process PID {pid} on port {self.listen_port}")
+        for attempt in range(5):
+            try:
+                result = subprocess.run(
+                    ['netstat', '-ano', '-p', 'UDP'],
+                    capture_output=True, text=True, timeout=10
+                )
+                stale_pids = []
+                for line in result.stdout.splitlines():
+                    if f':{self.listen_port}' in line and 'UDP' in line:
+                        parts = line.split()
+                        pid = int(parts[-1])
+                        if pid != my_pid and pid != 0:
+                            stale_pids.append(pid)
+
+                if not stale_pids:
+                    logger.info(f"[{self.site_name}] Port {self.listen_port} is free (attempt {attempt+1})")
+                    return True
+
+                for pid in stale_pids:
+                    logger.info(f"[{self.site_name}] Killing stale PID {pid} on port {self.listen_port} (attempt {attempt+1})")
+                    try:
                         subprocess.run(['taskkill', '/F', '/PID', str(pid)], timeout=5)
-            time.sleep(1)
-        except Exception as e:
-            logger.warning(f"[{self.site_name}] Port cleanup warning: {e}")
+                    except Exception:
+                        pass
+                time.sleep(2)
+            except Exception as e:
+                logger.warning(f"[{self.site_name}] Port cleanup error: {e}")
+                time.sleep(1)
+        logger.warning(f"[{self.site_name}] Could not free port {self.listen_port} after 5 attempts")
+        return False
 
     def _try_bind(self) -> bool:
         """Try to bind the UDP socket. Returns True if successful."""
@@ -189,19 +204,18 @@ class RamsayCallbellMonitor(CallbellMonitor):
         self.debug_info['status'] = 'starting'
         logger.info(f"[{self.site_name}] UDP syslog listener starting on {self.listen_ip}:{self.listen_port}")
 
-        # Kill stale processes from previous runs (safe: no DB wipe since reset_all_calls removed)
-        self._cleanup_port()
-
-        # Retry binding until we get the port
+        # Kill stale processes then bind. Retry if needed.
         while self.running:
+            self.debug_info['status'] = 'cleaning_port'
+            self._cleanup_port()
             if self._try_bind():
                 self.debug_info['status'] = 'listening - waiting for packets'
                 logger.info(f"✅ [{self.site_name}] Listening on UDP {self.listen_ip}:{self.listen_port}")
                 break
             else:
-                self.debug_info['status'] = 'waiting - port in use, retrying every 10s'
-                logger.info(f"[{self.site_name}] Port {self.listen_port} in use, retrying in 10s...")
-                for _ in range(10):
+                self.debug_info['status'] = 'waiting - port in use, retrying in 5s'
+                logger.info(f"[{self.site_name}] Port {self.listen_port} still in use, retrying in 5s...")
+                for _ in range(5):
                     if not self.running:
                         return
                     time.sleep(1)

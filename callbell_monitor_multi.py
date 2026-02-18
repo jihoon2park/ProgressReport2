@@ -23,6 +23,7 @@ Available routes:
     - /api/callbell/reset - Ramsay reset
 """
 import os
+import time
 import logging
 from flask import Flask
 
@@ -34,6 +35,25 @@ logger = logging.getLogger(__name__)
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _CALLBELL_DB = os.path.join(_BASE_DIR, 'edenfield_calls.db')
 _SITE_CONFIG_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'site_config.json')
+_RESET_FLAG = os.path.join(_BASE_DIR, '.callbell_reset')
+
+
+def _is_first_startup() -> bool:
+    """Check if this is a true first startup (not an IIS recycle overlap)."""
+    try:
+        if os.path.exists(_RESET_FLAG):
+            mtime = os.path.getmtime(_RESET_FLAG)
+            if time.time() - mtime < 60:
+                return False  # Another process just reset within 60s
+    except Exception:
+        pass
+    # Mark this reset
+    try:
+        with open(_RESET_FLAG, 'w') as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+    return True
 
 
 def init_callbell_system(app: Flask = None, sites_to_monitor: list = None):
@@ -56,6 +76,13 @@ def init_callbell_system(app: Flask = None, sites_to_monitor: list = None):
     
     # Initialize the manager
     manager = init_manager(_CALLBELL_DB, _SITE_CONFIG_PATH)
+    
+    # Clear stale calls only on true first startup (not IIS recycle overlap)
+    if _is_first_startup():
+        manager.reset_all_calls()
+        logger.info("Server startup: all active calls have been reset")
+    else:
+        logger.info("Skipping reset - another process already reset recently")
     
     # Default: Only Parafield Gardens enabled (Ramsay disabled by default)
     if sites_to_monitor is None:
