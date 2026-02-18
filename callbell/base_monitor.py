@@ -269,7 +269,6 @@ class CallbellMonitor(ABC):
                 rows = conn.execute(f'''
                     SELECT room, type, priority, start_time, color, message_text, message_subtext, event_id
                     FROM {self._active_table}
-                    ORDER BY priority ASC, start_time ASC
                 ''').fetchall()
                 
                 calls = []
@@ -296,6 +295,10 @@ class CallbellMonitor(ABC):
                         'card_border': style['border'],
                         'card_text': style['text'],
                     })
+                
+                # Sort: most critical color first, then longest timer first
+                level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}
+                calls.sort(key=lambda c: (level_order.get(c['card_level'], 3), -c['elapsed_seconds']))
                 
                 return calls
         except Exception as e:

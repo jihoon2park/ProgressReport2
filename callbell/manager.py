@@ -91,7 +91,10 @@ class CallbellManager:
         
         # Auto-detect monitor type if needed
         if monitor_type == 'auto':
-            if 'base_url' in callbell_config:
+            explicit = callbell_config.get('monitor_type', '')
+            if explicit == 'syslog' or 'listen_port' in callbell_config:
+                monitor_type = 'ramsay'
+            elif 'base_url' in callbell_config:
                 monitor_type = 'ramsay'
             elif 'host' in callbell_config:
                 monitor_type = 'parafield'

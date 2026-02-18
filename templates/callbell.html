@@ -337,18 +337,8 @@
                 '</div>';
         };
 
-        const sortGrid = (siteId) => {
-            const grid = document.getElementById('call-grid-' + siteId);
-            if (!grid) return;
-            const children = Array.from(grid.children);
-            siteState[siteId].callCount = children.length;
-
-            const levelOrder = { red: 0, yellow: 1, green: 2, gray: 3 };
-            children.sort((a, b) => (levelOrder[a.dataset.level] || 3) - (levelOrder[b.dataset.level] || 3) || parseFloat(a.dataset.start) - parseFloat(b.dataset.start));
-            const fragment = document.createDocumentFragment();
-            children.forEach(child => fragment.appendChild(child));
-            grid.appendChild(fragment);
-
+        const updateCount = (siteId, count) => {
+            siteState[siteId].callCount = count;
             updateClearMessage();
         };
 
@@ -400,18 +390,12 @@
                         countEl.className = 'tab-count ' + (calls.length > 0 ? 'has-calls' : 'empty');
                     }
 
-                    // Remove cards no longer in server data
+                    // Rebuild grid in API order (API sorts: critical first, longest timer first)
                     const grid = document.getElementById('call-grid-' + s.id);
                     if (!grid) return;
-                    const serverRooms = new Set(calls.map(c => c.room));
-                    Array.from(grid.children).forEach(card => {
-                        const roomId = card.id.replace('room-' + s.id + '-', '');
-                        if (!serverRooms.has(roomId)) card.remove();
-                    });
-
-                    // Add / update cards
+                    grid.innerHTML = '';
                     calls.forEach(c => syncUI(s.id, c));
-                    sortGrid(s.id);
+                    updateCount(s.id, calls.length);
                 });
 
             } catch (e) { console.warn('Poll failed:', e); }
