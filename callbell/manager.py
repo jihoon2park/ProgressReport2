@@ -308,12 +308,15 @@ def api_callbell_poll():
 
     # Gather calls per permitted site
     sites_data = {}
+    debug_by_site = {}
     total = 0
     for site_id in callbell_site_ids:
         monitor = manager.get_monitor(site_id)
         calls = monitor.get_active_calls() if monitor else []
         sites_data[site_id] = calls
         total += len(calls)
+        if monitor:
+            debug_by_site[site_id] = monitor.debug_info
 
     settings = get_color_settings(manager.db_path)
 
@@ -326,6 +329,7 @@ def api_callbell_poll():
         'is_admin': is_admin,
         'role': role,
         'display_name': display_name,
+        'debug': debug_by_site,
     })
 
 
