@@ -189,8 +189,9 @@ class CallbellMonitor(ABC):
                 # (CREATE TABLE IF NOT EXISTS won't alter existing tables)
                 for tbl in [active_table, history_table]:
                     cols = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
-                    if 'event_id' not in cols:
-                        conn.execute(f"ALTER TABLE {tbl} ADD COLUMN event_id TEXT")
+                    for col in ['event_id', 'site_id']:
+                        if col not in cols:
+                            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} TEXT")
                     if tbl == active_table:
                         for col in ['color', 'message_text', 'message_subtext']:
                             if col not in cols:
