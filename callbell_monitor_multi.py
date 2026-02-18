@@ -57,10 +57,6 @@ def init_callbell_system(app: Flask = None, sites_to_monitor: list = None):
     # Initialize the manager
     manager = init_manager(_CALLBELL_DB, _SITE_CONFIG_PATH)
     
-    # Auto-reset all active calls on server startup (stale calls would have incorrect timers)
-    manager.reset_all_calls()
-    logger.info("🔄 Server startup: all active calls have been reset")
-    
     # Default: Only Parafield Gardens enabled (Ramsay disabled by default)
     if sites_to_monitor is None:
         sites_to_monitor = ['parafield_gardens']
