@@ -12,9 +12,11 @@ We only care about "has been dispatched" messages.
 Ignore: "completed successfully", "purged due to reaching queue size limit".
 """
 import re
+import os
 import time
 import socket
 import logging
+import subprocess
 import threading
 from typing import Dict, Any, Optional
 from .base_monitor import CallbellMonitor
@@ -53,9 +55,11 @@ class RamsayCallbellMonitor(CallbellMonitor):
         super().__init__(site_id, site_name, db_path)
 
         self.config = config
+        logger.info(f"[{site_name}] Ramsay config received: {config}")
         self.listen_ip = config.get('listen_ip', '0.0.0.0')
-        self.listen_port = config.get('listen_port', 514)
+        self.listen_port = config.get('listen_port', 10514)
         self.source_ip = config.get('source_ip')  # e.g. '192.168.31.124'
+        logger.info(f"[{site_name}] Will listen on {self.listen_ip}:{self.listen_port}, source_ip={self.source_ip}")
 
         self.sock = None
         self.monitor_thread = None
@@ -145,27 +149,74 @@ class RamsayCallbellMonitor(CallbellMonitor):
 
     # ── Main listener loop ──────────────────────────────────────
 
+    def _kill_port_holders(self):
+        """Kill any processes already bound to our UDP port and wait until port is free."""
+        my_pid = os.getpid()
+        self.debug_info['status'] = 'cleaning_port'
+        max_attempts = 10
+
+        for attempt in range(max_attempts):
+            try:
+                result = subprocess.run(
+                    ['netstat', '-ano', '-p', 'UDP'],
+                    capture_output=True, text=True, timeout=10
+                )
+                stale_pids = []
+                for line in result.stdout.splitlines():
+                    if f':{self.listen_port}' in line and 'UDP' in line:
+                        parts = line.split()
+                        pid = int(parts[-1])
+                        if pid != my_pid and pid != 0:
+                            stale_pids.append(pid)
+
+                if not stale_pids:
+                    logger.info(f"[{self.site_name}] Port {self.listen_port} is free")
+                    return True
+
+                for pid in stale_pids:
+                    logger.info(f"[{self.site_name}] Killing stale PID {pid} on port {self.listen_port} (attempt {attempt+1})")
+                    try:
+                        subprocess.run(['taskkill', '/F', '/PID', str(pid)], timeout=5)
+                    except Exception as e:
+                        logger.warning(f"[{self.site_name}] Could not kill PID {pid}: {e}")
+
+                time.sleep(1)
+            except Exception as e:
+                logger.warning(f"[{self.site_name}] Port cleanup error: {e}")
+                time.sleep(1)
+
+        logger.error(f"[{self.site_name}] Could not free port {self.listen_port} after {max_attempts} attempts")
+        return False
+
     def _monitor_loop(self):
         """Background UDP listener loop."""
         self.debug_info['monitor_started'] = True
+        self.debug_info['status'] = 'starting'
         logger.info(f"[{self.site_name}] UDP syslog listener starting on {self.listen_ip}:{self.listen_port}")
 
+        # Kill any stale processes holding our port
+        if not self._kill_port_holders():
+            self.debug_info['status'] = 'failed - port in use'
+            self.debug_info['last_error'] = f"Port {self.listen_port} still in use after cleanup"
+            return
+
         try:
+            self.debug_info['status'] = 'binding'
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind((self.listen_ip, self.listen_port))
             self.sock.settimeout(2.0)  # allow periodic self.running check
+            self.debug_info['status'] = 'listening - waiting for packets'
             logger.info(f"✅ [{self.site_name}] Listening on UDP {self.listen_ip}:{self.listen_port}")
         except PermissionError:
-            logger.error(
-                f"[{self.site_name}] Permission denied binding to port {self.listen_port}. "
-                "Run as Administrator for ports < 1024."
-            )
+            self.debug_info['status'] = 'failed - permission denied'
             self.debug_info['last_error'] = f"Permission denied on port {self.listen_port}"
+            logger.error(f"[{self.site_name}] Permission denied binding to port {self.listen_port}")
             return
         except Exception as e:
-            logger.error(f"[{self.site_name}] Failed to bind UDP socket: {e}")
+            self.debug_info['status'] = f"failed - {e}"
             self.debug_info['last_error'] = str(e)
+            logger.error(f"[{self.site_name}] Failed to bind UDP socket: {e}")
             return
 
         while self.running:
@@ -182,6 +233,7 @@ class RamsayCallbellMonitor(CallbellMonitor):
                 message = data.decode('utf-8', errors='ignore')
                 self.debug_info['packets_received'] += 1
                 self.debug_info['last_packet'] = message[:200]
+                self.debug_info['status'] = 'connected - receiving packets'
                 parsed = self._parse_syslog(message)
                 if not parsed:
                     continue
