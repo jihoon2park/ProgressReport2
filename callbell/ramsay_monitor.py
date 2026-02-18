@@ -147,39 +147,41 @@ class RamsayCallbellMonitor(CallbellMonitor):
 
     # ── Main listener loop ──────────────────────────────────────
 
+    def _try_bind(self) -> bool:
+        """Try to bind the UDP socket. Returns True if successful."""
+        try:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            self.sock.bind((self.listen_ip, self.listen_port))
+            self.sock.settimeout(2.0)
+            return True
+        except OSError:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+            return False
+
     def _monitor_loop(self):
-        """Background UDP listener loop."""
+        """Background UDP listener loop with retry."""
         self.debug_info['monitor_started'] = True
         self.debug_info['status'] = 'starting'
         logger.info(f"[{self.site_name}] UDP syslog listener starting on {self.listen_ip}:{self.listen_port}")
 
-        try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            # SO_EXCLUSIVEADDRUSE (Windows): guarantees only ONE process can bind this port.
-            # If another IIS worker already has it, bind() fails immediately with a clean error.
-            if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
-                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            self.sock.bind((self.listen_ip, self.listen_port))
-            self.sock.settimeout(2.0)  # allow periodic self.running check
-            self.debug_info['status'] = 'listening - waiting for packets'
-            logger.info(f"✅ [{self.site_name}] Listening on UDP {self.listen_ip}:{self.listen_port}")
-        except OSError as e:
-            # Port already in use = another IIS worker is already monitoring. That's OK.
-            self.debug_info['status'] = 'skipped - another worker is monitoring'
-            self.debug_info['last_error'] = str(e)
-            logger.info(f"[{self.site_name}] Port {self.listen_port} already in use - another worker has the monitor. Skipping.")
-            if self.sock:
-                self.sock.close()
-                self.sock = None
-            return
-        except Exception as e:
-            self.debug_info['status'] = f"failed - {e}"
-            self.debug_info['last_error'] = str(e)
-            logger.error(f"[{self.site_name}] Failed to bind UDP socket: {e}")
-            if self.sock:
-                self.sock.close()
-                self.sock = None
-            return
+        # Retry binding until we get the port (another worker may hold it temporarily)
+        while self.running:
+            if self._try_bind():
+                self.debug_info['status'] = 'listening - waiting for packets'
+                logger.info(f"✅ [{self.site_name}] Listening on UDP {self.listen_ip}:{self.listen_port}")
+                break
+            else:
+                self.debug_info['status'] = 'waiting - port in use, retrying every 10s'
+                logger.info(f"[{self.site_name}] Port {self.listen_port} in use, retrying in 10s...")
+                # Wait 10s but check self.running every 1s so we can stop quickly
+                for _ in range(10):
+                    if not self.running:
+                        return
+                    time.sleep(1)
 
         while self.running:
             try:
