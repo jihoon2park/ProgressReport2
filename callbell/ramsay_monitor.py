@@ -12,9 +12,11 @@ We only care about "has been dispatched" messages.
 Ignore: "completed successfully", "purged due to reaching queue size limit".
 """
 import re
+import os
 import time
 import socket
 import logging
+import subprocess
 import threading
 from typing import Dict, Any, Optional
 from .base_monitor import CallbellMonitor
@@ -147,6 +149,25 @@ class RamsayCallbellMonitor(CallbellMonitor):
 
     # ── Main listener loop ──────────────────────────────────────
 
+    def _cleanup_port(self):
+        """Kill any stale processes holding our UDP port on startup."""
+        my_pid = os.getpid()
+        try:
+            result = subprocess.run(
+                ['netstat', '-ano', '-p', 'UDP'],
+                capture_output=True, text=True, timeout=10
+            )
+            for line in result.stdout.splitlines():
+                if f':{self.listen_port}' in line and 'UDP' in line:
+                    parts = line.split()
+                    pid = int(parts[-1])
+                    if pid != my_pid and pid != 0:
+                        logger.info(f"[{self.site_name}] Killing stale process PID {pid} on port {self.listen_port}")
+                        subprocess.run(['taskkill', '/F', '/PID', str(pid)], timeout=5)
+            time.sleep(1)
+        except Exception as e:
+            logger.warning(f"[{self.site_name}] Port cleanup warning: {e}")
+
     def _try_bind(self) -> bool:
         """Try to bind the UDP socket. Returns True if successful."""
         try:
@@ -168,7 +189,10 @@ class RamsayCallbellMonitor(CallbellMonitor):
         self.debug_info['status'] = 'starting'
         logger.info(f"[{self.site_name}] UDP syslog listener starting on {self.listen_ip}:{self.listen_port}")
 
-        # Retry binding until we get the port (another worker may hold it temporarily)
+        # Kill stale processes from previous runs (safe: no DB wipe since reset_all_calls removed)
+        self._cleanup_port()
+
+        # Retry binding until we get the port
         while self.running:
             if self._try_bind():
                 self.debug_info['status'] = 'listening - waiting for packets'
@@ -177,7 +201,6 @@ class RamsayCallbellMonitor(CallbellMonitor):
             else:
                 self.debug_info['status'] = 'waiting - port in use, retrying every 10s'
                 logger.info(f"[{self.site_name}] Port {self.listen_port} in use, retrying in 10s...")
-                # Wait 10s but check self.running every 1s so we can stop quickly
                 for _ in range(10):
                     if not self.running:
                         return
