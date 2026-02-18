@@ -219,7 +219,7 @@ class CallbellMonitor(ABC):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(f'''
-                    INSERT OR REPLACE INTO {self._active_table}
+                    INSERT OR IGNORE INTO {self._active_table}
                     (room, type, priority, start_time, event_id, color, message_text, message_subtext, site_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (room, call_type, priority, start_time, event_id, color, 
