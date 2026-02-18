@@ -23,8 +23,8 @@ Available routes:
     - /api/callbell/reset - Ramsay reset
 """
 import os
-import time
-import sqlite3
+import json
+import subprocess
 import logging
 from flask import Flask
 
@@ -38,18 +38,36 @@ _CALLBELL_DB = os.path.join(_BASE_DIR, 'edenfield_calls.db')
 _SITE_CONFIG_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'site_config.json')
 
 
-def _is_first_startup(db_path: str) -> bool:
-    """Check if this is a true first startup (not an IIS recycle overlap)."""
+def _kill_port_once(port: int):
+    """Kill any process holding the UDP port. Runs ONCE on app startup."""
+    my_pid = os.getpid()
     try:
-        with sqlite3.connect(db_path) as conn:
-            conn.execute('CREATE TABLE IF NOT EXISTS _startup_meta (key TEXT PRIMARY KEY, value REAL)')
-            row = conn.execute("SELECT value FROM _startup_meta WHERE key = 'last_reset'").fetchone()
-            if row and time.time() - row[0] < 60:
-                return False  # Another process just reset within 60s
-            conn.execute("INSERT OR REPLACE INTO _startup_meta (key, value) VALUES ('last_reset', ?)", (time.time(),))
+        result = subprocess.run(
+            ['netstat', '-ano', '-p', 'UDP'],
+            capture_output=True, text=True, timeout=10
+        )
+        for line in result.stdout.splitlines():
+            if f':{port}' in line and 'UDP' in line:
+                parts = line.split()
+                pid = int(parts[-1])
+                if pid != my_pid and pid != 0:
+                    logger.info(f"Startup: killing stale PID {pid} on UDP port {port}")
+                    subprocess.run(['taskkill', '/F', '/PID', str(pid)], timeout=5)
+    except Exception as e:
+        logger.warning(f"Startup port cleanup warning: {e}")
+
+
+def _get_ramsay_port() -> int:
+    """Read the Ramsay listen port from site config."""
+    try:
+        with open(_SITE_CONFIG_PATH) as f:
+            config = json.load(f)
+        for site in config.get('sites', []):
+            if site.get('id') == 'ramsay':
+                return site.get('callbell', {}).get('listen_port', 10514)
     except Exception:
         pass
-    return True
+    return 10514
 
 
 def init_callbell_system(app: Flask = None, sites_to_monitor: list = None):
@@ -73,12 +91,12 @@ def init_callbell_system(app: Flask = None, sites_to_monitor: list = None):
     # Initialize the manager
     manager = init_manager(_CALLBELL_DB, _SITE_CONFIG_PATH)
     
-    # Clear stale calls only on true first startup (not IIS recycle overlap)
-    if _is_first_startup(_CALLBELL_DB):
-        manager.reset_all_calls()
-        logger.info("Server startup: all active calls have been reset")
-    else:
-        logger.info("Skipping reset - another process already reset recently")
+    # Only remove calls older than 4 hours (safe to call from any process)
+    manager.cleanup_stale_calls(max_age_hours=4.0)
+    
+    # One-time: kill any stale process holding the Ramsay UDP port
+    if sites_to_monitor and 'ramsay' in sites_to_monitor:
+        _kill_port_once(_get_ramsay_port())
     
     # Default: Only Parafield Gardens enabled (Ramsay disabled by default)
     if sites_to_monitor is None:

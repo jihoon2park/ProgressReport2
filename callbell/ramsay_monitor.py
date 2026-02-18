@@ -16,7 +16,6 @@ import os
 import time
 import socket
 import logging
-import subprocess
 import threading
 from typing import Dict, Any, Optional
 from .base_monitor import CallbellMonitor
@@ -149,39 +148,23 @@ class RamsayCallbellMonitor(CallbellMonitor):
 
     # ── Main listener loop ──────────────────────────────────────
 
-    def _cleanup_port(self):
-        """Kill any stale processes holding our UDP port and verify they're dead."""
-        my_pid = os.getpid()
-        for attempt in range(5):
-            try:
-                result = subprocess.run(
-                    ['netstat', '-ano', '-p', 'UDP'],
-                    capture_output=True, text=True, timeout=10
-                )
-                stale_pids = []
-                for line in result.stdout.splitlines():
-                    if f':{self.listen_port}' in line and 'UDP' in line:
-                        parts = line.split()
-                        pid = int(parts[-1])
-                        if pid != my_pid and pid != 0:
-                            stale_pids.append(pid)
-
-                if not stale_pids:
-                    logger.info(f"[{self.site_name}] Port {self.listen_port} is free (attempt {attempt+1})")
-                    return True
-
-                for pid in stale_pids:
-                    logger.info(f"[{self.site_name}] Killing stale PID {pid} on port {self.listen_port} (attempt {attempt+1})")
-                    try:
-                        subprocess.run(['taskkill', '/F', '/PID', str(pid)], timeout=5)
-                    except Exception:
-                        pass
-                time.sleep(2)
-            except Exception as e:
-                logger.warning(f"[{self.site_name}] Port cleanup error: {e}")
-                time.sleep(1)
-        logger.warning(f"[{self.site_name}] Could not free port {self.listen_port} after 5 attempts")
-        return False
+    def _acquire_lock(self) -> bool:
+        """Try to acquire a file lock so only one process runs the monitor."""
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        lock_path = os.path.join(data_dir, f'.ramsay_monitor_{self.listen_port}.lock')
+        try:
+            import msvcrt
+            self._lock_file = open(lock_path, 'w')
+            msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            self._lock_file.write(str(os.getpid()))
+            self._lock_file.flush()
+            return True
+        except Exception:
+            if hasattr(self, '_lock_file') and self._lock_file:
+                self._lock_file.close()
+                self._lock_file = None
+            return False
 
     def _try_bind(self) -> bool:
         """Try to bind the UDP socket. Returns True if successful."""
@@ -192,33 +175,50 @@ class RamsayCallbellMonitor(CallbellMonitor):
             self.sock.bind((self.listen_ip, self.listen_port))
             self.sock.settimeout(2.0)
             return True
-        except OSError:
+        except OSError as e:
             if self.sock:
                 self.sock.close()
                 self.sock = None
+            self.debug_info['last_error'] = str(e)
             return False
 
     def _monitor_loop(self):
-        """Background UDP listener loop with retry."""
+        """Background UDP listener loop with file lock."""
         self.debug_info['monitor_started'] = True
         self.debug_info['status'] = 'starting'
         logger.info(f"[{self.site_name}] UDP syslog listener starting on {self.listen_ip}:{self.listen_port}")
 
-        # Kill stale processes then bind. Retry if needed.
-        while self.running:
-            self.debug_info['status'] = 'cleaning_port'
-            self._cleanup_port()
-            if self._try_bind():
-                self.debug_info['status'] = 'listening - waiting for packets'
-                logger.info(f"✅ [{self.site_name}] Listening on UDP {self.listen_ip}:{self.listen_port}")
-                break
+        # Only one process should run the monitor - use file lock
+        if not self._acquire_lock():
+            self.debug_info['status'] = 'standby - another process is monitoring'
+            logger.info(f"[{self.site_name}] Another process holds the monitor lock. Standing by.")
+            # Wait in standby - if the other process dies, try to take over
+            while self.running:
+                time.sleep(10)
+                if self._acquire_lock():
+                    logger.info(f"[{self.site_name}] Lock acquired - taking over monitoring")
+                    break
+            if not self.running:
+                return
+
+        # We have the lock - bind the port
+        self.debug_info['status'] = 'binding_port'
+        if not self._try_bind():
+            # Port stuck from a crashed process - wait for OS to release it
+            logger.info(f"[{self.site_name}] Port {self.listen_port} not ready, waiting for OS to release...")
+            for attempt in range(12):  # Wait up to 60 seconds
+                if not self.running:
+                    return
+                time.sleep(5)
+                if self._try_bind():
+                    break
             else:
-                self.debug_info['status'] = 'waiting - port in use, retrying in 5s'
-                logger.info(f"[{self.site_name}] Port {self.listen_port} still in use, retrying in 5s...")
-                for _ in range(5):
-                    if not self.running:
-                        return
-                    time.sleep(1)
+                self.debug_info['status'] = 'failed - could not bind port'
+                logger.error(f"[{self.site_name}] Could not bind port {self.listen_port} after 60s")
+                return
+
+        self.debug_info['status'] = 'listening - waiting for packets'
+        logger.info(f"✅ [{self.site_name}] Listening on UDP {self.listen_ip}:{self.listen_port}")
 
         while self.running:
             try:

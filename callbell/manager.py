@@ -163,6 +163,24 @@ class CallbellManager:
             logger.info("✅ All active call tables cleared on startup")
         except Exception as e:
             logger.error(f"Failed to reset all calls: {e}")
+
+    def cleanup_stale_calls(self, max_age_hours: float = 4.0):
+        """Remove only calls older than max_age_hours. Safe to call from any process."""
+        import time
+        cutoff = time.time() - (max_age_hours * 3600)
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                tables = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'active_calls%'"
+                ).fetchall()
+                for (table_name,) in tables:
+                    deleted = conn.execute(
+                        f'DELETE FROM {table_name} WHERE start_time < ?', (cutoff,)
+                    ).rowcount
+                    if deleted:
+                        logger.info(f"🗑️ Cleaned {deleted} stale calls from {table_name} (older than {max_age_hours}h)")
+        except Exception as e:
+            logger.error(f"Failed to cleanup stale calls: {e}")
     
     def get_debug_info(self, site_id: Optional[str] = None) -> Dict[str, Any]:
         """Get debug information for one or all monitors."""
