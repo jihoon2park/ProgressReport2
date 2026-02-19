@@ -131,7 +131,7 @@ class CallbellMonitor(ABC):
         self.site_name = site_name
         self.db_path = db_path
         self.monitor_started = False
-        self._buzz_levels = {}  # event_id -> last card_level (for buzz detection)
+        self._buzz_levels_app = {}      # app heartbeat: buzz_key -> last card_level (buzz once per new call/escalation)
         self.debug_info = {
             'site_id': site_id,
             'site_name': site_name,
@@ -268,7 +268,7 @@ class CallbellMonitor(ABC):
             logger.error(f"Failed to archive call for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)
     
-    def get_active_calls(self) -> List[Dict[str, Any]]:
+    def get_active_calls(self, consumer: str = 'web') -> List[Dict[str, Any]]:
         """Get all active calls with computed card colors and buzz flags from backend."""
         try:
             now = time.time()
@@ -289,12 +289,15 @@ class CallbellMonitor(ABC):
                     card_level = compute_card_color(elapsed, priority, settings)
                     style = CARD_STYLES[card_level]
                     
-                    # Buzz logic: true on new call or color level change
-                    prev_level = self._buzz_levels.get(event_id)
-                    buzz = prev_level is None or prev_level != card_level
-                    self._buzz_levels[event_id] = card_level
-                    if event_id:
-                        current_event_ids.add(event_id)
+                    # Buzz: only tracked for app consumer (buzz once on new call or color escalation)
+                    buzz_key = event_id if event_id is not None else r[0]
+                    current_event_ids.add(buzz_key)
+                    if consumer == 'app':
+                        prev_level = self._buzz_levels_app.get(buzz_key)
+                        buzz = prev_level is None or prev_level != card_level
+                        self._buzz_levels_app[buzz_key] = card_level
+                    else:
+                        buzz = False
                     
                     calls.append({
                         'room': r[0],
@@ -315,10 +318,10 @@ class CallbellMonitor(ABC):
                         'buzz': buzz,
                     })
                 
-                # Clean up stale entries from _buzz_levels
-                stale = [eid for eid in self._buzz_levels if eid not in current_event_ids]
-                for eid in stale:
-                    del self._buzz_levels[eid]
+                # Clean up stale entries from app buzz store
+                stale = [k for k in self._buzz_levels_app if k not in current_event_ids]
+                for k in stale:
+                    del self._buzz_levels_app[k]
                 
                 # Sort: most critical color first, then longest timer first
                 level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}

@@ -250,7 +250,8 @@ def api_app_heartbeat():
         # Map site display name to site_id
         site_id = _site_name_to_id(site)
         if site_id:
-            calls = manager.get_site_active_calls(site_id)
+            monitor = manager.get_monitor(site_id)
+            calls = monitor.get_active_calls(consumer='app') if monitor else []
     except Exception as e:
         logger.error(f"Failed to get calls for heartbeat: {e}")
 
