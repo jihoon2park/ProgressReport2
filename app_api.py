@@ -357,16 +357,46 @@ def api_app_admin_staff_online():
     if not current_user.is_authenticated or getattr(current_user, 'role', '') not in ('admin', 'site_admin'):
         return jsonify({'success': False, 'message': 'Admin access required'}), 403
 
+    from config_users import get_user
+    user_data = get_user(current_user.id) or {}
+    allowed_locations = user_data.get('location', [])
+    see_all = 'All' in allowed_locations
+    role = getattr(current_user, 'role', '')
+
+    # Optional ?site= filter from frontend (active tab site name)
+    site_filter = request.args.get('site', '').strip()
+
     # Staff are online after login, offline after finish shift
     _ensure_tables()
     try:
         with sqlite3.connect(_CALLBELL_DB) as conn:
-            rows = conn.execute('''
-                SELECT username, staff_name, site, device_info, started_at, last_heartbeat
-                FROM staff_sessions
-                WHERE is_active = 1
-                ORDER BY site, staff_name
-            ''').fetchall()
+            if site_filter:
+                # Frontend is requesting a specific site tab
+                # Admin can request any site; site_admin only their allowed sites
+                if see_all or site_filter in allowed_locations:
+                    rows = conn.execute('''
+                        SELECT username, staff_name, site, device_info, started_at, last_heartbeat
+                        FROM staff_sessions
+                        WHERE is_active = 1 AND site = ?
+                        ORDER BY staff_name
+                    ''', (site_filter,)).fetchall()
+                else:
+                    rows = []
+            elif see_all:
+                rows = conn.execute('''
+                    SELECT username, staff_name, site, device_info, started_at, last_heartbeat
+                    FROM staff_sessions
+                    WHERE is_active = 1
+                    ORDER BY site, staff_name
+                ''').fetchall()
+            else:
+                placeholders = ','.join('?' * len(allowed_locations))
+                rows = conn.execute(f'''
+                    SELECT username, staff_name, site, device_info, started_at, last_heartbeat
+                    FROM staff_sessions
+                    WHERE is_active = 1 AND site IN ({placeholders})
+                    ORDER BY site, staff_name
+                ''', allowed_locations).fetchall()
 
         staff = []
         for r in rows:

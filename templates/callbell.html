@@ -316,6 +316,7 @@
                 el.classList.toggle('active', el.id === 'tab-' + siteId);
             });
             updateClearMessage();
+            if (isAdmin) pollStaffOnline();
         }
 
         function updateClearMessage() {
@@ -580,9 +581,16 @@
         };
 
         // ── Staff Online (admin only, right sidebar) ──
+        // For admin: filters by active tab site. For site_admin: shows their site only.
         const pollStaffOnline = async () => {
             try {
-                const res = await fetch('/api/app/admin/staff-online');
+                // Find the display name of the active tab's site
+                const activeSite = sites.find(s => s.id === activeTab);
+                const siteName = activeSite ? activeSite.name : '';
+                const url = siteName
+                    ? '/api/app/admin/staff-online?site=' + encodeURIComponent(siteName)
+                    : '/api/app/admin/staff-online';
+                const res = await fetch(url);
                 const data = await res.json();
                 const el = document.getElementById('staff-online-list');
                 if (!data.success || !data.staff || data.staff.length === 0) {
@@ -594,7 +602,7 @@
                     '<div class="w-2 h-2 rounded-full bg-green-400 mt-1 flex-shrink-0"></div>' +
                     '<div class="min-w-0">' +
                     '<div class="text-slate-200 font-bold text-xs truncate">' + (s.staff_name || s.username) + '</div>' +
-                    '<div class="text-slate-500 text-[10px]">' + s.site + ' &middot; ' + s.online_minutes + 'm</div>' +
+                    '<div class="text-slate-500 text-[10px]">' + s.online_minutes + 'm</div>' +
                     '</div></div>'
                 ).join('');
             } catch (e) { /* ignore - not admin */ }
