@@ -239,6 +239,22 @@ USERS_DB = {
         "position": "Site Administrator",
         "location": ["Ramsay"]
     },
+    "staff.parafield": {
+        "password_hash": hash_password("password123"),
+        "first_name": "Staff",
+        "last_name": "Parafield",
+        "role": "staff",
+        "position": "Staff",
+        "location": ["Parafield Gardens"]
+    },
+    "staff.ramsay": {
+        "password_hash": hash_password("password123"),
+        "first_name": "Staff",
+        "last_name": "Ramsay",
+        "role": "staff",
+        "position": "Staff",
+        "location": ["Ramsay"]
+    },
 }
 
 def verify_password(password, password_hash):

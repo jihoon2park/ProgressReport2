@@ -12,12 +12,12 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 # ── Card color definitions ──
-# Each level maps to background, border, and CSS class
+# Light-theme professional palette for mobile app
 CARD_STYLES = {
-    'gray':   {'bg': '#1e293b', 'border': '#475569', 'text': '#94a3b8'},
-    'green':  {'bg': '#14532d', 'border': '#22c55e', 'text': '#86efac'},
-    'yellow': {'bg': '#78350f', 'border': '#d97706', 'text': '#fcd34d'},
-    'red':    {'bg': '#450a0a', 'border': '#f87171', 'text': '#fca5a5'},
+    'gray':   {'bg': '#F0F4F8', 'border': '#90A4AE', 'text': '#455A64'},
+    'green':  {'bg': '#E8F5E9', 'border': '#43A047', 'text': '#1B5E20'},
+    'yellow': {'bg': '#FFF8E1', 'border': '#F9A825', 'text': '#E65100'},
+    'red':    {'bg': '#FFEBEE', 'border': '#E53935', 'text': '#B71C1C'},
 }
 
 # Default color thresholds (minutes)
@@ -131,6 +131,7 @@ class CallbellMonitor(ABC):
         self.site_name = site_name
         self.db_path = db_path
         self.monitor_started = False
+        self._buzz_levels = {}  # event_id -> last card_level (for buzz detection)
         self.debug_info = {
             'site_id': site_id,
             'site_name': site_name,
@@ -268,7 +269,7 @@ class CallbellMonitor(ABC):
             self.debug_info['last_error'] = str(e)
     
     def get_active_calls(self) -> List[Dict[str, Any]]:
-        """Get all active calls with computed card colors from backend."""
+        """Get all active calls with computed card colors and buzz flags from backend."""
         try:
             now = time.time()
             settings = get_color_settings(self.db_path)
@@ -280,11 +281,20 @@ class CallbellMonitor(ABC):
                 ''').fetchall()
                 
                 calls = []
+                current_event_ids = set()
                 for r in rows:
                     elapsed = now - r[3]
                     priority = r[2]
+                    event_id = r[7]
                     card_level = compute_card_color(elapsed, priority, settings)
                     style = CARD_STYLES[card_level]
+                    
+                    # Buzz logic: true on new call or color level change
+                    prev_level = self._buzz_levels.get(event_id)
+                    buzz = prev_level is None or prev_level != card_level
+                    self._buzz_levels[event_id] = card_level
+                    if event_id:
+                        current_event_ids.add(event_id)
                     
                     calls.append({
                         'room': r[0],
@@ -294,7 +304,7 @@ class CallbellMonitor(ABC):
                         'color': r[4] or '#ffffff',
                         'messageText': r[5] or r[0],
                         'messageSubText': r[6] or r[1],
-                        'event_id': r[7],
+                        'event_id': event_id,
                         'site_id': self.site_id,
                         'site_name': self.site_name,
                         'elapsed_seconds': int(elapsed),
@@ -302,7 +312,13 @@ class CallbellMonitor(ABC):
                         'card_bg': style['bg'],
                         'card_border': style['border'],
                         'card_text': style['text'],
+                        'buzz': buzz,
                     })
+                
+                # Clean up stale entries from _buzz_levels
+                stale = [eid for eid in self._buzz_levels if eid not in current_event_ids]
+                for eid in stale:
+                    del self._buzz_levels[eid]
                 
                 # Sort: most critical color first, then longest timer first
                 level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}

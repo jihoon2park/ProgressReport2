@@ -8906,7 +8906,13 @@ app.register_blueprint(callbell_bp)
 #   ['parafield_gardens'] - Only Parafield (Ramsay OFF)
 #   ['ramsay', 'parafield_gardens'] - Both sites
 #   [] - All monitors disabled
-init_callbell_system(app, sites_to_monitor=['ramsay', 'parafield_gardens'])
+init_callbell_system(app, sites_to_monitor=['parafield_gardens'])
+
+# ==============================
+# Mobile App API (staff callbell app)
+# ==============================
+from app_api import app_api_bp
+app.register_blueprint(app_api_bp)
 
 # ==============================
 # App Execution
