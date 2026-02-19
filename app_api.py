@@ -173,10 +173,11 @@ def api_app_login():
     _ensure_tables()
     try:
         with sqlite3.connect(_CALLBELL_DB) as conn:
-            # Deactivate any existing sessions for this username on same site
+            # Deactivate any existing sessions for this username + staff_name on same site
+            # (allows multiple people to share the same account with different staff names)
             conn.execute(
-                'UPDATE staff_sessions SET is_active = 0 WHERE username = ? AND site = ? AND is_active = 1',
-                (username, site)
+                'UPDATE staff_sessions SET is_active = 0 WHERE username = ? AND site = ? AND staff_name = ? AND is_active = 1',
+                (username, site, staff_name)
             )
             conn.execute('''
                 INSERT INTO staff_sessions (session_id, username, staff_name, site, device_info, started_at, last_heartbeat, is_active)
@@ -356,17 +357,16 @@ def api_app_admin_staff_online():
     if not current_user.is_authenticated or getattr(current_user, 'role', '') not in ('admin', 'site_admin'):
         return jsonify({'success': False, 'message': 'Admin access required'}), 403
 
-    # Consider staff "online" if heartbeat within last 60 seconds
-    cutoff = time.time() - 60
+    # Staff are online after login, offline after finish shift
     _ensure_tables()
     try:
         with sqlite3.connect(_CALLBELL_DB) as conn:
             rows = conn.execute('''
                 SELECT username, staff_name, site, device_info, started_at, last_heartbeat
                 FROM staff_sessions
-                WHERE is_active = 1 AND last_heartbeat > ?
+                WHERE is_active = 1
                 ORDER BY site, staff_name
-            ''', (cutoff,)).fetchall()
+            ''').fetchall()
 
         staff = []
         for r in rows:
