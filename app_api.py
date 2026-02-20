@@ -24,6 +24,7 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _CALLBELL_DB = os.path.join(_BASE_DIR, 'edenfield_calls.db')
 _SITE_CONFIG_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'site_config.json')
 _GLOBAL_CONFIG_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'app_global_config.json')
+_STAFF_NAMES_PATH = os.path.join(_BASE_DIR, 'data', 'staff_names.json')
 
 # ── Default app config ──────────────────────────────────────
 _DEFAULT_APP_CONFIG = {
@@ -131,43 +132,41 @@ def api_app_config():
     })
 
 
-@app_api_bp.route('/api/app/login', methods=['POST'])
-def api_app_login():
-    """Authenticate staff user, create session, return user info + config."""
+@app_api_bp.route('/api/app/staff-names', methods=['GET'])
+def api_app_staff_names():
+    """Return staff name suggestions for a given site."""
+    site = request.args.get('site', '').strip()
+    try:
+        with open(_STAFF_NAMES_PATH, 'r', encoding='utf-8') as f:
+            all_names = json.load(f)
+        names = all_names.get(site, [])
+        return jsonify({'success': True, 'names': names})
+    except Exception as e:
+        logger.error(f"Failed to read staff names: {e}")
+        return jsonify({'success': True, 'names': []})
+
+
+@app_api_bp.route('/api/app/checkin', methods=['POST'])
+def api_app_checkin():
+    """Staff check-in: create session with just site + staff_name. No password needed."""
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'message': 'No data provided'}), 400
 
-    password = (data.get('password') or '').strip()
     site = (data.get('site') or '').strip()
     staff_name = (data.get('staff_name') or '').strip()
     device_info = (data.get('device_info') or '').strip()
 
-    if not password:
-        return jsonify({'success': False, 'message': 'Password required'}), 400
     if not site:
         return jsonify({'success': False, 'message': 'Site selection required'}), 400
+    if not staff_name:
+        return jsonify({'success': False, 'message': 'Staff name is required'}), 400
 
-    # Auto-resolve username from site selection
+    # Auto-resolve username from site
     site_id = _site_name_to_id(site)
-    username = data.get('username', '').strip() or _SITE_STAFF_MAP.get(site_id, '')
-    if not username:
-        return jsonify({'success': False, 'message': 'No staff account configured for this site'}), 400
-
-    success, user_info = authenticate_user(username, password)
-    if not success:
-        return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
-
-    role = user_info.get('role', '')
-    # Only staff, site_admin, and admin can use the app
-    if role not in ('staff', 'site_admin', 'admin'):
-        return jsonify({'success': False, 'message': 'This account does not have app access'}), 403
+    username = _SITE_STAFF_MAP.get(site_id, 'staff')
 
     config = _get_app_config()
-
-    # Check if staff_name is required
-    if config.get('require_staff_name', True) and not staff_name:
-        return jsonify({'success': False, 'message': 'Staff name is required'}), 400
 
     # Create session
     import uuid
@@ -176,11 +175,10 @@ def api_app_login():
     _ensure_tables()
     try:
         with sqlite3.connect(_CALLBELL_DB) as conn:
-            # Deactivate any existing sessions for this username + staff_name on same site
-            # (allows multiple people to share the same account with different staff names)
+            # Deactivate any existing sessions for this staff_name on same site
             conn.execute(
-                'UPDATE staff_sessions SET is_active = 0 WHERE username = ? AND site = ? AND staff_name = ? AND is_active = 1',
-                (username, site, staff_name)
+                'UPDATE staff_sessions SET is_active = 0 WHERE site = ? AND staff_name = ? AND is_active = 1',
+                (site, staff_name)
             )
             conn.execute('''
                 INSERT INTO staff_sessions (session_id, username, staff_name, site, device_info, started_at, last_heartbeat, is_active)
@@ -188,17 +186,15 @@ def api_app_login():
             ''', (session_id, username, staff_name, site, device_info, now, now))
     except Exception as e:
         logger.error(f"Failed to create staff session: {e}")
-
-    actual_username = get_username_by_lowercase(username) or username
-    display_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+        return jsonify({'success': False, 'message': 'Failed to create session'}), 500
 
     return jsonify({
         'success': True,
         'session_id': session_id,
         'user': {
-            'username': actual_username,
-            'display_name': display_name,
-            'role': role,
+            'username': username,
+            'display_name': staff_name,
+            'role': 'staff',
             'site': site,
             'staff_name': staff_name,
         },
@@ -207,6 +203,12 @@ def api_app_login():
             'show_timer': config.get('show_timer', False),
         },
     })
+
+
+@app_api_bp.route('/api/app/login', methods=['POST'])
+def api_app_login():
+    """Legacy login endpoint - redirects to checkin."""
+    return api_app_checkin()
 
 
 # ── Authenticated endpoints (session_id required) ───────────
