@@ -240,7 +240,7 @@ USERS_DB = {
         "location": ["Ramsay"]
     },
     "staff.parafield": {
-        "password_hash": hash_password("password123"),
+        "password_hash": hash_password("2036"),
         "first_name": "Staff",
         "last_name": "Parafield",
         "role": "staff",
