@@ -316,7 +316,10 @@
                 el.classList.toggle('active', el.id === 'tab-' + siteId);
             });
             updateClearMessage();
-            if (isAdmin) pollStaffOnline();
+            if (isAdmin) {
+                document.getElementById('staff-online-list').innerHTML = '<div class="text-slate-600 text-[11px] italic py-2">Loading...</div>';
+                pollStaffOnline();
+            }
         }
 
         function updateClearMessage() {

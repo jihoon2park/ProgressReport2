@@ -36,32 +36,35 @@ _DEFAULT_APP_CONFIG = {
 
 def _ensure_tables():
     """Create app_config and staff_sessions tables if missing."""
-    with sqlite3.connect(_CALLBELL_DB) as conn:
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS app_config (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS staff_sessions (
-                session_id TEXT PRIMARY KEY,
-                username TEXT NOT NULL,
-                staff_name TEXT,
-                site TEXT NOT NULL,
-                device_info TEXT,
-                started_at REAL NOT NULL,
-                last_heartbeat REAL NOT NULL,
-                is_active INTEGER NOT NULL DEFAULT 1
-            )
-        ''')
-        # Seed defaults if empty
-        existing = conn.execute('SELECT COUNT(*) FROM app_config').fetchone()[0]
-        if existing == 0:
-            for k, v in _DEFAULT_APP_CONFIG.items():
-                conn.execute('INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)',
-                             (k, json.dumps(v)))
-        conn.commit()
+    try:
+        with sqlite3.connect(_CALLBELL_DB) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS app_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS staff_sessions (
+                    session_id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    staff_name TEXT,
+                    site TEXT NOT NULL,
+                    device_info TEXT,
+                    started_at REAL NOT NULL,
+                    last_heartbeat REAL NOT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1
+                )
+            ''')
+            # Seed defaults if empty
+            existing = conn.execute('SELECT COUNT(*) FROM app_config').fetchone()[0]
+            if existing == 0:
+                for k, v in _DEFAULT_APP_CONFIG.items():
+                    conn.execute('INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)',
+                                 (k, json.dumps(v)))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to ensure tables: {e}")
 
 
 def _get_app_config() -> dict:
@@ -227,44 +230,49 @@ def _validate_session(data: dict):
 @app_api_bp.route('/api/app/heartbeat', methods=['POST'])
 def api_app_heartbeat():
     """Keep session alive and return active calls for the staff's site."""
-    data = request.get_json() or {}
-    session_row = _validate_session(data)
-    if not session_row:
-        return jsonify({'success': False, 'message': 'Invalid or expired session', 'logged_out': True}), 401
-
-    session_id, username, staff_name, site = session_row
-    now = time.time()
-
-    # Update heartbeat
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
-            conn.execute('UPDATE staff_sessions SET last_heartbeat = ? WHERE session_id = ?', (now, session_id))
+        data = request.get_json() or {}
+        session_row = _validate_session(data)
+        if not session_row:
+            return jsonify({'success': False, 'message': 'Invalid or expired session', 'logged_out': True}), 401
+
+        session_id, username, staff_name, site = session_row
+        now = time.time()
+
+        # Update heartbeat + clean up stale sessions (no heartbeat for 10+ min)
+        try:
+            with sqlite3.connect(_CALLBELL_DB) as conn:
+                conn.execute('UPDATE staff_sessions SET last_heartbeat = ? WHERE session_id = ?', (now, session_id))
+                stale_cutoff = now - 600  # 10 minutes
+                conn.execute('UPDATE staff_sessions SET is_active = 0 WHERE is_active = 1 AND last_heartbeat < ?', (stale_cutoff,))
+        except Exception as e:
+            logger.error(f"Failed to update heartbeat: {e}")
+
+        # Get calls for this staff's site - use callbell manager
+        calls = []
+        try:
+            from callbell.manager import get_manager
+            manager = get_manager()
+            site_id = _site_name_to_id(site)
+            if site_id:
+                monitor = manager.get_monitor(site_id)
+                calls = monitor.get_active_calls(consumer='app') if monitor else []
+        except Exception as e:
+            logger.error(f"Failed to get calls for heartbeat: {e}")
+
+        config = _get_app_config()
+
+        return jsonify({
+            'success': True,
+            'calls': calls,
+            'config': {
+                'poll_interval_ms': config.get('poll_interval_ms', 3000),
+                'show_timer': config.get('show_timer', False),
+            },
+        })
     except Exception as e:
-        logger.error(f"Failed to update heartbeat: {e}")
-
-    # Get calls for this staff's site - use callbell manager
-    calls = []
-    try:
-        from callbell.manager import get_manager
-        manager = get_manager()
-        # Map site display name to site_id
-        site_id = _site_name_to_id(site)
-        if site_id:
-            monitor = manager.get_monitor(site_id)
-            calls = monitor.get_active_calls(consumer='app') if monitor else []
-    except Exception as e:
-        logger.error(f"Failed to get calls for heartbeat: {e}")
-
-    config = _get_app_config()
-
-    return jsonify({
-        'success': True,
-        'calls': calls,
-        'config': {
-            'poll_interval_ms': config.get('poll_interval_ms', 3000),
-            'show_timer': config.get('show_timer', False),
-        },
-    })
+        logger.error(f"Unhandled error in heartbeat: {e}")
+        return jsonify({'success': False, 'message': 'Server error', 'calls': []}), 500
 
 
 @app_api_bp.route('/api/app/finish-shift', methods=['POST'])
@@ -391,13 +399,16 @@ def api_app_admin_staff_online():
                     ORDER BY site, staff_name
                 ''').fetchall()
             else:
-                placeholders = ','.join('?' * len(allowed_locations))
-                rows = conn.execute(f'''
-                    SELECT username, staff_name, site, device_info, started_at, last_heartbeat
-                    FROM staff_sessions
-                    WHERE is_active = 1 AND site IN ({placeholders})
-                    ORDER BY site, staff_name
-                ''', allowed_locations).fetchall()
+                if not allowed_locations:
+                    rows = []
+                else:
+                    placeholders = ','.join('?' * len(allowed_locations))
+                    rows = conn.execute(f'''
+                        SELECT username, staff_name, site, device_info, started_at, last_heartbeat
+                        FROM staff_sessions
+                        WHERE is_active = 1 AND site IN ({placeholders})
+                        ORDER BY site, staff_name
+                    ''', allowed_locations).fetchall()
 
         staff = []
         for r in rows:
