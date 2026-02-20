@@ -289,15 +289,13 @@ class CallbellMonitor(ABC):
                     card_level = compute_card_color(elapsed, priority, settings)
                     style = CARD_STYLES[card_level]
                     
-                    # Buzz: only tracked for app consumer (buzz once on new call or color escalation)
+                    # Buzz: always true for app consumer — each client tracks its own
+                    # dedup locally (buzzedRooms ref + AsyncStorage) so all 30 phones
+                    # independently decide when to buzz. Server-side tracking was broken
+                    # because _buzz_levels_app was shared across all sessions.
                     buzz_key = event_id if event_id is not None else r[0]
                     current_event_ids.add(buzz_key)
-                    if consumer == 'app':
-                        prev_level = self._buzz_levels_app.get(buzz_key)
-                        buzz = prev_level is None or prev_level != card_level
-                        self._buzz_levels_app[buzz_key] = card_level
-                    else:
-                        buzz = False
+                    buzz = (consumer == 'app')
                     
                     calls.append({
                         'room': r[0],

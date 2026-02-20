@@ -241,12 +241,10 @@ def api_app_heartbeat():
         session_id, username, staff_name, site = session_row
         now = time.time()
 
-        # Update heartbeat + clean up stale sessions (no heartbeat for 10+ min)
+        # Update heartbeat — sessions stay active until staff finishes shift
         try:
             with sqlite3.connect(_CALLBELL_DB) as conn:
                 conn.execute('UPDATE staff_sessions SET last_heartbeat = ? WHERE session_id = ?', (now, session_id))
-                stale_cutoff = now - 600  # 10 minutes
-                conn.execute('UPDATE staff_sessions SET is_active = 0 WHERE is_active = 1 AND last_heartbeat < ?', (stale_cutoff,))
         except Exception as e:
             logger.error(f"Failed to update heartbeat: {e}")
 
