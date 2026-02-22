@@ -6,6 +6,7 @@ import os
 import time
 import sqlite3
 import logging
+import threading
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
@@ -131,7 +132,9 @@ class CallbellMonitor(ABC):
         self.site_name = site_name
         self.db_path = db_path
         self.monitor_started = False
-        self._buzz_levels_app = {}      # app heartbeat: buzz_key -> last card_level (buzz once per new call/escalation)
+        self._buzz_levels_app = {}      # legacy — no longer used for client buzz
+        self._push_levels = {}           # FCM push: buzz_key -> last pushed card_level
+        self._push_lock = threading.Lock()
         self.debug_info = {
             'site_id': site_id,
             'site_name': site_name,
@@ -217,18 +220,35 @@ class CallbellMonitor(ABC):
                   event_id: Optional[str] = None, color: Optional[str] = None,
                   message_text: Optional[str] = None, message_subtext: Optional[str] = None):
         """Save a new active call to the database."""
+        is_new = False
         try:
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute(f'''
+                cursor = conn.execute(f'''
                     INSERT OR IGNORE INTO {self._active_table}
                     (room, type, priority, start_time, event_id, color, message_text, message_subtext, site_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (room, call_type, priority, start_time, event_id, color, 
                       message_text or room, message_subtext or call_type, self.site_id))
+                is_new = cursor.rowcount > 0
             logger.info(f"📞 [{self.site_name}] Call saved: {room} ({call_type}) priority={priority}")
         except Exception as e:
             logger.error(f"Failed to save call for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)
+        
+        # Send FCM push notification for genuinely new calls
+        if is_new:
+            try:
+                from firebase_push import send_push_for_new_call
+                send_push_for_new_call(
+                    site_name=self.site_name,
+                    room=room,
+                    call_type=call_type,
+                    priority=priority,
+                    message_text=message_text or room,
+                    card_level='red' if priority <= 1 else 'yellow' if priority <= 2 else 'green',
+                )
+            except Exception as e:
+                logger.error(f"Failed to send push for new call: {e}")
     
     def archive_call(self, room: str, event_id: Optional[str] = None):
         """Archive and remove a call from active calls."""
@@ -325,11 +345,55 @@ class CallbellMonitor(ABC):
                 level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}
                 calls.sort(key=lambda c: (level_order.get(c['card_level'], 3), -c['elapsed_seconds']))
                 
+                # Check for color escalations and send FCM push (app consumer only)
+                if consumer == 'app':
+                    self._check_push_escalations(calls, current_event_ids)
+                
                 return calls
         except Exception as e:
             logger.error(f"Failed to get active calls for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)
             return []
+    
+    def _check_push_escalations(self, calls: List[Dict[str, Any]], current_keys: set):
+        """Check if any call's color level changed and send FCM push if so.
+        Uses a lock so only one heartbeat thread sends the push per escalation."""
+        with self._push_lock:
+            escalated = []
+            for call in calls:
+                buzz_key = call.get('event_id') or call['room']
+                current_level = call['card_level']
+                prev_level = self._push_levels.get(buzz_key)
+                
+                if prev_level is not None and prev_level != current_level:
+                    # Color changed — this is an escalation
+                    escalated.append(call)
+                
+                self._push_levels[buzz_key] = current_level
+            
+            # Clean up calls that are no longer active
+            stale = [k for k in self._push_levels if k not in current_keys]
+            for k in stale:
+                del self._push_levels[k]
+        
+        # Send push outside the lock (network call)
+        if escalated:
+            try:
+                from firebase_push import send_push_for_new_call
+                # Pick the most urgent escalated call
+                level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}
+                escalated.sort(key=lambda c: level_order.get(c['card_level'], 3))
+                top = escalated[0]
+                send_push_for_new_call(
+                    site_name=self.site_name,
+                    room=top['room'],
+                    call_type=top.get('type', ''),
+                    priority=top.get('priority', 3),
+                    message_text=top.get('messageText', top['room']),
+                    card_level=top['card_level'],
+                )
+            except Exception as e:
+                logger.error(f"Failed to send escalation push: {e}")
     
     def clear_all_calls(self):
         """Clear all active calls for this site."""

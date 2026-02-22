@@ -18,6 +18,15 @@ from config_users import authenticate_user, get_username_by_lowercase
 
 logger = logging.getLogger(__name__)
 
+# Lazy import firebase push to avoid circular imports
+def _get_firebase_push():
+    try:
+        import firebase_push
+        return firebase_push
+    except Exception as e:
+        logger.error(f"Failed to import firebase_push: {e}")
+        return None
+
 app_api_bp = Blueprint('app_api', __name__)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -275,6 +284,25 @@ def api_app_heartbeat():
         return jsonify({'success': False, 'message': 'Server error', 'calls': []}), 500
 
 
+@app_api_bp.route('/api/app/register-push-token', methods=['POST'])
+def api_app_register_push_token():
+    """Register a device FCM token for push notifications."""
+    data = request.get_json() or {}
+    session_row = _validate_session(data)
+    if not session_row:
+        return jsonify({'success': False, 'message': 'Invalid session'}), 401
+
+    token = (data.get('token') or '').strip()
+    if not token:
+        return jsonify({'success': False, 'message': 'Token required'}), 400
+
+    session_id, username, staff_name, site = session_row
+    fp = _get_firebase_push()
+    if fp:
+        fp.register_device_token(session_id, token, site, staff_name or '')
+    return jsonify({'success': True})
+
+
 @app_api_bp.route('/api/app/finish-shift', methods=['POST'])
 def api_app_finish_shift():
     """End the staff session."""
@@ -289,6 +317,11 @@ def api_app_finish_shift():
             conn.execute('UPDATE staff_sessions SET is_active = 0 WHERE session_id = ?', (session_id,))
     except Exception as e:
         logger.error(f"Failed to end session: {e}")
+
+    # Remove device tokens for this session
+    fp = _get_firebase_push()
+    if fp:
+        fp.unregister_device_tokens(session_id)
 
     return jsonify({'success': True, 'message': 'Shift ended'})
 
