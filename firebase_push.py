@@ -134,7 +134,7 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
                     priority='high',
                     notification=messaging.AndroidNotification(
                         channel_id='callbell-alerts',
-                        notification_priority='max',
+                        priority='max',
                         sound='default',
                         vibrate_timings_millis=[0, 800, 150, 800, 150, 800, 150, 800],
                         default_vibrate_timings=False,
