@@ -98,13 +98,61 @@ def _get_tokens_for_site(site_name: str) -> list:
         return []
 
 
+def _get_tokens_for_site_by_area(site_name: str, detected_area: str) -> list:
+    """Get device tokens filtered by area. If a user has no areas set, they get all calls.
+    If detected_area is empty, return all tokens (can't filter)."""
+    _ensure_device_tokens_table()
+    try:
+        import json
+        with sqlite3.connect(_CALLBELL_DB) as conn:
+            rows = conn.execute('''
+                SELECT dt.token, ss.areas FROM device_tokens dt
+                INNER JOIN staff_sessions ss ON dt.session_id = ss.session_id
+                WHERE ss.site = ? AND ss.is_active = 1
+            ''', (site_name,)).fetchall()
+
+            if not detected_area:
+                # Can't detect area — send to everyone
+                return [r[0] for r in rows]
+
+            tokens = []
+            for token, areas_json in rows:
+                try:
+                    user_areas = json.loads(areas_json) if areas_json else []
+                except (json.JSONDecodeError, TypeError):
+                    user_areas = []
+
+                # No areas set = receives all calls; otherwise check match
+                if not user_areas or detected_area.lower() in [a.lower() for a in user_areas]:
+                    tokens.append(token)
+            return tokens
+    except Exception as e:
+        logger.error(f"Failed to get area-filtered tokens for {site_name}: {e}")
+        return []
+
+
+def _detect_area_for_push(site_name: str, message_text: str) -> str:
+    """Detect area from a callbell message for push filtering."""
+    try:
+        from app_api import _detect_area_parafield, _detect_area_ramsay
+        if 'parafield' in site_name.lower():
+            return _detect_area_parafield(message_text)
+        elif 'ramsay' in site_name.lower():
+            return _detect_area_ramsay(message_text)
+    except Exception as e:
+        logger.error(f"Failed to detect area for push: {e}")
+    return ''
+
+
 def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: int,
                            message_text: str = '', card_level: str = 'green'):
-    """Send FCM push notification to all devices at a site for a new call."""
+    """Send FCM push notification to devices at a site, filtered by area."""
     if not _init_firebase():
         return
 
-    tokens = _get_tokens_for_site(site_name)
+    # Detect area from the message and get area-filtered tokens
+    detected_area = _detect_area_for_push(site_name, message_text or room)
+    tokens = _get_tokens_for_site_by_area(site_name, detected_area)
     if not tokens:
         return
 
