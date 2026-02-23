@@ -271,12 +271,21 @@ def api_app_heartbeat():
 
         config = _get_app_config()
 
+        # Get notification tone from callbell settings
+        tone = 'bell1'
+        try:
+            from callbell.base_monitor import get_notification_tone
+            tone = get_notification_tone(_CALLBELL_DB)
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
             'calls': calls,
             'config': {
                 'poll_interval_ms': config.get('poll_interval_ms', 3000),
                 'show_timer': config.get('show_timer', False),
+                'notification_tone': tone,
             },
         })
     except Exception as e:

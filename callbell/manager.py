@@ -12,6 +12,7 @@ from flask_login import current_user
 
 from .base_monitor import (
     CallbellMonitor, get_color_settings, save_color_settings,
+    get_notification_tone, save_notification_tone,
     init_settings_table, CARD_STYLES
 )
 from .ramsay_monitor import RamsayCallbellMonitor
@@ -353,12 +354,13 @@ def api_callbell_poll():
 
 @callbell_bp.route('/api/callbell/settings', methods=['GET'])
 def api_get_settings():
-    """Get current color threshold settings."""
+    """Get current color threshold and notification settings."""
     manager = get_manager()
     settings = get_color_settings(manager.db_path)
     return jsonify({
         'settings': settings,
         'card_styles': CARD_STYLES,
+        'available_tones': ['bell1', 'bell2', 'bell3'],
     })
 
 
@@ -386,11 +388,21 @@ def api_save_settings():
         }), 400
     
     save_color_settings(manager.db_path, green, yellow, red)
-    logger.info(f"Color settings updated: green={green}m, yellow={yellow}m, red={red}m")
     
+    # Save notification tone if provided
+    tone = data.get('notification_tone')
+    if tone:
+        try:
+            save_notification_tone(manager.db_path, tone)
+        except ValueError as ve:
+            return jsonify({'status': 'error', 'message': str(ve)}), 400
+    
+    logger.info(f"Settings updated: green={green}m, yellow={yellow}m, red={red}m, tone={tone}")
+    
+    settings = get_color_settings(manager.db_path)
     return jsonify({
         'status': 'ok',
-        'settings': {'green_minutes': green, 'yellow_minutes': yellow, 'red_minutes': red}
+        'settings': settings
     })
 
 

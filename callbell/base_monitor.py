@@ -26,6 +26,7 @@ DEFAULT_SETTINGS = {
     'green_minutes': 3,
     'yellow_minutes': 5,
     'red_minutes': 7,
+    'notification_tone': 'bell1',
 }
 
 
@@ -58,10 +59,39 @@ def get_color_settings(db_path: str) -> Dict[str, int]:
             rows = conn.execute('SELECT key, value FROM callbell_settings').fetchall()
             for key, value in rows:
                 if key in settings:
-                    settings[key] = int(value)
+                    if key == 'notification_tone':
+                        settings[key] = value
+                    else:
+                        settings[key] = int(value)
     except Exception as e:
         logger.error(f"Failed to read color settings: {e}")
     return settings
+
+
+def get_notification_tone(db_path: str) -> str:
+    """Read notification tone setting from DB."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            row = conn.execute("SELECT value FROM callbell_settings WHERE key = 'notification_tone'").fetchone()
+            if row:
+                return row[0]
+    except Exception as e:
+        logger.error(f"Failed to read notification tone: {e}")
+    return 'bell1'
+
+
+def save_notification_tone(db_path: str, tone: str):
+    """Save notification tone setting to DB."""
+    valid = ('bell1', 'bell2', 'bell3')
+    if tone not in valid:
+        raise ValueError(f'Invalid tone: {tone}. Must be one of {valid}')
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
+                         ('notification_tone', tone))
+        logger.info(f"✅ Notification tone saved: {tone}")
+    except Exception as e:
+        logger.error(f"Failed to save notification tone: {e}")
 
 
 def save_color_settings(db_path: str, green_minutes: int, yellow_minutes: int, red_minutes: int):

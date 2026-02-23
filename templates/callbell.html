@@ -150,6 +150,31 @@
                 </div>
             </div>
 
+            <!-- Notification Tone -->
+            <div class="mt-4 pt-4 border-t border-slate-700/50">
+                <h2 class="text-sm font-black uppercase tracking-wide text-slate-300 mb-3">Notification Tone</h2>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <label class="tone-option flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border border-slate-700/50 hover:border-teal-500/50 transition-all" data-tone="bell1">
+                            <input type="radio" name="notification_tone" value="bell1" class="accent-teal-500">
+                            <span class="text-xs text-slate-300 font-bold">Bell 1</span>
+                            <button onclick="previewTone('bell1')" class="ml-1 px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-bold rounded transition-colors">▶</button>
+                        </label>
+                        <label class="tone-option flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border border-slate-700/50 hover:border-teal-500/50 transition-all" data-tone="bell2">
+                            <input type="radio" name="notification_tone" value="bell2" class="accent-teal-500">
+                            <span class="text-xs text-slate-300 font-bold">Bell 2</span>
+                            <button onclick="previewTone('bell2')" class="ml-1 px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-bold rounded transition-colors">▶</button>
+                        </label>
+                        <label class="tone-option flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border border-slate-700/50 hover:border-teal-500/50 transition-all" data-tone="bell3">
+                            <input type="radio" name="notification_tone" value="bell3" class="accent-teal-500">
+                            <span class="text-xs text-slate-300 font-bold">Bell 3</span>
+                            <button onclick="previewTone('bell3')" class="ml-1 px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-bold rounded transition-colors">▶</button>
+                        </label>
+                    </div>
+                    <button id="stop-preview" onclick="stopPreview()" class="hidden px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold uppercase rounded transition-colors">■ Stop</button>
+                </div>
+            </div>
+
             <!-- App Config -->
             <div class="mt-4 pt-4 border-t border-slate-700/50">
                 <div class="flex items-center justify-between mb-3">
@@ -337,12 +362,45 @@
             document.getElementById('settings-panel').classList.toggle('open');
         };
 
+        let previewAudio = null;
+
+        const previewTone = (tone) => {
+            stopPreview();
+            previewAudio = new Audio('/static/sounds/' + tone + '.mp3');
+            previewAudio.play();
+            document.getElementById('stop-preview').classList.remove('hidden');
+            previewAudio.onended = () => { document.getElementById('stop-preview').classList.add('hidden'); };
+        };
+
+        const stopPreview = () => {
+            if (previewAudio) { previewAudio.pause(); previewAudio.currentTime = 0; previewAudio = null; }
+            document.getElementById('stop-preview').classList.add('hidden');
+        };
+
         const applySettings = (settings) => {
             if (!settings) return;
             document.getElementById('set-green').value = settings.green_minutes || 3;
             document.getElementById('set-yellow').value = settings.yellow_minutes || 5;
             document.getElementById('set-red').value = settings.red_minutes || 7;
+            // Apply notification tone
+            const tone = settings.notification_tone || 'bell1';
+            const radio = document.querySelector('input[name="notification_tone"][value="' + tone + '"]');
+            if (radio) radio.checked = true;
+            // Highlight selected tone
+            document.querySelectorAll('.tone-option').forEach(el => {
+                el.classList.toggle('border-teal-500', el.dataset.tone === tone);
+            });
         };
+
+        // Update tone highlight on change
+        document.querySelectorAll('input[name="notification_tone"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                document.querySelectorAll('.tone-option').forEach(el => {
+                    el.classList.toggle('border-teal-500', el.dataset.tone === radio.value && radio.checked);
+                    el.classList.toggle('border-slate-700/50', !(el.dataset.tone === radio.value && radio.checked));
+                });
+            });
+        });
 
         const saveSettings = async () => {
             const green = parseInt(document.getElementById('set-green').value);
@@ -358,7 +416,7 @@
                 const res = await fetch('/api/callbell/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ green_minutes: green, yellow_minutes: yellow, red_minutes: red })
+                    body: JSON.stringify({ green_minutes: green, yellow_minutes: yellow, red_minutes: red, notification_tone: document.querySelector('input[name="notification_tone"]:checked')?.value || 'bell1' })
                 });
                 const data = await res.json();
                 if (data.status === 'ok') {

@@ -136,7 +136,7 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
                         channel_id='callbell-alerts',
                         priority='max',
                         sound='default',
-                        vibrate_timings_millis=[0, 800, 150, 800, 150, 800, 150, 800],
+                        vibrate_timings_millis=[0, 4000],
                         default_vibrate_timings=False,
                         visibility='public',
                         tag='callbell-call',
