@@ -82,7 +82,7 @@ def get_notification_tone(db_path: str) -> str:
 
 def save_notification_tone(db_path: str, tone: str):
     """Save notification tone setting to DB."""
-    valid = ('bell1', 'bell2', 'bell3')
+    valid = ('default', 'bell1', 'bell2', 'bell3')
     if tone not in valid:
         raise ValueError(f'Invalid tone: {tone}. Must be one of {valid}')
     try:

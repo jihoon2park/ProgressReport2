@@ -110,6 +110,12 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
 
     try:
         from firebase_admin import messaging
+        from callbell.base_monitor import get_notification_tone
+
+        # Get the selected notification tone from settings
+        tone = get_notification_tone(_CALLBELL_DB)
+        channel_id = f'callbell-{tone}'
+        sound_file = 'default' if tone == 'default' else f'{tone}.mp3'
 
         # Build urgency label
         if card_level == 'red':
@@ -133,9 +139,9 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
                 android=messaging.AndroidConfig(
                     priority='high',
                     notification=messaging.AndroidNotification(
-                        channel_id='callbell-alerts',
+                        channel_id=channel_id,
                         priority='max',
-                        sound='default',
+                        sound=sound_file,
                         vibrate_timings_millis=[0, 4000],
                         default_vibrate_timings=False,
                         visibility='public',

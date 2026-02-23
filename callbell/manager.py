@@ -360,7 +360,7 @@ def api_get_settings():
     return jsonify({
         'settings': settings,
         'card_styles': CARD_STYLES,
-        'available_tones': ['bell1', 'bell2', 'bell3'],
+        'available_tones': ['default', 'bell1', 'bell2', 'bell3'],
     })
 
 
