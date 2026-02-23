@@ -145,14 +145,19 @@ def _detect_area_for_push(site_name: str, message_text: str) -> str:
 
 
 def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: int,
-                           message_text: str = '', card_level: str = 'green'):
-    """Send FCM push notification to devices at a site, filtered by area."""
+                           message_text: str = '', card_level: str = 'green',
+                           send_to_all: bool = False):
+    """Send FCM push notification to devices at a site, filtered by area.
+    If send_to_all is True, skip area filtering (used for escalated calls)."""
     if not _init_firebase():
         return
 
-    # Detect area from the message and get area-filtered tokens
-    detected_area = _detect_area_for_push(site_name, message_text or room)
-    tokens = _get_tokens_for_site_by_area(site_name, detected_area)
+    # For escalated calls or when send_to_all is True, send to everyone
+    if send_to_all:
+        tokens = _get_tokens_for_site(site_name)
+    else:
+        detected_area = _detect_area_for_push(site_name, message_text or room)
+        tokens = _get_tokens_for_site_by_area(site_name, detected_area)
     if not tokens:
         return
 

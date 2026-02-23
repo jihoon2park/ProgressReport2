@@ -282,7 +282,7 @@ def api_site_active_calls(site_id: str):
 
 @callbell_bp.route('/api/callbell/<site_id>/reset', methods=['POST'])
 def api_site_reset_calls(site_id: str):
-    """Clear all active calls for a specific site. Requires admin/site_admin."""
+    """Clear all active calls and staff sessions for a specific site. Requires admin/site_admin."""
     if not current_user.is_authenticated or getattr(current_user, 'role', '') not in ('admin', 'site_admin'):
         return jsonify({'status': 'error', 'message': 'Admin access required'}), 403
     
@@ -290,10 +290,42 @@ def api_site_reset_calls(site_id: str):
     success = manager.clear_site_calls(site_id)
     
     if success:
-        logger.info(f"Cleared active calls for {site_id}")
+        # Also clear staff sessions for this site
+        try:
+            site_config = manager._get_site_config(site_id)
+            site_name = site_config.get('site_name', '') if site_config else ''
+            if site_name:
+                with sqlite3.connect(manager.db_path) as conn:
+                    conn.execute('UPDATE staff_sessions SET is_active = 0 WHERE site = ? AND is_active = 1', (site_name,))
+                    conn.execute('DELETE FROM device_tokens WHERE site = ?', (site_name,))
+                logger.info(f"Cleared staff sessions for {site_name}")
+        except Exception as e:
+            logger.error(f"Failed to clear staff sessions for {site_id}: {e}")
         return jsonify({'status': 'ok', 'site_id': site_id})
     else:
         return jsonify({'status': 'error', 'message': f'Site {site_id} not found'}), 404
+
+
+@callbell_bp.route('/api/callbell/<site_id>/cancel-call', methods=['POST'])
+def api_web_cancel_call(site_id: str):
+    """Cancel a specific call from the web UI. Requires admin/site_admin."""
+    if not current_user.is_authenticated or getattr(current_user, 'role', '') not in ('admin', 'site_admin'):
+        return jsonify({'status': 'error', 'message': 'Admin access required'}), 403
+    
+    data = request.get_json() or {}
+    room = data.get('room', '')
+    event_id = data.get('event_id', '')
+    if not room and not event_id:
+        return jsonify({'status': 'error', 'message': 'room or event_id required'}), 400
+    
+    manager = get_manager()
+    monitor = manager.get_monitor(site_id)
+    if not monitor:
+        return jsonify({'status': 'error', 'message': f'Site {site_id} not found'}), 404
+    
+    monitor.archive_call(room, event_id)
+    logger.info(f"Web UI cancelled call: site={site_id} room={room} event_id={event_id} by {current_user.id}")
+    return jsonify({'status': 'ok'})
 
 
 @callbell_bp.route('/api/callbell/poll')

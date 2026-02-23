@@ -244,13 +244,13 @@
         </main>
 
         <!-- Right sidebar: Staff Online (admin only) -->
-        <aside id="staff-sidebar" class="hidden w-56 bg-slate-900/95 border-l border-slate-700/50 overflow-y-auto flex-shrink-0">
-            <div class="px-4 py-3">
-                <h2 class="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+        <aside id="staff-sidebar" class="hidden w-80 bg-slate-900/95 border-l border-slate-700/50 overflow-y-auto flex-shrink-0">
+            <div class="px-5 py-4">
+                <h2 class="text-sm font-black uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                    <div class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></div>
                     Staff Online
                 </h2>
-                <div id="staff-online-list" class="text-xs text-slate-400"></div>
+                <div id="staff-online-list" class="text-sm text-slate-400"></div>
             </div>
         </aside>
     </div>
@@ -497,10 +497,15 @@
             card.dataset.level = level;
 
             const label = data.messageText || data.room;
+            const cancelBtn = isAdmin
+                ? '<button onclick="cancelCall(\'' + siteId + '\', \'' + data.room.replace(/'/g, "\\'") + '\', \'' + (data.event_id || '').replace(/'/g, "\\'") + '\')" ' +
+                  'class="mt-2 px-3 py-1 bg-red-700/60 hover:bg-red-600 text-red-200 text-[11px] font-bold uppercase rounded transition-colors">✕ Cancel</button>'
+                : '';
 
             card.innerHTML =
                 '<div class="room-text font-black" style="color:' + webStyle.text + '">' + label + '</div>' +
-                '<div class="flex justify-end items-end mt-3">' +
+                '<div class="flex justify-between items-end mt-3">' +
+                    '<div>' + cancelBtn + '</div>' +
                     '<div class="text-4xl font-bold timer-font tabular-nums" data-start="' + data.start + '" style="display: ' + (timerEnabled ? 'block' : 'none') + '; color: ' + webStyle.text + '">00:00</div>' +
                 '</div>';
         };
@@ -573,12 +578,25 @@
         poll();
         setInterval(poll, 1000);
 
-        // ── Reset (active tab only) ──
+        // ── Cancel a single call ──
+        const cancelCall = async (siteId, room, eventId) => {
+            if (!confirm('Cancel call: ' + room + '?')) return;
+            try {
+                await fetch('/api/callbell/' + siteId + '/cancel-call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ room: room, event_id: eventId })
+                });
+                prevPollJson = ''; // force re-render
+            } catch (e) { console.warn('Cancel call failed:', e); }
+        };
+
+        // ── Reset (active tab only) — clears calls AND staff sessions ──
         const resetCalls = async () => {
             if (!activeTab) return;
             const site = sites.find(s => s.id === activeTab);
             const siteName = site ? site.name : activeTab;
-            if (!confirm('Clear all active calls for ' + siteName + '?')) return;
+            if (!confirm('Clear all active calls AND log out all staff for ' + siteName + '?')) return;
             await fetch('/api/callbell/' + activeTab + '/reset', { method: 'POST' });
             const grid = document.getElementById('call-grid-' + activeTab);
             if (grid) grid.innerHTML = '';
@@ -586,6 +604,7 @@
             siteState[activeTab].callCount = 0;
             prevPollJson = '';
             updateClearMessage();
+            if (isAdmin) pollStaffOnline();
         };
 
         // ── Timer Animation ──
@@ -662,14 +681,26 @@
                     el.innerHTML = '<div class="text-slate-600 text-[11px] italic py-2">No staff online</div>';
                     return;
                 }
-                el.innerHTML = data.staff.map(s =>
-                    '<div class="flex items-start gap-2 py-2 border-b border-slate-800/50">' +
-                    '<div class="w-2 h-2 rounded-full bg-green-400 mt-1 flex-shrink-0"></div>' +
-                    '<div class="min-w-0">' +
-                    '<div class="text-slate-200 font-bold text-xs truncate">' + (s.staff_name || s.username) + '</div>' +
-                    '<div class="text-slate-500 text-[10px]">' + s.online_minutes + 'm</div>' +
-                    '</div></div>'
-                ).join('');
+                el.innerHTML = data.staff.map(s => {
+                    const totalMin = s.online_minutes || 0;
+                    const h = Math.floor(totalMin / 60);
+                    const m = Math.floor(totalMin % 60);
+                    const sec = Math.round((totalMin % 1) * 60);
+                    const timeStr = h > 0
+                        ? h + 'h ' + m.toString().padStart(2,'0') + 'm ' + sec.toString().padStart(2,'0') + 's'
+                        : m + 'm ' + sec.toString().padStart(2,'0') + 's';
+                    const areasHtml = s.areas && s.areas.length > 0
+                        ? '<div class="flex flex-wrap gap-1 mt-1">' + s.areas.map(a => '<span class="px-2 py-0.5 bg-teal-900/50 text-teal-300 text-xs font-bold rounded">' + a + '</span>').join('') + '</div>'
+                        : '';
+                    return '<div class="py-3 border-b border-slate-800/50">' +
+                        '<div class="flex items-center gap-2">' +
+                        '<div class="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0"></div>' +
+                        '<div class="min-w-0 flex-1">' +
+                        '<div class="text-slate-200 font-bold text-sm truncate">' + (s.staff_name || s.username) + '</div>' +
+                        '<div class="text-slate-500 text-xs mt-0.5">' + timeStr + '</div>' +
+                        areasHtml +
+                        '</div></div></div>';
+                }).join('');
             } catch (e) { /* ignore - not admin */ }
         };
 

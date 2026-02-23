@@ -421,6 +421,7 @@ class CallbellMonitor(ABC):
                     priority=top.get('priority', 3),
                     message_text=top.get('messageText', top['room']),
                     card_level=top['card_level'],
+                    send_to_all=True,
                 )
             except Exception as e:
                 logger.error(f"Failed to send escalation push: {e}")
