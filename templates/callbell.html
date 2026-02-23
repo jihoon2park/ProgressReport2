@@ -499,7 +499,7 @@
             const label = data.messageText || data.room;
             const cancelBtn = isAdmin
                 ? '<button onclick="cancelCall(\'' + siteId + '\', \'' + data.room.replace(/'/g, "\\'") + '\', \'' + (data.event_id || '').replace(/'/g, "\\'") + '\')" ' +
-                  'class="mt-2 px-3 py-1 bg-red-700/60 hover:bg-red-600 text-red-200 text-[11px] font-bold uppercase rounded transition-colors">✕ Cancel</button>'
+                  'class="mt-2 px-3 py-1 bg-red-700/60 hover:bg-red-600 text-red-200 text-[11px] font-bold uppercase rounded transition-colors">✕ Cancelled</button>'
                 : '';
 
             card.innerHTML =

@@ -3903,11 +3903,12 @@ def cleanup_data_folder():
             # Find only progress note related files among JSON files (preserve client data)
             all_json_files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
             
-            # Files to preserve (client data)
+            # Files to preserve (client data + app config)
             preserve_files = [
                 'Client_list.json',
                 'carearea.json', 
-                'eventtype.json'
+                'eventtype.json',
+                'staff_names.json',
             ]
             
             # Also preserve site-specific client files
