@@ -429,7 +429,20 @@ def api_save_settings():
         except ValueError as ve:
             return jsonify({'status': 'error', 'message': str(ve)}), 400
     
-    logger.info(f"Settings updated: green={green}m, yellow={yellow}m, red={red}m, tone={tone}")
+    # Save call max minutes if provided
+    call_max = data.get('call_max_minutes')
+    if call_max is not None:
+        call_max = int(call_max)
+        if call_max < 1:
+            return jsonify({'status': 'error', 'message': 'Call max minutes must be > 0'}), 400
+        try:
+            with sqlite3.connect(manager.db_path) as conn:
+                conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
+                             ('call_max_minutes', str(call_max)))
+        except Exception as e:
+            logger.error(f"Failed to save call_max_minutes: {e}")
+    
+    logger.info(f"Settings updated: green={green}m, yellow={yellow}m, red={red}m, tone={tone}, call_max={call_max}")
     
     settings = get_color_settings(manager.db_path)
     return jsonify({

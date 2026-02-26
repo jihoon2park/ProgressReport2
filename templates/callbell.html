@@ -142,10 +142,19 @@
                         <span class="text-xs text-slate-500 font-bold">min</span>
                     </div>
                 </div>
+                <div class="threshold-card">
+                    <div class="w-4 h-4 rounded-full" style="background:#64748b; box-shadow: 0 0 8px #64748b88;"></div>
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Auto-Archive</span>
+                    <div class="flex items-center gap-1">
+                        <input id="set-call-max" type="number" min="1" max="1440" value="60" class="threshold-input" style="color: #94a3b8;">
+                        <span class="text-xs text-slate-500 font-bold">min</span>
+                    </div>
+                </div>
                 <div class="flex-1 flex items-center">
                     <div class="text-[11px] text-slate-500 leading-relaxed pl-4 border-l border-slate-700/50">
                         <div class="mb-1"><span class="text-yellow-400 font-bold">Assist</span> calls always start from <span class="text-yellow-400 font-bold">Yellow</span></div>
                         <div><span class="text-red-400 font-bold">Emergency</span> calls are always <span class="text-red-400 font-bold">Red</span></div>
+                        <div class="mt-1"><span class="text-slate-400 font-bold">Auto-Archive</span> removes stuck calls after set minutes</div>
                     </div>
                 </div>
             </div>
@@ -386,6 +395,7 @@
             document.getElementById('set-green').value = settings.green_minutes || 3;
             document.getElementById('set-yellow').value = settings.yellow_minutes || 5;
             document.getElementById('set-red').value = settings.red_minutes || 7;
+            document.getElementById('set-call-max').value = settings.call_max_minutes || 60;
             // Apply notification tone
             const tone = settings.notification_tone || 'bell1';
             const radio = document.querySelector('input[name="notification_tone"][value="' + tone + '"]');
@@ -410,9 +420,14 @@
             const green = parseInt(document.getElementById('set-green').value);
             const yellow = parseInt(document.getElementById('set-yellow').value);
             const red = parseInt(document.getElementById('set-red').value);
+            const callMax = parseInt(document.getElementById('set-call-max').value);
 
             if (!(green < yellow && yellow < red && green > 0)) {
                 alert('Thresholds must be: Green < Yellow < Red (all > 0)');
+                return;
+            }
+            if (!callMax || callMax < 1) {
+                alert('Auto-Archive minutes must be > 0');
                 return;
             }
 
@@ -420,7 +435,7 @@
                 const res = await fetch('/api/callbell/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ green_minutes: green, yellow_minutes: yellow, red_minutes: red, notification_tone: document.querySelector('input[name="notification_tone"]:checked')?.value || 'bell1' })
+                    body: JSON.stringify({ green_minutes: green, yellow_minutes: yellow, red_minutes: red, call_max_minutes: callMax, notification_tone: document.querySelector('input[name="notification_tone"]:checked')?.value || 'bell1' })
                 });
                 const data = await res.json();
                 if (data.status === 'ok') {
@@ -538,6 +553,9 @@
                         document.getElementById('admin-controls').classList.add('flex');
                         document.getElementById('staff-sidebar').classList.remove('hidden');
                         applySettings(data.settings);
+                    }
+                    // Timer: only visible to admin role (not site_admin)
+                    if (data.role === 'admin') {
                         const saved = localStorage.getItem('callbell_timer_enabled');
                         timerEnabled = saved !== null ? saved === 'true' : true;
                         toggleTimer(timerEnabled);

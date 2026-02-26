@@ -203,11 +203,20 @@ def api_app_checkin():
     _ensure_tables()
     try:
         with sqlite3.connect(_CALLBELL_DB) as conn:
-            # Deactivate any existing sessions for this staff_name on same site
+            # Find old active sessions for this staff_name on same site
+            old_sessions = conn.execute(
+                'SELECT session_id FROM staff_sessions WHERE site = ? AND staff_name = ? AND is_active = 1',
+                (site, staff_name)
+            ).fetchall()
+            # Deactivate old sessions
             conn.execute(
                 'UPDATE staff_sessions SET is_active = 0 WHERE site = ? AND staff_name = ? AND is_active = 1',
                 (site, staff_name)
             )
+            # Clean up stale push tokens from old sessions
+            for (old_sid,) in old_sessions:
+                conn.execute('DELETE FROM device_tokens WHERE session_id = ?', (old_sid,))
+                logger.info(f"🗑️ Cleaned up old session {old_sid[:8]}... for {staff_name}")
             conn.execute('''
                 INSERT INTO staff_sessions (session_id, username, staff_name, site, device_info, started_at, last_heartbeat, is_active, areas)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)

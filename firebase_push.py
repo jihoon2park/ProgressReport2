@@ -170,16 +170,10 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
         channel_id = f'callbell-{tone}'
         sound_file = 'default' if tone == 'default' else f'{tone}.mp3'
 
-        # Build urgency label
-        if card_level == 'red':
-            urgency = '🔴 URGENT'
-        elif card_level == 'yellow':
-            urgency = '🟡 Warning'
-        else:
-            urgency = '🟢 New'
-
-        title = f'{urgency} — {message_text or room}'
-        body = f'Call from {room} requires attention'
+        # Build clean, glanceable notification — just the display text, big and simple
+        # message_text is already human-readable (e.g. "KURR RM 4.2 CALL" or "RM 56 BED - CALL")
+        title = (message_text or room).upper()
+        body = 'CALLING'
 
         # Send to each token individually (handles invalid tokens gracefully)
         messages = []
@@ -198,7 +192,7 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
                         vibrate_timings_millis=[0, 4000],
                         default_vibrate_timings=False,
                         visibility='public',
-                        tag='callbell-call',
+                        tag=f'callbell-{room}',
                     ),
                 ),
                 token=token,

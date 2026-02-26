@@ -27,6 +27,7 @@ DEFAULT_SETTINGS = {
     'yellow_minutes': 5,
     'red_minutes': 7,
     'notification_tone': 'bell1',
+    'call_max_minutes': 60,
 }
 
 
@@ -62,7 +63,10 @@ def get_color_settings(db_path: str) -> Dict[str, int]:
                     if key == 'notification_tone':
                         settings[key] = value
                     else:
-                        settings[key] = int(value)
+                        try:
+                            settings[key] = int(value)
+                        except (ValueError, TypeError):
+                            pass
     except Exception as e:
         logger.error(f"Failed to read color settings: {e}")
     return settings
@@ -323,12 +327,28 @@ class CallbellMonitor(ABC):
         try:
             now = time.time()
             settings = get_color_settings(self.db_path)
+            call_max_seconds = settings.get('call_max_minutes', 60) * 60
             
             with sqlite3.connect(self.db_path) as conn:
                 rows = conn.execute(f'''
                     SELECT room, type, priority, start_time, color, message_text, message_subtext, event_id
                     FROM {self._active_table}
                 ''').fetchall()
+                
+                # Auto-archive stale calls that exceeded max TTL
+                stale_rooms = [r[0] for r in rows if (now - r[3]) > call_max_seconds]
+                if stale_rooms:
+                    for room in stale_rooms:
+                        try:
+                            self.archive_call(room)
+                            logger.info(f"⏰ [{self.site_name}] Auto-archived stale call: {room} (exceeded {settings.get('call_max_minutes', 60)} min)")
+                        except Exception as e:
+                            logger.error(f"Failed to auto-archive stale call {room}: {e}")
+                    # Re-fetch after cleanup
+                    rows = conn.execute(f'''
+                        SELECT room, type, priority, start_time, color, message_text, message_subtext, event_id
+                        FROM {self._active_table}
+                    ''').fetchall()
                 
                 calls = []
                 current_event_ids = set()

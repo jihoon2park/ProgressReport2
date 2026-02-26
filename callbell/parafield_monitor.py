@@ -248,8 +248,8 @@ class ParafieldCallbellMonitor(CallbellMonitor):
                 self._setup_websocket_handlers()
                 
                 if not self._connect_websocket():
-                    logger.warning(f"[{self.site_name}] Connection failed, retrying in 30s...")
-                    time.sleep(30)
+                    logger.warning(f"[{self.site_name}] Connection failed, retrying in 5s...")
+                    time.sleep(5)
                     continue
                 
                 # Start time sync thread
@@ -265,8 +265,8 @@ class ParafieldCallbellMonitor(CallbellMonitor):
             
             # If we get here, connection was lost — retry after delay
             if self.running:
-                logger.info(f"[{self.site_name}] Reconnecting in 30s...")
-                time.sleep(30)
+                logger.info(f"[{self.site_name}] Reconnecting in 5s...")
+                time.sleep(5)
     
     def start(self):
         """Start the Parafield callbell monitor."""
