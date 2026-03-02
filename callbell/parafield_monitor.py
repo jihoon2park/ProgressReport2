@@ -192,13 +192,17 @@ class ParafieldCallbellMonitor(CallbellMonitor):
         event_id = event.get('eventInstanceId', '')
         self.archive_call(room, event_id)
     
-    def _time_sync_loop(self):
-        """Periodic time synchronization (every 6 minutes)."""
-        while self.running and self.sio and self.sio.connected:
+    def _time_sync_loop(self, sio_ref):
+        """Periodic time synchronization (every 6 minutes).
+        Captures sio_ref so this thread exits when sio is reassigned on reconnect."""
+        while self.running and sio_ref is self.sio and sio_ref.connected:
             time.sleep(360)
-            if self.sio and self.sio.connected:
-                ms = int(time.time() * 1000)
-                self.sio.emit("system/time", {"ts": ms})
+            if self.running and sio_ref is self.sio and sio_ref.connected:
+                try:
+                    ms = int(time.time() * 1000)
+                    sio_ref.emit("system/time", {"ts": ms})
+                except Exception:
+                    break
     
     def _connect_websocket(self) -> bool:
         """Connect to Aptus WebSocket server (no authentication required)."""
@@ -252,8 +256,8 @@ class ParafieldCallbellMonitor(CallbellMonitor):
                     time.sleep(5)
                     continue
                 
-                # Start time sync thread
-                time_sync_thread = threading.Thread(target=self._time_sync_loop, daemon=True)
+                # Start time sync thread (pass current sio so old threads exit on reconnect)
+                time_sync_thread = threading.Thread(target=self._time_sync_loop, args=(self.sio,), daemon=True)
                 time_sync_thread.start()
                 
                 # Keep connection alive

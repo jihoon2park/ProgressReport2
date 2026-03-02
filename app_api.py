@@ -12,8 +12,10 @@ import os
 import re
 import json
 import time
+import uuid
 import sqlite3
 import logging
+import threading
 from flask import Blueprint, request, jsonify
 from config_users import authenticate_user, get_username_by_lowercase
 
@@ -36,19 +38,46 @@ _SITE_CONFIG_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'site_config.jso
 _GLOBAL_CONFIG_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'app_global_config.json')
 _STAFF_NAMES_PATH = os.path.join(_BASE_DIR, 'data', 'staff_names.json')
 
-# ── Default app config ──────────────────────────────────────
+# ── Default app config ──────────────────────────────────────────
 _DEFAULT_APP_CONFIG = {
     'require_staff_name': True,
-    'poll_interval_ms': 1000,
+    'poll_interval_ms': 3000,
     'show_timer': False,
 }
 
-# ── DB helpers ──────────────────────────────────────────────
+
+def _open_db(db_path: str) -> sqlite3.Connection:
+    """Open a SQLite connection with WAL mode and busy_timeout."""
+    conn = sqlite3.connect(db_path, timeout=15)
+    try:
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=10000')
+        conn.execute('PRAGMA synchronous=NORMAL')
+    except Exception:
+        pass
+    return conn
+
+
+# ── DB helpers (tables ensured once, config cached) ──────────────
+_tables_initialized = False
+_app_config_cache = {}
+_app_config_lock = threading.Lock()
+_site_id_map = {}
+
+
+def _invalidate_app_config_cache():
+    """Clear app config cache so next read reloads from DB."""
+    with _app_config_lock:
+        _app_config_cache.clear()
+
 
 def _ensure_tables():
-    """Create app_config and staff_sessions tables if missing."""
+    """Create app_config, staff_sessions, and device_tokens tables if missing. Called once."""
+    global _tables_initialized
+    if _tables_initialized:
+        return
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS app_config (
                     key TEXT PRIMARY KEY,
@@ -68,6 +97,15 @@ def _ensure_tables():
                     areas TEXT DEFAULT '[]'
                 )
             ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS device_tokens (
+                    token TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    site TEXT NOT NULL,
+                    staff_name TEXT,
+                    registered_at REAL NOT NULL
+                )
+            ''')
             # Migrate: add areas column if missing
             cols = {r[1] for r in conn.execute("PRAGMA table_info(staff_sessions)").fetchall()}
             if 'areas' not in cols:
@@ -79,16 +117,20 @@ def _ensure_tables():
                     conn.execute('INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)',
                                  (k, json.dumps(v)))
             conn.commit()
+        _tables_initialized = True
     except Exception as e:
         logger.error(f"Failed to ensure tables: {e}")
 
 
 def _get_app_config() -> dict:
-    """Read all app_config rows into a dict."""
+    """Read all app_config rows — returns from cache if available."""
+    with _app_config_lock:
+        if _app_config_cache:
+            return _app_config_cache.copy()
     _ensure_tables()
     config = _DEFAULT_APP_CONFIG.copy()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             rows = conn.execute('SELECT key, value FROM app_config').fetchall()
             for k, v in rows:
                 try:
@@ -97,6 +139,8 @@ def _get_app_config() -> dict:
                     config[k] = v
     except Exception as e:
         logger.error(f"Failed to read app_config: {e}")
+    with _app_config_lock:
+        _app_config_cache.update(config)
     return config
 
 
@@ -196,27 +240,25 @@ def api_app_checkin():
 
     config = _get_app_config()
 
-    # Create session
-    import uuid
     session_id = str(uuid.uuid4())
     now = time.time()
     _ensure_tables()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
-            # Find old active sessions for this staff_name on same site
+        with _open_db(_CALLBELL_DB) as conn:
             old_sessions = conn.execute(
                 'SELECT session_id FROM staff_sessions WHERE site = ? AND staff_name = ? AND is_active = 1',
                 (site, staff_name)
             ).fetchall()
-            # Deactivate old sessions
             conn.execute(
                 'UPDATE staff_sessions SET is_active = 0 WHERE site = ? AND staff_name = ? AND is_active = 1',
                 (site, staff_name)
             )
-            # Clean up stale push tokens from old sessions
             for (old_sid,) in old_sessions:
-                conn.execute('DELETE FROM device_tokens WHERE session_id = ?', (old_sid,))
-                logger.info(f"🗑️ Cleaned up old session {old_sid[:8]}... for {staff_name}")
+                try:
+                    conn.execute('DELETE FROM device_tokens WHERE session_id = ?', (old_sid,))
+                except Exception:
+                    pass
+                logger.info(f"Cleaned up old session {old_sid[:8]}... for {staff_name}")
             conn.execute('''
                 INSERT INTO staff_sessions (session_id, username, staff_name, site, device_info, started_at, last_heartbeat, is_active, areas)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
@@ -224,6 +266,14 @@ def api_app_checkin():
     except Exception as e:
         logger.error(f"Failed to create staff session: {e}")
         return jsonify({'success': False, 'message': 'Failed to create session'}), 500
+
+    # Get notification tone from cached settings
+    tone = 'bell1'
+    try:
+        from callbell.base_monitor import get_notification_tone
+        tone = get_notification_tone(_CALLBELL_DB)
+    except Exception:
+        pass
 
     return jsonify({
         'success': True,
@@ -239,6 +289,7 @@ def api_app_checkin():
         'config': {
             'poll_interval_ms': config.get('poll_interval_ms', 3000),
             'show_timer': config.get('show_timer', False),
+            'notification_tone': tone,
         },
     })
 
@@ -251,67 +302,116 @@ def api_app_login():
 
 # ── Authenticated endpoints (session_id required) ───────────
 
+class _DbBusy(Exception):
+    """Raised when DB is locked so callers can return 503 instead of 401."""
+    pass
+
+
 def _validate_session(data: dict):
-    """Validate session_id from request data. Returns session row or None.
-    Row: (session_id, username, staff_name, site, areas_json)"""
+    """Validate session_id from request data.
+    Returns session row or None. Raises _DbBusy on SQLite errors."""
     session_id = data.get('session_id', '')
     if not session_id:
         return None
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             row = conn.execute(
                 'SELECT session_id, username, staff_name, site, areas FROM staff_sessions WHERE session_id = ? AND is_active = 1',
                 (session_id,)
             ).fetchone()
             return row
-    except Exception:
-        return None
+    except Exception as e:
+        logger.error(f"_validate_session DB error: {e}")
+        raise _DbBusy(str(e))
+
+
+@app_api_bp.route('/api/app/calls', methods=['GET'])
+def api_app_calls():
+    """Lightweight poll endpoint — returns calls only. No writes, no session validation."""
+    try:
+        site = request.args.get('site', '').strip()
+        areas_raw = request.args.get('areas', '').strip()
+        user_areas = [a.strip() for a in areas_raw.split(',') if a.strip()] if areas_raw else []
+
+        calls = []
+        if site:
+            try:
+                from callbell.manager import get_manager
+                manager = get_manager()
+                site_id = _site_name_to_id(site)
+                if site_id:
+                    monitor = manager.get_monitor(site_id)
+                    calls = monitor.get_active_calls(consumer='app') if monitor else []
+            except Exception as e:
+                logger.error(f"Failed to get calls: {e}")
+
+            if user_areas and calls:
+                calls = _filter_calls_by_area(calls, user_areas, site)
+
+        return jsonify({'success': True, 'calls': calls})
+    except Exception as e:
+        logger.error(f"Error in /api/app/calls: {e}")
+        return jsonify({'success': True, 'calls': []})
 
 
 @app_api_bp.route('/api/app/heartbeat', methods=['POST'])
 def api_app_heartbeat():
-    """Keep session alive and return active calls for the staff's site, filtered by area."""
+    """Backward-compatible heartbeat — no writes, returns calls + cached config."""
     try:
         data = request.get_json() or {}
-        session_row = _validate_session(data)
-        if not session_row:
-            return jsonify({'success': False, 'message': 'Invalid or expired session', 'logged_out': True}), 401
+        session_id = data.get('session_id', '')
 
-        session_id, username, staff_name, site, areas_json = session_row
-        now = time.time()
+        # Look up session to get site + areas (one read, no write)
+        site = ''
+        user_areas = []
+        if session_id:
+            try:
+                with _open_db(_CALLBELL_DB) as conn:
+                    row = conn.execute(
+                        'SELECT site, areas FROM staff_sessions WHERE session_id = ? AND is_active = 1',
+                        (session_id,)
+                    ).fetchone()
+                    if row:
+                        site = row[0] or ''
+                        try:
+                            user_areas = json.loads(row[1]) if row[1] else []
+                        except (json.JSONDecodeError, TypeError):
+                            user_areas = []
+            except Exception as e:
+                logger.error(f"Heartbeat session lookup error: {e}")
+                # DB locked — return empty calls, NOT 401
+                config = _get_app_config()
+                tone = 'bell1'
+                try:
+                    from callbell.base_monitor import get_notification_tone
+                    tone = get_notification_tone(_CALLBELL_DB)
+                except Exception:
+                    pass
+                return jsonify({
+                    'success': True, 'calls': [],
+                    'config': {
+                        'poll_interval_ms': config.get('poll_interval_ms', 3000),
+                        'show_timer': config.get('show_timer', False),
+                        'notification_tone': tone,
+                    },
+                })
 
-        # Parse user's selected areas
-        try:
-            user_areas = json.loads(areas_json) if areas_json else []
-        except (json.JSONDecodeError, TypeError):
-            user_areas = []
-
-        # Update heartbeat — sessions stay active until staff finishes shift
-        try:
-            with sqlite3.connect(_CALLBELL_DB) as conn:
-                conn.execute('UPDATE staff_sessions SET last_heartbeat = ? WHERE session_id = ?', (now, session_id))
-        except Exception as e:
-            logger.error(f"Failed to update heartbeat: {e}")
-
-        # Get calls for this staff's site - use callbell manager
         calls = []
-        try:
-            from callbell.manager import get_manager
-            manager = get_manager()
-            site_id = _site_name_to_id(site)
-            if site_id:
-                monitor = manager.get_monitor(site_id)
-                calls = monitor.get_active_calls(consumer='app') if monitor else []
-        except Exception as e:
-            logger.error(f"Failed to get calls for heartbeat: {e}")
+        if site:
+            try:
+                from callbell.manager import get_manager
+                manager = get_manager()
+                site_id = _site_name_to_id(site)
+                if site_id:
+                    monitor = manager.get_monitor(site_id)
+                    calls = monitor.get_active_calls(consumer='app') if monitor else []
+            except Exception as e:
+                logger.error(f"Failed to get calls for heartbeat: {e}")
 
-        # Filter calls by user's selected areas (if any areas selected)
-        if user_areas and calls:
-            calls = _filter_calls_by_area(calls, user_areas, site)
+            if user_areas and calls:
+                calls = _filter_calls_by_area(calls, user_areas, site)
 
         config = _get_app_config()
-
-        # Get notification tone from callbell settings
         tone = 'bell1'
         try:
             from callbell.base_monitor import get_notification_tone
@@ -330,14 +430,17 @@ def api_app_heartbeat():
         })
     except Exception as e:
         logger.error(f"Unhandled error in heartbeat: {e}")
-        return jsonify({'success': False, 'message': 'Server error', 'calls': []}), 500
+        return jsonify({'success': True, 'calls': []})
 
 
 @app_api_bp.route('/api/app/register-push-token', methods=['POST'])
 def api_app_register_push_token():
     """Register a device FCM token for push notifications."""
     data = request.get_json() or {}
-    session_row = _validate_session(data)
+    try:
+        session_row = _validate_session(data)
+    except _DbBusy:
+        return jsonify({'success': False, 'message': 'Server busy, try again'}), 503
     if not session_row:
         return jsonify({'success': False, 'message': 'Invalid session'}), 401
 
@@ -356,13 +459,16 @@ def api_app_register_push_token():
 def api_app_finish_shift():
     """End the staff session."""
     data = request.get_json() or {}
-    session_row = _validate_session(data)
+    try:
+        session_row = _validate_session(data)
+    except _DbBusy:
+        return jsonify({'success': False, 'message': 'Server busy, try again'}), 503
     if not session_row:
         return jsonify({'success': False, 'message': 'Invalid or expired session'}), 401
 
     session_id = session_row[0]
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             conn.execute('UPDATE staff_sessions SET is_active = 0 WHERE session_id = ?', (session_id,))
     except Exception as e:
         logger.error(f"Failed to end session: {e}")
@@ -379,7 +485,10 @@ def api_app_finish_shift():
 def api_app_cancel_call():
     """Staff manually cancels/dismisses a call that was a mistake or already handled."""
     data = request.get_json() or {}
-    session_row = _validate_session(data)
+    try:
+        session_row = _validate_session(data)
+    except _DbBusy:
+        return jsonify({'success': False, 'message': 'Server busy, try again'}), 503
     if not session_row:
         return jsonify({'success': False, 'message': 'Invalid or expired session'}), 401
 
@@ -431,10 +540,11 @@ def api_app_admin_config_post():
 
     _ensure_tables()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             for k, v in data.items():
                 conn.execute('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)',
                              (k, json.dumps(v)))
+        _invalidate_app_config_cache()
         logger.info(f"App config updated: {list(data.keys())}")
         return jsonify({'success': True, 'config': _get_app_config()})
     except Exception as e:
@@ -460,7 +570,7 @@ def api_app_admin_staff_online():
     # Staff are online after login, offline after finish shift
     _ensure_tables()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             if site_filter:
                 # Frontend is requesting a specific site tab
                 # Admin can request any site; site_admin only their allowed sites
@@ -533,7 +643,10 @@ def api_app_download_url():
 def api_app_update_areas():
     """Update the areas/wings a staff member is working on."""
     data = request.get_json() or {}
-    session_row = _validate_session(data)
+    try:
+        session_row = _validate_session(data)
+    except _DbBusy:
+        return jsonify({'success': False, 'message': 'Server busy, try again'}), 503
     if not session_row:
         return jsonify({'success': False, 'message': 'Invalid or expired session'}), 401
 
@@ -544,7 +657,7 @@ def api_app_update_areas():
 
     session_id = session_row[0]
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             conn.execute('UPDATE staff_sessions SET areas = ? WHERE session_id = ?', (areas_json, session_id))
         return jsonify({'success': True, 'areas': areas})
     except Exception as e:
@@ -645,15 +758,17 @@ def _filter_calls_by_area(calls: list, user_areas: list, site: str) -> list:
 # ── Helpers ──────────────────────────────────────────────────
 
 def _site_name_to_id(site_name: str) -> str:
-    """Map a site display name (e.g. 'Ramsay') to its config id (e.g. 'ramsay')."""
-    try:
-        with open(_SITE_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            sites = json.load(f)
-        for s in sites:
-            if s.get('site_name', '').lower() == site_name.lower():
-                return s['id']
-            if s.get('id', '').lower() == site_name.lower():
-                return s['id']
-    except Exception:
-        pass
-    return ''
+    """Map a site display name to its config id. Cached after first load."""
+    if not _site_id_map:
+        try:
+            with open(_SITE_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                sites = json.load(f)
+            for s in sites:
+                sid = s.get('id', '')
+                sname = s.get('site_name', '')
+                if sid:
+                    _site_id_map[sname.lower()] = sid
+                    _site_id_map[sid.lower()] = sid
+        except Exception:
+            pass
+    return _site_id_map.get(site_name.lower(), '')

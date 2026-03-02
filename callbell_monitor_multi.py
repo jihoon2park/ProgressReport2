@@ -119,6 +119,10 @@ def init_callbell_system(app: Flask = None, sites_to_monitor: list = None):
         except Exception as e:
             logger.error(f"❌ Error registering monitor for {site_id}: {e}")
     
+    # Start periodic auto-archive timer (server-side, replaces per-poll archive)
+    if manager.monitors:
+        manager.start_archive_timer()
+    
     logger.info(f"Callbell system initialized with {len(manager.monitors)} active monitors")
     return manager
 

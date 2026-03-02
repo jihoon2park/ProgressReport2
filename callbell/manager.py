@@ -6,6 +6,7 @@ import os
 import json
 import sqlite3
 import logging
+import threading
 from typing import Dict, List, Any, Optional
 from flask import Blueprint, render_template, jsonify, request, redirect, url_for
 from flask_login import current_user
@@ -13,12 +14,14 @@ from flask_login import current_user
 from .base_monitor import (
     CallbellMonitor, get_color_settings, save_color_settings,
     get_notification_tone, save_notification_tone,
-    init_settings_table, CARD_STYLES
+    init_settings_table, CARD_STYLES, _open_db, _invalidate_settings_cache
 )
 from .ramsay_monitor import RamsayCallbellMonitor
 from .parafield_monitor import ParafieldCallbellMonitor
 
 logger = logging.getLogger(__name__)
+
+_ARCHIVE_INTERVAL = 60  # seconds between auto-archive sweeps
 
 
 class CallbellManager:
@@ -153,15 +156,14 @@ class CallbellManager:
     def reset_all_calls(self):
         """Reset all active calls across all known tables (used on server startup)."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                # Get all active_calls tables
+            with _open_db(self.db_path) as conn:
                 tables = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'active_calls%'"
                 ).fetchall()
                 for (table_name,) in tables:
                     conn.execute(f'DELETE FROM {table_name}')
-                    logger.info(f"🗑️ Auto-reset: cleared {table_name}")
-            logger.info("✅ All active call tables cleared on startup")
+                    logger.info(f"Auto-reset: cleared {table_name}")
+            logger.info("All active call tables cleared on startup")
         except Exception as e:
             logger.error(f"Failed to reset all calls: {e}")
 
@@ -170,7 +172,7 @@ class CallbellManager:
         import time
         cutoff = time.time() - (max_age_hours * 3600)
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with _open_db(self.db_path) as conn:
                 tables = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'active_calls%'"
                 ).fetchall()
@@ -179,9 +181,27 @@ class CallbellManager:
                         f'DELETE FROM {table_name} WHERE start_time < ?', (cutoff,)
                     ).rowcount
                     if deleted:
-                        logger.info(f"🗑️ Cleaned {deleted} stale calls from {table_name} (older than {max_age_hours}h)")
+                        logger.info(f"Cleaned {deleted} stale calls from {table_name} (older than {max_age_hours}h)")
         except Exception as e:
             logger.error(f"Failed to cleanup stale calls: {e}")
+
+    def start_archive_timer(self):
+        """Start periodic timer that archives stale calls for all monitors."""
+        def _run():
+            for sid, m in self.monitors.items():
+                try:
+                    m.archive_stale_calls()
+                except Exception as e:
+                    logger.error(f"Archive timer error for {sid}: {e}")
+            # Re-schedule
+            self._archive_timer = threading.Timer(_ARCHIVE_INTERVAL, _run)
+            self._archive_timer.daemon = True
+            self._archive_timer.start()
+        
+        self._archive_timer = threading.Timer(_ARCHIVE_INTERVAL, _run)
+        self._archive_timer.daemon = True
+        self._archive_timer.start()
+        logger.info(f"Archive timer started (every {_ARCHIVE_INTERVAL}s)")
     
     def get_debug_info(self, site_id: Optional[str] = None) -> Dict[str, Any]:
         """Get debug information for one or all monitors."""
@@ -295,7 +315,7 @@ def api_site_reset_calls(site_id: str):
             site_config = manager._get_site_config(site_id)
             site_name = site_config.get('site_name', '') if site_config else ''
             if site_name:
-                with sqlite3.connect(manager.db_path) as conn:
+                with _open_db(manager.db_path) as conn:
                     conn.execute('UPDATE staff_sessions SET is_active = 0 WHERE site = ? AND is_active = 1', (site_name,))
                     conn.execute('DELETE FROM device_tokens WHERE site = ?', (site_name,))
                 logger.info(f"Cleared staff sessions for {site_name}")
@@ -436,9 +456,10 @@ def api_save_settings():
         if call_max < 1:
             return jsonify({'status': 'error', 'message': 'Call max minutes must be > 0'}), 400
         try:
-            with sqlite3.connect(manager.db_path) as conn:
+            with _open_db(manager.db_path) as conn:
                 conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
                              ('call_max_minutes', str(call_max)))
+            _invalidate_settings_cache()
         except Exception as e:
             logger.error(f"Failed to save call_max_minutes: {e}")
     

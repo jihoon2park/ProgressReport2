@@ -12,6 +12,19 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _open_db(db_path: str) -> sqlite3.Connection:
+    """Open a SQLite connection with WAL mode and busy_timeout.
+    Eliminates 'database is locked' errors under concurrency."""
+    conn = sqlite3.connect(db_path, timeout=15)
+    try:
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=10000')
+        conn.execute('PRAGMA synchronous=NORMAL')
+    except Exception:
+        pass
+    return conn
+
 # ── Card color definitions ──
 # Light-theme professional palette for mobile app
 CARD_STYLES = {
@@ -31,32 +44,45 @@ DEFAULT_SETTINGS = {
 }
 
 
+# ── In-memory settings cache (event-driven invalidation) ──
+_settings_cache: Dict[str, Any] = {}
+_settings_cache_lock = threading.Lock()
+
+
+def _invalidate_settings_cache():
+    """Clear the settings cache so next read reloads from DB."""
+    with _settings_cache_lock:
+        _settings_cache.clear()
+
+
 def init_settings_table(db_path: str):
     """Create settings table and insert defaults if not present."""
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _open_db(db_path) as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS callbell_settings (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 )
             ''')
-            # Insert defaults only if not already set
             for key, value in DEFAULT_SETTINGS.items():
                 conn.execute(
                     'INSERT OR IGNORE INTO callbell_settings (key, value) VALUES (?, ?)',
                     (key, str(value))
                 )
-        logger.info("✅ Callbell settings table initialized")
+        logger.info("Settings table initialized")
     except Exception as e:
         logger.error(f"Failed to initialize settings table: {e}")
 
 
-def get_color_settings(db_path: str) -> Dict[str, int]:
-    """Read color threshold settings from DB."""
+def get_color_settings(db_path: str) -> Dict[str, Any]:
+    """Read color threshold settings — returns from cache if available."""
+    with _settings_cache_lock:
+        if _settings_cache:
+            return _settings_cache.copy()
     settings = DEFAULT_SETTINGS.copy()
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _open_db(db_path) as conn:
             rows = conn.execute('SELECT key, value FROM callbell_settings').fetchall()
             for key, value in rows:
                 if key in settings:
@@ -69,46 +95,44 @@ def get_color_settings(db_path: str) -> Dict[str, int]:
                             pass
     except Exception as e:
         logger.error(f"Failed to read color settings: {e}")
+    with _settings_cache_lock:
+        _settings_cache.update(settings)
     return settings
 
 
 def get_notification_tone(db_path: str) -> str:
-    """Read notification tone setting from DB."""
-    try:
-        with sqlite3.connect(db_path) as conn:
-            row = conn.execute("SELECT value FROM callbell_settings WHERE key = 'notification_tone'").fetchone()
-            if row:
-                return row[0]
-    except Exception as e:
-        logger.error(f"Failed to read notification tone: {e}")
-    return 'bell1'
+    """Read notification tone — uses cached settings."""
+    settings = get_color_settings(db_path)
+    return settings.get('notification_tone', 'bell1')
 
 
 def save_notification_tone(db_path: str, tone: str):
-    """Save notification tone setting to DB."""
+    """Save notification tone setting to DB and invalidate cache."""
     valid = ('default', 'bell1', 'bell2', 'bell3')
     if tone not in valid:
         raise ValueError(f'Invalid tone: {tone}. Must be one of {valid}')
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _open_db(db_path) as conn:
             conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
                          ('notification_tone', tone))
-        logger.info(f"✅ Notification tone saved: {tone}")
+        _invalidate_settings_cache()
+        logger.info(f"Notification tone saved: {tone}")
     except Exception as e:
         logger.error(f"Failed to save notification tone: {e}")
 
 
 def save_color_settings(db_path: str, green_minutes: int, yellow_minutes: int, red_minutes: int):
-    """Save color threshold settings to DB."""
+    """Save color threshold settings to DB and invalidate cache."""
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _open_db(db_path) as conn:
             conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
                          ('green_minutes', str(green_minutes)))
             conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
                          ('yellow_minutes', str(yellow_minutes)))
             conn.execute('INSERT OR REPLACE INTO callbell_settings (key, value) VALUES (?, ?)',
                          ('red_minutes', str(red_minutes)))
-        logger.info(f"✅ Color settings saved: green={green_minutes}m, yellow={yellow_minutes}m, red={red_minutes}m")
+        _invalidate_settings_cache()
+        logger.info(f"Color settings saved: green={green_minutes}m, yellow={yellow_minutes}m, red={red_minutes}m")
     except Exception as e:
         logger.error(f"Failed to save color settings: {e}")
 
@@ -220,7 +244,7 @@ class CallbellMonitor(ABC):
         """
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with _open_db(self.db_path) as conn:
                 conn.executescript(schema)
                 
                 # Migrate existing tables: add ALL expected columns if missing
@@ -256,7 +280,7 @@ class CallbellMonitor(ABC):
         """Save a new active call to the database."""
         is_new = False
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with _open_db(self.db_path) as conn:
                 cursor = conn.execute(f'''
                     INSERT OR IGNORE INTO {self._active_table}
                     (room, type, priority, start_time, event_id, color, message_text, message_subtext, site_id)
@@ -264,36 +288,36 @@ class CallbellMonitor(ABC):
                 ''', (room, call_type, priority, start_time, event_id, color, 
                       message_text or room, message_subtext or call_type, self.site_id))
                 is_new = cursor.rowcount > 0
-            logger.info(f"📞 [{self.site_name}] Call saved: {room} ({call_type}) priority={priority}")
         except Exception as e:
             logger.error(f"Failed to save call for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)
         
-        # Send FCM push notification for genuinely new calls
         if is_new:
+            logger.info(f"[{self.site_name}] Call saved: {room} ({call_type}) priority={priority}")
+            # Send FCM push in background thread (non-blocking)
             try:
                 from firebase_push import send_push_for_new_call
-                send_push_for_new_call(
-                    site_name=self.site_name,
-                    room=room,
-                    call_type=call_type,
-                    priority=priority,
-                    message_text=message_text or room,
-                    card_level='red' if priority <= 1 else 'yellow' if priority <= 2 else 'green',
-                )
+                threading.Thread(
+                    target=send_push_for_new_call,
+                    kwargs=dict(
+                        site_name=self.site_name, room=room, call_type=call_type,
+                        priority=priority, message_text=message_text or room,
+                        card_level='red' if priority <= 1 else 'yellow' if priority <= 2 else 'green',
+                    ),
+                    daemon=True,
+                ).start()
             except Exception as e:
                 logger.error(f"Failed to send push for new call: {e}")
     
     def archive_call(self, room: str, event_id: Optional[str] = None):
         """Archive and remove a call from active calls."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                # Get the active call
+            with _open_db(self.db_path) as conn:
                 query = f'SELECT room, type, priority, start_time, event_id FROM {self._active_table} WHERE room = ?'
                 params = [room]
                 
                 if event_id:
-                    query += ' OR event_id = ?'
+                    query += ' OR (event_id = ?)'
                     params.append(event_id)
                 
                 row = conn.execute(query, params).fetchone()
@@ -302,112 +326,87 @@ class CallbellMonitor(ABC):
                     end_time = time.time()
                     duration = end_time - row[3]
                     
-                    # Archive to history
                     conn.execute(f'''
                         INSERT INTO {self._history_table}
                         (room, type, priority, start_time, end_time, event_id, duration_seconds, site_id)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (row[0], row[1], row[2], row[3], end_time, row[4], duration, self.site_id))
                     
-                    # Remove from active
                     delete_query = f'DELETE FROM {self._active_table} WHERE room = ?'
                     delete_params = [room]
                     if event_id:
-                        delete_query += ' OR event_id = ?'
+                        delete_query += ' OR (event_id = ?)'
                         delete_params.append(event_id)
                     
                     conn.execute(delete_query, delete_params)
-                    logger.info(f"✅ [{self.site_name}] Call archived: {room} (duration: {duration:.0f}s)")
+                    logger.info(f"[{self.site_name}] Call archived: {room} (duration: {duration:.0f}s)")
         except Exception as e:
             logger.error(f"Failed to archive call for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)
     
     def get_active_calls(self, consumer: str = 'web') -> List[Dict[str, Any]]:
-        """Get all active calls with computed card colors and buzz flags from backend."""
+        """Get all active calls with computed card colors. Pure read — no writes."""
         try:
             now = time.time()
             settings = get_color_settings(self.db_path)
             call_max_seconds = settings.get('call_max_minutes', 60) * 60
             
-            with sqlite3.connect(self.db_path) as conn:
+            with _open_db(self.db_path) as conn:
                 rows = conn.execute(f'''
                     SELECT room, type, priority, start_time, color, message_text, message_subtext, event_id
                     FROM {self._active_table}
                 ''').fetchall()
+            
+            calls = []
+            current_event_ids = set()
+            for r in rows:
+                elapsed = now - r[3]
+                # Skip stale calls in output (archive timer handles cleanup)
+                if elapsed > call_max_seconds:
+                    continue
+                priority = r[2]
+                event_id = r[7]
+                card_level = compute_card_color(elapsed, priority, settings)
+                style = CARD_STYLES[card_level]
                 
-                # Auto-archive stale calls that exceeded max TTL
-                stale_rooms = [r[0] for r in rows if (now - r[3]) > call_max_seconds]
-                if stale_rooms:
-                    for room in stale_rooms:
-                        try:
-                            self.archive_call(room)
-                            logger.info(f"⏰ [{self.site_name}] Auto-archived stale call: {room} (exceeded {settings.get('call_max_minutes', 60)} min)")
-                        except Exception as e:
-                            logger.error(f"Failed to auto-archive stale call {room}: {e}")
-                    # Re-fetch after cleanup
-                    rows = conn.execute(f'''
-                        SELECT room, type, priority, start_time, color, message_text, message_subtext, event_id
-                        FROM {self._active_table}
-                    ''').fetchall()
+                buzz_key = event_id if event_id is not None else r[0]
+                current_event_ids.add(buzz_key)
+                buzz = (consumer == 'app')
                 
-                calls = []
-                current_event_ids = set()
-                for r in rows:
-                    elapsed = now - r[3]
-                    priority = r[2]
-                    event_id = r[7]
-                    card_level = compute_card_color(elapsed, priority, settings)
-                    style = CARD_STYLES[card_level]
-                    
-                    # Buzz: always true for app consumer — each client tracks its own
-                    # dedup locally (buzzedRooms ref + AsyncStorage) so all 30 phones
-                    # independently decide when to buzz. Server-side tracking was broken
-                    # because _buzz_levels_app was shared across all sessions.
-                    buzz_key = event_id if event_id is not None else r[0]
-                    current_event_ids.add(buzz_key)
-                    buzz = (consumer == 'app')
-                    
-                    calls.append({
-                        'room': r[0],
-                        'type': r[1],
-                        'priority': priority,
-                        'start': r[3],
-                        'color': r[4] or '#ffffff',
-                        'messageText': r[5] or r[0],
-                        'messageSubText': r[6] or r[1],
-                        'event_id': event_id,
-                        'site_id': self.site_id,
-                        'site_name': self.site_name,
-                        'elapsed_seconds': int(elapsed),
-                        'card_level': card_level,
-                        'card_bg': style['bg'],
-                        'card_border': style['border'],
-                        'card_text': style['text'],
-                        'buzz': buzz,
-                    })
-                
-                # Clean up stale entries from app buzz store
-                stale = [k for k in self._buzz_levels_app if k not in current_event_ids]
-                for k in stale:
-                    del self._buzz_levels_app[k]
-                
-                # Sort: most critical color first, then longest timer first
-                level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}
-                calls.sort(key=lambda c: (level_order.get(c['card_level'], 3), -c['elapsed_seconds']))
-                
-                # Check for color escalations and send FCM push (app consumer only)
-                if consumer == 'app':
-                    self._check_push_escalations(calls, current_event_ids)
-                
-                return calls
+                calls.append({
+                    'room': r[0],
+                    'type': r[1],
+                    'priority': priority,
+                    'start': r[3],
+                    'color': r[4] or '#ffffff',
+                    'messageText': r[5] or r[0],
+                    'messageSubText': r[6] or r[1],
+                    'event_id': event_id,
+                    'site_id': self.site_id,
+                    'site_name': self.site_name,
+                    'elapsed_seconds': int(elapsed),
+                    'card_level': card_level,
+                    'card_bg': style['bg'],
+                    'card_border': style['border'],
+                    'card_text': style['text'],
+                    'buzz': buzz,
+                })
+            
+            level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}
+            calls.sort(key=lambda c: (level_order.get(c['card_level'], 3), -c['elapsed_seconds']))
+            
+            # Check for color escalations and send FCM push in background
+            if consumer == 'app':
+                self._check_push_escalations(calls, current_event_ids)
+            
+            return calls
         except Exception as e:
             logger.error(f"Failed to get active calls for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)
             return []
     
     def _check_push_escalations(self, calls: List[Dict[str, Any]], current_keys: set):
-        """Check if any call's color level changed and send FCM push if so.
-        Uses a lock so only one heartbeat thread sends the push per escalation."""
+        """Check if any call's color level changed and send FCM push if so."""
         with self._push_lock:
             escalated = []
             for call in calls:
@@ -416,42 +415,64 @@ class CallbellMonitor(ABC):
                 prev_level = self._push_levels.get(buzz_key)
                 
                 if prev_level is not None and prev_level != current_level:
-                    # Color changed — this is an escalation
                     escalated.append(call)
                 
                 self._push_levels[buzz_key] = current_level
             
-            # Clean up calls that are no longer active
             stale = [k for k in self._push_levels if k not in current_keys]
             for k in stale:
                 del self._push_levels[k]
         
-        # Send push outside the lock (network call)
         if escalated:
             try:
                 from firebase_push import send_push_for_new_call
-                # Pick the most urgent escalated call
                 level_order = {'red': 0, 'yellow': 1, 'green': 2, 'gray': 3}
                 escalated.sort(key=lambda c: level_order.get(c['card_level'], 3))
                 top = escalated[0]
-                send_push_for_new_call(
-                    site_name=self.site_name,
-                    room=top['room'],
-                    call_type=top.get('type', ''),
-                    priority=top.get('priority', 3),
-                    message_text=top.get('messageText', top['room']),
-                    card_level=top['card_level'],
-                    send_to_all=True,
-                )
+                # Run FCM push in background thread
+                threading.Thread(
+                    target=send_push_for_new_call,
+                    kwargs=dict(
+                        site_name=self.site_name,
+                        room=top['room'],
+                        call_type=top.get('type', ''),
+                        priority=top.get('priority', 3),
+                        message_text=top.get('messageText', top['room']),
+                        card_level=top['card_level'],
+                    ),
+                    daemon=True,
+                ).start()
             except Exception as e:
                 logger.error(f"Failed to send escalation push: {e}")
+    
+    def archive_stale_calls(self):
+        """Archive calls that exceeded call_max_minutes. Called by periodic timer."""
+        try:
+            now = time.time()
+            settings = get_color_settings(self.db_path)
+            call_max_seconds = settings.get('call_max_minutes', 60) * 60
+            
+            with _open_db(self.db_path) as conn:
+                rows = conn.execute(f'''
+                    SELECT room FROM {self._active_table}
+                    WHERE (? - start_time) > ?
+                ''', (now, call_max_seconds)).fetchall()
+            
+            for (room,) in rows:
+                try:
+                    self.archive_call(room)
+                    logger.info(f"[{self.site_name}] Auto-archived stale call: {room}")
+                except Exception as e:
+                    logger.error(f"Failed to auto-archive {room}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to run archive timer for {self.site_name}: {e}")
     
     def clear_all_calls(self):
         """Clear all active calls for this site."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with _open_db(self.db_path) as conn:
                 conn.execute(f'DELETE FROM {self._active_table}')
-            logger.info(f"🗑️ [{self.site_name}] All active calls cleared")
+            logger.info(f"[{self.site_name}] All active calls cleared")
         except Exception as e:
             logger.error(f"Failed to clear calls for {self.site_name}: {e}")
             self.debug_info['last_error'] = str(e)

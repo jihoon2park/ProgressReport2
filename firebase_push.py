@@ -15,6 +15,19 @@ _FIREBASE_KEY_PATH = os.path.join(_BASE_DIR, 'data', 'api_keys', 'firebase-admin
 
 _firebase_app = None
 _init_lock = threading.Lock()
+_device_tokens_ready = False
+
+
+def _open_db(db_path: str) -> sqlite3.Connection:
+    """Open a SQLite connection with WAL mode and busy_timeout."""
+    conn = sqlite3.connect(db_path, timeout=15)
+    try:
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=10000')
+        conn.execute('PRAGMA synchronous=NORMAL')
+    except Exception:
+        pass
+    return conn
 
 
 def _init_firebase():
@@ -41,9 +54,12 @@ def _init_firebase():
 
 
 def _ensure_device_tokens_table():
-    """Create device_tokens table if it doesn't exist."""
+    """Create device_tokens table if it doesn't exist. Called once."""
+    global _device_tokens_ready
+    if _device_tokens_ready:
+        return
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS device_tokens (
                     token TEXT PRIMARY KEY,
@@ -53,6 +69,7 @@ def _ensure_device_tokens_table():
                     registered_at REAL NOT NULL
                 )
             ''')
+        _device_tokens_ready = True
     except Exception as e:
         logger.error(f"Failed to create device_tokens table: {e}")
 
@@ -62,12 +79,12 @@ def register_device_token(session_id: str, token: str, site: str, staff_name: st
     import time
     _ensure_device_tokens_table()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             conn.execute('''
                 INSERT OR REPLACE INTO device_tokens (token, session_id, site, staff_name, registered_at)
                 VALUES (?, ?, ?, ?, ?)
             ''', (token, session_id, site, staff_name, time.time()))
-        logger.info(f"📱 Push token registered for {staff_name} at {site}")
+        logger.info(f"Push token registered for {staff_name} at {site}")
     except Exception as e:
         logger.error(f"Failed to register device token: {e}")
 
@@ -76,7 +93,7 @@ def unregister_device_tokens(session_id: str):
     """Remove device tokens for a session (on finish-shift)."""
     _ensure_device_tokens_table()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             conn.execute('DELETE FROM device_tokens WHERE session_id = ?', (session_id,))
     except Exception as e:
         logger.error(f"Failed to unregister device tokens: {e}")
@@ -86,7 +103,7 @@ def _get_tokens_for_site(site_name: str) -> list:
     """Get all active device tokens for a site."""
     _ensure_device_tokens_table()
     try:
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             rows = conn.execute('''
                 SELECT dt.token FROM device_tokens dt
                 INNER JOIN staff_sessions ss ON dt.session_id = ss.session_id
@@ -104,7 +121,7 @@ def _get_tokens_for_site_by_area(site_name: str, detected_area: str) -> list:
     _ensure_device_tokens_table()
     try:
         import json
-        with sqlite3.connect(_CALLBELL_DB) as conn:
+        with _open_db(_CALLBELL_DB) as conn:
             rows = conn.execute('''
                 SELECT dt.token, ss.areas FROM device_tokens dt
                 INNER JOIN staff_sessions ss ON dt.session_id = ss.session_id
@@ -112,7 +129,6 @@ def _get_tokens_for_site_by_area(site_name: str, detected_area: str) -> list:
             ''', (site_name,)).fetchall()
 
             if not detected_area:
-                # Can't detect area — send to everyone
                 return [r[0] for r in rows]
 
             tokens = []
@@ -122,7 +138,6 @@ def _get_tokens_for_site_by_area(site_name: str, detected_area: str) -> list:
                 except (json.JSONDecodeError, TypeError):
                     user_areas = []
 
-                # No areas set = receives all calls; otherwise check match
                 if not user_areas or detected_area.lower() in [a.lower() for a in user_areas]:
                     tokens.append(token)
             return tokens
@@ -211,9 +226,9 @@ def send_push_for_new_call(site_name: str, room: str, call_type: str, priority: 
                     error_code = getattr(send_response.exception, 'code', '')
                     if 'NOT_FOUND' in str(error_code) or 'UNREGISTERED' in str(error_code):
                         try:
-                            with sqlite3.connect(_CALLBELL_DB) as conn:
+                            with _open_db(_CALLBELL_DB) as conn:
                                 conn.execute('DELETE FROM device_tokens WHERE token = ?', (tokens[i],))
-                            logger.info(f"🗑️ Removed invalid FCM token")
+                            logger.info("Removed invalid FCM token")
                         except Exception:
                             pass
     except Exception as e:
